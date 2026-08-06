@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "SQLite Database Expert": {
+      "source": "martinholovsky/claude-skills-generator",
+      "sourceType": "github",
+      "skillPath": "skills/sqlite/SKILL.md",
+      "computedHash": "0e75baa1c3159dba4c6db79330634327039c9813410256b73357dcbb0ed9d0ea"
+    },
+    "go-mcp-server-generator": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/go-mcp-server-generator/SKILL.md",
+      "computedHash": "96615e5275583ea9f3dbb747b059fd98e3b2bbfc7fe20ec59144c7447e1bbc86"
+    }
+  }
+}

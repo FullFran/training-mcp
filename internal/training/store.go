@@ -1,0 +1,12 @@
+package training
+
+import "context"
+
+type Store interface {
+	Start(context.Context, Session) (Session, error)
+	AddSet(context.Context, AddSetInput) (Set, float64, error)
+	UpdateSet(context.Context, int64, SetPatch) (Set, float64, error)
+	DeleteSet(context.Context, int64) (int64, float64, int, error)
+	GetSession(context.Context, int64) (Session, error)
+	ListSessions(context.Context, ListFilter) ([]SessionSummary, error)
+}
