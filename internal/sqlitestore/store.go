@@ -76,11 +76,14 @@ func (s *Store) AddSet(ctx context.Context, in training.AddSetInput) (training.S
 	if err != nil {
 		return training.Set{}, 0, err
 	}
+	var total float64
+	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(si),0) FROM sets WHERE session_id=?`, in.SessionID).Scan(&total); err != nil {
+		return training.Set{}, 0, err
+	}
 	if err = tx.Commit(); err != nil {
 		return training.Set{}, 0, err
 	}
-	total, err := s.total(ctx, in.SessionID)
-	return training.Set{ID: id, SessionID: in.SessionID, Position: pos, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, SI: si}, total, err
+	return training.Set{ID: id, SessionID: in.SessionID, Position: pos, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, SI: si}, total, nil
 }
 func (s *Store) UpdateSet(ctx context.Context, id int64, p training.SetPatch) (training.Set, float64, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
