@@ -75,6 +75,30 @@ func TestStoreAddSetReturnsCurrentSessionTotal(t *testing.T) {
 	}
 }
 
+func TestStoreNormalizesMultiSetTotal(t *testing.T) {
+	store, err := Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	session, err := store.Start(context.Background(), training.Session{Date: "2026-08-06"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var total float64
+	for _, rpe := range []float64{9, 9, 10} {
+		_, total, err = store.AddSet(context.Background(), training.AddSetInput{
+			SessionID: session.ID, Exercise: "press", WeightKG: 50, Reps: 5, RPE: rpe,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if total != 3.8 {
+		t.Fatalf("total = %v, want 3.8", total)
+	}
+}
+
 func TestStoreDeleteRollbackRestoresRowsAfterInjectedFailure(t *testing.T) {
 	store, err := Open(t.TempDir() + "/training.db")
 	if err != nil {

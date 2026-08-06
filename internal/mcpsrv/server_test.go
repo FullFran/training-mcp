@@ -1,6 +1,7 @@
 package mcpsrv
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -83,12 +84,123 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 	if len(summaries.Sessions) != 1 || summaries.Sessions[0].SetCount != 1 || summaries.Sessions[0].TotalSI != 1.4 {
 		t.Fatalf("list=%#v", summaries)
 	}
-	invalid := call(t, session, "update_set", map[string]any{"set_id": added2.Set.ID, "rpe": 99})
-	if !invalid.IsError || invalid.Content == nil {
-		t.Fatalf("invalid mutation result=%#v", invalid)
+	if _, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "update_set", Arguments: map[string]any{"set_id": added2.Set.ID, "rpe": 99}}); err == nil {
+		t.Fatal("update_set accepted RPE outside its declared range")
 	}
 	if _, err := store.GetSession(context.Background(), started.Session.ID); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestServerToolsDescribeTheirInputsAndValidationContract(t *testing.T) {
+	session := mustConnect(t, New(training.NewService(testStore{}, time.Now)).Handler())
+	result, err := session.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name        string
+		description string
+		required    []string
+		properties  map[string]map[string]any
+		minProps    float64
+	}{
+		{
+			name:        "start_session",
+			description: "Start a training session on an optional date. Omit date to use the server's current local date.",
+			properties: map[string]map[string]any{
+				"date": {"description": "Training date in exact YYYY-MM-DD format.", "pattern": `^\d{4}-\d{2}-\d{2}$`},
+			},
+		},
+		{
+			name:        "add_set",
+			description: "Add a set to an existing training session and return the set plus the session's recalculated total SI.",
+			required:    []string{"session_id", "exercise", "weight_kg", "reps", "rpe"},
+			properties: map[string]map[string]any{
+				"session_id": {"description": "Positive ID of the existing training session.", "minimum": float64(1)},
+				"exercise":   {"description": "Non-empty exercise name; it is trimmed and lowercased before storage.", "pattern": `.*\S.*`},
+				"weight_kg":  {"description": "Weight in kilograms; must be strictly positive.", "exclusiveMinimum": float64(0)},
+				"reps":       {"description": "Repetition count; must be strictly positive.", "minimum": float64(1)},
+				"rpe":        {"description": "Numeric rate of perceived exertion from 1 through 10; determines the set's SI.", "minimum": float64(1), "maximum": float64(10)},
+			},
+		},
+		{
+			name:        "update_set",
+			description: "Update one or more fields of an existing set. Omitted fields remain unchanged; RPE changes recalculate SI.",
+			required:    []string{"set_id"},
+			minProps:    2,
+			properties: map[string]map[string]any{
+				"set_id":    {"description": "Positive ID of the existing set to update.", "minimum": float64(1)},
+				"exercise":  {"description": "Non-empty replacement exercise name; it is trimmed and lowercased before storage.", "type": "string", "pattern": `.*\S.*`},
+				"weight_kg": {"description": "Replacement weight in kilograms; must be strictly positive.", "type": "number", "exclusiveMinimum": float64(0)},
+				"reps":      {"description": "Replacement repetition count; must be strictly positive.", "type": "integer", "minimum": float64(1)},
+				"rpe":       {"description": "Replacement numeric RPE from 1 through 10; recalculates the set's SI.", "type": "number", "minimum": float64(1), "maximum": float64(10)},
+			},
+		},
+		{
+			name:        "delete_set",
+			description: "Permanently delete an existing set and compact the remaining set positions to a dense sequence.",
+			required:    []string{"set_id"},
+			properties: map[string]map[string]any{
+				"set_id": {"description": "Positive ID of the existing set to delete.", "minimum": float64(1)},
+			},
+		},
+		{
+			name:        "get_session",
+			description: "Get an existing training session with its ordered sets and total SI.",
+			required:    []string{"session_id"},
+			properties: map[string]map[string]any{
+				"session_id": {"description": "Positive ID of the existing training session to retrieve.", "minimum": float64(1)},
+			},
+		},
+		{
+			name:        "list_sessions",
+			description: "List training sessions newest first, optionally filtered by inclusive date bounds.",
+			properties: map[string]map[string]any{
+				"limit": {"description": "Maximum sessions to return; defaults to 20 and accepts 1 through 100.", "default": float64(20), "minimum": float64(1), "maximum": float64(100)},
+				"from":  {"description": "Inclusive earliest training date in exact YYYY-MM-DD format.", "pattern": `^\d{4}-\d{2}-\d{2}$`},
+				"to":    {"description": "Inclusive latest training date in exact YYYY-MM-DD format.", "pattern": `^\d{4}-\d{2}-\d{2}$`},
+			},
+		},
+	}
+
+	toolsByName := make(map[string]*mcp.Tool, len(result.Tools))
+	for _, tool := range result.Tools {
+		toolsByName[tool.Name] = tool
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tool := toolsByName[tt.name]
+			if tool == nil {
+				t.Fatalf("tool %q is not registered", tt.name)
+			}
+			if tool.Description != tt.description {
+				t.Fatalf("description = %q, want %q", tool.Description, tt.description)
+			}
+			schema := schemaMap(t, tool.InputSchema)
+			if got := stringSlice(schema["required"]); !reflect.DeepEqual(got, tt.required) {
+				t.Fatalf("required = %v, want %v", got, tt.required)
+			}
+			if tt.minProps > 0 && schema["minProperties"] != tt.minProps {
+				t.Fatalf("minProperties = %v, want %v", schema["minProperties"], tt.minProps)
+			}
+			properties, ok := schema["properties"].(map[string]any)
+			if !ok {
+				t.Fatalf("properties = %#v", schema["properties"])
+			}
+			for property, expected := range tt.properties {
+				actual, ok := properties[property].(map[string]any)
+				if !ok {
+					t.Fatalf("property %q = %#v", property, properties[property])
+				}
+				for keyword, want := range expected {
+					if actual[keyword] != want {
+						t.Errorf("property %q %s = %#v, want %#v", property, keyword, actual[keyword], want)
+					}
+				}
+			}
+		})
 	}
 }
 
@@ -97,6 +209,46 @@ func TestUnexpectedStartSessionErrorUsesGenericMCPError(t *testing.T) {
 	result := call(t, mustConnect(t, s.Handler()), "start_session", map[string]any{"date": "2026-08-06"})
 	if !result.IsError || stringContent(result) != "internal tool error" {
 		t.Fatalf("result=%#v content=%q", result, stringContent(result))
+	}
+}
+
+func TestServerSerializesNormalizedSIValuesAndTotal(t *testing.T) {
+	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	session := mustConnect(t, New(training.NewService(store, time.Now)).Handler())
+	startedResult := call(t, session, "start_session", map[string]any{"date": "2026-08-06"})
+	var started SessionOut
+	decode(t, startedResult, &started)
+
+	var result *mcp.CallToolResult
+	for i, rpe := range []float64{9, 9, 10} {
+		result = call(t, session, "add_set", map[string]any{
+			"session_id": started.Session.ID,
+			"exercise":   "press",
+			"weight_kg":  50,
+			"reps":       5,
+			"rpe":        rpe,
+		})
+		if i == 0 {
+			var first SetOut
+			decode(t, result, &first)
+			if first.Set.SI != 1.2 || first.TotalSI != 1.2 {
+				t.Fatalf("first MCP result = %#v, want SI and total 1.2", first)
+			}
+		}
+	}
+	data, err := json.Marshal(result.StructuredContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(data, []byte("3.8000000000000003")) {
+		t.Fatalf("MCP output contains floating-point artifact: %s", data)
+	}
+	if !bytes.Contains(data, []byte(`"si":1.4`)) || !bytes.Contains(data, []byte(`"total_si":3.8`)) {
+		t.Fatalf("MCP output = %s, want SI 1.4 and total 3.8", data)
 	}
 }
 
@@ -176,6 +328,32 @@ func stringContent(result *mcp.CallToolResult) string {
 	}
 	return ""
 }
+
+func schemaMap(t *testing.T, schema any) map[string]any {
+	t.Helper()
+	data, err := json.Marshal(schema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
+func stringSlice(value any) []string {
+	values, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		result = append(result, value.(string))
+	}
+	return result
+}
+
 func mustConnect(t *testing.T, handler http.Handler) *mcp.ClientSession {
 	t.Helper()
 	server := httptest.NewServer(handler)

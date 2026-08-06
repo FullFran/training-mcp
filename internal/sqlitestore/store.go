@@ -80,6 +80,7 @@ func (s *Store) AddSet(ctx context.Context, in training.AddSetInput) (training.S
 	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(si),0) FROM sets WHERE session_id=?`, in.SessionID).Scan(&total); err != nil {
 		return training.Set{}, 0, err
 	}
+	total = training.NormalizeSI(total)
 	if err = tx.Commit(); err != nil {
 		return training.Set{}, 0, err
 	}
@@ -194,10 +195,15 @@ func (s *Store) GetSession(ctx context.Context, id int64) (training.Session, err
 		if err = rows.Scan(&v.ID, &v.SessionID, &v.Position, &v.Exercise, &v.WeightKG, &v.Reps, &v.RPE, &v.SI); err != nil {
 			return out, err
 		}
+		v.SI = training.NormalizeSI(v.SI)
 		out.Sets = append(out.Sets, v)
 		out.TotalSI += v.SI
 	}
-	return out, rows.Err()
+	if err = rows.Err(); err != nil {
+		return out, err
+	}
+	out.TotalSI = training.NormalizeSI(out.TotalSI)
+	return out, nil
 }
 func (s *Store) ListSessions(ctx context.Context, f training.ListFilter) ([]training.SessionSummary, error) {
 	q := `SELECT s.id,s.date,COUNT(st.id),COALESCE(SUM(st.si),0) FROM sessions s LEFT JOIN sets st ON st.session_id=s.id WHERE 1=1`
@@ -223,6 +229,7 @@ func (s *Store) ListSessions(ctx context.Context, f training.ListFilter) ([]trai
 		if err = rows.Scan(&v.ID, &v.Date, &v.SetCount, &v.TotalSI); err != nil {
 			return nil, err
 		}
+		v.TotalSI = training.NormalizeSI(v.TotalSI)
 		out = append(out, v)
 	}
 	return out, rows.Err()
@@ -230,5 +237,5 @@ func (s *Store) ListSessions(ctx context.Context, f training.ListFilter) ([]trai
 func (s *Store) total(ctx context.Context, id int64) (float64, error) {
 	var total float64
 	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(si),0) FROM sets WHERE session_id=?`, id).Scan(&total)
-	return total, err
+	return training.NormalizeSI(total), err
 }

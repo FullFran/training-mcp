@@ -13,9 +13,12 @@ func TestCalculateSI(t *testing.T) {
 		rpe  float64
 		want float64
 	}{
-		{"boundary", 2, 0},
-		{"high effort", 10, 1.4},
 		{"low effort", 1, 0},
+		{"boundary", 2, 0},
+		{"RPE 8", 8, 1.0},
+		{"RPE 9", 9, 1.2},
+		{"RPE 10", 10, 1.4},
+		{"decimal RPE rounds SI to one decimal", 8.25, 1.1},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := CalculateSI(tt.rpe); got != tt.want {

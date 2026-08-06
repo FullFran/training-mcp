@@ -2,16 +2,21 @@ package training
 
 import (
 	"context"
+	"math"
 	"strings"
 	"time"
 )
+
+func NormalizeSI(si float64) float64 {
+	return math.Round(si*10) / 10
+}
 
 func CalculateSI(rpe float64) float64 {
 	v := 0.2*rpe - 0.6
 	if v < 0 {
 		return 0
 	}
-	return v
+	return NormalizeSI(v)
 }
 
 type Service struct {
