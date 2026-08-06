@@ -3,6 +3,7 @@ package mcpsrv
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -110,7 +111,7 @@ func New(service *training.Service) *Server {
 	listSchema.Properties["limit"].Maximum = jsonschema.Ptr(100.0)
 	listSchema.Properties["from"].Pattern = `^\d{4}-\d{2}-\d{2}$`
 	listSchema.Properties["to"].Pattern = `^\d{4}-\d{2}-\d{2}$`
-	mcp.AddTool(s, &mcp.Tool{Name: "list_sessions", Description: "List training sessions newest first, optionally filtered by inclusive date bounds.", InputSchema: listSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in ListInput) (*mcp.CallToolResult, ListOut, error) {
+	mcp.AddTool(s, &mcp.Tool{Name: "list_sessions", Description: "List training sessions newest first, optionally filtered by inclusive date bounds. From must not be after to.", InputSchema: listSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in ListInput) (*mcp.CallToolResult, ListOut, error) {
 		v, err := service.ListSessions(ctx, training.ListFilter{Limit: in.Limit, From: in.From, To: in.To})
 		return nil, ListOut{Sessions: v}, toolError(err)
 	})
@@ -141,7 +142,7 @@ func toolError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if err == training.ErrValidation || err == training.ErrNotFound {
+	if errors.Is(err, training.ErrValidation) || errors.Is(err, training.ErrNotFound) {
 		return err
 	}
 	return fmt.Errorf("internal tool error")

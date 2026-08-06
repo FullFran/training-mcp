@@ -3,6 +3,7 @@ package training
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -60,10 +61,91 @@ func TestServicePatchAndAtomicValidation(t *testing.T) {
 	}
 }
 
+func TestServiceListSessionsDateRange(t *testing.T) {
+	tests := []struct {
+		name      string
+		filter    ListFilter
+		wantErr   bool
+		wantCalls int
+	}{
+		{name: "inverted range is rejected", filter: ListFilter{From: "2026-08-07", To: "2026-08-06"}, wantErr: true},
+		{name: "equal bounds are valid and inclusive", filter: ListFilter{From: "2026-08-06", To: "2026-08-06"}, wantCalls: 1},
+		{name: "ascending range is valid", filter: ListFilter{From: "2026-08-05", To: "2026-08-06"}, wantCalls: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := newMemoryStore()
+			store.listResults = []SessionSummary{{ID: 1, Date: "2026-08-06"}}
+			svc := NewService(store, time.Now)
+
+			got, err := svc.ListSessions(context.Background(), tt.filter)
+			if tt.wantErr {
+				if !errors.Is(err, ErrValidation) {
+					t.Fatalf("ListSessions() error = %v, want validation error", err)
+				}
+				if err.Error() != "validation error: invalid date range: from must not be after to" {
+					t.Fatalf("ListSessions() error = %q, want clear range validation", err)
+				}
+			} else if err != nil {
+				t.Fatalf("ListSessions() error = %v", err)
+			} else if len(got) != 1 || got[0].Date != "2026-08-06" {
+				t.Fatalf("ListSessions() = %#v, want store result", got)
+			}
+			if store.listCalls != tt.wantCalls {
+				t.Fatalf("store ListSessions calls = %d, want %d", store.listCalls, tt.wantCalls)
+			}
+			if tt.wantCalls == 1 && (store.listFilter.From != tt.filter.From || store.listFilter.To != tt.filter.To) {
+				t.Fatalf("store filter = %#v, want bounds from %#v", store.listFilter, tt.filter)
+			}
+		})
+	}
+}
+
+func TestServiceListSessionsResults(t *testing.T) {
+	tests := []struct {
+		name  string
+		store []SessionSummary
+		want  []SessionSummary
+	}{
+		{name: "empty results are an empty list", want: []SessionSummary{}},
+		{
+			name: "non-empty results preserve store ordering",
+			store: []SessionSummary{
+				{ID: 2, Date: "2026-08-06"},
+				{ID: 1, Date: "2026-08-05"},
+			},
+			want: []SessionSummary{
+				{ID: 2, Date: "2026-08-06"},
+				{ID: 1, Date: "2026-08-05"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := newMemoryStore()
+			store.listResults = tt.store
+			svc := NewService(store, time.Now)
+
+			got, err := svc.ListSessions(context.Background(), ListFilter{})
+			if err != nil {
+				t.Fatalf("ListSessions() error = %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("ListSessions() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
 type memoryStore struct {
 	nextSession, nextSet int64
 	sessions             map[int64]Session
 	sets                 map[int64]Set
+	listCalls            int
+	listFilter           ListFilter
+	listResults          []SessionSummary
 }
 
 func newMemoryStore() *memoryStore {
@@ -103,7 +185,9 @@ func (m *memoryStore) GetSession(_ context.Context, id int64) (Session, error) {
 	}
 	return s, nil
 }
-func (m *memoryStore) ListSessions(context.Context, ListFilter) ([]SessionSummary, error) {
-	return nil, nil
+func (m *memoryStore) ListSessions(_ context.Context, filter ListFilter) ([]SessionSummary, error) {
+	m.listCalls++
+	m.listFilter = filter
+	return m.listResults, nil
 }
 func floatPtr(v float64) *float64 { return &v }

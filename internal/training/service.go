@@ -2,6 +2,7 @@ package training
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -68,9 +69,16 @@ func (s *Service) ListSessions(ctx context.Context, f ListFilter) ([]SessionSumm
 	if f.Limit < 0 || f.Limit > 100 || (f.From != "" && !validDate(f.From)) || (f.To != "" && !validDate(f.To)) {
 		return nil, ErrValidation
 	}
+	if f.From != "" && f.To != "" && f.From > f.To {
+		return nil, fmt.Errorf("%w: invalid date range: from must not be after to", ErrValidation)
+	}
 	if f.Limit == 0 {
 		f.Limit = 20
 	}
-	return s.store.ListSessions(ctx, f)
+	sessions, err := s.store.ListSessions(ctx, f)
+	if err == nil && sessions == nil {
+		sessions = []SessionSummary{}
+	}
+	return sessions, err
 }
 func validDate(v string) bool { _, err := time.Parse("2006-01-02", v); return err == nil }

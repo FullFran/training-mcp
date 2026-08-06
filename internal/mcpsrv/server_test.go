@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -156,7 +157,7 @@ func TestServerToolsDescribeTheirInputsAndValidationContract(t *testing.T) {
 		},
 		{
 			name:        "list_sessions",
-			description: "List training sessions newest first, optionally filtered by inclusive date bounds.",
+			description: "List training sessions newest first, optionally filtered by inclusive date bounds. From must not be after to.",
 			properties: map[string]map[string]any{
 				"limit": {"description": "Maximum sessions to return; defaults to 20 and accepts 1 through 100.", "default": float64(20), "minimum": float64(1), "maximum": float64(100)},
 				"from":  {"description": "Inclusive earliest training date in exact YYYY-MM-DD format.", "pattern": `^\d{4}-\d{2}-\d{2}$`},
@@ -201,6 +202,38 @@ func TestServerToolsDescribeTheirInputsAndValidationContract(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestListSessionsRejectsInvertedDateRangeThroughMCP(t *testing.T) {
+	session := mustConnect(t, New(training.NewService(testStore{}, time.Now)).Handler())
+	result := call(t, session, "list_sessions", map[string]any{
+		"from": "2026-08-07",
+		"to":   "2026-08-06",
+	})
+	message := stringContent(result)
+
+	if !result.IsError {
+		t.Fatalf("result IsError = false, want true: %#v", result)
+	}
+	if !strings.Contains(message, "from must not be after to") {
+		t.Fatalf("error message = %q, want date range guidance", message)
+	}
+	if strings.Contains(strings.ToLower(message), "sql") || strings.Contains(message, "internal tool error") {
+		t.Fatalf("error message exposes internal details: %q", message)
+	}
+}
+
+func TestListSessionsSerializesEmptyResultsAsArray(t *testing.T) {
+	session := mustConnect(t, New(training.NewService(testStore{}, time.Now)).Handler())
+	result := call(t, session, "list_sessions", map[string]any{})
+
+	data, err := json.Marshal(result.StructuredContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != `{"sessions":[]}` {
+		t.Fatalf("MCP output = %s, want empty sessions array", data)
 	}
 }
 

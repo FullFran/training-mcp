@@ -53,6 +53,10 @@ func TestStoreListsWithFiltersAndLimit(t *testing.T) {
 	if err != nil || len(rows) != 1 || rows[0].Date != "2026-08-03" {
 		t.Fatalf("rows = %#v, err=%v", rows, err)
 	}
+	rows, err = store.ListSessions(context.Background(), training.ListFilter{From: "2026-08-02", To: "2026-08-02", Limit: 20})
+	if err != nil || len(rows) != 1 || rows[0].Date != "2026-08-02" {
+		t.Fatalf("equal-bound rows = %#v, err=%v", rows, err)
+	}
 }
 
 func TestStoreAddSetReturnsCurrentSessionTotal(t *testing.T) {
