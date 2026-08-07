@@ -5,13 +5,15 @@ import (
 	"database/sql"
 	"embed"
 	"errors"
+	"io/fs"
+	"sort"
 
 	_ "modernc.org/sqlite"
 
 	"github.com/fullfran/training-mcp/internal/training"
 )
 
-//go:embed migrations/001_init.sql
+//go:embed migrations/*.sql
 var migrationFS embed.FS
 
 // Store is the SQLite adapter. The unexported failpoint is only used by
@@ -27,18 +29,33 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 	s := &Store{db: db}
-	if _, err = db.Exec(string(mustMigration())); err != nil {
-		db.Close()
-		return nil, err
+	for _, m := range mustMigrations() {
+		if _, err = db.Exec(m); err != nil {
+			db.Close()
+			return nil, err
+		}
 	}
 	return s, nil
 }
-func mustMigration() []byte {
-	b, err := migrationFS.ReadFile("migrations/001_init.sql")
+
+// mustMigrations returns every migration in filename order. Each one is
+// idempotent (CREATE TABLE IF NOT EXISTS), so replaying them all on start is
+// safe and keeps an existing database up to date.
+func mustMigrations() []string {
+	names, err := fs.Glob(migrationFS, "migrations/*.sql")
 	if err != nil {
 		panic(err)
 	}
-	return b
+	sort.Strings(names)
+	out := make([]string, 0, len(names))
+	for _, n := range names {
+		b, err := migrationFS.ReadFile(n)
+		if err != nil {
+			panic(err)
+		}
+		out = append(out, string(b))
+	}
+	return out
 }
 func (s *Store) Close() error { return s.db.Close() }
 
@@ -253,6 +270,66 @@ ORDER BY id DESC LIMIT ?`, limit)
 		if err = rows.Scan(&v.Exercise, &v.WeightKG, &v.Reps, &v.RPE); err != nil {
 			return nil, err
 		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) SetExerciseGroup(ctx context.Context, g training.ExerciseGroup) error {
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO exercise_groups(exercise,muscle_group,updated_at) VALUES (?,?,CURRENT_TIMESTAMP)
+ON CONFLICT(exercise) DO UPDATE SET muscle_group=excluded.muscle_group, updated_at=CURRENT_TIMESTAMP`,
+		g.Exercise, g.MuscleGroup)
+	return err
+}
+
+func (s *Store) ExerciseGroups(ctx context.Context) ([]training.ExerciseGroup, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT exercise,muscle_group FROM exercise_groups ORDER BY muscle_group,exercise`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []training.ExerciseGroup
+	for rows.Next() {
+		var v training.ExerciseGroup
+		if err = rows.Scan(&v.Exercise, &v.MuscleGroup); err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}
+
+// VolumeByGroup left-joins the catalogue so sets whose exercise has no mapping
+// still appear, grouped under an empty muscle group.
+func (s *Store) VolumeByGroup(ctx context.Context, f training.ListFilter) ([]training.GroupVolume, error) {
+	q := `SELECT COALESCE(g.muscle_group,''),COALESCE(SUM(st.si),0),COUNT(st.id)
+FROM sets st
+JOIN sessions se ON se.id=st.session_id
+LEFT JOIN exercise_groups g ON g.exercise=st.exercise
+WHERE 1=1`
+	args := []any{}
+	if f.From != "" {
+		q += ` AND se.date>=?`
+		args = append(args, f.From)
+	}
+	if f.To != "" {
+		q += ` AND se.date<=?`
+		args = append(args, f.To)
+	}
+	q += ` GROUP BY 1 ORDER BY 2 DESC`
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []training.GroupVolume
+	for rows.Next() {
+		var v training.GroupVolume
+		if err = rows.Scan(&v.MuscleGroup, &v.TotalSI, &v.Sets); err != nil {
+			return nil, err
+		}
+		v.TotalSI = training.NormalizeSI(v.TotalSI)
 		out = append(out, v)
 	}
 	return out, rows.Err()

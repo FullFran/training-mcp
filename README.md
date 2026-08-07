@@ -23,7 +23,9 @@ The unauthenticated `GET /health` endpoint returns `{"status":"ok"}`. MCP is onl
 
 ## Tools
 
-`start_session`, `add_set`, `update_set`, `delete_set`, `get_session`, and `list_sessions` are the complete MVP surface. Exercises are trimmed/lowercased, positions remain dense, and totals are recalculated from stored SI values.
+`start_session`, `add_set`, `update_set`, `delete_set`, `get_session`, and `list_sessions` cover logging. Exercises are trimmed/lowercased, positions remain dense, and totals are recalculated from stored SI values.
+
+`set_exercise_group`, `list_exercise_groups`, and `volume_by_muscle` add per-muscle-group volume. Each exercise maps to exactly one muscle group, so group SI is a true partition of session SI — every set counts once and the group totals add up to the session total. Sets whose exercise has no mapping are reported under an empty group rather than dropped, so gaps in the catalogue stay visible.
 
 ## Web UI (PWA)
 

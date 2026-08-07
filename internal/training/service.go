@@ -98,4 +98,39 @@ func (s *Service) RecentExercises(ctx context.Context, limit int) ([]ExerciseMem
 	return out, err
 }
 
+// SetExerciseGroup assigns an exercise to a muscle group. The exercise name is
+// normalized the same way AddSet normalizes it, so the catalogue key always
+// matches what is stored on sets.
+func (s *Service) SetExerciseGroup(ctx context.Context, exercise, group string) error {
+	exercise = strings.ToLower(strings.TrimSpace(exercise))
+	group = strings.ToLower(strings.TrimSpace(group))
+	if exercise == "" || !ValidMuscleGroup(group) {
+		return ErrValidation
+	}
+	return s.store.SetExerciseGroup(ctx, ExerciseGroup{Exercise: exercise, MuscleGroup: group})
+}
+
+func (s *Service) ExerciseGroups(ctx context.Context) ([]ExerciseGroup, error) {
+	out, err := s.store.ExerciseGroups(ctx)
+	if err == nil && out == nil {
+		out = []ExerciseGroup{}
+	}
+	return out, err
+}
+
+// VolumeByGroup totals SI per muscle group over an optional date range.
+func (s *Service) VolumeByGroup(ctx context.Context, f ListFilter) ([]GroupVolume, error) {
+	if (f.From != "" && !validDate(f.From)) || (f.To != "" && !validDate(f.To)) {
+		return nil, ErrValidation
+	}
+	if f.From != "" && f.To != "" && f.From > f.To {
+		return nil, fmt.Errorf("%w: invalid date range: from must not be after to", ErrValidation)
+	}
+	out, err := s.store.VolumeByGroup(ctx, f)
+	if err == nil && out == nil {
+		out = []GroupVolume{}
+	}
+	return out, err
+}
+
 func validDate(v string) bool { _, err := time.Parse("2006-01-02", v); return err == nil }

@@ -148,6 +148,9 @@ type memoryStore struct {
 	listResults          []SessionSummary
 	recentLimit          int
 	recentResults        []ExerciseMemory
+	groups               map[string]string
+	volumeFilter         ListFilter
+	volumeResults        []GroupVolume
 }
 
 func newMemoryStore() *memoryStore {
@@ -233,3 +236,52 @@ func (m *memoryStore) RecentExercises(_ context.Context, limit int) ([]ExerciseM
 	return m.recentResults, nil
 }
 func floatPtr(v float64) *float64 { return &v }
+
+func (m *memoryStore) SetExerciseGroup(_ context.Context, g ExerciseGroup) error {
+	if m.groups == nil {
+		m.groups = map[string]string{}
+	}
+	m.groups[g.Exercise] = g.MuscleGroup
+	return nil
+}
+func (m *memoryStore) ExerciseGroups(context.Context) ([]ExerciseGroup, error) {
+	var out []ExerciseGroup
+	for e, g := range m.groups {
+		out = append(out, ExerciseGroup{Exercise: e, MuscleGroup: g})
+	}
+	return out, nil
+}
+func (m *memoryStore) VolumeByGroup(_ context.Context, f ListFilter) ([]GroupVolume, error) {
+	m.volumeFilter = f
+	return m.volumeResults, nil
+}
+
+func TestServiceExerciseGroupValidation(t *testing.T) {
+	store := newMemoryStore()
+	svc := NewService(store, time.Now)
+	ctx := context.Background()
+
+	if err := svc.SetExerciseGroup(ctx, "  Press Banca ", "PECHO"); err != nil {
+		t.Fatalf("SetExerciseGroup() error = %v", err)
+	}
+	// The key must match how AddSet stores the exercise, or volume never joins.
+	if got := store.groups["press banca"]; got != "pecho" {
+		t.Fatalf("stored mapping = %#v, want normalized key and group", store.groups)
+	}
+	for _, tt := range []struct{ exercise, group string }{
+		{"", "pecho"},
+		{"banca", ""},
+		{"banca", "biceps femoral"},
+	} {
+		if err := svc.SetExerciseGroup(ctx, tt.exercise, tt.group); !errors.Is(err, ErrValidation) {
+			t.Fatalf("SetExerciseGroup(%q,%q) error = %v, want validation", tt.exercise, tt.group, err)
+		}
+	}
+	if _, err := svc.VolumeByGroup(ctx, ListFilter{From: "2026-08-07", To: "2026-08-01"}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("inverted range error = %v, want validation", err)
+	}
+	got, err := svc.VolumeByGroup(ctx, ListFilter{})
+	if err != nil || got == nil {
+		t.Fatalf("VolumeByGroup() = %#v, %v, want empty non-nil", got, err)
+	}
+}

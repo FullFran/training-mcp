@@ -59,6 +59,24 @@ type ListInput struct {
 type ListOut struct {
 	Sessions []training.SessionSummary `json:"sessions"`
 }
+type GroupInput struct {
+	Exercise    string `json:"exercise" jsonschema:"Non-empty exercise name; it is trimmed and lowercased to match stored sets."`
+	MuscleGroup string `json:"muscle_group" jsonschema:"Muscle group the exercise trains; must be one of the supported values."`
+}
+type GroupOut struct {
+	Exercise    string `json:"exercise"`
+	MuscleGroup string `json:"muscle_group"`
+}
+type GroupsOut struct {
+	Groups []training.ExerciseGroup `json:"groups"`
+}
+type VolumeInput struct {
+	From string `json:"from,omitempty" jsonschema:"Inclusive earliest training date in exact YYYY-MM-DD format."`
+	To   string `json:"to,omitempty" jsonschema:"Inclusive latest training date in exact YYYY-MM-DD format."`
+}
+type VolumeOut struct {
+	Volume []training.GroupVolume `json:"volume"`
+}
 
 func New(service *training.Service) *Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "training-mcp", Version: "0.1.0"}, nil)
@@ -115,12 +133,39 @@ func New(service *training.Service) *Server {
 		v, err := service.ListSessions(ctx, training.ListFilter{Limit: in.Limit, From: in.From, To: in.To})
 		return nil, ListOut{Sessions: v}, toolError(err)
 	})
+	groupSchema := mustInputSchema[GroupInput]()
+	groupSchema.Properties["exercise"].Pattern = `.*\S.*`
+	groupSchema.Properties["muscle_group"].Enum = muscleGroupEnum()
+	mcp.AddTool(s, &mcp.Tool{Name: "set_exercise_group", Description: "Assign an exercise to one muscle group so its sets count toward that group's volume. Re-assigning replaces the previous group.", InputSchema: groupSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in GroupInput) (*mcp.CallToolResult, GroupOut, error) {
+		err := service.SetExerciseGroup(ctx, in.Exercise, in.MuscleGroup)
+		return nil, GroupOut{Exercise: in.Exercise, MuscleGroup: in.MuscleGroup}, toolError(err)
+	})
+	mcp.AddTool(s, &mcp.Tool{Name: "list_exercise_groups", Description: "List every exercise that has a muscle group assigned, ordered by group."}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, GroupsOut, error) {
+		v, err := service.ExerciseGroups(ctx)
+		return nil, GroupsOut{Groups: v}, toolError(err)
+	})
+	volumeSchema := mustInputSchema[VolumeInput]()
+	volumeSchema.Properties["from"].Pattern = `^\d{4}-\d{2}-\d{2}$`
+	volumeSchema.Properties["to"].Pattern = `^\d{4}-\d{2}-\d{2}$`
+	mcp.AddTool(s, &mcp.Tool{Name: "volume_by_muscle", Description: "Total SI and set count per muscle group, optionally within an inclusive date range. Sets whose exercise has no group yet are reported under an empty muscle_group.", InputSchema: volumeSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in VolumeInput) (*mcp.CallToolResult, VolumeOut, error) {
+		v, err := service.VolumeByGroup(ctx, training.ListFilter{From: in.From, To: in.To})
+		return nil, VolumeOut{Volume: v}, toolError(err)
+	})
+
 	h := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s }, nil)
 	return &Server{mcp: s, handler: h}
 }
 func (s *Server) Handler() http.Handler { return s.handler }
 func (s *Server) ToolNames() []string {
-	return []string{"start_session", "add_set", "update_set", "delete_set", "get_session", "list_sessions"}
+	return []string{"start_session", "add_set", "update_set", "delete_set", "get_session", "list_sessions",
+		"set_exercise_group", "list_exercise_groups", "volume_by_muscle"}
+}
+func muscleGroupEnum() []any {
+	out := make([]any, 0, len(training.MuscleGroups))
+	for _, g := range training.MuscleGroups {
+		out = append(out, g)
+	}
+	return out
 }
 func mustInputSchema[T any]() *jsonschema.Schema {
 	schema, err := jsonschema.For[T](nil)

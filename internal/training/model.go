@@ -50,6 +50,41 @@ type ListFilter struct {
 	From, To string
 }
 
+// MuscleGroups is the closed taxonomy sets are aggregated by. It mirrors the
+// groups the user already tracked by hand, so the per-group SI view the
+// spreadsheet produced can be reproduced exactly.
+var MuscleGroups = []string{
+	"pecho", "espalda", "hombro anterior", "hombro lateral", "hombro posterior",
+	"biceps", "triceps", "antebrazo", "trapecio",
+	"cuadriceps", "isquios", "gluteo", "aductor", "gemelo", "abdomen",
+}
+
+func ValidMuscleGroup(v string) bool {
+	for _, g := range MuscleGroups {
+		if g == v {
+			return true
+		}
+	}
+	return false
+}
+
+// ExerciseGroup assigns one exercise to one muscle group. One group per
+// exercise keeps per-group SI a true partition of session SI: every set counts
+// once, so the group totals always add up to the session total.
+type ExerciseGroup struct {
+	Exercise    string `json:"exercise"`
+	MuscleGroup string `json:"muscle_group"`
+}
+
+// GroupVolume is accumulated SI for one muscle group over a date range.
+// Unmapped exercises are reported under an empty group rather than dropped, so
+// a gap in the catalogue is visible instead of silently shrinking the totals.
+type GroupVolume struct {
+	MuscleGroup string  `json:"muscle_group"`
+	TotalSI     float64 `json:"total_si"`
+	Sets        int     `json:"sets"`
+}
+
 // ExerciseMemory is the last recorded set for one exercise. It powers the web
 // UI's quick-pick chips, so a repeated exercise can be logged without retyping
 // weight, reps, or RPE.

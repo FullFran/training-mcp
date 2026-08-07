@@ -38,7 +38,7 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_set", "delete_set", "get_session", "list_sessions", "start_session", "update_set"}) {
+	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_set", "delete_set", "get_session", "list_exercise_groups", "list_sessions", "set_exercise_group", "start_session", "update_set", "volume_by_muscle"}) {
 		t.Fatalf("tools=%v", toolNames(tools))
 	}
 	for _, tool := range tools.Tools {
@@ -401,4 +401,12 @@ func mustConnect(t *testing.T, handler http.Handler) *mcp.ClientSession {
 	}
 	t.Cleanup(func() { session.Close() })
 	return session
+}
+
+func (testStore) SetExerciseGroup(context.Context, training.ExerciseGroup) error { return nil }
+func (testStore) ExerciseGroups(context.Context) ([]training.ExerciseGroup, error) {
+	return nil, nil
+}
+func (testStore) VolumeByGroup(context.Context, training.ListFilter) ([]training.GroupVolume, error) {
+	return nil, nil
 }

@@ -170,3 +170,70 @@ func TestStoreDeleteRollbackRestoresRowsAfterInjectedFailure(t *testing.T) {
 		t.Fatalf("rollback session=%#v err=%v", got, err)
 	}
 }
+
+func TestStoreVolumeByGroupPartitionsSessionSIAndSurfacesUnmapped(t *testing.T) {
+	store, err := Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	s1, _ := store.Start(ctx, training.Session{Date: "2026-08-01"})
+	s2, _ := store.Start(ctx, training.Session{Date: "2026-08-05"})
+	for _, in := range []training.AddSetInput{
+		{SessionID: s1.ID, Exercise: "banca", WeightKG: 80, Reps: 5, RPE: 8},  // SI 1.0
+		{SessionID: s1.ID, Exercise: "remo", WeightKG: 60, Reps: 8, RPE: 9},   // SI 1.2
+		{SessionID: s2.ID, Exercise: "banca", WeightKG: 85, Reps: 3, RPE: 10}, // SI 1.4
+		{SessionID: s2.ID, Exercise: "sin mapear", WeightKG: 20, Reps: 10, RPE: 8},
+	} {
+		if _, _, err := store.AddSet(ctx, in); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, g := range []training.ExerciseGroup{
+		{Exercise: "banca", MuscleGroup: "pecho"},
+		{Exercise: "remo", MuscleGroup: "espalda"},
+	} {
+		if err := store.SetExerciseGroup(ctx, g); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := store.VolumeByGroup(ctx, training.ListFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]training.GroupVolume{
+		"pecho":   {MuscleGroup: "pecho", TotalSI: 2.4, Sets: 2},
+		"espalda": {MuscleGroup: "espalda", TotalSI: 1.2, Sets: 1},
+		// An exercise with no mapping must stay visible, not vanish from totals.
+		"": {MuscleGroup: "", TotalSI: 1.0, Sets: 1},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("groups = %#v, want %d", got, len(want))
+	}
+	for _, v := range got {
+		if w, seen := want[v.MuscleGroup]; !seen || !reflect.DeepEqual(v, w) {
+			t.Fatalf("group %q = %#v, want %#v", v.MuscleGroup, v, w)
+		}
+	}
+
+	// A date range restricts the aggregation.
+	ranged, err := store.VolumeByGroup(ctx, training.ListFilter{From: "2026-08-01", To: "2026-08-01"})
+	if err != nil || len(ranged) != 2 {
+		t.Fatalf("ranged = %#v, err=%v", ranged, err)
+	}
+
+	// Re-assigning an exercise replaces its group instead of duplicating it.
+	if err := store.SetExerciseGroup(ctx, training.ExerciseGroup{Exercise: "banca", MuscleGroup: "triceps"}); err != nil {
+		t.Fatal(err)
+	}
+	groups, err := store.ExerciseGroups(ctx)
+	if err != nil || len(groups) != 2 {
+		t.Fatalf("groups = %#v, err=%v", groups, err)
+	}
+	for _, g := range groups {
+		if g.Exercise == "banca" && g.MuscleGroup != "triceps" {
+			t.Fatalf("re-assignment did not replace the group: %#v", g)
+		}
+	}
+}
