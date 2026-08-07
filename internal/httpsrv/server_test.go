@@ -62,7 +62,7 @@ func TestBearerAuthorizationPolicyCanDenyAuthenticatedRequest(t *testing.T) {
 }
 
 func TestRoutesHealthAndMethodBehaviorAndBypassWarning(t *testing.T) {
-	h := Routes(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) }), true, "")
+	h := Routes(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) }), true, "", nil)
 	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodDelete} {
 		r := httptest.NewRequest(method, "/health", nil)
 		w := httptest.NewRecorder()
@@ -85,7 +85,7 @@ func TestRoutesRequireBearerForEveryMCPMethodWithoutLeakingCredential(t *testing
 	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodDelete} {
 		r := httptest.NewRequest(method, "/mcp", strings.NewReader("{}"))
 		w := httptest.NewRecorder()
-		Routes(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), false, "super-secret").ServeHTTP(w, r)
+		Routes(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), false, "super-secret", nil).ServeHTTP(w, r)
 		if w.Code != http.StatusUnauthorized || strings.Contains(w.Body.String(), "super-secret") {
 			t.Fatalf("%s status=%d body=%q", method, w.Code, w.Body.String())
 		}
@@ -93,7 +93,7 @@ func TestRoutesRequireBearerForEveryMCPMethodWithoutLeakingCredential(t *testing
 	wrong := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader("{}"))
 	wrong.Header.Set("Authorization", "Bearer wrong-super-secret")
 	w := httptest.NewRecorder()
-	Routes(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), false, "super-secret").ServeHTTP(w, wrong)
+	Routes(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), false, "super-secret", nil).ServeHTTP(w, wrong)
 	if strings.Contains(w.Body.String(), "super-secret") || strings.Contains(w.Body.String(), "wrong-super-secret") {
 		t.Fatalf("credential leaked in response %q", w.Body.String())
 	}

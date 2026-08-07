@@ -3,6 +3,7 @@ package sqlitestore
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/fullfran/training-mcp/internal/training"
@@ -56,6 +57,42 @@ func TestStoreListsWithFiltersAndLimit(t *testing.T) {
 	rows, err = store.ListSessions(context.Background(), training.ListFilter{From: "2026-08-02", To: "2026-08-02", Limit: 20})
 	if err != nil || len(rows) != 1 || rows[0].Date != "2026-08-02" {
 		t.Fatalf("equal-bound rows = %#v, err=%v", rows, err)
+	}
+}
+
+func TestStoreRecentExercisesReturnsLastSetPerExerciseNewestFirst(t *testing.T) {
+	store, err := Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := store.Start(context.Background(), training.Session{Date: "2026-08-07"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, in := range []training.AddSetInput{
+		{SessionID: session.ID, Exercise: "squat", WeightKG: 100, Reps: 5, RPE: 8},
+		{SessionID: session.ID, Exercise: "bench", WeightKG: 80, Reps: 5, RPE: 8},
+		{SessionID: session.ID, Exercise: "squat", WeightKG: 110, Reps: 3, RPE: 9},
+	} {
+		if _, _, err := store.AddSet(context.Background(), in); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := store.RecentExercises(context.Background(), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// One entry per exercise, most recently used first, carrying the latest values.
+	want := []training.ExerciseMemory{
+		{Exercise: "squat", WeightKG: 110, Reps: 3, RPE: 9},
+		{Exercise: "bench", WeightKG: 80, Reps: 5, RPE: 8},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("RecentExercises() = %#v, want %#v", got, want)
+	}
+	limited, err := store.RecentExercises(context.Background(), 1)
+	if err != nil || len(limited) != 1 || limited[0].Exercise != "squat" {
+		t.Fatalf("limited = %#v, err=%v", limited, err)
 	}
 }
 

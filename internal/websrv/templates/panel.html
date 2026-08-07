@@ -1,0 +1,35 @@
+{{define "panel.html"}}<section id="panel" class="panel"
+  {{with .LastSet}}data-last-exercise="{{.Exercise}}" data-last-weight="{{num .WeightKG}}" data-last-reps="{{.Reps}}" data-last-rpe="{{num .RPE}}"{{end}}>
+
+  {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
+
+  <div class="total">
+    <span>{{len .Session.Sets}} serie{{if ne (len .Session.Sets) 1}}s{{end}}</span>
+    <strong>SI {{num .Session.TotalSI}}</strong>
+  </div>
+
+  {{if .Session.Sets}}
+  <ol class="sets">
+    {{range .Session.Sets}}
+    <li>
+      <div class="what">
+        <span class="ex">{{.Exercise}}</span>
+        <span class="detail">{{num .WeightKG}} kg × {{.Reps}} @{{num .RPE}}</span>
+      </div>
+      <span class="si">{{num .SI}}</span>
+      {{if not $.ReadOnly}}
+      <button class="del" type="button"
+              hx-post="{{$.Base}}/sets/{{.ID}}/delete"
+              hx-target="#panel"
+              hx-swap="outerHTML"
+              hx-confirm="¿Borrar esta serie?"
+              aria-label="Borrar serie">✕</button>
+      {{end}}
+    </li>
+    {{end}}
+  </ol>
+  {{else}}
+  <p class="empty">Sin series todavía. Añade la primera.</p>
+  {{end}}
+</section>
+{{end}}

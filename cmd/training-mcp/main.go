@@ -16,6 +16,7 @@ import (
 	"github.com/fullfran/training-mcp/internal/mcpsrv"
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
 	"github.com/fullfran/training-mcp/internal/training"
+	"github.com/fullfran/training-mcp/internal/websrv"
 )
 
 func address(args []string) string {
@@ -58,7 +59,19 @@ func runWithContext(ctx context.Context, args []string) error {
 	mcpServer := mcpsrv.New(service)
 	logger := log.Default()
 	httpsrv.WarningIfDisabled(cfg.AuthDisabled, logger)
-	httpServer := &http.Server{Addr: cfg.Addr, Handler: httpsrv.Routes(mcpServer.Handler(), cfg.AuthDisabled, cfg.Token), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
+
+	var web *httpsrv.WebUI
+	if cfg.WebBasePath != "" {
+		webServer, err := websrv.New(service, time.Now, cfg.WebBasePath)
+		if err != nil {
+			return err
+		}
+		web = &httpsrv.WebUI{Handler: webServer.Handler(), BasePath: webServer.BasePath()}
+		logger.Printf("web UI mounted under a secret base path (%d chars)", len(cfg.WebBasePath))
+	}
+
+	handler := httpsrv.Routes(mcpServer.Handler(), cfg.AuthDisabled, cfg.Token, web)
+	httpServer := &http.Server{Addr: cfg.Addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
 	errCh := make(chan error, 1)
 	go func() { errCh <- httpServer.ListenAndServe() }()
 	select {

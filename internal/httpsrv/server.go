@@ -49,9 +49,25 @@ func WarningIfDisabled(disabled bool, logger *log.Logger) {
 		logger.Printf("WARNING: MCP_AUTH_DISABLED=1 is unsafe and only supported for tunnel-only development")
 	}
 }
-func Routes(mcp http.Handler, authDisabled bool, token string) http.Handler {
+
+// WebUI mounts the PWA under its secret base path. It is optional: a nil value
+// serves MCP only.
+type WebUI struct {
+	Handler  http.Handler
+	BasePath string
+}
+
+func Routes(mcp http.Handler, authDisabled bool, token string, web *WebUI) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", MaxBody(Bearer(token, authDisabled, mcp)))
+	if web != nil && web.Handler != nil && web.BasePath != "" {
+		// The secret path is the outer gate, but the same bearer still guards
+		// these routes so the app is never reachable from inside the network
+		// without it. The reverse proxy supplies the header.
+		guarded := MaxBody(Bearer(token, authDisabled, web.Handler))
+		mux.Handle(web.BasePath, guarded)
+		mux.Handle(web.BasePath+"/", guarded)
+	}
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			w.WriteHeader(http.StatusMethodNotAllowed)

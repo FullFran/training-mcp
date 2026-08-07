@@ -81,4 +81,21 @@ func (s *Service) ListSessions(ctx context.Context, f ListFilter) ([]SessionSumm
 	}
 	return sessions, err
 }
+
+// RecentExercises returns the most recently used exercises, newest first, each
+// carrying the values of its last recorded set.
+func (s *Service) RecentExercises(ctx context.Context, limit int) ([]ExerciseMemory, error) {
+	if limit < 0 || limit > 50 {
+		return nil, ErrValidation
+	}
+	if limit == 0 {
+		limit = 8
+	}
+	out, err := s.store.RecentExercises(ctx, limit)
+	if err == nil && out == nil {
+		out = []ExerciseMemory{}
+	}
+	return out, err
+}
+
 func validDate(v string) bool { _, err := time.Parse("2006-01-02", v); return err == nil }

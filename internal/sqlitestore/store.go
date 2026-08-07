@@ -234,6 +234,30 @@ func (s *Store) ListSessions(ctx context.Context, f training.ListFilter) ([]trai
 	}
 	return out, rows.Err()
 }
+
+// RecentExercises returns the newest set of each distinct exercise, most
+// recently used first. MAX(id) picks the latest row per exercise because ids
+// are monotonic within a table lifetime.
+func (s *Store) RecentExercises(ctx context.Context, limit int) ([]training.ExerciseMemory, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT exercise,weight_kg,reps,rpe FROM sets
+WHERE id IN (SELECT MAX(id) FROM sets GROUP BY exercise)
+ORDER BY id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []training.ExerciseMemory
+	for rows.Next() {
+		var v training.ExerciseMemory
+		if err = rows.Scan(&v.Exercise, &v.WeightKG, &v.Reps, &v.RPE); err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) total(ctx context.Context, id int64) (float64, error) {
 	var total float64
 	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(si),0) FROM sets WHERE session_id=?`, id).Scan(&total)

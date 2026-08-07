@@ -25,7 +25,7 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 	}
 	defer store.Close()
 	s := New(training.NewService(store, time.Now))
-	h := httptest.NewServer(httpsrv.Routes(s.Handler(), false, "secret"))
+	h := httptest.NewServer(httpsrv.Routes(s.Handler(), false, "secret", nil))
 	defer h.Close()
 	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "1.0.0"}, nil)
 	transport := &mcp.StreamableClientTransport{Endpoint: h.URL + "/mcp", HTTPClient: &http.Client{Transport: bearerTransport{base: http.DefaultTransport}}}
@@ -307,6 +307,9 @@ func (testStore) GetSession(context.Context, int64) (training.Session, error) {
 	return training.Session{}, nil
 }
 func (testStore) ListSessions(context.Context, training.ListFilter) ([]training.SessionSummary, error) {
+	return nil, nil
+}
+func (testStore) RecentExercises(context.Context, int) ([]training.ExerciseMemory, error) {
 	return nil, nil
 }
 

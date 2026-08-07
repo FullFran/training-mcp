@@ -1,0 +1,65 @@
+// Service worker for the training PWA.
+//
+// Deliberately minimal: the shell is cached so the app opens instantly, and
+// pages are cached opportunistically so a lost connection still shows the last
+// known session. Writes are NOT queued offline — a set only counts once the
+// server has stored it, and a silent queue would let you believe otherwise.
+const VERSION = 'v1';
+const SHELL = 'shell-' + VERSION;
+const PAGES = 'pages-' + VERSION;
+const BASE = '{{.Base}}';
+
+const SHELL_ASSETS = [
+  BASE + '/static/app.css',
+  BASE + '/static/app.js',
+  BASE + '/static/htmx.min.js',
+  BASE + '/static/icon-192.png',
+  BASE + '/static/icon-512.png'
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(SHELL).then((cache) => cache.addAll(SHELL_ASSETS)).then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(
+        keys.filter((k) => k !== SHELL && k !== PAGES).map((k) => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  if (request.method !== 'GET') return; // writes always go to the network
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  // Static assets are content-stable: serve from cache, refresh in background.
+  if (url.pathname.startsWith(BASE + '/static/')) {
+    event.respondWith(
+      caches.match(request).then((hit) => hit || fetch(request).then((res) => {
+        const copy = res.clone();
+        caches.open(SHELL).then((cache) => cache.put(request, copy));
+        return res;
+      }))
+    );
+    return;
+  }
+
+  // Pages must be fresh when online; fall back to the last copy when offline.
+  event.respondWith(
+    fetch(request)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(PAGES).then((cache) => cache.put(request, copy));
+        return res;
+      })
+      .catch(() => caches.match(request))
+  );
+});

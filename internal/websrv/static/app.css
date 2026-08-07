@@ -1,0 +1,273 @@
+/* Mobile-first. Every interactive target is at least 48px tall because this is
+   used standing up, mid-set, often with sweaty hands. */
+:root {
+  --bg: #0f1115;
+  --card: #171a21;
+  --line: #262b36;
+  --text: #e8eaf0;
+  --muted: #9aa3b5;
+  --accent: #4ade80;
+  --accent-ink: #07240f;
+  --danger: #f87171;
+  --radius: 14px;
+  --tap: 52px;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding-bottom: env(safe-area-inset-bottom);
+  overscroll-behavior-y: contain;
+}
+
+main { padding: 12px 12px 40px; max-width: 640px; margin: 0 auto; }
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+  background: rgba(15, 17, 21, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.bar strong { font-size: 18px; }
+.muted { color: var(--muted); font-size: 14px; }
+
+a { color: inherit; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: grid;
+  gap: 14px;
+}
+
+/* --- quick pick ------------------------------------------------------- */
+.chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: -2px;
+  padding: 2px;
+}
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #10131a;
+  color: var(--text);
+  font-size: 14px;
+  white-space: nowrap;
+}
+.chip:active { border-color: var(--accent); }
+
+/* --- fields ----------------------------------------------------------- */
+.field { display: grid; gap: 6px; }
+.field > span { font-size: 13px; color: var(--muted); }
+
+input[type="text"], input[type="number"] {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #10131a;
+  color: var(--text);
+  font-size: 17px;
+}
+input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.stepper { display: grid; gap: 6px; }
+.stepper .label { font-size: 13px; color: var(--muted); }
+.stepper .controls {
+  display: grid;
+  grid-template-columns: var(--tap) 1fr var(--tap);
+  gap: 6px;
+  align-items: center;
+}
+.stepper input { text-align: center; padding: 0 2px; }
+/* Native spinners are too small to hit reliably; the pads replace them. */
+.stepper input::-webkit-outer-spin-button,
+.stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.stepper input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+.pad {
+  min-height: var(--tap);
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #10131a;
+  color: var(--text);
+  font-size: 24px;
+  line-height: 1;
+  touch-action: manipulation;
+}
+.pad:active { background: #1d2330; }
+
+/* --- RPE -------------------------------------------------------------- */
+.rpe { border: 0; padding: 0; margin: 0; }
+.rpe legend { font-size: 13px; color: var(--muted); padding: 0 0 6px; }
+.pills { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.pills input { position: absolute; opacity: 0; pointer-events: none; }
+.pills label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #10131a;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  touch-action: manipulation;
+}
+.pills input:checked + label {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.pills input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* --- buttons ---------------------------------------------------------- */
+button { font: inherit; cursor: pointer; }
+
+.primary {
+  min-height: 58px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 18px;
+  font-weight: 700;
+  touch-action: manipulation;
+}
+.primary:active { filter: brightness(0.92); }
+
+.ghost {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 15px;
+}
+.wide { width: 100%; }
+
+/* --- session panel ---------------------------------------------------- */
+.panel { margin-top: 16px; display: grid; gap: 10px; }
+
+.total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.total strong { color: var(--text); font-size: 20px; font-variant-numeric: tabular-nums; }
+
+.sets { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; counter-reset: s; }
+.sets li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.sets .ex { display: block; font-size: 15px; }
+.sets .detail { display: block; color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.sets .si {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--accent);
+}
+.del {
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--danger);
+  font-size: 15px;
+}
+
+.sessions { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.sessions a {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  text-decoration: none;
+}
+.sessions .date { font-variant-numeric: tabular-nums; }
+.sessions em { color: var(--accent); font-style: normal; font-size: 13px; }
+.sessions .meta { color: var(--muted); font-size: 14px; }
+.sessions .si { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+.empty { color: var(--muted); text-align: center; padding: 24px 0; }
+
+.alert {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #2a1618;
+  border: 1px solid #5b2b2f;
+  color: #ffd7d7;
+  font-size: 14px;
+}
+
+/* Newly swapped-in content gets a brief highlight so a set logged without
+   looking still gives visible confirmation. */
+@keyframes flash { from { background: #1d3527; } to { background: var(--card); } }
+.sets li.new { animation: flash 900ms ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sets li.new { animation: none; }
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --line: #dfe3ea;
+    --text: #14171d;
+    --muted: #5d6675;
+    --accent: #16a34a;
+    --accent-ink: #ffffff;
+  }
+  .bar { background: rgba(245, 246, 248, 0.92); }
+  .chip, .pad, .pills label, input[type="text"], input[type="number"] { background: #f0f2f6; }
+  .alert { background: #fdeaea; border-color: #f3bcbc; color: #7f1d1d; }
+  @keyframes flash { from { background: #dcfce7; } to { background: var(--card); } }
+}

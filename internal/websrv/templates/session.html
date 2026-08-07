@@ -1,0 +1,27 @@
+{{define "session.html"}}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{.Session.Date}}</title>
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="{{.Base}}/manifest.webmanifest">
+<link rel="icon" href="{{.Base}}/static/icon-192.png">
+<link rel="stylesheet" href="{{.Base}}/static/app.css">
+</head>
+<body data-base="{{.Base}}">
+
+<header class="bar">
+  <div>
+    <strong>{{.Session.Date}}</strong>
+    {{if eq .Session.Date .Today}}<span class="muted">hoy</span>{{end}}
+  </div>
+  <a class="ghost" href="{{.Base}}/history">Historial</a>
+</header>
+
+<main>
+  {{template "panel.html" .}}
+</main>
+</body>
+</html>
+{{end}}

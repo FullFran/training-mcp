@@ -9,4 +9,5 @@ type Store interface {
 	DeleteSet(context.Context, int64) (int64, float64, int, error)
 	GetSession(context.Context, int64) (Session, error)
 	ListSessions(context.Context, ListFilter) ([]SessionSummary, error)
+	RecentExercises(context.Context, int) ([]ExerciseMemory, error)
 }

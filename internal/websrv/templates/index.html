@@ -1,0 +1,95 @@
+{{define "index.html"}}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Entreno</title>
+<meta name="theme-color" content="#0f1115">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="{{.Base}}/manifest.webmanifest">
+<link rel="icon" href="{{.Base}}/static/icon-192.png">
+<link rel="apple-touch-icon" href="{{.Base}}/static/icon-192.png">
+<link rel="stylesheet" href="{{.Base}}/static/app.css">
+</head>
+<body data-base="{{.Base}}">
+
+<header class="bar">
+  <div>
+    <strong>Hoy</strong>
+    <span class="muted">{{.Today}}</span>
+  </div>
+  <a class="ghost" href="{{.Base}}/history">Historial</a>
+</header>
+
+<main>
+  <form id="entry" class="card"
+        hx-post="{{.Base}}/sets"
+        hx-target="#panel"
+        hx-swap="outerHTML"
+        autocomplete="off">
+
+    {{if .Recent}}
+    <div class="chips" aria-label="Ejercicios recientes">
+      {{range .Recent}}
+      <button type="button" class="chip"
+              data-exercise="{{.Exercise}}"
+              data-weight="{{num .WeightKG}}"
+              data-reps="{{.Reps}}"
+              data-rpe="{{num .RPE}}">{{.Exercise}}</button>
+      {{end}}
+    </div>
+    {{end}}
+
+    <label class="field">
+      <span>Ejercicio</span>
+      <input id="exercise" name="exercise" type="text" required
+             enterkeyhint="done" autocapitalize="none" spellcheck="false"
+             placeholder="press inclinado mancuernas">
+    </label>
+
+    <div class="row">
+      <div class="stepper" data-target="weight" data-step="2.5" data-min="0.5">
+        <span class="label">Peso (kg)</span>
+        <div class="controls">
+          <button type="button" class="pad" data-delta="-1" aria-label="Bajar peso">−</button>
+          <input id="weight" name="weight_kg" type="number" inputmode="decimal"
+                 step="0.5" min="0.5" value="20" required>
+          <button type="button" class="pad" data-delta="1" aria-label="Subir peso">+</button>
+        </div>
+      </div>
+
+      <div class="stepper" data-target="reps" data-step="1" data-min="1">
+        <span class="label">Reps</span>
+        <div class="controls">
+          <button type="button" class="pad" data-delta="-1" aria-label="Bajar reps">−</button>
+          <input id="reps" name="reps" type="number" inputmode="numeric"
+                 step="1" min="1" value="8" required>
+          <button type="button" class="pad" data-delta="1" aria-label="Subir reps">+</button>
+        </div>
+      </div>
+    </div>
+
+    <fieldset class="rpe">
+      <legend>RPE</legend>
+      <div class="pills">
+        {{range $v := rpeScale}}
+        <input type="radio" name="rpe" id="rpe-{{$v}}" value="{{$v}}" {{if eq $v "8"}}checked{{end}}>
+        <label for="rpe-{{$v}}">{{$v}}</label>
+        {{end}}
+      </div>
+    </fieldset>
+
+    <button type="submit" class="primary">Añadir serie</button>
+    <button type="button" id="repeat" class="ghost wide" hidden>Repetir última</button>
+  </form>
+
+  {{template "panel.html" .}}
+</main>
+
+<script src="{{.Base}}/static/htmx.min.js" defer></script>
+<script src="{{.Base}}/static/app.js" defer></script>
+</body>
+</html>
+{{end}}

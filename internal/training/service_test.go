@@ -146,6 +146,8 @@ type memoryStore struct {
 	listCalls            int
 	listFilter           ListFilter
 	listResults          []SessionSummary
+	recentLimit          int
+	recentResults        []ExerciseMemory
 }
 
 func newMemoryStore() *memoryStore {
@@ -189,5 +191,45 @@ func (m *memoryStore) ListSessions(_ context.Context, filter ListFilter) ([]Sess
 	m.listCalls++
 	m.listFilter = filter
 	return m.listResults, nil
+}
+func TestServiceRecentExercises(t *testing.T) {
+	svc := func(store *memoryStore) *Service {
+		return NewService(store, func() time.Time { return time.Date(2026, 8, 7, 12, 0, 0, 0, time.UTC) })
+	}
+	t.Run("zero limit falls back to the default", func(t *testing.T) {
+		store := newMemoryStore()
+		if _, err := svc(store).RecentExercises(context.Background(), 0); err != nil {
+			t.Fatalf("RecentExercises() error = %v", err)
+		}
+		if store.recentLimit != 8 {
+			t.Fatalf("limit forwarded = %d, want 8", store.recentLimit)
+		}
+	})
+	t.Run("out of range limits are rejected", func(t *testing.T) {
+		for _, limit := range []int{-1, 51} {
+			if _, err := svc(newMemoryStore()).RecentExercises(context.Background(), limit); !errors.Is(err, ErrValidation) {
+				t.Fatalf("RecentExercises(%d) error = %v, want validation", limit, err)
+			}
+		}
+	})
+	t.Run("nil results become an empty slice", func(t *testing.T) {
+		got, err := svc(newMemoryStore()).RecentExercises(context.Background(), 5)
+		if err != nil || got == nil || len(got) != 0 {
+			t.Fatalf("RecentExercises() = %#v, %v, want empty non-nil", got, err)
+		}
+	})
+	t.Run("results pass through in store order", func(t *testing.T) {
+		store := newMemoryStore()
+		store.recentResults = []ExerciseMemory{{Exercise: "squat", WeightKG: 100, Reps: 3, RPE: 8}}
+		got, err := svc(store).RecentExercises(context.Background(), 5)
+		if err != nil || !reflect.DeepEqual(got, store.recentResults) {
+			t.Fatalf("RecentExercises() = %#v, %v", got, err)
+		}
+	})
+}
+
+func (m *memoryStore) RecentExercises(_ context.Context, limit int) ([]ExerciseMemory, error) {
+	m.recentLimit = limit
+	return m.recentResults, nil
 }
 func floatPtr(v float64) *float64 { return &v }

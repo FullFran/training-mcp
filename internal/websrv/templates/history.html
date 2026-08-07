@@ -1,0 +1,38 @@
+{{define "history.html"}}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Historial</title>
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="{{.Base}}/manifest.webmanifest">
+<link rel="icon" href="{{.Base}}/static/icon-192.png">
+<link rel="stylesheet" href="{{.Base}}/static/app.css">
+</head>
+<body data-base="{{.Base}}">
+
+<header class="bar">
+  <div><strong>Historial</strong></div>
+  <a class="ghost" href="{{.Base}}/">Hoy</a>
+</header>
+
+<main>
+  {{if .History}}
+  <ul class="sessions">
+    {{range .History}}
+    <li>
+      <a href="{{$.Base}}/s/{{.ID}}">
+        <span class="date">{{.Date}}{{if eq .Date $.Today}} <em>hoy</em>{{end}}</span>
+        <span class="meta">{{.SetCount}} serie{{if ne .SetCount 1}}s{{end}}</span>
+        <strong class="si">SI {{num .TotalSI}}</strong>
+      </a>
+    </li>
+    {{end}}
+  </ul>
+  {{else}}
+  <p class="empty">Todavía no hay sesiones.</p>
+  {{end}}
+</main>
+</body>
+</html>
+{{end}}
