@@ -156,6 +156,9 @@ type memoryStore struct {
 	historyResult        ExerciseHistory
 	weeklyFilter         ListFilter
 	weeklyResults        []WeeklyVolume
+	planCreated          Plan
+	plans                []Plan
+	progress             []PlanProgress
 }
 
 func newMemoryStore() *memoryStore {
@@ -391,5 +394,76 @@ func TestServiceWeeklyVolumeValidatesRange(t *testing.T) {
 	got, err := svc.WeeklyVolume(ctx, ListFilter{})
 	if err != nil || got == nil {
 		t.Fatalf("WeeklyVolume() = %#v, %v, want empty non-nil", got, err)
+	}
+}
+
+func (m *memoryStore) CreatePlan(_ context.Context, p Plan) (Plan, error) {
+	m.planCreated = p
+	p.ID = 1
+	return p, nil
+}
+func (m *memoryStore) ListPlans(context.Context) ([]Plan, error) { return m.plans, nil }
+func (m *memoryStore) GetPlan(_ context.Context, id int64) (Plan, error) {
+	for _, p := range m.plans {
+		if p.ID == id {
+			return p, nil
+		}
+	}
+	return Plan{}, ErrNotFound
+}
+func (m *memoryStore) DeletePlan(context.Context, int64) error { return nil }
+func (m *memoryStore) SessionProgress(context.Context, int64) ([]PlanProgress, error) {
+	return m.progress, nil
+}
+
+func TestServiceCreatePlanValidation(t *testing.T) {
+	store := newMemoryStore()
+	svc := NewService(store, time.Now)
+	ctx := context.Background()
+
+	good := Plan{Name: " Empuje A ", Items: []PlanItem{{Exercise: " Press Banca ", TargetSets: 3, RepMin: 8, RepMax: 10, TargetRPE: 9}}}
+	if _, err := svc.CreatePlan(ctx, good); err != nil {
+		t.Fatalf("CreatePlan() error = %v", err)
+	}
+	// Names must be normalized the same way sets are, or a plan item never
+	// matches the sets logged against it.
+	if store.planCreated.Name != "Empuje A" || store.planCreated.Items[0].Exercise != "press banca" {
+		t.Fatalf("plan not normalized: %#v", store.planCreated)
+	}
+
+	for _, tt := range []struct {
+		name string
+		plan Plan
+	}{
+		{"no name", Plan{Items: []PlanItem{{Exercise: "banca", TargetSets: 1}}}},
+		{"no items", Plan{Name: "x"}},
+		{"empty exercise", Plan{Name: "x", Items: []PlanItem{{TargetSets: 1}}}},
+		{"zero sets", Plan{Name: "x", Items: []PlanItem{{Exercise: "banca"}}}},
+		{"too many sets", Plan{Name: "x", Items: []PlanItem{{Exercise: "banca", TargetSets: 21}}}},
+		{"inverted rep range", Plan{Name: "x", Items: []PlanItem{{Exercise: "banca", TargetSets: 3, RepMin: 12, RepMax: 8}}}},
+		{"rpe out of range", Plan{Name: "x", Items: []PlanItem{{Exercise: "banca", TargetSets: 3, TargetRPE: 11}}}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := svc.CreatePlan(ctx, tt.plan); !errors.Is(err, ErrValidation) {
+				t.Fatalf("CreatePlan(%s) error = %v, want validation", tt.name, err)
+			}
+		})
+	}
+}
+
+func TestServicePlanLookupsValidateIDs(t *testing.T) {
+	svc := NewService(newMemoryStore(), time.Now)
+	ctx := context.Background()
+	if _, err := svc.GetPlan(ctx, 0); !errors.Is(err, ErrValidation) {
+		t.Fatalf("GetPlan(0) error = %v", err)
+	}
+	if err := svc.DeletePlan(ctx, 0); !errors.Is(err, ErrValidation) {
+		t.Fatalf("DeletePlan(0) error = %v", err)
+	}
+	if _, err := svc.SessionProgress(ctx, 0); !errors.Is(err, ErrValidation) {
+		t.Fatalf("SessionProgress(0) error = %v", err)
+	}
+	if _, err := svc.StartPlannedSession(ctx, "2026-08-08", -1); !errors.Is(err, ErrValidation) {
+		t.Fatalf("negative plan id error = %v, want validation", err)
 	}
 }

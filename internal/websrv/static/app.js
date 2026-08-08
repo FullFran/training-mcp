@@ -82,6 +82,24 @@
 
   if (exercise) exercise.addEventListener('input', showPrevious);
 
+  // Tapping a planned exercise loads its prescription: the exercise, the middle
+  // of the target rep range and the target RPE, plus last time's weight, which
+  // the plan deliberately does not prescribe.
+  document.addEventListener('click', (event) => {
+    const item = event.target.closest('.planned li');
+    if (!item) return;
+    const name = item.dataset.exercise;
+    const known = info[name] || {};
+    fill({
+      exercise: name,
+      weight: known.last ? known.last.weight_kg : null,
+      reps: item.dataset.reps !== '0' ? item.dataset.reps : null,
+      rpe: item.dataset.rpe !== '0' ? item.dataset.rpe : null
+    });
+    buzz(8);
+    window.scrollTo({ top: document.getElementById('entry').offsetTop - 60, behavior: 'smooth' });
+  });
+
   // --- inline edit -------------------------------------------------------
   // Turns a logged set into an editable row so a mistyped weight does not need
   // deleting and re-entering.

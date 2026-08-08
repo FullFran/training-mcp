@@ -17,7 +17,8 @@ type Server struct {
 	handler *mcp.StreamableHTTPHandler
 }
 type StartInput struct {
-	Date string `json:"date,omitempty" jsonschema:"Training date in exact YYYY-MM-DD format."`
+	Date   string `json:"date,omitempty" jsonschema:"Training date in exact YYYY-MM-DD format."`
+	PlanID int64  `json:"plan_id,omitempty" jsonschema:"Optional plan to follow. Omit for a free-form session."`
 }
 type SessionOut struct {
 	Session training.Session `json:"session"`
@@ -59,6 +60,35 @@ type ListInput struct {
 type ListOut struct {
 	Sessions []training.SessionSummary `json:"sessions"`
 }
+type PlanItemInput struct {
+	Exercise   string  `json:"exercise" jsonschema:"Non-empty exercise name; trimmed and lowercased to match stored sets."`
+	TargetSets int     `json:"target_sets" jsonschema:"Planned number of sets; 1 through 20."`
+	RepMin     int     `json:"rep_min,omitempty" jsonschema:"Lower bound of the target rep range, e.g. 10 for '10 to 12'."`
+	RepMax     int     `json:"rep_max,omitempty" jsonschema:"Upper bound of the target rep range, e.g. 12 for '10 to 12'."`
+	TargetRPE  float64 `json:"target_rpe,omitempty" jsonschema:"Prescribed RPE from 1 through 10. Omit if the plan does not prescribe one."`
+}
+type CreatePlanInput struct {
+	Name  string          `json:"name" jsonschema:"Name of the plan, e.g. 'Empuje A'."`
+	Notes string          `json:"notes,omitempty" jsonschema:"Optional free-text notes about the plan."`
+	Items []PlanItemInput `json:"items" jsonschema:"Ordered exercises to perform; order is preserved as the session order."`
+}
+type PlanOut struct {
+	Plan training.Plan `json:"plan"`
+}
+type PlansOut struct {
+	Plans []training.Plan `json:"plans"`
+}
+type PlanInput struct {
+	PlanID int64 `json:"plan_id" jsonschema:"Positive ID of the plan."`
+}
+type PlanDeleteOut struct {
+	PlanID int64 `json:"plan_id"`
+}
+type ProgressOut struct {
+	SessionID int64                   `json:"session_id"`
+	PlanName  string                  `json:"plan_name,omitempty"`
+	Progress  []training.PlanProgress `json:"progress"`
+}
 type DeleteSessionOut struct {
 	SessionID   int64 `json:"session_id"`
 	DeletedSets int   `json:"deleted_sets"`
@@ -96,8 +126,8 @@ func New(service *training.Service) *Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "training-mcp", Version: "0.1.0"}, nil)
 	startSchema := mustInputSchema[StartInput]()
 	startSchema.Properties["date"].Pattern = `^\d{4}-\d{2}-\d{2}$`
-	mcp.AddTool(s, &mcp.Tool{Name: "start_session", Description: "Start a training session on an optional date. Omit date to use the server's current local date.", InputSchema: startSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in StartInput) (*mcp.CallToolResult, SessionOut, error) {
-		v, err := service.StartSession(ctx, in.Date)
+	mcp.AddTool(s, &mcp.Tool{Name: "start_session", Description: "Start a training session on an optional date, optionally following a plan. Omit date to use the server's current local date.", InputSchema: startSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in StartInput) (*mcp.CallToolResult, SessionOut, error) {
+		v, err := service.StartPlannedSession(ctx, in.Date, in.PlanID)
 		return nil, SessionOut{Session: v}, toolError(err)
 	})
 	addSchema := mustInputSchema[AddInput]()
@@ -147,6 +177,46 @@ func New(service *training.Service) *Server {
 		v, err := service.ListSessions(ctx, training.ListFilter{Limit: in.Limit, From: in.From, To: in.To})
 		return nil, ListOut{Sessions: v}, toolError(err)
 	})
+	createPlanSchema := mustInputSchema[CreatePlanInput]()
+	createPlanSchema.Properties["name"].Pattern = `.*\S.*`
+	mcp.AddTool(s, &mcp.Tool{Name: "create_plan", Description: "Create a reusable workout plan: an ordered list of exercises with a target set count and an optional rep range and RPE. Load is not planned; it is filled in at the gym.", InputSchema: createPlanSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in CreatePlanInput) (*mcp.CallToolResult, PlanOut, error) {
+		plan := training.Plan{Name: in.Name, Notes: in.Notes}
+		for _, it := range in.Items {
+			plan.Items = append(plan.Items, training.PlanItem{
+				Exercise: it.Exercise, TargetSets: it.TargetSets,
+				RepMin: it.RepMin, RepMax: it.RepMax, TargetRPE: it.TargetRPE,
+			})
+		}
+		v, err := service.CreatePlan(ctx, plan)
+		return nil, PlanOut{Plan: v}, toolError(err)
+	})
+	mcp.AddTool(s, &mcp.Tool{Name: "list_plans", Description: "List every saved workout plan with its total planned set count."}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, PlansOut, error) {
+		v, err := service.ListPlans(ctx)
+		return nil, PlansOut{Plans: v}, toolError(err)
+	})
+	planSchema := mustInputSchema[PlanInput]()
+	setPositiveID(planSchema.Properties["plan_id"])
+	mcp.AddTool(s, &mcp.Tool{Name: "get_plan", Description: "Get one plan with its ordered exercises, target sets, rep ranges and RPEs.", InputSchema: planSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in PlanInput) (*mcp.CallToolResult, PlanOut, error) {
+		v, err := service.GetPlan(ctx, in.PlanID)
+		return nil, PlanOut{Plan: v}, toolError(err)
+	})
+	deletePlanSchema := mustInputSchema[PlanInput]()
+	setPositiveID(deletePlanSchema.Properties["plan_id"])
+	mcp.AddTool(s, &mcp.Tool{Name: "delete_plan", Description: "Permanently delete a plan. Sessions that followed it keep their recorded plan name.", InputSchema: deletePlanSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in PlanInput) (*mcp.CallToolResult, PlanDeleteOut, error) {
+		err := service.DeletePlan(ctx, in.PlanID)
+		return nil, PlanDeleteOut{PlanID: in.PlanID}, toolError(err)
+	})
+	progressSchema := mustInputSchema[SessionInput]()
+	setPositiveID(progressSchema.Properties["session_id"])
+	mcp.AddTool(s, &mcp.Tool{Name: "session_progress", Description: "For a session following a plan: planned versus completed sets per exercise, with the prescribed rep range and RPE. Exercises done off-plan are listed with target_sets 0.", InputSchema: progressSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in SessionInput) (*mcp.CallToolResult, ProgressOut, error) {
+		v, err := service.SessionProgress(ctx, in.SessionID)
+		out := ProgressOut{SessionID: in.SessionID, Progress: v}
+		if sess, e := service.GetSession(ctx, in.SessionID); e == nil {
+			out.PlanName = sess.PlanName
+		}
+		return nil, out, toolError(err)
+	})
+
 	deleteSessionSchema := mustInputSchema[SessionInput]()
 	setPositiveID(deleteSessionSchema.Properties["session_id"])
 	mcp.AddTool(s, &mcp.Tool{Name: "delete_session", Description: "Permanently delete a training session and every set in it. Irreversible; returns how many sets were destroyed. Use to remove an empty or mistaken session.", InputSchema: deleteSessionSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in SessionInput) (*mcp.CallToolResult, DeleteSessionOut, error) {
@@ -202,7 +272,8 @@ func (s *Server) Handler() http.Handler { return s.handler }
 func (s *Server) ToolNames() []string {
 	return []string{"start_session", "add_set", "update_set", "delete_set", "delete_session",
 		"get_session", "list_sessions", "exercise_history", "weekly_volume",
-		"set_exercise_group", "list_exercise_groups", "volume_by_muscle"}
+		"set_exercise_group", "list_exercise_groups", "volume_by_muscle",
+		"create_plan", "list_plans", "get_plan", "delete_plan", "session_progress"}
 }
 func muscleGroupEnum() []any {
 	out := make([]any, 0, len(training.MuscleGroups))

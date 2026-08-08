@@ -422,3 +422,86 @@ func TestHistoryShowsMuscleGroupVolume(t *testing.T) {
 		t.Fatalf("history should chart volume per muscle group: %q", body)
 	}
 }
+
+func TestPlanPickerAppearsAndStartsAPlannedSession(t *testing.T) {
+	h, service := newServer(t)
+	plan, err := service.CreatePlan(t.Context(), training.Plan{
+		Name: "Empuje A",
+		Items: []training.PlanItem{
+			{Exercise: "banca", TargetSets: 3, RepMin: 8, RepMax: 10, TargetRPE: 9},
+			{Exercise: "laterales polea", TargetSets: 4, RepMin: 12, RepMax: 15, TargetRPE: 9},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := get(t, h, base+"/").Body.String()
+	if !strings.Contains(body, "Empuje A · 7 series") {
+		t.Fatalf("plan picker should list the plan with its set count: %q", body)
+	}
+
+	w := post(t, h, base+"/plan", url.Values{"plan_id": {itoa(plan.ID)}}, false)
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want 303", w.Code)
+	}
+	body = get(t, h, base+"/").Body.String()
+	for _, want := range []string{"Empuje A", "0/2 ejercicios", "8-10 reps @9", `class="planned"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("planned checklist missing %q", want)
+		}
+	}
+
+	// Logging planned sets advances the checklist and ticks it off.
+	for range 3 {
+		post(t, h, base+"/sets", setForm("banca", "80", "9", "9"), true)
+	}
+	body = get(t, h, base+"/").Body.String()
+	if !strings.Contains(body, "1/2 ejercicios") {
+		t.Fatalf("checklist should show one exercise complete: %q", body)
+	}
+	if !strings.Contains(body, `class="ok"`) {
+		t.Fatalf("completed plan item should be marked done")
+	}
+}
+
+func TestOffPlanWorkIsShownRatherThanHidden(t *testing.T) {
+	h, service := newServer(t)
+	plan, err := service.CreatePlan(t.Context(), training.Plan{
+		Name:  "Empuje A",
+		Items: []training.PlanItem{{Exercise: "banca", TargetSets: 3}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	post(t, h, base+"/plan", url.Values{"plan_id": {itoa(plan.ID)}}, false)
+	post(t, h, base+"/sets", setForm("curl bayesian", "12", "12", "8"), true)
+
+	body := get(t, h, base+"/").Body.String()
+	if !strings.Contains(body, "curl bayesian") || !strings.Contains(body, "fuera de plan") {
+		t.Fatalf("off-plan exercise should be listed as such: %q", body)
+	}
+}
+
+// Switching plans after work is logged would silently reinterpret it, so the
+// session is left alone once it has sets.
+func TestChoosingAPlanIsRefusedOnceSetsExist(t *testing.T) {
+	h, service := newServer(t)
+	plan, err := service.CreatePlan(t.Context(), training.Plan{
+		Name:  "Empuje A",
+		Items: []training.PlanItem{{Exercise: "banca", TargetSets: 3}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	post(t, h, base+"/sets", setForm("sentadilla", "100", "5", "8"), true)
+	post(t, h, base+"/plan", url.Values{"plan_id": {itoa(plan.ID)}}, false)
+
+	sessions, _ := service.ListSessions(t.Context(), training.ListFilter{Limit: 10})
+	if len(sessions) != 1 {
+		t.Fatalf("expected exactly one session, got %#v", sessions)
+	}
+	if sessions[0].PlanName != "" || sessions[0].SetCount != 1 {
+		t.Fatalf("existing work must be left alone: %#v", sessions[0])
+	}
+}

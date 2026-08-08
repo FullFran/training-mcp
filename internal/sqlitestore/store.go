@@ -5,8 +5,11 @@ import (
 	"database/sql"
 	"embed"
 	"errors"
+	"fmt"
 	"io/fs"
 	"sort"
+	"strconv"
+	"strings"
 
 	_ "modernc.org/sqlite"
 
@@ -29,38 +32,97 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 	s := &Store{db: db}
-	for _, m := range mustMigrations() {
-		if _, err = db.Exec(m); err != nil {
-			db.Close()
-			return nil, err
-		}
+	if err = migrate(db); err != nil {
+		db.Close()
+		return nil, err
 	}
 	return s, nil
 }
 
-// mustMigrations returns every migration in filename order. Each one is
-// idempotent (CREATE TABLE IF NOT EXISTS), so replaying them all on start is
-// safe and keeps an existing database up to date.
-func mustMigrations() []string {
+// migrate applies each migration exactly once, recording its version in
+// schema_migrations. Version tracking is required rather than replaying: some
+// migrations use ALTER TABLE, which is not idempotent.
+func migrate(db *sql.DB) error {
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY)`); err != nil {
+		return err
+	}
+	applied := map[int]bool{}
+	rows, err := db.Query(`SELECT version FROM schema_migrations`)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var v int
+		if err = rows.Scan(&v); err != nil {
+			rows.Close()
+			return err
+		}
+		applied[v] = true
+	}
+	rows.Close()
+	if err = rows.Err(); err != nil {
+		return err
+	}
+
+	for _, name := range mustMigrationNames() {
+		version, err := strconv.Atoi(strings.SplitN(strings.TrimPrefix(name, "migrations/"), "_", 2)[0])
+		if err != nil {
+			return fmt.Errorf("migration %q has no numeric version prefix", name)
+		}
+		if applied[version] {
+			continue
+		}
+		body, err := migrationFS.ReadFile(name)
+		if err != nil {
+			return err
+		}
+		// Each migration and its bookkeeping commit together, so a failure
+		// never leaves a half-applied schema marked as done.
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		if _, err = tx.Exec(string(body)); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("migration %s: %w", name, err)
+		}
+		if _, err = tx.Exec(`INSERT INTO schema_migrations(version) VALUES (?)`, version); err != nil {
+			tx.Rollback()
+			return err
+		}
+		if err = tx.Commit(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func mustMigrationNames() []string {
 	names, err := fs.Glob(migrationFS, "migrations/*.sql")
 	if err != nil {
 		panic(err)
 	}
 	sort.Strings(names)
-	out := make([]string, 0, len(names))
-	for _, n := range names {
-		b, err := migrationFS.ReadFile(n)
-		if err != nil {
-			panic(err)
-		}
-		out = append(out, string(b))
-	}
-	return out
+	return names
 }
 func (s *Store) Close() error { return s.db.Close() }
 
 func (s *Store) Start(ctx context.Context, session training.Session) (training.Session, error) {
-	res, err := s.db.ExecContext(ctx, `INSERT INTO sessions(date, started_at) VALUES (?, CURRENT_TIMESTAMP)`, session.Date)
+	// The plan name is snapshotted alongside the id so history stays readable
+	// even if the plan is later renamed or deleted.
+	if session.PlanID > 0 && session.PlanName == "" {
+		p, err := s.GetPlan(ctx, session.PlanID)
+		if err != nil {
+			return training.Session{}, err
+		}
+		session.PlanName = p.Name
+	}
+	var planID any
+	if session.PlanID > 0 {
+		planID = session.PlanID
+	}
+	res, err := s.db.ExecContext(ctx, `INSERT INTO sessions(date, started_at, plan_id, plan_name) VALUES (?, CURRENT_TIMESTAMP, ?, ?)`,
+		session.Date, planID, session.PlanName)
 	if err != nil {
 		return training.Session{}, err
 	}
@@ -195,7 +257,10 @@ func (s *Store) DeleteSet(ctx context.Context, id int64) (int64, float64, int, e
 }
 func (s *Store) GetSession(ctx context.Context, id int64) (training.Session, error) {
 	var out training.Session
-	err := s.db.QueryRowContext(ctx, `SELECT id,date FROM sessions WHERE id=?`, id).Scan(&out.ID, &out.Date)
+	var planID sql.NullInt64
+	err := s.db.QueryRowContext(ctx, `SELECT id,date,plan_id,plan_name FROM sessions WHERE id=?`, id).
+		Scan(&out.ID, &out.Date, &planID, &out.PlanName)
+	out.PlanID = planID.Int64
 	if errors.Is(err, sql.ErrNoRows) {
 		return out, training.ErrNotFound
 	}
@@ -223,7 +288,7 @@ func (s *Store) GetSession(ctx context.Context, id int64) (training.Session, err
 	return out, nil
 }
 func (s *Store) ListSessions(ctx context.Context, f training.ListFilter) ([]training.SessionSummary, error) {
-	q := `SELECT s.id,s.date,COUNT(st.id),COALESCE(SUM(st.si),0) FROM sessions s LEFT JOIN sets st ON st.session_id=s.id WHERE 1=1`
+	q := `SELECT s.id,s.date,COUNT(st.id),COALESCE(SUM(st.si),0),s.plan_name FROM sessions s LEFT JOIN sets st ON st.session_id=s.id WHERE 1=1`
 	args := []any{}
 	if f.From != "" {
 		q += ` AND s.date>=?`
@@ -243,7 +308,7 @@ func (s *Store) ListSessions(ctx context.Context, f training.ListFilter) ([]trai
 	var out []training.SessionSummary
 	for rows.Next() {
 		var v training.SessionSummary
-		if err = rows.Scan(&v.ID, &v.Date, &v.SetCount, &v.TotalSI); err != nil {
+		if err = rows.Scan(&v.ID, &v.Date, &v.SetCount, &v.TotalSI, &v.PlanName); err != nil {
 			return nil, err
 		}
 		v.TotalSI = training.NormalizeSI(v.TotalSI)
@@ -273,6 +338,149 @@ ORDER BY id DESC LIMIT ?`, limit)
 		out = append(out, v)
 	}
 	return out, rows.Err()
+}
+
+func (s *Store) CreatePlan(ctx context.Context, p training.Plan) (training.Plan, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return training.Plan{}, err
+	}
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, `INSERT INTO plans(name,notes,created_at) VALUES (?,?,CURRENT_TIMESTAMP)`, p.Name, p.Notes)
+	if err != nil {
+		return training.Plan{}, err
+	}
+	if p.ID, err = res.LastInsertId(); err != nil {
+		return training.Plan{}, err
+	}
+	for i := range p.Items {
+		p.Items[i].Position = i + 1
+		it := p.Items[i]
+		if _, err = tx.ExecContext(ctx, `INSERT INTO plan_items(plan_id,position,exercise,target_sets,rep_min,rep_max,target_rpe) VALUES (?,?,?,?,?,?,?)`,
+			p.ID, it.Position, it.Exercise, it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE); err != nil {
+			return training.Plan{}, err
+		}
+		p.TotalSets += it.TargetSets
+	}
+	return p, tx.Commit()
+}
+
+func (s *Store) ListPlans(ctx context.Context) ([]training.Plan, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT p.id,p.name,p.notes,COALESCE(SUM(i.target_sets),0),COUNT(i.id)
+FROM plans p LEFT JOIN plan_items i ON i.plan_id=p.id
+GROUP BY p.id ORDER BY p.name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []training.Plan
+	for rows.Next() {
+		var p training.Plan
+		var items int
+		if err = rows.Scan(&p.ID, &p.Name, &p.Notes, &p.TotalSets, &items); err != nil {
+			return nil, err
+		}
+		// Items are left empty here; the list view only needs the totals.
+		p.Items = make([]training.PlanItem, 0, items)
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) GetPlan(ctx context.Context, id int64) (training.Plan, error) {
+	var p training.Plan
+	err := s.db.QueryRowContext(ctx, `SELECT id,name,notes FROM plans WHERE id=?`, id).Scan(&p.ID, &p.Name, &p.Notes)
+	if errors.Is(err, sql.ErrNoRows) {
+		return p, training.ErrNotFound
+	}
+	if err != nil {
+		return p, err
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT position,exercise,target_sets,rep_min,rep_max,target_rpe FROM plan_items WHERE plan_id=? ORDER BY position`, id)
+	if err != nil {
+		return p, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var it training.PlanItem
+		if err = rows.Scan(&it.Position, &it.Exercise, &it.TargetSets, &it.RepMin, &it.RepMax, &it.TargetRPE); err != nil {
+			return p, err
+		}
+		p.Items = append(p.Items, it)
+		p.TotalSets += it.TargetSets
+	}
+	return p, rows.Err()
+}
+
+func (s *Store) DeletePlan(ctx context.Context, id int64) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM plans WHERE id=?`, id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return training.ErrNotFound
+	}
+	return nil
+}
+
+// SessionProgress lists the session's planned exercises with how many sets are
+// done, then any exercise performed that the plan did not prescribe.
+func (s *Store) SessionProgress(ctx context.Context, sessionID int64) ([]training.PlanProgress, error) {
+	var planID sql.NullInt64
+	err := s.db.QueryRowContext(ctx, `SELECT plan_id FROM sessions WHERE id=?`, sessionID).Scan(&planID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, training.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT i.exercise, i.target_sets, i.rep_min, i.rep_max, i.target_rpe,
+       (SELECT COUNT(*) FROM sets st WHERE st.session_id=? AND st.exercise=i.exercise),
+       COALESCE(g.muscle_group,'')
+FROM plan_items i LEFT JOIN exercise_groups g ON g.exercise=i.exercise
+WHERE i.plan_id=? ORDER BY i.position`, sessionID, planID.Int64)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	planned := map[string]bool{}
+	var out []training.PlanProgress
+	for rows.Next() {
+		var v training.PlanProgress
+		if err = rows.Scan(&v.Exercise, &v.TargetSets, &v.RepMin, &v.RepMax, &v.TargetRPE, &v.DoneSets, &v.MuscleGroup); err != nil {
+			return nil, err
+		}
+		planned[v.Exercise] = true
+		out = append(out, v)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	extra, err := s.db.QueryContext(ctx, `
+SELECT st.exercise, COUNT(*), COALESCE(g.muscle_group,'')
+FROM sets st LEFT JOIN exercise_groups g ON g.exercise=st.exercise
+WHERE st.session_id=? GROUP BY st.exercise ORDER BY MIN(st.position)`, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer extra.Close()
+	for extra.Next() {
+		var v training.PlanProgress
+		if err = extra.Scan(&v.Exercise, &v.DoneSets, &v.MuscleGroup); err != nil {
+			return nil, err
+		}
+		if !planned[v.Exercise] {
+			out = append(out, v)
+		}
+	}
+	return out, extra.Err()
 }
 
 // DeleteSession removes a session and, by ON DELETE CASCADE, all of its sets.

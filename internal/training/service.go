@@ -28,13 +28,80 @@ type Service struct {
 func NewService(store Store, clock Clock) *Service { return &Service{store: store, clock: clock} }
 
 func (s *Service) StartSession(ctx context.Context, date string) (Session, error) {
+	return s.StartPlannedSession(ctx, date, 0)
+}
+
+// StartPlannedSession begins a session optionally following a plan. planID 0
+// means an unplanned, free-form session.
+func (s *Service) StartPlannedSession(ctx context.Context, date string, planID int64) (Session, error) {
 	if date == "" {
 		date = s.clock().In(s.clock().Location()).Format("2006-01-02")
 	}
 	if _, err := time.Parse("2006-01-02", date); err != nil {
 		return Session{}, ErrValidation
 	}
-	return s.store.Start(ctx, Session{Date: date})
+	if planID < 0 {
+		return Session{}, ErrValidation
+	}
+	return s.store.Start(ctx, Session{Date: date, PlanID: planID})
+}
+
+// CreatePlan stores a reusable workout template. Exercise names are normalized
+// exactly as AddSet normalizes them, so a plan item always matches the sets
+// logged against it.
+func (s *Service) CreatePlan(ctx context.Context, p Plan) (Plan, error) {
+	p.Name = strings.TrimSpace(p.Name)
+	if p.Name == "" || len(p.Items) == 0 || len(p.Items) > 40 {
+		return Plan{}, ErrValidation
+	}
+	for i := range p.Items {
+		it := &p.Items[i]
+		it.Exercise = strings.ToLower(strings.TrimSpace(it.Exercise))
+		if it.Exercise == "" || it.TargetSets <= 0 || it.TargetSets > 20 {
+			return Plan{}, ErrValidation
+		}
+		if it.RepMin < 0 || it.RepMax < 0 || (it.RepMax > 0 && it.RepMin > it.RepMax) {
+			return Plan{}, fmt.Errorf("%w: rep range for %q is inverted", ErrValidation, it.Exercise)
+		}
+		if it.TargetRPE != 0 && (it.TargetRPE < 1 || it.TargetRPE > 10) {
+			return Plan{}, ErrValidation
+		}
+	}
+	return s.store.CreatePlan(ctx, p)
+}
+
+func (s *Service) ListPlans(ctx context.Context) ([]Plan, error) {
+	out, err := s.store.ListPlans(ctx)
+	if err == nil && out == nil {
+		out = []Plan{}
+	}
+	return out, err
+}
+
+func (s *Service) GetPlan(ctx context.Context, id int64) (Plan, error) {
+	if id <= 0 {
+		return Plan{}, ErrValidation
+	}
+	return s.store.GetPlan(ctx, id)
+}
+
+func (s *Service) DeletePlan(ctx context.Context, id int64) error {
+	if id <= 0 {
+		return ErrValidation
+	}
+	return s.store.DeletePlan(ctx, id)
+}
+
+// SessionProgress reports planned versus completed sets for a session.
+func (s *Service) SessionProgress(ctx context.Context, sessionID int64) ([]PlanProgress, error) {
+	if sessionID <= 0 {
+		return nil, ErrValidation
+	}
+	out, err := s.store.SessionProgress(ctx, sessionID)
+	if err == nil && out == nil {
+		out = []PlanProgress{}
+	}
+	return out, err
 }
 func (s *Service) AddSet(ctx context.Context, in AddSetInput) (Set, float64, error) {
 	in.Exercise = strings.ToLower(strings.TrimSpace(in.Exercise))

@@ -11,6 +11,11 @@ type Store interface {
 	ListSessions(context.Context, ListFilter) ([]SessionSummary, error)
 	RecentExercises(context.Context, int) ([]ExerciseMemory, error)
 	DeleteSession(context.Context, int64) (int, error)
+	CreatePlan(context.Context, Plan) (Plan, error)
+	ListPlans(context.Context) ([]Plan, error)
+	GetPlan(context.Context, int64) (Plan, error)
+	DeletePlan(context.Context, int64) error
+	SessionProgress(context.Context, int64) ([]PlanProgress, error)
 	ExerciseHistory(context.Context, string, int) (ExerciseHistory, error)
 	WeeklyVolume(context.Context, ListFilter) ([]WeeklyVolume, error)
 	SetExerciseGroup(context.Context, ExerciseGroup) error

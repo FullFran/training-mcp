@@ -63,13 +63,15 @@ type ExerciseInfo struct {
 }
 
 type pageData struct {
-	Base    string
-	Today   string
-	Session training.Session
-	Recent  []training.ExerciseMemory
-	History []training.SessionSummary
-	Volume  []training.GroupVolume
-	Blocks  []ExerciseBlock
+	Base     string
+	Today    string
+	Session  training.Session
+	Recent   []training.ExerciseMemory
+	History  []training.SessionSummary
+	Volume   []training.GroupVolume
+	Blocks   []ExerciseBlock
+	Plans    []training.Plan
+	Progress []training.PlanProgress
 	// InfoJSON is a name -> ExerciseInfo map the client uses to show "last
 	// time" and the record without another round trip.
 	InfoJSON template.JS
@@ -97,6 +99,27 @@ func New(service *training.Service, clock training.Clock, basePath string) (*Ser
 		"num":      formatNumber,
 		"rpeScale": rpeScale,
 		"add":      func(a, b int) int { return a + b },
+		"doneCount": func(items []training.PlanProgress) int {
+			n := 0
+			for _, it := range items {
+				if it.Done() {
+					n++
+				}
+			}
+			return n
+		},
+		// targetReps prefills the middle of the prescribed range, the sensible
+		// first attempt when the plan says "10 to 12".
+		"targetReps": func(p training.PlanProgress) int {
+			switch {
+			case p.RepMin > 0 && p.RepMax > 0:
+				return (p.RepMin + p.RepMax) / 2
+			case p.RepMin > 0:
+				return p.RepMin
+			default:
+				return 0
+			}
+		},
 		"pct": func(v, max float64) string {
 			if max <= 0 {
 				return "0"
@@ -138,6 +161,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST "+b+"/sets/{id}/delete", s.deleteSet)
 	s.mux.HandleFunc("POST "+b+"/sets/{id}/update", s.updateSet)
 	s.mux.HandleFunc("GET "+b+"/history", s.history)
+	s.mux.HandleFunc("POST "+b+"/plan", s.choosePlan)
 	s.mux.HandleFunc("GET "+b+"/s/{id}", s.session)
 	s.mux.HandleFunc("GET "+b+"/manifest.webmanifest", s.manifest)
 	s.mux.HandleFunc("GET "+b+"/sw.js", s.serviceWorker)
@@ -349,10 +373,55 @@ func (s *Server) todayData(ctx context.Context, message string) (pageData, error
 	if data.Recent, err = s.service.RecentExercises(ctx, recentExerciseLimit); err != nil {
 		return data, err
 	}
+	if data.Plans, err = s.service.ListPlans(ctx); err != nil {
+		return data, err
+	}
+	if data.Session.ID > 0 && data.Session.PlanID > 0 {
+		if data.Progress, err = s.service.SessionProgress(ctx, data.Session.ID); err != nil {
+			return data, err
+		}
+	}
 	if err = s.decorate(ctx, &data); err != nil {
 		return data, err
 	}
 	return data, nil
+}
+
+// choosePlan starts today's session from a plan. It refuses once sets exist,
+// because the plan is snapshotted at session start and switching afterwards
+// would silently reinterpret work already logged.
+func (s *Server) choosePlan(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.fail(w, err)
+		return
+	}
+	planID, err := strconv.ParseInt(strings.TrimSpace(r.PostFormValue("plan_id")), 10, 64)
+	if err != nil || planID <= 0 {
+		http.Redirect(w, r, s.base+"/", http.StatusSeeOther)
+		return
+	}
+	today := s.todayDate()
+	sessions, err := s.service.ListSessions(r.Context(), training.ListFilter{From: today, To: today, Limit: 1})
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	if len(sessions) > 0 {
+		if sessions[0].SetCount > 0 {
+			http.Redirect(w, r, s.base+"/", http.StatusSeeOther)
+			return
+		}
+		// An empty session from an earlier choice is replaced, not stacked.
+		if _, err := s.service.DeleteSession(r.Context(), sessions[0].ID); err != nil {
+			s.fail(w, err)
+			return
+		}
+	}
+	if _, err := s.service.StartPlannedSession(r.Context(), today, planID); err != nil {
+		s.fail(w, err)
+		return
+	}
+	http.Redirect(w, r, s.base+"/", http.StatusSeeOther)
 }
 
 // decorate builds the per-exercise blocks and the "last time / record" map. It

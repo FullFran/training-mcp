@@ -24,6 +24,43 @@
 </header>
 
 <main>
+  {{if .Progress}}
+  <section class="plan card" aria-label="Plan de hoy">
+    <header class="plan-head">
+      <strong>{{.Session.PlanName}}</strong>
+      <span class="muted">{{doneCount .Progress}}/{{len .Progress}} ejercicios</span>
+    </header>
+    <ol class="planned">
+      {{range .Progress}}
+      <li class="{{if .Done}}ok{{end}}{{if eq .TargetSets 0}} extra{{end}}"
+          data-exercise="{{.Exercise}}"
+          data-reps="{{targetReps .}}"
+          data-rpe="{{num .TargetRPE}}">
+        <span class="chk">{{if .Done}}✓{{else}}○{{end}}</span>
+        <span class="what">
+          <span class="ex">{{.Exercise}}</span>
+          <span class="rx">
+            {{if eq .TargetSets 0}}fuera de plan
+            {{else}}{{.RepMin}}{{if ne .RepMax .RepMin}}-{{.RepMax}}{{end}} reps{{if .TargetRPE}} @{{num .TargetRPE}}{{end}}{{end}}
+          </span>
+        </span>
+        <span class="count">{{.DoneSets}}{{if .TargetSets}}/{{.TargetSets}}{{end}}</span>
+      </li>
+      {{end}}
+    </ol>
+  </section>
+  {{else if .Plans}}
+  <form class="card plan-pick" method="post" action="{{.Base}}/plan">
+    <label class="field">
+      <span>Entrenar con un plan</span>
+      <select name="plan_id">
+        {{range .Plans}}<option value="{{.ID}}">{{.Name}} · {{.TotalSets}} series</option>{{end}}
+      </select>
+    </label>
+    <button type="submit" class="ghost wide">Empezar este plan</button>
+  </form>
+  {{end}}
+
   <form id="entry" class="card"
         hx-post="{{.Base}}/sets"
         hx-target="#panel"

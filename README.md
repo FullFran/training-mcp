@@ -25,6 +25,8 @@ The unauthenticated `GET /health` endpoint returns `{"status":"ok"}`. MCP is onl
 
 `start_session`, `add_set`, `update_set`, `delete_set`, `get_session`, and `list_sessions` cover logging. Exercises are trimmed/lowercased, positions remain dense, and totals are recalculated from stored SI values.
 
+`create_plan`, `list_plans`, `get_plan` and `delete_plan` manage reusable workout plans: an ordered list of exercises with a target set count and an optional rep range and RPE. Load is deliberately not planned — the prescription is effort and reps, and the weight that meets it is discovered at the gym. `start_session` takes an optional `plan_id`; `session_progress` then reports planned versus completed sets per exercise, listing anything done off-plan with `target_sets` 0 so it stays visible.
+
 `delete_session` removes a session and every set in it, reporting how many were destroyed. `exercise_history` returns one exercise's sets newest first with each set's estimated 1RM plus its all-time best, so progression can be judged in one call instead of reading every session. `weekly_volume` buckets SI per muscle group by training week.
 
 `set_exercise_group`, `list_exercise_groups`, and `volume_by_muscle` add per-muscle-group volume. Each exercise maps to exactly one muscle group, so group SI is a true partition of session SI — every set counts once and the group totals add up to the session total. Sets whose exercise has no mapping are reported under an empty group rather than dropped, so gaps in the catalogue stay visible.
@@ -37,6 +39,8 @@ without going through ChatGPT. It is a driving adapter over the same
 shared with the MCP tools and cannot drift apart.
 
 - Served only under the configured secret prefix; unset means not served at all.
+- A plan can be started for the day; its exercises become a checklist showing
+  done/target sets, and tapping one loads its prescription into the form.
 - Sets are grouped by exercise, the way a workout is performed and read back.
 - The entry form shows what was done last time for that exercise and the
   standing estimated-1RM record; a set matching the record is badged `PR`.
@@ -54,12 +58,18 @@ debt, not a design: see the open issues.
 
 ## Scope boundary
 
-This MVP excludes analytics, recommendations, templates, planned workouts,
-multi-user identity/RBAC, REST/GraphQL, OAuth/JWT/token rotation, audit history,
-cloud sync/backups, concurrent-writer controls, and formula changes.
+This MVP excludes recommendations, multi-user identity/RBAC, REST/GraphQL,
+OAuth/JWT/token rotation, audit history, cloud sync/backups, concurrent-writer
+controls, and formula changes.
 
-The original boundary also excluded frontend/mobile clients. That exclusion was
-deliberately lifted to add the PWA above; everything else still stands.
+Three exclusions were deliberately lifted as the tool proved useful:
+frontend/mobile clients (the PWA), analytics (per-muscle volume and exercise
+progression), and planned workouts (plans). Everything else still stands.
+
+Plans record prescriptions only. The volume-landmark feedback loop that the
+original spreadsheet automated — rating fatigue, pump and recovery per muscle
+group to compute next week's set counts — is **not** implemented; the numbers a
+plan carries are the ones you decide.
 
 ## Documentation
 

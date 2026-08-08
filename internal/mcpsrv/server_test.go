@@ -38,7 +38,7 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_set", "delete_session", "delete_set", "exercise_history", "get_session", "list_exercise_groups", "list_sessions", "set_exercise_group", "start_session", "update_set", "volume_by_muscle", "weekly_volume"}) {
+	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_set", "create_plan", "delete_plan", "delete_session", "delete_set", "exercise_history", "get_plan", "get_session", "list_exercise_groups", "list_plans", "list_sessions", "session_progress", "set_exercise_group", "start_session", "update_set", "volume_by_muscle", "weekly_volume"}) {
 		t.Fatalf("tools=%v", toolNames(tools))
 	}
 	for _, tool := range tools.Tools {
@@ -109,7 +109,7 @@ func TestServerToolsDescribeTheirInputsAndValidationContract(t *testing.T) {
 	}{
 		{
 			name:        "start_session",
-			description: "Start a training session on an optional date. Omit date to use the server's current local date.",
+			description: "Start a training session on an optional date, optionally following a plan. Omit date to use the server's current local date.",
 			properties: map[string]map[string]any{
 				"date": {"description": "Training date in exact YYYY-MM-DD format.", "pattern": `^\d{4}-\d{2}-\d{2}$`},
 			},
@@ -416,5 +416,18 @@ func (testStore) ExerciseHistory(context.Context, string, int) (training.Exercis
 	return training.ExerciseHistory{}, nil
 }
 func (testStore) WeeklyVolume(context.Context, training.ListFilter) ([]training.WeeklyVolume, error) {
+	return nil, nil
+}
+
+func (testStore) CreatePlan(_ context.Context, p training.Plan) (training.Plan, error) {
+	p.ID = 1
+	return p, nil
+}
+func (testStore) ListPlans(context.Context) ([]training.Plan, error) { return nil, nil }
+func (testStore) GetPlan(context.Context, int64) (training.Plan, error) {
+	return training.Plan{}, nil
+}
+func (testStore) DeletePlan(context.Context, int64) error { return nil }
+func (testStore) SessionProgress(context.Context, int64) ([]training.PlanProgress, error) {
 	return nil, nil
 }

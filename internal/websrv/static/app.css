@@ -411,3 +411,35 @@ button { font: inherit; cursor: pointer; }
 .volume .bar { height: 8px; border-radius: 999px; background: #10131a; overflow: hidden; }
 .volume .bar span { display: block; height: 100%; background: var(--accent); }
 .volume .val { font-variant-numeric: tabular-nums; color: var(--text); }
+
+/* --- plan --------------------------------------------------------------- */
+.plan { gap: 10px; }
+.plan-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.plan-pick select {
+  width: 100%; min-height: var(--tap);
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #10131a;
+  color: var(--text);
+  font-size: 16px;
+}
+.planned { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.planned li {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #10131a;
+}
+.planned li.ok { border-color: var(--accent); }
+.planned li.extra { opacity: .75; border-style: dashed; }
+.planned .chk { color: var(--muted); font-size: 15px; }
+.planned li.ok .chk { color: var(--accent); }
+.planned .ex { display: block; font-size: 15px; }
+.planned .rx { display: block; color: var(--muted); font-size: 13px; }
+.planned .count { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; }
+.planned li.ok .count { color: var(--accent); font-weight: 700; }

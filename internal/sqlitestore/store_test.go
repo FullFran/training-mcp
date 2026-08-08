@@ -339,3 +339,107 @@ func TestStoreWeeklyVolumeBucketsByMondayOfTheTrainingWeek(t *testing.T) {
 		t.Fatalf("WeeklyVolume() = %#v, want %#v", got, want)
 	}
 }
+
+func TestStorePlanRoundTripAndSessionProgress(t *testing.T) {
+	store, err := Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	plan, err := store.CreatePlan(ctx, training.Plan{
+		Name:  "Empuje A",
+		Notes: "semana 1",
+		Items: []training.PlanItem{
+			{Exercise: "banca", TargetSets: 3, RepMin: 8, RepMax: 10, TargetRPE: 9},
+			{Exercise: "laterales polea", TargetSets: 4, RepMin: 12, RepMax: 15, TargetRPE: 9},
+		},
+	})
+	if err != nil || plan.ID == 0 || plan.TotalSets != 7 {
+		t.Fatalf("CreatePlan() = %#v, %v", plan, err)
+	}
+	// Positions are assigned from the given order.
+	if plan.Items[0].Position != 1 || plan.Items[1].Position != 2 {
+		t.Fatalf("positions not assigned: %#v", plan.Items)
+	}
+
+	got, err := store.GetPlan(ctx, plan.ID)
+	if err != nil || got.Name != "Empuje A" || len(got.Items) != 2 || got.TotalSets != 7 {
+		t.Fatalf("GetPlan() = %#v, %v", got, err)
+	}
+	if got.Items[0].RepMin != 8 || got.Items[0].RepMax != 10 || got.Items[0].TargetRPE != 9 {
+		t.Fatalf("prescription lost: %#v", got.Items[0])
+	}
+
+	listed, err := store.ListPlans(ctx)
+	if err != nil || len(listed) != 1 || listed[0].TotalSets != 7 {
+		t.Fatalf("ListPlans() = %#v, %v", listed, err)
+	}
+
+	// A session started from the plan snapshots its name.
+	session, err := store.Start(ctx, training.Session{Date: "2026-08-08", PlanID: plan.ID})
+	if err != nil || session.PlanName != "Empuje A" {
+		t.Fatalf("Start() = %#v, %v", session, err)
+	}
+	for range 2 {
+		if _, _, err := store.AddSet(ctx, training.AddSetInput{SessionID: session.ID, Exercise: "banca", WeightKG: 80, Reps: 9, RPE: 9}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// One exercise done that the plan never prescribed.
+	if _, _, err := store.AddSet(ctx, training.AddSetInput{SessionID: session.ID, Exercise: "curl", WeightKG: 10, Reps: 12, RPE: 8}); err != nil {
+		t.Fatal(err)
+	}
+
+	progress, err := store.SessionProgress(ctx, session.ID)
+	if err != nil || len(progress) != 3 {
+		t.Fatalf("SessionProgress() = %#v, %v", progress, err)
+	}
+	if progress[0].Exercise != "banca" || progress[0].DoneSets != 2 || progress[0].TargetSets != 3 || progress[0].Done() {
+		t.Fatalf("banca progress = %#v, want 2/3 incomplete", progress[0])
+	}
+	if progress[1].Exercise != "laterales polea" || progress[1].DoneSets != 0 {
+		t.Fatalf("untouched plan item = %#v", progress[1])
+	}
+	// Off-plan work is visible, not hidden.
+	if progress[2].Exercise != "curl" || progress[2].TargetSets != 0 || progress[2].DoneSets != 1 {
+		t.Fatalf("off-plan exercise = %#v", progress[2])
+	}
+
+	// Deleting the plan must not rewrite the session's recorded plan name.
+	if err := store.DeletePlan(ctx, plan.ID); err != nil {
+		t.Fatal(err)
+	}
+	after, err := store.GetSession(ctx, session.ID)
+	if err != nil || after.PlanName != "Empuje A" {
+		t.Fatalf("session lost its plan name after the plan was deleted: %#v", after)
+	}
+	if _, err := store.GetPlan(ctx, plan.ID); !errors.Is(err, training.ErrNotFound) {
+		t.Fatalf("GetPlan after delete = %v, want not found", err)
+	}
+}
+
+func TestStoreMigrationsAreAppliedOnceAcrossReopen(t *testing.T) {
+	path := t.TempDir() + "/training.db"
+	store, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CreatePlan(context.Background(), training.Plan{
+		Name:  "p",
+		Items: []training.PlanItem{{Exercise: "banca", TargetSets: 1}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	store.Close()
+	// Reopening must not fail: migration 003 uses ALTER TABLE, which would
+	// error if migrations were replayed instead of version-tracked.
+	store, err = Open(path)
+	if err != nil {
+		t.Fatalf("reopen failed, migrations are not idempotent: %v", err)
+	}
+	defer store.Close()
+	plans, err := store.ListPlans(context.Background())
+	if err != nil || len(plans) != 1 {
+		t.Fatalf("plans after reopen = %#v, %v", plans, err)
+	}
+}
