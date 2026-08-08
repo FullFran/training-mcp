@@ -38,7 +38,7 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_set", "delete_set", "get_session", "list_exercise_groups", "list_sessions", "set_exercise_group", "start_session", "update_set", "volume_by_muscle"}) {
+	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_set", "delete_session", "delete_set", "exercise_history", "get_session", "list_exercise_groups", "list_sessions", "set_exercise_group", "start_session", "update_set", "volume_by_muscle", "weekly_volume"}) {
 		t.Fatalf("tools=%v", toolNames(tools))
 	}
 	for _, tool := range tools.Tools {
@@ -408,5 +408,13 @@ func (testStore) ExerciseGroups(context.Context) ([]training.ExerciseGroup, erro
 	return nil, nil
 }
 func (testStore) VolumeByGroup(context.Context, training.ListFilter) ([]training.GroupVolume, error) {
+	return nil, nil
+}
+
+func (testStore) DeleteSession(context.Context, int64) (int, error) { return 0, nil }
+func (testStore) ExerciseHistory(context.Context, string, int) (training.ExerciseHistory, error) {
+	return training.ExerciseHistory{}, nil
+}
+func (testStore) WeeklyVolume(context.Context, training.ListFilter) ([]training.WeeklyVolume, error) {
 	return nil, nil
 }

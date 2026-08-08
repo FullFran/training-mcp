@@ -10,6 +10,9 @@ type Store interface {
 	GetSession(context.Context, int64) (Session, error)
 	ListSessions(context.Context, ListFilter) ([]SessionSummary, error)
 	RecentExercises(context.Context, int) ([]ExerciseMemory, error)
+	DeleteSession(context.Context, int64) (int, error)
+	ExerciseHistory(context.Context, string, int) (ExerciseHistory, error)
+	WeeklyVolume(context.Context, ListFilter) ([]WeeklyVolume, error)
 	SetExerciseGroup(context.Context, ExerciseGroup) error
 	ExerciseGroups(context.Context) ([]ExerciseGroup, error)
 	VolumeByGroup(context.Context, ListFilter) ([]GroupVolume, error)

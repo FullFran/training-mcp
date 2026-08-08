@@ -275,6 +275,117 @@ ORDER BY id DESC LIMIT ?`, limit)
 	return out, rows.Err()
 }
 
+// DeleteSession removes a session and, by ON DELETE CASCADE, all of its sets.
+// It returns how many sets went with it so the caller can report the cost of an
+// irreversible delete.
+func (s *Store) DeleteSession(ctx context.Context, id int64) (int, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	var n int
+	err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM sets WHERE session_id=?`, id).Scan(&n)
+	if err != nil {
+		return 0, err
+	}
+	res, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE id=?`, id)
+	if err != nil {
+		return 0, err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if affected == 0 {
+		return 0, training.ErrNotFound
+	}
+	return n, tx.Commit()
+}
+
+func (s *Store) ExerciseHistory(ctx context.Context, exercise string, limit int) (training.ExerciseHistory, error) {
+	out := training.ExerciseHistory{Exercise: exercise, Sets: []training.ExerciseSet{}}
+	err := s.db.QueryRowContext(ctx, `SELECT muscle_group FROM exercise_groups WHERE exercise=?`, exercise).Scan(&out.MuscleGroup)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return out, err
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT st.id,st.session_id,se.date,st.weight_kg,st.reps,st.rpe,st.si
+FROM sets st JOIN sessions se ON se.id=st.session_id
+WHERE st.exercise=?
+ORDER BY se.date DESC, st.position DESC LIMIT ?`, exercise, limit)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var v training.ExerciseSet
+		if err = rows.Scan(&v.SetID, &v.SessionID, &v.Date, &v.WeightKG, &v.Reps, &v.RPE, &v.SI); err != nil {
+			return out, err
+		}
+		v.SI = training.NormalizeSI(v.SI)
+		v.Est1RM = training.Epley1RM(v.WeightKG, v.Reps)
+		out.Sets = append(out.Sets, v)
+	}
+	if err = rows.Err(); err != nil {
+		return out, err
+	}
+	// The record is computed over the whole history, not just the page returned.
+	var best training.ExerciseSet
+	err = s.db.QueryRowContext(ctx, `
+SELECT st.id,st.session_id,se.date,st.weight_kg,st.reps,st.rpe,st.si
+FROM sets st JOIN sessions se ON se.id=st.session_id
+WHERE st.exercise=?
+ORDER BY st.weight_kg*(1+CAST(st.reps AS REAL)/30) DESC, se.date DESC LIMIT 1`, exercise).
+		Scan(&best.SetID, &best.SessionID, &best.Date, &best.WeightKG, &best.Reps, &best.RPE, &best.SI)
+	if errors.Is(err, sql.ErrNoRows) {
+		return out, nil
+	}
+	if err != nil {
+		return out, err
+	}
+	best.SI = training.NormalizeSI(best.SI)
+	best.Est1RM = training.Epley1RM(best.WeightKG, best.Reps)
+	out.Best = &best
+	return out, nil
+}
+
+// WeeklyVolume buckets SI per muscle group by training week. The week start is
+// computed as the Monday on or before the session date.
+func (s *Store) WeeklyVolume(ctx context.Context, f training.ListFilter) ([]training.WeeklyVolume, error) {
+	q := `SELECT date(se.date, '-' || ((CAST(strftime('%w', se.date) AS INTEGER) + 6) % 7) || ' days') AS wk,
+COALESCE(g.muscle_group,''),COALESCE(SUM(st.si),0),COUNT(st.id)
+FROM sets st
+JOIN sessions se ON se.id=st.session_id
+LEFT JOIN exercise_groups g ON g.exercise=st.exercise
+WHERE 1=1`
+	args := []any{}
+	if f.From != "" {
+		q += ` AND se.date>=?`
+		args = append(args, f.From)
+	}
+	if f.To != "" {
+		q += ` AND se.date<=?`
+		args = append(args, f.To)
+	}
+	q += ` GROUP BY wk,2 ORDER BY wk DESC,3 DESC`
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []training.WeeklyVolume
+	for rows.Next() {
+		var v training.WeeklyVolume
+		if err = rows.Scan(&v.WeekStart, &v.MuscleGroup, &v.TotalSI, &v.Sets); err != nil {
+			return nil, err
+		}
+		v.TotalSI = training.NormalizeSI(v.TotalSI)
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) SetExerciseGroup(ctx context.Context, g training.ExerciseGroup) error {
 	_, err := s.db.ExecContext(ctx, `
 INSERT INTO exercise_groups(exercise,muscle_group,updated_at) VALUES (?,?,CURRENT_TIMESTAMP)

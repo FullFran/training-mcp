@@ -271,3 +271,143 @@ button { font: inherit; cursor: pointer; }
   .alert { background: #fdeaea; border-color: #f3bcbc; color: #7f1d1d; }
   @keyframes flash { from { background: #dcfce7; } to { background: var(--card); } }
 }
+
+/* --- previous performance --------------------------------------------- */
+.previous {
+  margin: -4px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #10131a;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.previous strong { color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* --- exercise blocks --------------------------------------------------- */
+.blocks { display: grid; gap: 10px; }
+.block {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.block > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.block .ex { font-size: 15px; font-weight: 600; }
+.block .tag {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #10131a;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+.block > header .si { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+.block .sets { display: block; padding: 4px 0; }
+.block .sets li {
+  display: grid;
+  grid-template-columns: 24px 1fr auto auto auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.block .sets li + li { border-top: 1px solid var(--line); }
+.block .n { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.block .detail { font-size: 15px; font-variant-numeric: tabular-nums; }
+.block .pr {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .3px;
+}
+.edit {
+  min-width: 36px; min-height: 36px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.edit-form {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 6px;
+  padding-top: 8px;
+}
+.edit-form input { min-height: 44px; font-size: 15px; text-align: center; padding: 0 4px; }
+.edit-form .ok {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+/* --- rest timer -------------------------------------------------------- */
+.rest {
+  position: fixed;
+  left: 12px; right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  z-index: 20;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .38);
+}
+.rest-adj {
+  min-height: 46px; padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+}
+.rest-time {
+  min-height: 46px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.rest.done { border-color: var(--accent); }
+.rest.done .rest-time { color: var(--accent); }
+
+/* --- muscle volume ----------------------------------------------------- */
+.volume { display: grid; gap: 6px; margin: 0 0 16px; }
+.volume .row-v {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.volume .name { color: var(--muted); text-transform: capitalize; }
+.volume .bar { height: 8px; border-radius: 999px; background: #10131a; overflow: hidden; }
+.volume .bar span { display: block; height: 100%; background: var(--accent); }
+.volume .val { font-variant-numeric: tabular-nums; color: var(--text); }

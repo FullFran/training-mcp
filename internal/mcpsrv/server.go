@@ -59,6 +59,20 @@ type ListInput struct {
 type ListOut struct {
 	Sessions []training.SessionSummary `json:"sessions"`
 }
+type DeleteSessionOut struct {
+	SessionID   int64 `json:"session_id"`
+	DeletedSets int   `json:"deleted_sets"`
+}
+type HistoryInput struct {
+	Exercise string `json:"exercise" jsonschema:"Non-empty exercise name; it is trimmed and lowercased to match stored sets."`
+	Limit    int    `json:"limit,omitempty" jsonschema:"Maximum sets to return; defaults to 50 and accepts 1 through 500."`
+}
+type HistoryOut struct {
+	History training.ExerciseHistory `json:"history"`
+}
+type WeeklyOut struct {
+	Weeks []training.WeeklyVolume `json:"weeks"`
+}
 type GroupInput struct {
 	Exercise    string `json:"exercise" jsonschema:"Non-empty exercise name; it is trimmed and lowercased to match stored sets."`
 	MuscleGroup string `json:"muscle_group" jsonschema:"Muscle group the exercise trains; must be one of the supported values."`
@@ -133,6 +147,29 @@ func New(service *training.Service) *Server {
 		v, err := service.ListSessions(ctx, training.ListFilter{Limit: in.Limit, From: in.From, To: in.To})
 		return nil, ListOut{Sessions: v}, toolError(err)
 	})
+	deleteSessionSchema := mustInputSchema[SessionInput]()
+	setPositiveID(deleteSessionSchema.Properties["session_id"])
+	mcp.AddTool(s, &mcp.Tool{Name: "delete_session", Description: "Permanently delete a training session and every set in it. Irreversible; returns how many sets were destroyed. Use to remove an empty or mistaken session.", InputSchema: deleteSessionSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in SessionInput) (*mcp.CallToolResult, DeleteSessionOut, error) {
+		n, err := service.DeleteSession(ctx, in.SessionID)
+		return nil, DeleteSessionOut{SessionID: in.SessionID, DeletedSets: n}, toolError(err)
+	})
+	historySchema := mustInputSchema[HistoryInput]()
+	historySchema.Properties["exercise"].Pattern = `.*\S.*`
+	historySchema.Properties["limit"].Default = json.RawMessage("50")
+	historySchema.Properties["limit"].Minimum = jsonschema.Ptr(1.0)
+	historySchema.Properties["limit"].Maximum = jsonschema.Ptr(500.0)
+	mcp.AddTool(s, &mcp.Tool{Name: "exercise_history", Description: "All recorded sets of one exercise, newest first, with each set's estimated 1RM, plus the best set ever recorded for it. Use this to judge progression instead of reading whole sessions.", InputSchema: historySchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in HistoryInput) (*mcp.CallToolResult, HistoryOut, error) {
+		v, err := service.ExerciseHistory(ctx, in.Exercise, in.Limit)
+		return nil, HistoryOut{History: v}, toolError(err)
+	})
+	weeklySchema := mustInputSchema[VolumeInput]()
+	weeklySchema.Properties["from"].Pattern = `^\d{4}-\d{2}-\d{2}$`
+	weeklySchema.Properties["to"].Pattern = `^\d{4}-\d{2}-\d{2}$`
+	mcp.AddTool(s, &mcp.Tool{Name: "weekly_volume", Description: "SI and set count per muscle group per training week, newest week first. Week start is the Monday of that week. Use this to see whether a muscle group's stimulus is rising or falling over time.", InputSchema: weeklySchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in VolumeInput) (*mcp.CallToolResult, WeeklyOut, error) {
+		v, err := service.WeeklyVolume(ctx, training.ListFilter{From: in.From, To: in.To})
+		return nil, WeeklyOut{Weeks: v}, toolError(err)
+	})
+
 	groupSchema := mustInputSchema[GroupInput]()
 	groupSchema.Properties["exercise"].Pattern = `.*\S.*`
 	groupSchema.Properties["muscle_group"].Enum = muscleGroupEnum()
@@ -152,12 +189,19 @@ func New(service *training.Service) *Server {
 		return nil, VolumeOut{Volume: v}, toolError(err)
 	})
 
-	h := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s }, nil)
+	// Stateless: the server keeps no per-client session state, so restarting the
+	// container no longer invalidates a live conversation. These tools are plain
+	// request/response with no server-initiated notifications, so nothing is lost.
+	h := mcp.NewStreamableHTTPHandler(
+		func(*http.Request) *mcp.Server { return s },
+		&mcp.StreamableHTTPOptions{Stateless: true},
+	)
 	return &Server{mcp: s, handler: h}
 }
 func (s *Server) Handler() http.Handler { return s.handler }
 func (s *Server) ToolNames() []string {
-	return []string{"start_session", "add_set", "update_set", "delete_set", "get_session", "list_sessions",
+	return []string{"start_session", "add_set", "update_set", "delete_set", "delete_session",
+		"get_session", "list_sessions", "exercise_history", "weekly_volume",
 		"set_exercise_group", "list_exercise_groups", "volume_by_muscle"}
 }
 func muscleGroupEnum() []any {

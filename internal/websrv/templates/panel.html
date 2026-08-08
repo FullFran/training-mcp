@@ -4,30 +4,43 @@
   {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
 
   <div class="total">
-    <span>{{len .Session.Sets}} serie{{if ne (len .Session.Sets) 1}}s{{end}}</span>
+    <span>{{len .Session.Sets}} serie{{if ne (len .Session.Sets) 1}}s{{end}} · {{len .Blocks}} ejercicio{{if ne (len .Blocks) 1}}s{{end}}</span>
     <strong>SI {{num .Session.TotalSI}}</strong>
   </div>
 
-  {{if .Session.Sets}}
-  <ol class="sets">
-    {{range .Session.Sets}}
-    <li>
-      <div class="what">
-        <span class="ex">{{.Exercise}}</span>
-        <span class="detail">{{num .WeightKG}} kg × {{.Reps}} @{{num .RPE}}</span>
-      </div>
-      <span class="si">{{num .SI}}</span>
-      {{if not $.ReadOnly}}
-      <button class="del" type="button"
-              hx-post="{{$.Base}}/sets/{{.ID}}/delete"
-              hx-target="#panel"
-              hx-swap="outerHTML"
-              hx-confirm="¿Borrar esta serie?"
-              aria-label="Borrar serie">✕</button>
-      {{end}}
-    </li>
+  {{if .Blocks}}
+  <div class="blocks">
+    {{range .Blocks}}
+    <article class="block">
+      <header>
+        <div>
+          <span class="ex">{{.Exercise}}</span>
+          {{if .MuscleGroup}}<span class="tag">{{.MuscleGroup}}</span>{{end}}
+        </div>
+        <span class="si">{{num .TotalSI}}</span>
+      </header>
+      <ol class="sets">
+        {{$block := .}}
+        {{range $i, $set := .Sets}}
+        <li data-set-id="{{$set.ID}}"
+            data-weight="{{num $set.WeightKG}}" data-reps="{{$set.Reps}}" data-rpe="{{num $set.RPE}}">
+          <span class="n">{{add $i 1}}</span>
+          <span class="detail">{{num $set.WeightKG}} kg × {{$set.Reps}} @{{num $set.RPE}}</span>
+          {{if $block.IsRecord $set}}<span class="pr" title="Récord: mejor 1RM estimado">PR</span>{{end}}
+          <span class="si">{{num $set.SI}}</span>
+          {{if not $.ReadOnly}}
+          <button class="edit" type="button" aria-label="Editar serie">✎</button>
+          <button class="del" type="button"
+                  hx-post="{{$.Base}}/sets/{{$set.ID}}/delete"
+                  hx-target="#panel" hx-swap="outerHTML"
+                  hx-confirm="¿Borrar esta serie?" aria-label="Borrar serie">✕</button>
+          {{end}}
+        </li>
+        {{end}}
+      </ol>
+    </article>
     {{end}}
-  </ol>
+  </div>
   {{else}}
   <p class="empty">Sin series todavía. Añade la primera.</p>
   {{end}}

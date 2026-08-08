@@ -98,6 +98,47 @@ func (s *Service) RecentExercises(ctx context.Context, limit int) ([]ExerciseMem
 	return out, err
 }
 
+// DeleteSession removes a session and every set in it. Irreversible, so the
+// number of sets destroyed is returned for the caller to report.
+func (s *Service) DeleteSession(ctx context.Context, id int64) (int, error) {
+	if id <= 0 {
+		return 0, ErrValidation
+	}
+	return s.store.DeleteSession(ctx, id)
+}
+
+// ExerciseHistory returns one exercise's sets newest first, plus its best set
+// by estimated 1RM.
+func (s *Service) ExerciseHistory(ctx context.Context, exercise string, limit int) (ExerciseHistory, error) {
+	exercise = strings.ToLower(strings.TrimSpace(exercise))
+	if exercise == "" || limit < 0 || limit > 500 {
+		return ExerciseHistory{}, ErrValidation
+	}
+	if limit == 0 {
+		limit = 50
+	}
+	out, err := s.store.ExerciseHistory(ctx, exercise, limit)
+	if err == nil && out.Sets == nil {
+		out.Sets = []ExerciseSet{}
+	}
+	return out, err
+}
+
+// WeeklyVolume returns SI per muscle group bucketed by training week.
+func (s *Service) WeeklyVolume(ctx context.Context, f ListFilter) ([]WeeklyVolume, error) {
+	if (f.From != "" && !validDate(f.From)) || (f.To != "" && !validDate(f.To)) {
+		return nil, ErrValidation
+	}
+	if f.From != "" && f.To != "" && f.From > f.To {
+		return nil, fmt.Errorf("%w: invalid date range: from must not be after to", ErrValidation)
+	}
+	out, err := s.store.WeeklyVolume(ctx, f)
+	if err == nil && out == nil {
+		out = []WeeklyVolume{}
+	}
+	return out, err
+}
+
 // SetExerciseGroup assigns an exercise to a muscle group. The exercise name is
 // normalized the same way AddSet normalizes it, so the catalogue key always
 // matches what is stored on sets.

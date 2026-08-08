@@ -7,9 +7,11 @@ package websrv
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"errors"
 	"html/template"
 	"io/fs"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -40,12 +42,37 @@ type Server struct {
 	mux *http.ServeMux
 }
 
+// ExerciseBlock groups a session's sets by exercise, the way a workout is
+// actually performed and read back, instead of one flat chronological list.
+type ExerciseBlock struct {
+	Exercise    string
+	MuscleGroup string
+	Sets        []training.Set
+	TotalSI     float64
+	// BestE1RM is the all-time record for this exercise, used to flag a set
+	// performed today that matches it.
+	BestE1RM float64
+}
+
+// ExerciseInfo is what the entry form shows about the exercise being logged:
+// what was done last time and the standing record.
+type ExerciseInfo struct {
+	Last     *training.ExerciseSet `json:"last,omitempty"`
+	BestE1RM float64               `json:"best_e1rm,omitempty"`
+	Group    string                `json:"group,omitempty"`
+}
+
 type pageData struct {
 	Base    string
 	Today   string
 	Session training.Session
 	Recent  []training.ExerciseMemory
 	History []training.SessionSummary
+	Volume  []training.GroupVolume
+	Blocks  []ExerciseBlock
+	// InfoJSON is a name -> ExerciseInfo map the client uses to show "last
+	// time" and the record without another round trip.
+	InfoJSON template.JS
 	// ReadOnly renders a past session without the editing controls.
 	ReadOnly bool
 	Error    string
@@ -59,8 +86,24 @@ func (p pageData) LastSet() *training.Set {
 	return &p.Session.Sets[len(p.Session.Sets)-1]
 }
 
+// IsRecord reports whether a set matches the exercise's all-time best, so it can
+// be badged. Compared with a small tolerance because both sides are rounded.
+func (b ExerciseBlock) IsRecord(s training.Set) bool {
+	return b.BestE1RM > 0 && math.Abs(training.Epley1RM(s.WeightKG, s.Reps)-b.BestE1RM) < 0.05
+}
+
 func New(service *training.Service, clock training.Clock, basePath string) (*Server, error) {
-	funcs := map[string]any{"num": formatNumber, "rpeScale": rpeScale}
+	funcs := map[string]any{
+		"num":      formatNumber,
+		"rpeScale": rpeScale,
+		"add":      func(a, b int) int { return a + b },
+		"pct": func(v, max float64) string {
+			if max <= 0 {
+				return "0"
+			}
+			return strconv.FormatFloat(math.Round(v/max*1000)/10, 'f', -1, 64)
+		},
+	}
 	tpl, err := template.New("").Funcs(funcs).ParseFS(templateFS, "templates/*.html")
 	if err != nil {
 		return nil, err
@@ -93,6 +136,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET "+b+"/{$}", s.today)
 	s.mux.HandleFunc("POST "+b+"/sets", s.addSet)
 	s.mux.HandleFunc("POST "+b+"/sets/{id}/delete", s.deleteSet)
+	s.mux.HandleFunc("POST "+b+"/sets/{id}/update", s.updateSet)
 	s.mux.HandleFunc("GET "+b+"/history", s.history)
 	s.mux.HandleFunc("GET "+b+"/s/{id}", s.session)
 	s.mux.HandleFunc("GET "+b+"/manifest.webmanifest", s.manifest)
@@ -155,6 +199,55 @@ func (s *Server) addSet(w http.ResponseWriter, r *http.Request) {
 	s.renderPanel(w, r, message)
 }
 
+// updateSet edits an already logged set in place, so a mistyped weight does not
+// have to be deleted and re-entered.
+func (s *Server) updateSet(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		s.renderPanel(w, r, "No se pudo identificar la serie.")
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		s.fail(w, err)
+		return
+	}
+	patch := training.SetPatch{}
+	message := ""
+	if v := strings.TrimSpace(r.PostFormValue("weight_kg")); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			patch.WeightKG = &f
+		} else {
+			message = "Peso inválido."
+		}
+	}
+	if v := strings.TrimSpace(r.PostFormValue("reps")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			patch.Reps = &n
+		} else {
+			message = "Reps inválidas."
+		}
+	}
+	if v := strings.TrimSpace(r.PostFormValue("rpe")); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			patch.RPE = &f
+		} else {
+			message = "RPE inválido."
+		}
+	}
+	if message == "" {
+		switch _, _, err := s.service.UpdateSet(r.Context(), id, patch); {
+		case errors.Is(err, training.ErrNotFound):
+			message = "Esa serie ya no existe."
+		case errors.Is(err, training.ErrValidation):
+			message = "Datos inválidos: revisa peso, reps y RPE (1-10)."
+		case err != nil:
+			s.fail(w, err)
+			return
+		}
+	}
+	s.renderPanel(w, r, message)
+}
+
 func (s *Server) deleteSet(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
@@ -196,7 +289,12 @@ func (s *Server) history(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	s.render(w, "history.html", pageData{Base: s.base, Today: s.todayDate(), History: sessions})
+	volume, err := s.service.VolumeByGroup(r.Context(), training.ListFilter{})
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	s.render(w, "history.html", pageData{Base: s.base, Today: s.todayDate(), History: sessions, Volume: volume})
 }
 
 func (s *Server) session(w http.ResponseWriter, r *http.Request) {
@@ -214,7 +312,13 @@ func (s *Server) session(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	s.render(w, "session.html", pageData{Base: s.base, Today: s.todayDate(), Session: session, ReadOnly: true})
+	data := pageData{Base: s.base, Today: session.Date, Session: session, ReadOnly: true}
+	if err := s.decorate(r.Context(), &data); err != nil {
+		s.fail(w, err)
+		return
+	}
+	data.Today = s.todayDate()
+	s.render(w, "session.html", data)
 }
 
 func (s *Server) manifest(w http.ResponseWriter, r *http.Request) {
@@ -245,7 +349,73 @@ func (s *Server) todayData(ctx context.Context, message string) (pageData, error
 	if data.Recent, err = s.service.RecentExercises(ctx, recentExerciseLimit); err != nil {
 		return data, err
 	}
+	if err = s.decorate(ctx, &data); err != nil {
+		return data, err
+	}
 	return data, nil
+}
+
+// decorate builds the per-exercise blocks and the "last time / record" map. It
+// queries history once per distinct exercise in play, which is a handful per
+// session, not once per set.
+func (s *Server) decorate(ctx context.Context, data *pageData) error {
+	names := []string{}
+	seen := map[string]bool{}
+	for _, set := range data.Session.Sets {
+		if !seen[set.Exercise] {
+			seen[set.Exercise] = true
+			names = append(names, set.Exercise)
+		}
+	}
+	for _, r := range data.Recent {
+		if !seen[r.Exercise] {
+			seen[r.Exercise] = true
+			names = append(names, r.Exercise)
+		}
+	}
+
+	info := map[string]ExerciseInfo{}
+	for _, name := range names {
+		h, err := s.service.ExerciseHistory(ctx, name, 200)
+		if err != nil {
+			return err
+		}
+		entry := ExerciseInfo{Group: h.MuscleGroup}
+		if h.Best != nil {
+			entry.BestE1RM = h.Best.Est1RM
+		}
+		// "Last time" must skip today, or the form would echo the set just logged.
+		for i := range h.Sets {
+			if h.Sets[i].Date != data.Today {
+				entry.Last = &h.Sets[i]
+				break
+			}
+		}
+		info[name] = entry
+	}
+
+	byName := map[string]int{}
+	for _, set := range data.Session.Sets {
+		idx, ok := byName[set.Exercise]
+		if !ok {
+			data.Blocks = append(data.Blocks, ExerciseBlock{
+				Exercise:    set.Exercise,
+				MuscleGroup: info[set.Exercise].Group,
+				BestE1RM:    info[set.Exercise].BestE1RM,
+			})
+			idx = len(data.Blocks) - 1
+			byName[set.Exercise] = idx
+		}
+		data.Blocks[idx].Sets = append(data.Blocks[idx].Sets, set)
+		data.Blocks[idx].TotalSI = training.NormalizeSI(data.Blocks[idx].TotalSI + set.SI)
+	}
+
+	encoded, err := json.Marshal(info)
+	if err != nil {
+		return err
+	}
+	data.InfoJSON = template.JS(encoded)
+	return nil
 }
 
 // ensureToday finds today's session or creates it. Creating lazily on the first

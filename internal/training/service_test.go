@@ -151,6 +151,11 @@ type memoryStore struct {
 	groups               map[string]string
 	volumeFilter         ListFilter
 	volumeResults        []GroupVolume
+	historyExercise      string
+	historyLimit         int
+	historyResult        ExerciseHistory
+	weeklyFilter         ListFilter
+	weeklyResults        []WeeklyVolume
 }
 
 func newMemoryStore() *memoryStore {
@@ -283,5 +288,108 @@ func TestServiceExerciseGroupValidation(t *testing.T) {
 	got, err := svc.VolumeByGroup(ctx, ListFilter{})
 	if err != nil || got == nil {
 		t.Fatalf("VolumeByGroup() = %#v, %v, want empty non-nil", got, err)
+	}
+}
+
+func (m *memoryStore) DeleteSession(_ context.Context, id int64) (int, error) {
+	n := 0
+	for sid, s := range m.sets {
+		if s.SessionID == id {
+			delete(m.sets, sid)
+			n++
+		}
+	}
+	if _, ok := m.sessions[id]; !ok {
+		return 0, ErrNotFound
+	}
+	delete(m.sessions, id)
+	return n, nil
+}
+func (m *memoryStore) ExerciseHistory(_ context.Context, exercise string, limit int) (ExerciseHistory, error) {
+	m.historyExercise, m.historyLimit = exercise, limit
+	return m.historyResult, nil
+}
+func (m *memoryStore) WeeklyVolume(_ context.Context, f ListFilter) ([]WeeklyVolume, error) {
+	m.weeklyFilter = f
+	return m.weeklyResults, nil
+}
+
+func TestEpley1RM(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		weight float64
+		reps   int
+		want   float64
+	}{
+		{"single rep returns the weight", 100, 1, 103.3},
+		{"five reps", 100, 5, 116.7},
+		{"non positive weight is zero", 0, 5, 0},
+		{"non positive reps is zero", 100, 0, 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Epley1RM(tt.weight, tt.reps); got != tt.want {
+				t.Fatalf("Epley1RM(%v,%v) = %v, want %v", tt.weight, tt.reps, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestServiceDeleteSessionValidation(t *testing.T) {
+	store := newMemoryStore()
+	svc := NewService(store, time.Now)
+	if _, err := svc.DeleteSession(context.Background(), 0); !errors.Is(err, ErrValidation) {
+		t.Fatalf("DeleteSession(0) error = %v, want validation", err)
+	}
+	session, _ := svc.StartSession(context.Background(), "2026-08-07")
+	if _, _, err := svc.AddSet(context.Background(), AddSetInput{SessionID: session.ID, Exercise: "banca", WeightKG: 80, Reps: 5, RPE: 8}); err != nil {
+		t.Fatal(err)
+	}
+	n, err := svc.DeleteSession(context.Background(), session.ID)
+	if err != nil || n != 1 {
+		t.Fatalf("DeleteSession() = %d, %v, want 1", n, err)
+	}
+	if _, err := svc.DeleteSession(context.Background(), session.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("second delete error = %v, want not found", err)
+	}
+}
+
+func TestServiceExerciseHistoryNormalizesAndBoundsInput(t *testing.T) {
+	store := newMemoryStore()
+	svc := NewService(store, time.Now)
+	ctx := context.Background()
+
+	if _, err := svc.ExerciseHistory(ctx, "  Press Banca ", 0); err != nil {
+		t.Fatalf("ExerciseHistory() error = %v", err)
+	}
+	// The lookup key must match how AddSet stores the exercise.
+	if store.historyExercise != "press banca" || store.historyLimit != 50 {
+		t.Fatalf("forwarded = %q/%d, want normalized name and default limit", store.historyExercise, store.historyLimit)
+	}
+	for _, tt := range []struct {
+		exercise string
+		limit    int
+	}{{"", 10}, {"banca", -1}, {"banca", 501}} {
+		if _, err := svc.ExerciseHistory(ctx, tt.exercise, tt.limit); !errors.Is(err, ErrValidation) {
+			t.Fatalf("ExerciseHistory(%q,%d) error = %v, want validation", tt.exercise, tt.limit, err)
+		}
+	}
+	got, err := svc.ExerciseHistory(ctx, "banca", 10)
+	if err != nil || got.Sets == nil {
+		t.Fatalf("ExerciseHistory() = %#v, %v, want empty non-nil sets", got, err)
+	}
+}
+
+func TestServiceWeeklyVolumeValidatesRange(t *testing.T) {
+	svc := NewService(newMemoryStore(), time.Now)
+	ctx := context.Background()
+	if _, err := svc.WeeklyVolume(ctx, ListFilter{From: "2026-08-07", To: "2026-08-01"}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("inverted range error = %v, want validation", err)
+	}
+	if _, err := svc.WeeklyVolume(ctx, ListFilter{From: "nope"}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("bad date error = %v, want validation", err)
+	}
+	got, err := svc.WeeklyVolume(ctx, ListFilter{})
+	if err != nil || got == nil {
+		t.Fatalf("WeeklyVolume() = %#v, %v, want empty non-nil", got, err)
 	}
 }

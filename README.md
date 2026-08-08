@@ -25,6 +25,8 @@ The unauthenticated `GET /health` endpoint returns `{"status":"ok"}`. MCP is onl
 
 `start_session`, `add_set`, `update_set`, `delete_set`, `get_session`, and `list_sessions` cover logging. Exercises are trimmed/lowercased, positions remain dense, and totals are recalculated from stored SI values.
 
+`delete_session` removes a session and every set in it, reporting how many were destroyed. `exercise_history` returns one exercise's sets newest first with each set's estimated 1RM plus its all-time best, so progression can be judged in one call instead of reading every session. `weekly_volume` buckets SI per muscle group by training week.
+
 `set_exercise_group`, `list_exercise_groups`, and `volume_by_muscle` add per-muscle-group volume. Each exercise maps to exactly one muscle group, so group SI is a true partition of session SI — every set counts once and the group totals add up to the session total. Sets whose exercise has no mapping are reported under an empty group rather than dropped, so gaps in the catalogue stay visible.
 
 ## Web UI (PWA)
@@ -35,7 +37,12 @@ without going through ChatGPT. It is a driving adapter over the same
 shared with the MCP tools and cannot drift apart.
 
 - Served only under the configured secret prefix; unset means not served at all.
+- Sets are grouped by exercise, the way a workout is performed and read back.
+- The entry form shows what was done last time for that exercise and the
+  standing estimated-1RM record; a set matching the record is badged `PR`.
 - Quick-pick chips restore the last weight, reps and RPE per exercise.
+- A rest timer starts on every logged set and remembers the adjusted duration.
+- Sets can be edited in place instead of deleted and re-entered.
 - Today's session is created lazily on the first set, so opening the app never
   leaves an empty session behind.
 - The service worker caches the shell and the last viewed pages for offline

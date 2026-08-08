@@ -2,6 +2,7 @@ package training
 
 import (
 	"errors"
+	"math"
 	"time"
 )
 
@@ -80,6 +81,47 @@ type ExerciseGroup struct {
 // Unmapped exercises are reported under an empty group rather than dropped, so
 // a gap in the catalogue is visible instead of silently shrinking the totals.
 type GroupVolume struct {
+	MuscleGroup string  `json:"muscle_group"`
+	TotalSI     float64 `json:"total_si"`
+	Sets        int     `json:"sets"`
+}
+
+// Epley1RM estimates a one-rep max from a set. It is descriptive only and is
+// never stored: SI remains the single recorded intensity metric. Reps of 1
+// return the weight unchanged.
+func Epley1RM(weightKG float64, reps int) float64 {
+	if weightKG <= 0 || reps <= 0 {
+		return 0
+	}
+	return math.Round(weightKG*(1+float64(reps)/30)*10) / 10
+}
+
+// ExerciseSet is one recorded set carrying the date it was performed, so an
+// exercise's progression can be read without walking every session.
+type ExerciseSet struct {
+	SetID     int64   `json:"set_id"`
+	SessionID int64   `json:"session_id"`
+	Date      string  `json:"date"`
+	WeightKG  float64 `json:"weight_kg"`
+	Reps      int     `json:"reps"`
+	RPE       float64 `json:"rpe"`
+	SI        float64 `json:"si"`
+	Est1RM    float64 `json:"est_1rm"`
+}
+
+// ExerciseHistory is one exercise's recorded sets, newest first, plus its best
+// set by estimated 1RM — the personal record.
+type ExerciseHistory struct {
+	Exercise    string        `json:"exercise"`
+	MuscleGroup string        `json:"muscle_group,omitempty"`
+	Sets        []ExerciseSet `json:"sets"`
+	Best        *ExerciseSet  `json:"best,omitempty"`
+}
+
+// WeeklyVolume is SI for one muscle group in one training week. WeekStart is
+// the Monday of that week, so weeks sort and compare as plain dates.
+type WeeklyVolume struct {
+	WeekStart   string  `json:"week_start"`
 	MuscleGroup string  `json:"muscle_group"`
 	TotalSI     float64 `json:"total_si"`
 	Sets        int     `json:"sets"`

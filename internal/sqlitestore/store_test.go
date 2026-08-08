@@ -237,3 +237,105 @@ func TestStoreVolumeByGroupPartitionsSessionSIAndSurfacesUnmapped(t *testing.T) 
 		}
 	}
 }
+
+func TestStoreDeleteSessionRemovesItsSets(t *testing.T) {
+	store, err := Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	s, _ := store.Start(ctx, training.Session{Date: "2026-08-01"})
+	for range 3 {
+		if _, _, err := store.AddSet(ctx, training.AddSetInput{SessionID: s.ID, Exercise: "banca", WeightKG: 80, Reps: 5, RPE: 8}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	n, err := store.DeleteSession(ctx, s.ID)
+	if err != nil || n != 3 {
+		t.Fatalf("DeleteSession() = %d, %v, want 3", n, err)
+	}
+	if _, err := store.GetSession(ctx, s.ID); !errors.Is(err, training.ErrNotFound) {
+		t.Fatalf("session still present: %v", err)
+	}
+	if _, err := store.DeleteSession(ctx, s.ID); !errors.Is(err, training.ErrNotFound) {
+		t.Fatalf("second delete error = %v, want not found", err)
+	}
+}
+
+func TestStoreExerciseHistoryOrdersNewestFirstAndFindsTheRecord(t *testing.T) {
+	store, err := Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	old, _ := store.Start(ctx, training.Session{Date: "2026-07-01"})
+	recent, _ := store.Start(ctx, training.Session{Date: "2026-08-01"})
+	if err := store.SetExerciseGroup(ctx, training.ExerciseGroup{Exercise: "banca", MuscleGroup: "pecho"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, in := range []training.AddSetInput{
+		{SessionID: old.ID, Exercise: "banca", WeightKG: 100, Reps: 5, RPE: 9},   // e1RM 116.7 <- record
+		{SessionID: recent.ID, Exercise: "banca", WeightKG: 90, Reps: 5, RPE: 8}, // e1RM 105
+		{SessionID: recent.ID, Exercise: "remo", WeightKG: 60, Reps: 8, RPE: 8},
+	} {
+		if _, _, err := store.AddSet(ctx, in); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := store.ExerciseHistory(ctx, "banca", 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.MuscleGroup != "pecho" || len(got.Sets) != 2 {
+		t.Fatalf("history = %#v", got)
+	}
+	if got.Sets[0].Date != "2026-08-01" {
+		t.Fatalf("sets are not newest first: %#v", got.Sets)
+	}
+	if got.Sets[0].Est1RM != 105 {
+		t.Fatalf("est 1RM = %v, want 105", got.Sets[0].Est1RM)
+	}
+	// The record comes from the whole history, not just the newest page.
+	if got.Best == nil || got.Best.Date != "2026-07-01" || got.Best.Est1RM != 116.7 {
+		t.Fatalf("best = %#v, want the 100x5 set", got.Best)
+	}
+	// A limit truncates the returned sets but must not change the record.
+	limited, err := store.ExerciseHistory(ctx, "banca", 1)
+	if err != nil || len(limited.Sets) != 1 || limited.Best == nil || limited.Best.Est1RM != 116.7 {
+		t.Fatalf("limited = %#v, err=%v", limited, err)
+	}
+	empty, err := store.ExerciseHistory(ctx, "nunca hecho", 10)
+	if err != nil || len(empty.Sets) != 0 || empty.Best != nil {
+		t.Fatalf("unknown exercise = %#v, err=%v", empty, err)
+	}
+}
+
+func TestStoreWeeklyVolumeBucketsByMondayOfTheTrainingWeek(t *testing.T) {
+	store, err := Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if err := store.SetExerciseGroup(ctx, training.ExerciseGroup{Exercise: "banca", MuscleGroup: "pecho"}); err != nil {
+		t.Fatal(err)
+	}
+	// 2026-08-05 is a Wednesday, 2026-08-09 the Sunday of the same week,
+	// 2026-08-10 the Monday of the next one.
+	for _, d := range []string{"2026-08-05", "2026-08-09", "2026-08-10"} {
+		s, _ := store.Start(ctx, training.Session{Date: d})
+		if _, _, err := store.AddSet(ctx, training.AddSetInput{SessionID: s.ID, Exercise: "banca", WeightKG: 80, Reps: 5, RPE: 8}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := store.WeeklyVolume(ctx, training.ListFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []training.WeeklyVolume{
+		{WeekStart: "2026-08-10", MuscleGroup: "pecho", TotalSI: 1, Sets: 1},
+		{WeekStart: "2026-08-03", MuscleGroup: "pecho", TotalSI: 2, Sets: 2},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("WeeklyVolume() = %#v, want %#v", got, want)
+	}
+}

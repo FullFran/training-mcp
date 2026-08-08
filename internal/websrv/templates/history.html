@@ -17,6 +17,19 @@
 </header>
 
 <main>
+  {{if .Volume}}
+  <section class="volume" aria-label="Volumen por grupo muscular">
+    {{$max := 0.0}}{{range .Volume}}{{if gt .TotalSI $max}}{{$max = .TotalSI}}{{end}}{{end}}
+    {{range .Volume}}
+    <div class="row-v">
+      <span class="name">{{if .MuscleGroup}}{{.MuscleGroup}}{{else}}sin grupo{{end}}</span>
+      <span class="bar"><span style="width:{{pct .TotalSI $max}}%"></span></span>
+      <span class="val">{{num .TotalSI}}</span>
+    </div>
+    {{end}}
+  </section>
+  {{end}}
+
   {{if .History}}
   <ul class="sessions">
     {{range .History}}

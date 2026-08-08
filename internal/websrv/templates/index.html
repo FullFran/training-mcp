@@ -49,6 +49,8 @@
              placeholder="press inclinado mancuernas">
     </label>
 
+    <p id="previous" class="previous" hidden></p>
+
     <div class="row">
       <div class="stepper" data-target="weight" data-step="2.5" data-min="0.5">
         <span class="label">Peso (kg)</span>
@@ -88,6 +90,14 @@
   {{template "panel.html" .}}
 </main>
 
+<!-- Rest timer. Starts on every logged set; tapping the bar dismisses it. -->
+<div id="rest" class="rest" hidden>
+  <button type="button" class="rest-adj" data-delta="-30">−30s</button>
+  <button type="button" id="rest-time" class="rest-time">0:00</button>
+  <button type="button" class="rest-adj" data-delta="30">+30s</button>
+</div>
+
+<script id="exercise-info" type="application/json">{{.InfoJSON}}</script>
 <script src="{{.Base}}/static/htmx.min.js" defer></script>
 <script src="{{.Base}}/static/app.js" defer></script>
 </body>

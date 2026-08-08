@@ -9,6 +9,16 @@
   const weight = document.getElementById('weight');
   const reps = document.getElementById('reps');
   const repeat = document.getElementById('repeat');
+  const previous = document.getElementById('previous');
+
+  let info = {};
+  const infoTag = document.getElementById('exercise-info');
+  if (infoTag) {
+    try { info = JSON.parse(infoTag.textContent) || {}; } catch (e) { info = {}; }
+  }
+
+  const buzz = (ms) => { if (navigator.vibrate) navigator.vibrate(ms); };
+  const num = (v) => Math.round(parseFloat(v) * 100) / 100;
 
   function setRPE(value) {
     const el = document.getElementById('rpe-' + value);
@@ -21,6 +31,24 @@
     if (data.weight) weight.value = data.weight;
     if (data.reps) reps.value = data.reps;
     if (data.rpe) setRPE(data.rpe);
+    showPrevious();
+  }
+
+  // Shows what was done last time for the exercise being entered, plus the
+  // standing record. This is the number you are trying to beat.
+  function showPrevious() {
+    if (!previous) return;
+    const entry = info[(exercise.value || '').trim().toLowerCase()];
+    if (!entry) { previous.hidden = true; return; }
+    const bits = [];
+    if (entry.last) {
+      bits.push(`Anterior: <strong>${num(entry.last.weight_kg)} kg × ${entry.last.reps} @${num(entry.last.rpe)}</strong> (${entry.last.date})`);
+    }
+    if (entry.best_e1rm) bits.push(`Récord 1RM est. <strong>${entry.best_e1rm} kg</strong>`);
+    if (entry.group) bits.push(entry.group);
+    if (!bits.length) { previous.hidden = true; return; }
+    previous.innerHTML = bits.join(' · ');
+    previous.hidden = false;
   }
 
   // Steppers. Weight moves in 2.5 kg jumps by default because that is the
@@ -35,7 +63,7 @@
     const delta = parseFloat(pad.dataset.delta) * step;
     const next = Math.round(((parseFloat(input.value) || 0) + delta) * 100) / 100;
     input.value = next < min ? min : next;
-    if (navigator.vibrate) navigator.vibrate(8);
+    buzz(8);
   });
 
   // Quick-pick chips restore the whole last set for that exercise, which is the
@@ -49,8 +77,86 @@
       reps: chip.dataset.reps,
       rpe: chip.dataset.rpe
     });
-    if (navigator.vibrate) navigator.vibrate(8);
+    buzz(8);
   });
+
+  if (exercise) exercise.addEventListener('input', showPrevious);
+
+  // --- inline edit -------------------------------------------------------
+  // Turns a logged set into an editable row so a mistyped weight does not need
+  // deleting and re-entering.
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest('.edit');
+    if (!btn) return;
+    const li = btn.closest('li');
+    if (li.querySelector('form')) return;
+    const f = document.createElement('form');
+    f.className = 'edit-form';
+    f.setAttribute('hx-post', `${base}/sets/${li.dataset.setId}/update`);
+    f.setAttribute('hx-target', '#panel');
+    f.setAttribute('hx-swap', 'outerHTML');
+    f.innerHTML =
+      `<input name="weight_kg" type="number" step="0.5" min="0.5" inputmode="decimal" value="${li.dataset.weight}" aria-label="Peso">` +
+      `<input name="reps" type="number" step="1" min="1" inputmode="numeric" value="${li.dataset.reps}" aria-label="Reps">` +
+      `<input name="rpe" type="number" step="0.5" min="1" max="10" inputmode="decimal" value="${li.dataset.rpe}" aria-label="RPE">` +
+      `<button type="submit" class="ok">Guardar</button>`;
+    li.appendChild(f);
+    if (window.htmx) window.htmx.process(f);
+    f.querySelector('input').focus();
+  });
+
+  // --- rest timer --------------------------------------------------------
+  const restBar = document.getElementById('rest');
+  const restTime = document.getElementById('rest-time');
+  const REST_KEY = 'rest-seconds';
+  let restDefault = parseInt(localStorage.getItem(REST_KEY) || '120', 10);
+  let remaining = 0;
+  let ticker = null;
+
+  function paint() {
+    if (!restTime) return;
+    const m = Math.floor(Math.abs(remaining) / 60);
+    const s = Math.abs(remaining) % 60;
+    restTime.textContent = (remaining < 0 ? '-' : '') + m + ':' + String(s).padStart(2, '0');
+    restBar.classList.toggle('done', remaining <= 0);
+  }
+
+  function stopRest() {
+    clearInterval(ticker);
+    ticker = null;
+    restBar.hidden = true;
+  }
+
+  function startRest() {
+    if (!restBar) return;
+    remaining = restDefault;
+    restBar.hidden = false;
+    paint();
+    clearInterval(ticker);
+    ticker = setInterval(() => {
+      remaining -= 1;
+      paint();
+      if (remaining === 0) buzz([120, 80, 120]);
+      if (remaining <= -30) stopRest();
+    }, 1000);
+  }
+
+  if (restBar) {
+    restBar.addEventListener('click', (event) => {
+      const adj = event.target.closest('.rest-adj');
+      if (adj) {
+        const delta = parseInt(adj.dataset.delta, 10);
+        // Adjusting mid-rest also becomes the new default for next time.
+        restDefault = Math.max(30, restDefault + delta);
+        localStorage.setItem(REST_KEY, String(restDefault));
+        remaining = Math.max(0, remaining + delta);
+        paint();
+        buzz(8);
+        return;
+      }
+      stopRest();
+    });
+  }
 
   // "Repeat last" mirrors the final set of the current session.
   function syncRepeat() {
@@ -68,17 +174,12 @@
       : null;
   }
 
-  // Mark the newest row so a logged set is visible without reading it.
-  function flashNewest() {
-    const items = document.querySelectorAll('#panel .sets li');
-    if (items.length) items[items.length - 1].classList.add('new');
-  }
-
   document.body.addEventListener('htmx:afterSwap', (event) => {
     if (event.target.id !== 'panel') return;
     syncRepeat();
-    flashNewest();
-    if (navigator.vibrate) navigator.vibrate(18);
+    const failed = document.querySelector('#panel .alert');
+    if (!failed) startRest();
+    buzz(18);
   });
 
   if (form) {
@@ -90,6 +191,7 @@
   }
 
   syncRepeat();
+  showPrevious();
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

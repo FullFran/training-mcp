@@ -281,3 +281,144 @@ func TestBarePrefixRedirectsToAppRoot(t *testing.T) {
 }
 
 func itoa(v int64) string { return strconv.FormatInt(v, 10) }
+
+func TestPanelGroupsSetsByExerciseAndBadgesRecords(t *testing.T) {
+	h, service := newServer(t)
+	// An older, heavier session establishes the record to beat.
+	if _, err := service.StartSession(t.Context(), "2026-08-01"); err != nil {
+		t.Fatal(err)
+	}
+	old, _ := service.ListSessions(t.Context(), training.ListFilter{Limit: 1})
+	if _, _, err := service.AddSet(t.Context(), training.AddSetInput{
+		SessionID: old[0].ID, Exercise: "banca", WeightKG: 100, Reps: 5, RPE: 9,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	post(t, h, base+"/sets", setForm("banca", "80", "5", "8"), true)
+	post(t, h, base+"/sets", setForm("banca", "80", "6", "8"), true)
+	post(t, h, base+"/sets", setForm("remo", "60", "8", "8"), true)
+
+	body := get(t, h, base+"/").Body.String()
+	// Two exercises means two blocks, not six flat rows.
+	if n := strings.Count(body, `class="block"`); n != 2 {
+		t.Fatalf("expected 2 exercise blocks, got %d", n)
+	}
+	if !strings.Contains(body, "2 ejercicios") {
+		t.Fatalf("panel should report the exercise count: %q", body)
+	}
+	// Today's banca sets are lighter than the standing record, so that block
+	// carries no badge. remo, done for the first time ever, is its own record.
+	if strings.Contains(blockFor(t, body, "banca"), `class="pr"`) {
+		t.Fatalf("no banca set today beats the record, should not be badged")
+	}
+	if !strings.Contains(blockFor(t, body, "remo"), `class="pr"`) {
+		t.Fatalf("a first-ever set is by definition the record and should be badged")
+	}
+
+	// Beat it: 105x5 has a higher estimated 1RM than 100x5.
+	post(t, h, base+"/sets", setForm("banca", "105", "5", "9"), true)
+	body = get(t, h, base+"/").Body.String()
+	if !strings.Contains(blockFor(t, body, "banca"), `class="pr"`) {
+		t.Fatalf("a set matching the all-time best must be badged: %q", body)
+	}
+}
+
+// blockFor returns just the exercise block for one exercise, so assertions do
+// not accidentally match a badge belonging to a different exercise.
+func blockFor(t *testing.T, body, exercise string) string {
+	t.Helper()
+	marker := `<span class="ex">` + exercise + `</span>`
+	i := strings.Index(body, marker)
+	if i < 0 {
+		t.Fatalf("no block for %q", exercise)
+	}
+	rest := body[i:]
+	if end := strings.Index(rest, "</article>"); end >= 0 {
+		return rest[:end]
+	}
+	return rest
+}
+
+func TestEntryFormExposesPreviousPerformanceAndRecord(t *testing.T) {
+	h, service := newServer(t)
+	if _, err := service.StartSession(t.Context(), "2026-08-01"); err != nil {
+		t.Fatal(err)
+	}
+	old, _ := service.ListSessions(t.Context(), training.ListFilter{Limit: 1})
+	if _, _, err := service.AddSet(t.Context(), training.AddSetInput{
+		SessionID: old[0].ID, Exercise: "banca", WeightKG: 100, Reps: 5, RPE: 9,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.SetExerciseGroup(t.Context(), "banca", "pecho"); err != nil {
+		t.Fatal(err)
+	}
+
+	body := get(t, h, base+"/").Body.String()
+	start := strings.Index(body, `id="exercise-info"`)
+	if start < 0 {
+		t.Fatalf("page must embed the exercise info map")
+	}
+	blob := body[start:]
+	for _, want := range []string{`"banca"`, `"best_e1rm":116.7`, `"group":"pecho"`, `"date":"2026-08-01"`} {
+		if !strings.Contains(blob, want) {
+			t.Fatalf("exercise info missing %q", want)
+		}
+	}
+}
+
+func TestPreviousSkipsTodaySoItShowsTheSessionBefore(t *testing.T) {
+	h, _ := newServer(t)
+	post(t, h, base+"/sets", setForm("banca", "80", "5", "8"), true)
+
+	body := get(t, h, base+"/").Body.String()
+	start := strings.Index(body, `id="exercise-info"`)
+	blob := body[start : strings.Index(body[start:], "</script>")+start]
+	// The only set is today's, so there is no previous session to show.
+	if strings.Contains(blob, `"last"`) {
+		t.Fatalf("today's own set must not be offered as 'last time': %q", blob)
+	}
+	if !strings.Contains(blob, `"best_e1rm"`) {
+		t.Fatalf("the record should still be present: %q", blob)
+	}
+}
+
+func TestUpdateSetEditsInPlace(t *testing.T) {
+	h, service := newServer(t)
+	post(t, h, base+"/sets", setForm("banca", "80", "5", "8"), true)
+	sessions, _ := service.ListSessions(t.Context(), training.ListFilter{Limit: 1})
+	session, _ := service.GetSession(t.Context(), sessions[0].ID)
+	id := itoa(session.Sets[0].ID)
+
+	w := post(t, h, base+"/sets/"+id+"/update", url.Values{
+		"weight_kg": {"85"}, "reps": {"6"}, "rpe": {"9"},
+	}, true)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "85 kg × 6 @9") {
+		t.Fatalf("panel should show the edited values: %q", w.Body.String())
+	}
+	// RPE 9 -> SI 1.2, so the session total follows the edit.
+	if !strings.Contains(w.Body.String(), "SI 1.2") {
+		t.Fatalf("total should be recalculated: %q", w.Body.String())
+	}
+
+	bad := post(t, h, base+"/sets/"+id+"/update", url.Values{"rpe": {"99"}}, true)
+	if !strings.Contains(bad.Body.String(), `class="alert"`) {
+		t.Fatalf("out-of-range RPE should be rejected inline")
+	}
+}
+
+func TestHistoryShowsMuscleGroupVolume(t *testing.T) {
+	h, service := newServer(t)
+	post(t, h, base+"/sets", setForm("banca", "80", "5", "8"), true)
+	if err := service.SetExerciseGroup(t.Context(), "banca", "pecho"); err != nil {
+		t.Fatal(err)
+	}
+	body := get(t, h, base+"/history").Body.String()
+	if !strings.Contains(body, `class="volume"`) || !strings.Contains(body, "pecho") {
+		t.Fatalf("history should chart volume per muscle group: %q", body)
+	}
+}
