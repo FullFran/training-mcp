@@ -117,7 +117,26 @@
     buzz(8);
   });
 
-  if (exercise) exercise.addEventListener('input', showPrevious);
+  // Anything not preloaded is fetched once and cached, so picking a rarely
+  // used exercise from the catalogue still shows its history and setup note.
+  const pending = {};
+  function ensureInfo(name) {
+    if (!name || name in info || name in pending) return;
+    pending[name] = true;
+    fetch(base + '/exercise-info?name=' + encodeURIComponent(name))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) { info[name] = data; showPrevious(); }
+      })
+      .catch(() => {});
+  }
+
+  if (exercise) {
+    exercise.addEventListener('input', () => {
+      ensureInfo((exercise.value || '').trim().toLowerCase());
+      showPrevious();
+    });
+  }
 
   // The "⋯" opens per-exercise adjustments. Kept behind a tap so the checklist
   // stays readable at a glance mid-set.

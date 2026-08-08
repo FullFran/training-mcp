@@ -199,6 +199,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST "+b+"/plan/item", s.adjustItem)
 	s.mux.HandleFunc("POST "+b+"/feedback", s.recordFeedback)
 	s.mux.HandleFunc("POST "+b+"/note", s.saveNote)
+	s.mux.HandleFunc("GET "+b+"/exercise-info", s.exerciseInfo)
 	s.mux.HandleFunc("GET "+b+"/s/{id}", s.session)
 	s.mux.HandleFunc("GET "+b+"/manifest.webmanifest", s.manifest)
 	s.mux.HandleFunc("GET "+b+"/sw.js", s.serviceWorker)
@@ -493,6 +494,24 @@ func (s *Server) todayData(ctx context.Context, message string) (pageData, error
 	return data, nil
 }
 
+// exerciseInfo answers for one exercise on demand. The page preloads only the
+// handful in play; picking anything else from the catalogue would otherwise
+// show no previous performance and no setup note.
+func (s *Server) exerciseInfo(w http.ResponseWriter, r *http.Request) {
+	name := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("name")))
+	w.Header().Set("Content-Type", "application/json")
+	if name == "" {
+		w.Write([]byte("{}"))
+		return
+	}
+	entry, err := s.infoFor(r.Context(), name, s.todayDate())
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(entry)
+}
+
 // saveNote stores a setup reminder for an exercise. Written once, shown every
 // time that exercise comes up again.
 func (s *Server) saveNote(w http.ResponseWriter, r *http.Request) {
@@ -697,20 +716,9 @@ func (s *Server) decorate(ctx context.Context, data *pageData) error {
 
 	info := map[string]ExerciseInfo{}
 	for _, name := range names {
-		h, err := s.service.ExerciseHistory(ctx, name, 200)
+		entry, err := s.infoFor(ctx, name, data.Today)
 		if err != nil {
 			return err
-		}
-		entry := ExerciseInfo{Group: h.MuscleGroup, Note: noteByExercise[name]}
-		if h.Best != nil {
-			entry.BestE1RM = h.Best.Est1RM
-		}
-		// "Last time" must skip today, or the form would echo the set just logged.
-		for i := range h.Sets {
-			if h.Sets[i].Date != data.Today {
-				entry.Last = &h.Sets[i]
-				break
-			}
 		}
 		info[name] = entry
 	}
@@ -751,6 +759,37 @@ func (s *Server) ensureToday(ctx context.Context) (training.Session, error) {
 		return training.Session{ID: sessions[0].ID, Date: sessions[0].Date}, nil
 	}
 	return s.service.StartSession(ctx, today)
+}
+
+// infoFor gathers what the entry form shows about one exercise: last time's
+// set, the standing record, its muscle group and its setup note.
+func (s *Server) infoFor(ctx context.Context, name, today string) (ExerciseInfo, error) {
+	h, err := s.service.ExerciseHistory(ctx, name, 200)
+	if err != nil {
+		return ExerciseInfo{}, err
+	}
+	entry := ExerciseInfo{Group: h.MuscleGroup}
+	if h.Best != nil {
+		entry.BestE1RM = h.Best.Est1RM
+	}
+	// "Last time" must skip today, or the form would echo the set just logged.
+	for i := range h.Sets {
+		if h.Sets[i].Date != today {
+			entry.Last = &h.Sets[i]
+			break
+		}
+	}
+	notes, err := s.service.ExerciseNotes(ctx)
+	if err != nil {
+		return entry, err
+	}
+	for _, n := range notes {
+		if n.Exercise == name {
+			entry.Note = n.Note
+			break
+		}
+	}
+	return entry, nil
 }
 
 func (s *Server) todayDate() string { return s.clock().Format("2006-01-02") }

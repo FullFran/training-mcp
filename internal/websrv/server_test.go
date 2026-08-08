@@ -876,3 +876,42 @@ func TestExerciseSetupNoteIsStoredAndOffered(t *testing.T) {
 		t.Fatalf("empty note should remove it")
 	}
 }
+
+// The page preloads only the exercises in play; anything else must still be
+// answerable, or picking a rarely used exercise shows nothing useful.
+func TestExerciseInfoIsAvailableOnDemandForAnyExercise(t *testing.T) {
+	h, service := newServer(t)
+	if _, err := service.StartSession(t.Context(), "2026-08-01"); err != nil {
+		t.Fatal(err)
+	}
+	old, _ := service.ListSessions(t.Context(), training.ListFilter{Limit: 1})
+	if _, _, err := service.AddSet(t.Context(), training.AddSetInput{
+		SessionID: old[0].ID, Exercise: "prensa", WeightKG: 100, Reps: 10, RPE: 9,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.SetExerciseNote(t.Context(), "prensa", "asiento en 4"); err != nil {
+		t.Fatal(err)
+	}
+	// Push prensa out of the recent window so it is not preloaded.
+	for _, name := range []string{"a", "b", "c", "d", "e", "f", "g", "h"} {
+		post(t, h, base+"/sets", setForm(name, "20", "10", "8"), true)
+	}
+	if strings.Contains(get(t, h, base+"/").Body.String(), "asiento en 4") {
+		t.Fatalf("precondition: prensa should not be preloaded")
+	}
+
+	w := get(t, h, base+"/exercise-info?name=%20Prensa%20")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	body := w.Body.String()
+	for _, want := range []string{`"note":"asiento en 4"`, `"best_e1rm":133.3`, `"date":"2026-08-01"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("on-demand info missing %q, got %s", want, body)
+		}
+	}
+	if got := get(t, h, base+"/exercise-info?name=").Body.String(); strings.TrimSpace(got) != "{}" {
+		t.Fatalf("empty name should answer empty, got %q", got)
+	}
+}
