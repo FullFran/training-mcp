@@ -962,8 +962,11 @@ func TestVolumeRecommendationRespectsPersonalLandmarks(t *testing.T) {
 		wantAdvice string
 	}{
 		{"unknown landmarks do not clamp", 12, Landmarks{}, 3, false, "sube 3 series"},
-		{"MRV caps the increase", 12, Landmarks{MuscleGroup: "pecho", MRV: 14}, 2, true, "MRV es 14"},
-		{"already at MRV means no increase", 14, Landmarks{MuscleGroup: "pecho", MRV: 14}, 0, true, "MRV es 14"},
+		{"MRV caps the increase", 12, Landmarks{MuscleGroup: "pecho", MRV: 14}, 2, true, "sube 2"},
+		{"already at MRV means no increase", 14, Landmarks{MuscleGroup: "pecho", MRV: 14}, 0, true, "Ya estás en tu MRV"},
+		// Past the ceiling the advice must say "come down", not "do not go up".
+		{"above MRV advises a cut", 23, Landmarks{MuscleGroup: "pecho", MRV: 16}, -7, true, "baja 7"},
+		{"below MEV advises a rise to it", 4, Landmarks{MuscleGroup: "pecho", MEV: 10}, 6, true, "sube 6"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			store := newMemoryStore()

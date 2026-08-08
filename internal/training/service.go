@@ -347,7 +347,7 @@ func (s *Service) VolumeRecommendation(ctx context.Context) ([]SetChange, error)
 		change.SetsDelta, change.Advice = delta, advice
 		change.SetsDelta, change.Clamped = clampToLandmarks(change.LastWeekSets, delta, change.MEV, change.MRV)
 		if change.Clamped {
-			change.Advice = clampAdvice(delta, change.MEV, change.MRV)
+			change.Advice = clampAdvice(change.LastWeekSets, change.SetsDelta, change.MEV, change.MRV)
 		}
 		out = append(out, change)
 	}
@@ -368,11 +368,20 @@ func clampToLandmarks(current, delta, mev, mrv int) (int, bool) {
 	}
 }
 
-func clampAdvice(delta, mev, mrv int) string {
-	if delta > 0 {
-		return fmt.Sprintf("Tu MRV es %d series: no subas más aunque el estímulo lo pida.", mrv)
+// clampAdvice describes what to actually do, not what the raw rule wanted. When
+// the current volume is already past a landmark the clamped delta points the
+// other way, and saying "do not go up" while advising a cut would be wrong.
+func clampAdvice(current, delta, mev, mrv int) string {
+	switch {
+	case delta < 0:
+		return fmt.Sprintf("Estás en %d series y tu MRV es %d: baja %d aunque el estímulo pida más.", current, mrv, -delta)
+	case delta > 0:
+		return fmt.Sprintf("Estás en %d series y tu MEV es %d: sube %d para volver al mínimo efectivo.", current, mev, delta)
+	case mrv > 0 && current >= mrv:
+		return fmt.Sprintf("Ya estás en tu MRV (%d series): mantén el volumen.", mrv)
+	default:
+		return fmt.Sprintf("Ya estás en tu MEV (%d series): mantén el volumen.", mev)
 	}
-	return fmt.Sprintf("Tu MEV es %d series: no bajes de ahí o dejarás de crecer.", mev)
 }
 
 // Snapshot writes a consistent copy of the database to path, for backup.
