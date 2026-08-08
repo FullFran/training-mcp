@@ -282,6 +282,64 @@ func (s *Service) Snapshot(ctx context.Context, path string) error {
 	return s.store.Snapshot(ctx, path)
 }
 
+// SuggestLoad advises the next working weight for an exercise, judged against
+// the prescription it currently carries in today's session, falling back to the
+// most recent plan that prescribes it.
+func (s *Service) SuggestLoad(ctx context.Context, exercise string) (LoadSuggestion, error) {
+	exercise = strings.ToLower(strings.TrimSpace(exercise))
+	if exercise == "" {
+		return LoadSuggestion{}, ErrValidation
+	}
+	history, err := s.ExerciseHistory(ctx, exercise, 100)
+	if err != nil {
+		return LoadSuggestion{}, err
+	}
+	// Sets carrying an intensity technique are not comparable to straight sets,
+	// so they never drive the advice.
+	var last *ExerciseSet
+	for i := range history.Sets {
+		if history.Sets[i].Technique == "" {
+			last = &history.Sets[i]
+			break
+		}
+	}
+	repMin, repMax, targetRPE := s.prescriptionFor(ctx, exercise)
+	out := SuggestLoad(last, repMin, repMax, targetRPE)
+	out.Exercise = exercise
+	return out, nil
+}
+
+// prescriptionFor finds the rep range and RPE an exercise is prescribed at,
+// preferring today's session over any saved plan.
+func (s *Service) prescriptionFor(ctx context.Context, exercise string) (int, int, float64) {
+	today := s.clock().Format("2006-01-02")
+	if sessions, err := s.ListSessions(ctx, ListFilter{From: today, To: today, Limit: 1}); err == nil && len(sessions) > 0 {
+		if progress, err := s.SessionProgress(ctx, sessions[0].ID); err == nil {
+			for _, p := range progress {
+				if p.Exercise == exercise && p.TargetSets > 0 {
+					return p.RepMin, p.RepMax, p.TargetRPE
+				}
+			}
+		}
+	}
+	plans, err := s.ListPlans(ctx)
+	if err != nil {
+		return 0, 0, 0
+	}
+	for _, summary := range plans {
+		plan, err := s.GetPlan(ctx, summary.ID)
+		if err != nil {
+			continue
+		}
+		for _, it := range plan.Items {
+			if it.Exercise == exercise {
+				return it.RepMin, it.RepMax, it.TargetRPE
+			}
+		}
+	}
+	return 0, 0, 0
+}
+
 // SessionProgress reports planned versus completed sets for a session.
 func (s *Service) SessionProgress(ctx context.Context, sessionID int64) ([]PlanProgress, error) {
 	if sessionID <= 0 {

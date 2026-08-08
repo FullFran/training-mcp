@@ -161,6 +161,12 @@ type FeedbackOut struct {
 type RecommendOut struct {
 	Recommendations []training.SetChange `json:"recommendations"`
 }
+type LoadInput struct {
+	Exercise string `json:"exercise" jsonschema:"Non-empty exercise name; trimmed and lowercased to match stored sets."`
+}
+type LoadSuggestionOut struct {
+	Suggestion training.LoadSuggestion `json:"suggestion"`
+}
 type NoteInput struct {
 	Exercise string `json:"exercise" jsonschema:"Non-empty exercise name; trimmed and lowercased to match stored sets."`
 	Note     string `json:"note" jsonschema:"Setup reminder, e.g. 'asiento en 4, agarre ancho'. Pass an empty string to remove it."`
@@ -374,6 +380,13 @@ func New(service *training.Service) *Server {
 		return nil, PlanOut{Plan: v}, toolError(err)
 	})
 
+	loadSchema := mustInputSchema[LoadInput]()
+	loadSchema.Properties["exercise"].Pattern = `.*\S.*`
+	mcp.AddTool(s, &mcp.Tool{Name: "suggest_load", Description: "Suggest the next working weight for an exercise, judged against the rep range and RPE it is prescribed at. Advisory only: it explains its reasoning and never changes a plan. Sets carrying an intensity technique are ignored, since they are not comparable to straight sets.", InputSchema: loadSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in LoadInput) (*mcp.CallToolResult, LoadSuggestionOut, error) {
+		v, err := service.SuggestLoad(ctx, in.Exercise)
+		return nil, LoadSuggestionOut{Suggestion: v}, toolError(err)
+	})
+
 	noteSchema := mustInputSchema[NoteInput]()
 	noteSchema.Properties["exercise"].Pattern = `.*\S.*`
 	mcp.AddTool(s, &mcp.Tool{Name: "set_exercise_note", Description: "Store a persistent setup reminder for an exercise, such as seat height or grip width. It is shown every time that exercise is logged. An empty note removes it.", InputSchema: noteSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in NoteInput) (*mcp.CallToolResult, NotesOut, error) {
@@ -470,7 +483,7 @@ func (s *Server) ToolNames() []string {
 		"add_session_exercise", "adjust_session_exercise", "swap_session_exercise",
 		"remove_session_exercise", "save_session_as_plan",
 		"record_feedback", "volume_recommendation",
-		"set_exercise_note", "list_exercise_notes"}
+		"set_exercise_note", "list_exercise_notes", "suggest_load"}
 }
 func muscleGroupEnum() []any {
 	out := make([]any, 0, len(training.MuscleGroups))

@@ -952,3 +952,53 @@ func TestRoutineAndExerciseNotesTravelIntoTheSession(t *testing.T) {
 		t.Fatalf("an item without a note should carry none: %#v", progress[1])
 	}
 }
+
+func TestLoadSuggestionIsOfferedWithItsReasoning(t *testing.T) {
+	h, service := newServer(t)
+	plan, err := service.CreatePlan(t.Context(), training.Plan{
+		Name:  "Empuje A",
+		Items: []training.PlanItem{{Exercise: "banca", TargetSets: 3, RepMin: 8, RepMax: 12, TargetRPE: 9}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A previous session at the top of the range, comfortably under target RPE.
+	if _, err := service.StartPlannedSession(t.Context(), "2026-08-01", plan.ID); err != nil {
+		t.Fatal(err)
+	}
+	old, _ := service.ListSessions(t.Context(), training.ListFilter{Limit: 1})
+	if _, _, err := service.AddSet(t.Context(), training.AddSetInput{
+		SessionID: old[0].ID, Exercise: "banca", WeightKG: 80, Reps: 12, RPE: 8,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	body := get(t, h, base+"/exercise-info?name=banca").Body.String()
+	if !strings.Contains(body, `"suggested_kg":82.5`) || !strings.Contains(body, `"delta_kg":2.5`) {
+		t.Fatalf("should advise adding weight: %s", body)
+	}
+	if !strings.Contains(body, "sube el peso") {
+		t.Fatalf("advice must carry its reasoning: %s", body)
+	}
+}
+
+// Holding is the default and needs no prompt; only a change is worth showing.
+func TestNoLoadSuggestionWhenTheWeightIsRight(t *testing.T) {
+	h, service := newServer(t)
+	plan, _ := service.CreatePlan(t.Context(), training.Plan{
+		Name:  "Empuje A",
+		Items: []training.PlanItem{{Exercise: "banca", TargetSets: 3, RepMin: 8, RepMax: 12, TargetRPE: 9}},
+	})
+	if _, err := service.StartPlannedSession(t.Context(), "2026-08-01", plan.ID); err != nil {
+		t.Fatal(err)
+	}
+	old, _ := service.ListSessions(t.Context(), training.ListFilter{Limit: 1})
+	if _, _, err := service.AddSet(t.Context(), training.AddSetInput{
+		SessionID: old[0].ID, Exercise: "banca", WeightKG: 80, Reps: 10, RPE: 9,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(get(t, h, base+"/exercise-info?name=banca").Body.String(), `"suggest"`) {
+		t.Fatalf("a correct weight should not prompt a change")
+	}
+}

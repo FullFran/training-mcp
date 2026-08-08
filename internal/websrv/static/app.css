@@ -585,3 +585,14 @@ button { font: inherit; cursor: pointer; }
   line-height: 1.4;
 }
 .item-note { display: block; margin-top: 2px; color: var(--accent); font-size: 12px; }
+
+/* --- load suggestion ---------------------------------------------------- */
+.suggest {
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}

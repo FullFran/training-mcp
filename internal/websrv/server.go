@@ -65,6 +65,8 @@ type ExerciseInfo struct {
 	Group    string                `json:"group,omitempty"`
 	// Note is the persistent setup reminder: seat height, grip, pin.
 	Note string `json:"note,omitempty"`
+	// Suggest is the advised next working weight, with its reasoning.
+	Suggest *training.LoadSuggestion `json:"suggest,omitempty"`
 }
 
 type pageData struct {
@@ -793,6 +795,15 @@ func (s *Server) infoFor(ctx context.Context, name, today string) (ExerciseInfo,
 			entry.Note = n.Note
 			break
 		}
+	}
+	suggestion, err := s.service.SuggestLoad(ctx, name)
+	if err != nil {
+		return entry, err
+	}
+	// Only offer advice that actually moves the bar; "hold" is already implied
+	// by the previous set being shown.
+	if suggestion.DeltaKG != 0 {
+		entry.Suggest = &suggestion
 	}
 	return entry, nil
 }

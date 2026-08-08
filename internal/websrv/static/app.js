@@ -45,6 +45,11 @@
       bits.push(`Anterior: <strong>${num(entry.last.weight_kg)} kg × ${entry.last.reps} @${num(entry.last.rpe)}</strong> (${entry.last.date})`);
     }
     if (entry.best_e1rm) bits.push(`Récord 1RM est. <strong>${entry.best_e1rm} kg</strong>`);
+    if (entry.suggest && entry.suggest.delta_kg) {
+      const s = entry.suggest;
+      const sign = s.delta_kg > 0 ? '+' : '';
+      bits.push(`<button type="button" class="suggest" data-kg="${s.suggested_kg}" title="${s.reason}">→ ${s.suggested_kg} kg (${sign}${s.delta_kg})</button>`);
+    }
     if (entry.group) bits.push(entry.group);
     let html = bits.join(' · ');
     // The setup note goes on its own line: it is an instruction, not a stat.
@@ -55,6 +60,14 @@
     const noteInput = document.getElementById('note');
     if (noteInput) noteInput.value = entry.note || '';
   }
+
+  // Accepting the suggested load is one tap; it is never applied on its own.
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest('.suggest');
+    if (!btn) return;
+    weight.value = btn.dataset.kg;
+    buzz(8);
+  });
 
   // Saving a setup note is deliberately its own action: it belongs to the
   // exercise for good, not to the set being logged.

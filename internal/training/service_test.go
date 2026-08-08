@@ -797,3 +797,70 @@ func TestServiceUpdatePlanEditsIdentityOnly(t *testing.T) {
 		t.Fatalf("over-long notes = %v, want validation", err)
 	}
 }
+
+func TestSuggestLoadJudgesAgainstThePrescription(t *testing.T) {
+	set := func(w float64, reps int, rpe float64) *ExerciseSet {
+		return &ExerciseSet{WeightKG: w, Reps: reps, RPE: rpe}
+	}
+	for _, tt := range []struct {
+		name      string
+		last      *ExerciseSet
+		repMin    int
+		repMax    int
+		targetRPE float64
+		wantDelta float64
+	}{
+		{"top of range and easy means add weight", set(80, 12, 8), 8, 12, 9, 2.5},
+		{"short of the range means drop weight", set(80, 6, 9), 8, 12, 9, -2.5},
+		{"over the target RPE means drop weight", set(80, 10, 10), 8, 12, 9, -2.5},
+		{"inside the range at target RPE means hold", set(80, 10, 9), 8, 12, 9, 0},
+		{"heavy lifts move in bigger steps", set(140, 12, 8), 8, 12, 9, 5},
+		{"light isolation moves in smaller steps", set(20, 15, 7), 10, 15, 9, 1.25},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SuggestLoad(tt.last, tt.repMin, tt.repMax, tt.targetRPE)
+			if got.DeltaKG != tt.wantDelta {
+				t.Fatalf("delta = %v, want %v (%s)", got.DeltaKG, tt.wantDelta, got.Reason)
+			}
+			if got.SuggestedKG != tt.last.WeightKG+tt.wantDelta {
+				t.Fatalf("suggested = %v, want %v", got.SuggestedKG, tt.last.WeightKG+tt.wantDelta)
+			}
+			if got.Reason == "" {
+				t.Fatal("advice must explain itself")
+			}
+		})
+	}
+}
+
+// Refusing to guess is the point: reps mean nothing without knowing the target.
+func TestSuggestLoadRefusesWithoutEnoughToJudge(t *testing.T) {
+	none := SuggestLoad(nil, 8, 12, 9)
+	if none.DeltaKG != 0 || none.SuggestedKG != 0 || !strings.Contains(none.Reason, "Sin series previas") {
+		t.Fatalf("no history = %#v", none)
+	}
+	noRx := SuggestLoad(&ExerciseSet{WeightKG: 80, Reps: 20, RPE: 6}, 0, 0, 0)
+	if noRx.DeltaKG != 0 || noRx.SuggestedKG != 80 || !strings.Contains(noRx.Reason, "Sin prescripción") {
+		t.Fatalf("no prescription = %#v", noRx)
+	}
+}
+
+func TestServiceSuggestLoadIgnoresTechniqueSets(t *testing.T) {
+	store := newMemoryStore()
+	svc := NewService(store, func() time.Time { return time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC) })
+	ctx := context.Background()
+	// Newest first: a drop set, then the real straight set to judge.
+	store.historyResult = ExerciseHistory{Sets: []ExerciseSet{
+		{WeightKG: 40, Reps: 15, RPE: 10, Technique: "drop set"},
+		{WeightKG: 80, Reps: 12, RPE: 8},
+	}}
+	got, err := svc.SuggestLoad(ctx, " Banca ")
+	if err != nil || got.Exercise != "banca" {
+		t.Fatalf("SuggestLoad() = %#v, %v", got, err)
+	}
+	if got.LastWeightKG != 80 {
+		t.Fatalf("advice must come from the straight set, got %v kg", got.LastWeightKG)
+	}
+	if _, err := svc.SuggestLoad(ctx, "  "); !errors.Is(err, ErrValidation) {
+		t.Fatalf("empty exercise = %v, want validation", err)
+	}
+}

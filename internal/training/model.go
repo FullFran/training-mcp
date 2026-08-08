@@ -237,6 +237,73 @@ func RecommendSets(magnitude int) (int, string) {
 	}
 }
 
+// LoadSuggestion advises what weight to attempt next for an exercise, judged
+// against the prescription it was performed under.
+type LoadSuggestion struct {
+	Exercise string `json:"exercise"`
+	// LastWeightKG is what the advice is relative to; zero means no comparable
+	// set was found and nothing is suggested.
+	LastWeightKG float64 `json:"last_weight_kg,omitempty"`
+	SuggestedKG  float64 `json:"suggested_kg,omitempty"`
+	DeltaKG      float64 `json:"delta_kg"`
+	Reason       string  `json:"reason"`
+	// Prescription echoes what the judgement was made against, so the advice
+	// can be checked rather than trusted.
+	RepMin    int     `json:"rep_min,omitempty"`
+	RepMax    int     `json:"rep_max,omitempty"`
+	TargetRPE float64 `json:"target_rpe,omitempty"`
+	LastReps  int     `json:"last_reps,omitempty"`
+	LastRPE   float64 `json:"last_rpe,omitempty"`
+}
+
+// LoadStep is the smallest sensible jump for an exercise. Upper-body isolation
+// moves in smaller steps than a leg press, and guessing the same increment for
+// both produces advice nobody follows.
+func LoadStep(weightKG float64) float64 {
+	switch {
+	case weightKG >= 100:
+		return 5
+	case weightKG >= 40:
+		return 2.5
+	default:
+		return 1.25
+	}
+}
+
+// SuggestLoad judges the last comparable set against its prescription.
+//
+// It only ever advises. It refuses to guess when there is no prescription to
+// judge against, because "you did 10 reps" means nothing without knowing
+// whether 10 was the target or double it.
+func SuggestLoad(last *ExerciseSet, repMin, repMax int, targetRPE float64) LoadSuggestion {
+	out := LoadSuggestion{RepMin: repMin, RepMax: repMax, TargetRPE: targetRPE}
+	if last == nil {
+		out.Reason = "Sin series previas de este ejercicio: elige un peso que te deje en el rango objetivo."
+		return out
+	}
+	out.LastWeightKG, out.LastReps, out.LastRPE = last.WeightKG, last.Reps, last.RPE
+	out.SuggestedKG = last.WeightKG
+	if repMax == 0 || targetRPE == 0 {
+		out.Reason = "Sin prescripción de reps o RPE, no puedo juzgar si el peso fue el adecuado."
+		return out
+	}
+	step := LoadStep(last.WeightKG)
+	switch {
+	case last.Reps >= repMax && last.RPE <= targetRPE-1:
+		out.DeltaKG = step
+		out.Reason = "Llegaste al tope del rango sobrado de RPE: sube el peso."
+	case last.Reps < repMin || last.RPE >= targetRPE+1:
+		out.DeltaKG = -step
+		out.Reason = "Te quedaste corto de reps o pasado de RPE: baja el peso."
+	default:
+		out.Reason = "Peso correcto: mantenlo y busca una repetición más."
+	}
+	// Rounded to 2 decimals, not through NormalizeSI: that rounds to one
+	// decimal for SI and would turn a 1.25 kg step into 1.3.
+	out.SuggestedKG = math.Round((last.WeightKG+out.DeltaKG)*100) / 100
+	return out
+}
+
 // Epley1RM estimates a one-rep max from a set. It is descriptive only and is
 // never stored: SI remains the single recorded intensity metric. Reps of 1
 // return the weight unchanged.
