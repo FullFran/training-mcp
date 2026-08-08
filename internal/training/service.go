@@ -255,7 +255,7 @@ func (s *Service) SessionProgress(ctx context.Context, sessionID int64) ([]PlanP
 // LogSet is the one-call entry path: it finds today's session, creates it if
 // needed, and records count identical sets. Callers never handle a session id,
 // which is what makes conversational logging a single step.
-func (s *Service) LogSet(ctx context.Context, exercise string, weightKG float64, reps int, rpe float64, count int) (Session, []Set, error) {
+func (s *Service) LogSet(ctx context.Context, exercise string, weightKG float64, reps int, rpe float64, count int, technique string) (Session, []Set, error) {
 	if count <= 0 {
 		count = 1
 	}
@@ -283,7 +283,8 @@ func (s *Service) LogSet(ctx context.Context, exercise string, weightKG float64,
 	var out []Set
 	for range count {
 		set, total, err := s.AddSet(ctx, AddSetInput{
-			SessionID: session.ID, Exercise: exercise, WeightKG: weightKG, Reps: reps, RPE: rpe,
+			SessionID: session.ID, Exercise: exercise, WeightKG: weightKG,
+			Reps: reps, RPE: rpe, Technique: technique,
 		})
 		if err != nil {
 			return session, out, err
@@ -302,10 +303,20 @@ func validSetFields(exercise string, weightKG float64, reps int, rpe float64) bo
 
 func (s *Service) AddSet(ctx context.Context, in AddSetInput) (Set, float64, error) {
 	in.Exercise = strings.ToLower(strings.TrimSpace(in.Exercise))
+	in.Technique = normalizeTechnique(in.Technique)
 	if in.SessionID <= 0 || !validSetFields(in.Exercise, in.WeightKG, in.Reps, in.RPE) {
 		return Set{}, 0, ErrValidation
 	}
+	if len(in.Technique) > maxTechniqueLen {
+		return Set{}, 0, ErrValidation
+	}
 	return s.store.AddSet(ctx, in)
+}
+
+// normalizeTechnique lowercases and trims so "Drop Set" and "drop set" are the
+// same technique, the same rule exercise names follow.
+func normalizeTechnique(v string) string {
+	return strings.Join(strings.Fields(strings.ToLower(strings.TrimSpace(v))), " ")
 }
 func (s *Service) UpdateSet(ctx context.Context, id int64, p SetPatch) (Set, float64, error) {
 	if id <= 0 || p.Empty() || (p.Exercise != nil && strings.TrimSpace(*p.Exercise) == "") || (p.WeightKG != nil && *p.WeightKG <= 0) || (p.Reps != nil && *p.Reps <= 0) || (p.RPE != nil && (*p.RPE < 1 || *p.RPE > 10)) {
@@ -314,6 +325,13 @@ func (s *Service) UpdateSet(ctx context.Context, id int64, p SetPatch) (Set, flo
 	if p.Exercise != nil {
 		v := strings.ToLower(strings.TrimSpace(*p.Exercise))
 		p.Exercise = &v
+	}
+	if p.Technique != nil {
+		v := normalizeTechnique(*p.Technique)
+		if len(v) > maxTechniqueLen {
+			return Set{}, 0, ErrValidation
+		}
+		p.Technique = &v
 	}
 	return s.store.UpdateSet(ctx, id, p)
 }

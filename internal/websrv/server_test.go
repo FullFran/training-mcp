@@ -720,3 +720,62 @@ func TestExerciseFieldOffersTheKnownCatalogue(t *testing.T) {
 		}
 	}
 }
+
+func TestSetCanCarryAnIntensityTechnique(t *testing.T) {
+	h, _ := newServer(t)
+	form := setForm("banca", "80", "8", "9")
+	form.Set("technique", " Drop Set ")
+	w := post(t, h, base+"/sets", form, true)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	// Normalized like exercise names, so the vocabulary cannot fragment.
+	if !strings.Contains(w.Body.String(), `class="tech-tag">drop set<`) {
+		t.Fatalf("technique should be shown on the set: %q", w.Body.String())
+	}
+	if !strings.Contains(get(t, h, base+"/").Body.String(), `list="techniques"`) {
+		t.Fatalf("entry form should suggest known techniques")
+	}
+}
+
+// A drop set is not comparable to a straight set, so it must not become the
+// exercise's record.
+func TestTechniqueSetsDoNotBecomeTheRecord(t *testing.T) {
+	h, service := newServer(t)
+	post(t, h, base+"/sets", setForm("banca", "80", "5", "9"), true)
+	heavy := setForm("banca", "120", "5", "9")
+	heavy.Set("technique", "asistida")
+	post(t, h, base+"/sets", heavy, true)
+
+	history, err := service.ExerciseHistory(t.Context(), "banca", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history.Sets) != 2 {
+		t.Fatalf("both sets should be in the history: %#v", history.Sets)
+	}
+	if history.Best == nil || history.Best.WeightKG != 80 {
+		t.Fatalf("record should ignore the technique set: %#v", history.Best)
+	}
+}
+
+func TestTechniqueCanBeEditedAndCleared(t *testing.T) {
+	h, service := newServer(t)
+	form := setForm("banca", "80", "8", "9")
+	form.Set("technique", "drop set")
+	post(t, h, base+"/sets", form, true)
+
+	sessions, _ := service.ListSessions(t.Context(), training.ListFilter{Limit: 1})
+	session, _ := service.GetSession(t.Context(), sessions[0].ID)
+	id := itoa(session.Sets[0].ID)
+
+	w := post(t, h, base+"/sets/"+id+"/update", url.Values{"technique": {"rest-pause"}}, true)
+	if !strings.Contains(w.Body.String(), "rest-pause") {
+		t.Fatalf("technique not updated: %q", w.Body.String())
+	}
+	// An empty value clears it back to a normal set.
+	w = post(t, h, base+"/sets/"+id+"/update", url.Values{"technique": {""}}, true)
+	if strings.Contains(w.Body.String(), "tech-tag") {
+		t.Fatalf("technique should be cleared: %q", w.Body.String())
+	}
+}

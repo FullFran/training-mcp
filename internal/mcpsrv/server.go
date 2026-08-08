@@ -29,13 +29,15 @@ type AddInput struct {
 	WeightKG  float64 `json:"weight_kg" jsonschema:"Weight in kilograms; must be strictly positive."`
 	Reps      int     `json:"reps" jsonschema:"Repetition count; must be strictly positive."`
 	RPE       float64 `json:"rpe" jsonschema:"Numeric rate of perceived exertion from 1 through 10; determines the set's SI."`
+	Technique string  `json:"technique,omitempty" jsonschema:"Optional intensity technique applied to the set, e.g. 'drop set', 'rest-pause'. Omit for a normal straight set."`
 }
 type LogInput struct {
-	Exercise string  `json:"exercise" jsonschema:"Non-empty exercise name; it is trimmed and lowercased before storage."`
-	WeightKG float64 `json:"weight_kg" jsonschema:"Weight in kilograms; must be strictly positive."`
-	Reps     int     `json:"reps" jsonschema:"Repetition count; must be strictly positive."`
-	RPE      float64 `json:"rpe" jsonschema:"Numeric rate of perceived exertion from 1 through 10; determines the set's SI."`
-	Count    int     `json:"count,omitempty" jsonschema:"How many identical sets to record; defaults to 1, accepts up to 20. Use it for '3x10 at 80kg'."`
+	Exercise  string  `json:"exercise" jsonschema:"Non-empty exercise name; it is trimmed and lowercased before storage."`
+	WeightKG  float64 `json:"weight_kg" jsonschema:"Weight in kilograms; must be strictly positive."`
+	Reps      int     `json:"reps" jsonschema:"Repetition count; must be strictly positive."`
+	RPE       float64 `json:"rpe" jsonschema:"Numeric rate of perceived exertion from 1 through 10; determines the set's SI."`
+	Count     int     `json:"count,omitempty" jsonschema:"How many identical sets to record; defaults to 1, accepts up to 20. Use it for '3x10 at 80kg'."`
+	Technique string  `json:"technique,omitempty" jsonschema:"Optional intensity technique applied to the set, e.g. 'drop set', 'rest-pause', 'myo-reps', 'sin parar'. Omit for a normal straight set."`
 }
 type LogOut struct {
 	Session training.Session `json:"session"`
@@ -47,11 +49,12 @@ type SetOut struct {
 	TotalSI float64      `json:"total_si"`
 }
 type UpdateInput struct {
-	SetID    int64    `json:"set_id" jsonschema:"Positive ID of the existing set to update."`
-	Exercise *string  `json:"exercise,omitempty" jsonschema:"Non-empty replacement exercise name; it is trimmed and lowercased before storage."`
-	WeightKG *float64 `json:"weight_kg,omitempty" jsonschema:"Replacement weight in kilograms; must be strictly positive."`
-	Reps     *int     `json:"reps,omitempty" jsonschema:"Replacement repetition count; must be strictly positive."`
-	RPE      *float64 `json:"rpe,omitempty" jsonschema:"Replacement numeric RPE from 1 through 10; recalculates the set's SI."`
+	SetID     int64    `json:"set_id" jsonschema:"Positive ID of the existing set to update."`
+	Exercise  *string  `json:"exercise,omitempty" jsonschema:"Non-empty replacement exercise name; it is trimmed and lowercased before storage."`
+	WeightKG  *float64 `json:"weight_kg,omitempty" jsonschema:"Replacement weight in kilograms; must be strictly positive."`
+	Reps      *int     `json:"reps,omitempty" jsonschema:"Replacement repetition count; must be strictly positive."`
+	RPE       *float64 `json:"rpe,omitempty" jsonschema:"Replacement numeric RPE from 1 through 10; recalculates the set's SI."`
+	Technique *string  `json:"technique,omitempty" jsonschema:"Replacement intensity technique. Pass an empty string to clear it back to a normal set."`
 }
 type DeleteInput struct {
 	SetID int64 `json:"set_id" jsonschema:"Positive ID of the existing set to delete."`
@@ -197,7 +200,7 @@ func New(service *training.Service) *Server {
 	addSchema.Properties["reps"].Minimum = jsonschema.Ptr(1.0)
 	setRPERange(addSchema.Properties["rpe"])
 	mcp.AddTool(s, &mcp.Tool{Name: "add_set", Description: "Add a set to an existing training session and return the set plus the session's recalculated total SI.", InputSchema: addSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in AddInput) (*mcp.CallToolResult, SetOut, error) {
-		v, total, err := service.AddSet(ctx, training.AddSetInput{SessionID: in.SessionID, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE})
+		v, total, err := service.AddSet(ctx, training.AddSetInput{SessionID: in.SessionID, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, Technique: in.Technique})
 		return nil, SetOut{Set: v, TotalSI: total}, toolError(err)
 	})
 	logSchema := mustInputSchema[LogInput]()
@@ -209,7 +212,7 @@ func New(service *training.Service) *Server {
 	logSchema.Properties["count"].Minimum = jsonschema.Ptr(1.0)
 	logSchema.Properties["count"].Maximum = jsonschema.Ptr(20.0)
 	mcp.AddTool(s, &mcp.Tool{Name: "log_set", Description: "Record one or more identical sets into today's session, creating that session if it does not exist yet. This is the simplest way to log training: it needs no session id. Prefer it over start_session plus add_set.", InputSchema: logSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in LogInput) (*mcp.CallToolResult, LogOut, error) {
-		session, sets, err := service.LogSet(ctx, in.Exercise, in.WeightKG, in.Reps, in.RPE, in.Count)
+		session, sets, err := service.LogSet(ctx, in.Exercise, in.WeightKG, in.Reps, in.RPE, in.Count, in.Technique)
 		return nil, LogOut{Session: session, Sets: sets, TotalSI: session.TotalSI}, toolError(err)
 	})
 
@@ -224,8 +227,9 @@ func New(service *training.Service) *Server {
 	updateSchema.Properties["reps"].Minimum = jsonschema.Ptr(1.0)
 	setNonNullableType(updateSchema.Properties["rpe"], "number")
 	setRPERange(updateSchema.Properties["rpe"])
+	setNonNullableType(updateSchema.Properties["technique"], "string")
 	mcp.AddTool(s, &mcp.Tool{Name: "update_set", Description: "Update one or more fields of an existing set. Omitted fields remain unchanged; RPE changes recalculate SI.", InputSchema: updateSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in UpdateInput) (*mcp.CallToolResult, SetOut, error) {
-		v, total, err := service.UpdateSet(ctx, in.SetID, training.SetPatch{Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE})
+		v, total, err := service.UpdateSet(ctx, in.SetID, training.SetPatch{Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, Technique: in.Technique})
 		return nil, SetOut{Set: v, TotalSI: total}, toolError(err)
 	})
 	deleteSchema := mustInputSchema[DeleteInput]()

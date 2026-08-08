@@ -535,3 +535,24 @@ button { font: inherit; cursor: pointer; }
 .recommend li.up .delta { color: var(--accent); }
 .recommend li.down .delta { color: var(--danger); }
 .recommend .why { color: var(--muted); font-size: 13px; }
+
+/* --- intensity technique ------------------------------------------------ */
+.tech > summary {
+  min-height: 40px;
+  display: flex; align-items: center; gap: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+.tech input { margin-top: 8px; }
+.tech-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #10131a;
+  color: var(--muted);
+  font-size: 11px;
+}
+.edit-form.wide-edit { grid-template-columns: 1fr 1fr 1fr 1.4fr auto; }

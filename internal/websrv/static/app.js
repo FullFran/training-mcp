@@ -137,7 +137,7 @@
     const li = btn.closest('li');
     if (li.querySelector('form')) return;
     const f = document.createElement('form');
-    f.className = 'edit-form';
+    f.className = 'edit-form wide-edit';
     f.setAttribute('hx-post', `${base}/sets/${li.dataset.setId}/update`);
     f.setAttribute('hx-target', '#panel');
     f.setAttribute('hx-swap', 'outerHTML');
@@ -145,6 +145,7 @@
       `<input name="weight_kg" type="number" step="0.5" min="0.5" inputmode="decimal" value="${li.dataset.weight}" aria-label="Peso">` +
       `<input name="reps" type="number" step="1" min="1" inputmode="numeric" value="${li.dataset.reps}" aria-label="Reps">` +
       `<input name="rpe" type="number" step="0.5" min="1" max="10" inputmode="decimal" value="${li.dataset.rpe}" aria-label="RPE">` +
+      `<input name="technique" type="text" list="techniques" placeholder="técnica" value="${li.dataset.technique || ''}" aria-label="Técnica">` +
       `<button type="submit" class="ok">Guardar</button>`;
     li.appendChild(f);
     if (window.htmx) window.htmx.process(f);

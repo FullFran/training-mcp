@@ -30,7 +30,21 @@ type Set struct {
 	Reps      int     `json:"reps"`
 	RPE       float64 `json:"rpe"`
 	SI        float64 `json:"si"`
+	// Technique is an optional intensity method applied to this set. Empty
+	// means a normal straight set.
+	Technique string `json:"technique,omitempty"`
 }
+
+// Techniques are the intensity methods offered as suggestions. The field is not
+// restricted to them — reality invents more — but suggesting a known list is
+// what keeps the vocabulary from fragmenting the way exercise names did.
+var Techniques = []string{
+	"drop set", "rest-pause", "myo-reps", "cluster", "parciales",
+	"negativas", "isométrico", "sin parar", "superserie", "asistida",
+}
+
+const maxTechniqueLen = 40
+
 type SessionSummary struct {
 	ID       int64   `json:"id"`
 	Date     string  `json:"date"`
@@ -44,12 +58,14 @@ type AddSetInput struct {
 	WeightKG  float64
 	Reps      int
 	RPE       float64
+	Technique string
 }
 type SetPatch struct {
-	Exercise *string
-	WeightKG *float64
-	Reps     *int
-	RPE      *float64
+	Exercise  *string
+	WeightKG  *float64
+	Reps      *int
+	RPE       *float64
+	Technique *string
 }
 type ListFilter struct {
 	Limit    int
@@ -213,6 +229,7 @@ func Epley1RM(weightKG float64, reps int) float64 {
 // ExerciseSet is one recorded set carrying the date it was performed, so an
 // exercise's progression can be read without walking every session.
 type ExerciseSet struct {
+	Technique string  `json:"technique,omitempty"`
 	SetID     int64   `json:"set_id"`
 	SessionID int64   `json:"session_id"`
 	Date      string  `json:"date"`
@@ -253,5 +270,5 @@ type ExerciseMemory struct {
 type Clock func() time.Time
 
 func (p SetPatch) Empty() bool {
-	return p.Exercise == nil && p.WeightKG == nil && p.Reps == nil && p.RPE == nil
+	return p.Exercise == nil && p.WeightKG == nil && p.Reps == nil && p.RPE == nil && p.Technique == nil
 }

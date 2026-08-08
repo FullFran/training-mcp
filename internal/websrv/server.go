@@ -108,6 +108,7 @@ func New(service *training.Service, clock training.Clock, basePath string) (*Ser
 	funcs := map[string]any{
 		"num":         formatNumber,
 		"rpeScale":    rpeScale,
+		"techniques":  func() []string { return training.Techniques },
 		"ratingScale": func() []int { return []int{0, 1, 2, 3} },
 		"ratingDims": func() [][2]string {
 			return [][2]string{
@@ -229,6 +230,7 @@ func (s *Server) addSet(w http.ResponseWriter, r *http.Request) {
 	reps, errReps := strconv.Atoi(strings.TrimSpace(r.PostFormValue("reps")))
 	rpe, errRPE := strconv.ParseFloat(strings.TrimSpace(r.PostFormValue("rpe")), 64)
 	exercise := r.PostFormValue("exercise")
+	technique := r.PostFormValue("technique")
 
 	message := ""
 	if errWeight != nil || errReps != nil || errRPE != nil {
@@ -240,7 +242,8 @@ func (s *Server) addSet(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_, _, err = s.service.AddSet(r.Context(), training.AddSetInput{
-			SessionID: session.ID, Exercise: exercise, WeightKG: weight, Reps: reps, RPE: rpe,
+			SessionID: session.ID, Exercise: exercise, WeightKG: weight,
+			Reps: reps, RPE: rpe, Technique: technique,
 		})
 		switch {
 		case errors.Is(err, training.ErrValidation):
@@ -287,6 +290,11 @@ func (s *Server) updateSet(w http.ResponseWriter, r *http.Request) {
 		} else {
 			message = "RPE inválido."
 		}
+	}
+	// Present but empty clears the technique back to a normal set.
+	if r.Form.Has("technique") {
+		v := r.PostFormValue("technique")
+		patch.Technique = &v
 	}
 	if message == "" {
 		switch _, _, err := s.service.UpdateSet(r.Context(), id, patch); {

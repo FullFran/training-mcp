@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -178,7 +179,7 @@ func (m *memoryStore) Start(_ context.Context, s Session) (Session, error) {
 }
 func (m *memoryStore) AddSet(_ context.Context, in AddSetInput) (Set, float64, error) {
 	m.nextSet++
-	s := Set{ID: m.nextSet, SessionID: in.SessionID, Position: 1, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, SI: CalculateSI(in.RPE)}
+	s := Set{ID: m.nextSet, SessionID: in.SessionID, Position: 1, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, SI: CalculateSI(in.RPE), Technique: in.Technique}
 	m.sets[s.ID] = s
 	return s, s.SI, nil
 }
@@ -647,7 +648,7 @@ func TestServiceLogSetCreatesTodaysSessionOnceAndRecordsRepeats(t *testing.T) {
 	svc := NewService(store, func() time.Time { return time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC) })
 	ctx := context.Background()
 
-	session, sets, err := svc.LogSet(ctx, " Press Banca ", 80, 10, 9, 3)
+	session, sets, err := svc.LogSet(ctx, " Press Banca ", 80, 10, 9, 3, "")
 	if err != nil || len(sets) != 3 {
 		t.Fatalf("LogSet() = %#v, %v", sets, err)
 	}
@@ -657,13 +658,35 @@ func TestServiceLogSetCreatesTodaysSessionOnceAndRecordsRepeats(t *testing.T) {
 	// Invalid input must not leave an empty session behind.
 	store2 := newMemoryStore()
 	svc2 := NewService(store2, func() time.Time { return time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC) })
-	if _, _, err := svc2.LogSet(ctx, "", 80, 10, 9, 1); !errors.Is(err, ErrValidation) {
+	if _, _, err := svc2.LogSet(ctx, "", 80, 10, 9, 1, ""); !errors.Is(err, ErrValidation) {
 		t.Fatalf("LogSet with empty exercise = %v, want validation", err)
 	}
 	if len(store2.sessions) != 0 {
 		t.Fatalf("a rejected log created a session: %#v", store2.sessions)
 	}
-	if _, _, err := svc.LogSet(ctx, "banca", 80, 10, 9, 21); !errors.Is(err, ErrValidation) {
+	if _, _, err := svc.LogSet(ctx, "banca", 80, 10, 9, 21, ""); !errors.Is(err, ErrValidation) {
 		t.Fatalf("count above the cap = %v, want validation", err)
+	}
+}
+
+func TestServiceNormalizesAndBoundsTechnique(t *testing.T) {
+	store := newMemoryStore()
+	svc := NewService(store, func() time.Time { return time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC) })
+	ctx := context.Background()
+	session, _ := svc.StartSession(ctx, "2026-08-08")
+
+	set, _, err := svc.AddSet(ctx, AddSetInput{
+		SessionID: session.ID, Exercise: "banca", WeightKG: 80, Reps: 8, RPE: 9,
+		Technique: "  Drop   Set  ",
+	})
+	if err != nil || set.Technique != "drop set" {
+		t.Fatalf("technique = %q, %v, want normalized", set.Technique, err)
+	}
+	_, _, err = svc.AddSet(ctx, AddSetInput{
+		SessionID: session.ID, Exercise: "banca", WeightKG: 80, Reps: 8, RPE: 9,
+		Technique: strings.Repeat("x", 41),
+	})
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("over-long technique = %v, want validation", err)
 	}
 }
