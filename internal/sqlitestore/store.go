@@ -126,8 +126,20 @@ func (s *Store) Start(ctx context.Context, session training.Session) (training.S
 	if err != nil {
 		return training.Session{}, err
 	}
-	session.ID, err = res.LastInsertId()
-	return session, err
+	if session.ID, err = res.LastInsertId(); err != nil {
+		return training.Session{}, err
+	}
+	if session.PlanID > 0 {
+		// Copy the plan into the session so adjusting today never edits the
+		// template, and editing the template never rewrites this session.
+		if _, err = s.db.ExecContext(ctx, `
+INSERT INTO session_items (session_id,position,exercise,target_sets,rep_min,rep_max,target_rpe)
+SELECT ?,position,exercise,target_sets,rep_min,rep_max,target_rpe FROM plan_items WHERE plan_id=?`,
+			session.ID, session.PlanID); err != nil {
+			return training.Session{}, err
+		}
+	}
+	return session, nil
 }
 func (s *Store) AddSet(ctx context.Context, in training.AddSetInput) (training.Set, float64, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -431,20 +443,19 @@ func (s *Store) DeletePlan(ctx context.Context, id int64) error {
 // SessionProgress lists the session's planned exercises with how many sets are
 // done, then any exercise performed that the plan did not prescribe.
 func (s *Store) SessionProgress(ctx context.Context, sessionID int64) ([]training.PlanProgress, error) {
-	var planID sql.NullInt64
-	err := s.db.QueryRowContext(ctx, `SELECT plan_id FROM sessions WHERE id=?`, sessionID).Scan(&planID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, training.ErrNotFound
-	}
-	if err != nil {
+	var exists int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions WHERE id=?`, sessionID).Scan(&exists); err != nil {
 		return nil, err
 	}
+	if exists == 0 {
+		return nil, training.ErrNotFound
+	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT i.exercise, i.target_sets, i.rep_min, i.rep_max, i.target_rpe,
-       (SELECT COUNT(*) FROM sets st WHERE st.session_id=? AND st.exercise=i.exercise),
+SELECT i.exercise, i.target_sets, i.rep_min, i.rep_max, i.target_rpe, i.skipped,
+       (SELECT COUNT(*) FROM sets st WHERE st.session_id=i.session_id AND st.exercise=i.exercise),
        COALESCE(g.muscle_group,'')
-FROM plan_items i LEFT JOIN exercise_groups g ON g.exercise=i.exercise
-WHERE i.plan_id=? ORDER BY i.position`, sessionID, planID.Int64)
+FROM session_items i LEFT JOIN exercise_groups g ON g.exercise=i.exercise
+WHERE i.session_id=? ORDER BY i.position`, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -453,7 +464,7 @@ WHERE i.plan_id=? ORDER BY i.position`, sessionID, planID.Int64)
 	var out []training.PlanProgress
 	for rows.Next() {
 		var v training.PlanProgress
-		if err = rows.Scan(&v.Exercise, &v.TargetSets, &v.RepMin, &v.RepMax, &v.TargetRPE, &v.DoneSets, &v.MuscleGroup); err != nil {
+		if err = rows.Scan(&v.Exercise, &v.TargetSets, &v.RepMin, &v.RepMax, &v.TargetRPE, &v.Skipped, &v.DoneSets, &v.MuscleGroup); err != nil {
 			return nil, err
 		}
 		planned[v.Exercise] = true
@@ -481,6 +492,97 @@ WHERE st.session_id=? GROUP BY st.exercise ORDER BY MIN(st.position)`, sessionID
 		}
 	}
 	return out, extra.Err()
+}
+
+// SetSessionItem adds an exercise to today's session plan, or replaces its
+// prescription if it is already there. New items go last.
+func (s *Store) SetSessionItem(ctx context.Context, sessionID int64, it training.PlanItem) error {
+	var exists int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions WHERE id=?`, sessionID).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 0 {
+		return training.ErrNotFound
+	}
+	var pos int
+	if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(MAX(position),0)+1 FROM session_items WHERE session_id=?`, sessionID).Scan(&pos); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO session_items (session_id,position,exercise,target_sets,rep_min,rep_max,target_rpe)
+VALUES (?,?,?,?,?,?,?)
+ON CONFLICT(session_id,exercise) DO UPDATE SET
+ target_sets=excluded.target_sets, rep_min=excluded.rep_min,
+ rep_max=excluded.rep_max, target_rpe=excluded.target_rpe`,
+		sessionID, pos, it.Exercise, it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE)
+	return err
+}
+
+// PatchSessionItem changes only the fields given, so bumping the set count does
+// not require restating the rep range.
+func (s *Store) PatchSessionItem(ctx context.Context, sessionID int64, exercise string, p training.SessionItemPatch) error {
+	var it training.PlanItem
+	var skipped bool
+	err := s.db.QueryRowContext(ctx, `SELECT exercise,target_sets,rep_min,rep_max,target_rpe,skipped FROM session_items WHERE session_id=? AND exercise=?`,
+		sessionID, exercise).Scan(&it.Exercise, &it.TargetSets, &it.RepMin, &it.RepMax, &it.TargetRPE, &skipped)
+	if errors.Is(err, sql.ErrNoRows) {
+		return training.ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if p.TargetSets != nil {
+		it.TargetSets = *p.TargetSets
+	}
+	if p.RepMin != nil {
+		it.RepMin = *p.RepMin
+	}
+	if p.RepMax != nil {
+		it.RepMax = *p.RepMax
+	}
+	if p.TargetRPE != nil {
+		it.TargetRPE = *p.TargetRPE
+	}
+	if p.Skipped != nil {
+		skipped = *p.Skipped
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE session_items SET target_sets=?,rep_min=?,rep_max=?,target_rpe=?,skipped=? WHERE session_id=? AND exercise=?`,
+		it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE, skipped, sessionID, exercise)
+	return err
+}
+
+// SwapSessionItem substitutes one exercise for another in place, keeping its
+// position and prescription. This is the occupied-machine case.
+func (s *Store) SwapSessionItem(ctx context.Context, sessionID int64, from, to string) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE session_items SET exercise=? WHERE session_id=? AND exercise=?`, to, sessionID, from)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return training.ErrNotFound
+	}
+	return nil
+}
+
+// RemoveSessionItem drops an exercise from today's plan. Sets already logged
+// against it are untouched and resurface as off-plan work.
+func (s *Store) RemoveSessionItem(ctx context.Context, sessionID int64, exercise string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM session_items WHERE session_id=? AND exercise=?`, sessionID, exercise)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return training.ErrNotFound
+	}
+	return nil
 }
 
 // DeleteSession removes a session and, by ON DELETE CASCADE, all of its sets.

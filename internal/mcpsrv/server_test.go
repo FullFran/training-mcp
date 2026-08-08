@@ -38,7 +38,7 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_set", "create_plan", "delete_plan", "delete_session", "delete_set", "exercise_history", "get_plan", "get_session", "list_exercise_groups", "list_plans", "list_sessions", "session_progress", "set_exercise_group", "start_session", "update_set", "volume_by_muscle", "weekly_volume"}) {
+	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_session_exercise", "add_set", "adjust_session_exercise", "create_plan", "delete_plan", "delete_session", "delete_set", "exercise_history", "get_plan", "get_session", "list_exercise_groups", "list_plans", "list_sessions", "remove_session_exercise", "save_session_as_plan", "session_progress", "set_exercise_group", "start_session", "swap_session_exercise", "update_set", "volume_by_muscle", "weekly_volume"}) {
 		t.Fatalf("tools=%v", toolNames(tools))
 	}
 	for _, tool := range tools.Tools {
@@ -431,3 +431,10 @@ func (testStore) DeletePlan(context.Context, int64) error { return nil }
 func (testStore) SessionProgress(context.Context, int64) ([]training.PlanProgress, error) {
 	return nil, nil
 }
+
+func (testStore) SetSessionItem(context.Context, int64, training.PlanItem) error { return nil }
+func (testStore) PatchSessionItem(context.Context, int64, string, training.SessionItemPatch) error {
+	return nil
+}
+func (testStore) SwapSessionItem(context.Context, int64, string, string) error { return nil }
+func (testStore) RemoveSessionItem(context.Context, int64, string) error       { return nil }

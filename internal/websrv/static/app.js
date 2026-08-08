@@ -82,12 +82,40 @@
 
   if (exercise) exercise.addEventListener('input', showPrevious);
 
+  // The "⋯" opens per-exercise adjustments. Kept behind a tap so the checklist
+  // stays readable at a glance mid-set.
+  document.addEventListener('click', (event) => {
+    const more = event.target.closest('.more');
+    if (!more) return;
+    event.stopPropagation();
+    const box = more.parentElement.querySelector('.item-actions');
+    document.querySelectorAll('.item-actions').forEach((el) => { if (el !== box) el.hidden = true; });
+    box.hidden = !box.hidden;
+    buzz(8);
+  });
+
+  // Substitution asks for the replacement, then posts it like any other action.
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest('.swap');
+    if (!btn) return;
+    event.stopPropagation();
+    const replacement = window.prompt('¿Por qué ejercicio lo sustituyes?', '');
+    if (!replacement || !replacement.trim()) return;
+    if (!window.htmx) return;
+    window.htmx.ajax('POST', base + '/plan/item', {
+      target: '#panel',
+      swap: 'outerHTML',
+      values: { action: 'swap', exercise: btn.dataset.exercise, replacement: replacement.trim() }
+    });
+  });
+
   // Tapping a planned exercise loads its prescription: the exercise, the middle
   // of the target rep range and the target RPE, plus last time's weight, which
   // the plan deliberately does not prescribe.
   document.addEventListener('click', (event) => {
     const item = event.target.closest('.planned li');
     if (!item) return;
+    if (event.target.closest('.more, .item-actions')) return;
     const name = item.dataset.exercise;
     const known = info[name] || {};
     fill({

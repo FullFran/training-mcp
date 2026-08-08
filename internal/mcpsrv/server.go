@@ -89,6 +89,40 @@ type ProgressOut struct {
 	PlanName  string                  `json:"plan_name,omitempty"`
 	Progress  []training.PlanProgress `json:"progress"`
 }
+type SessionItemInput struct {
+	SessionID  int64   `json:"session_id" jsonschema:"Positive ID of the session to adjust."`
+	Exercise   string  `json:"exercise" jsonschema:"Non-empty exercise name; trimmed and lowercased to match stored sets."`
+	TargetSets int     `json:"target_sets" jsonschema:"Planned number of sets for this session; 1 through 20."`
+	RepMin     int     `json:"rep_min,omitempty" jsonschema:"Lower bound of the target rep range."`
+	RepMax     int     `json:"rep_max,omitempty" jsonschema:"Upper bound of the target rep range."`
+	TargetRPE  float64 `json:"target_rpe,omitempty" jsonschema:"Target RPE from 1 through 10."`
+}
+type AdjustItemInput struct {
+	SessionID  int64    `json:"session_id" jsonschema:"Positive ID of the session to adjust."`
+	Exercise   string   `json:"exercise" jsonschema:"Exercise already in this session's plan."`
+	TargetSets *int     `json:"target_sets,omitempty" jsonschema:"New planned set count; 1 through 20. Omit to leave unchanged."`
+	RepMin     *int     `json:"rep_min,omitempty" jsonschema:"New lower bound of the rep range. Omit to leave unchanged."`
+	RepMax     *int     `json:"rep_max,omitempty" jsonschema:"New upper bound of the rep range. Omit to leave unchanged."`
+	TargetRPE  *float64 `json:"target_rpe,omitempty" jsonschema:"New target RPE from 1 through 10. Omit to leave unchanged."`
+	Skipped    *bool    `json:"skipped,omitempty" jsonschema:"Mark the exercise as consciously skipped today, or unmark it."`
+}
+type SwapItemInput struct {
+	SessionID   int64  `json:"session_id" jsonschema:"Positive ID of the session to adjust."`
+	Exercise    string `json:"exercise" jsonschema:"Exercise currently in the session's plan."`
+	Replacement string `json:"replacement" jsonschema:"Exercise to use instead, keeping the same prescription."`
+}
+type RemoveItemInput struct {
+	SessionID int64  `json:"session_id" jsonschema:"Positive ID of the session to adjust."`
+	Exercise  string `json:"exercise" jsonschema:"Exercise to drop from this session's plan."`
+}
+type SaveAsPlanInput struct {
+	SessionID int64  `json:"session_id" jsonschema:"Positive ID of the session to turn into a plan."`
+	Name      string `json:"name" jsonschema:"Name for the new plan."`
+}
+type ItemOut struct {
+	SessionID int64  `json:"session_id"`
+	Exercise  string `json:"exercise"`
+}
 type DeleteSessionOut struct {
 	SessionID   int64 `json:"session_id"`
 	DeletedSets int   `json:"deleted_sets"`
@@ -217,6 +251,55 @@ func New(service *training.Service) *Server {
 		return nil, out, toolError(err)
 	})
 
+	setItemSchema := mustInputSchema[SessionItemInput]()
+	setPositiveID(setItemSchema.Properties["session_id"])
+	setItemSchema.Properties["exercise"].Pattern = `.*\S.*`
+	mcp.AddTool(s, &mcp.Tool{Name: "add_session_exercise", Description: "Add an exercise to today's session plan, or replace its prescription. Adjusting a session never edits the plan it was started from.", InputSchema: setItemSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in SessionItemInput) (*mcp.CallToolResult, ItemOut, error) {
+		err := service.SetSessionItem(ctx, in.SessionID, training.PlanItem{
+			Exercise: in.Exercise, TargetSets: in.TargetSets,
+			RepMin: in.RepMin, RepMax: in.RepMax, TargetRPE: in.TargetRPE,
+		})
+		return nil, ItemOut{SessionID: in.SessionID, Exercise: in.Exercise}, toolError(err)
+	})
+	adjustSchema := mustInputSchema[AdjustItemInput]()
+	setPositiveID(adjustSchema.Properties["session_id"])
+	adjustSchema.Properties["exercise"].Pattern = `.*\S.*`
+	adjustSchema.MinProperties = jsonschema.Ptr(3)
+	setNonNullableType(adjustSchema.Properties["target_sets"], "integer")
+	setNonNullableType(adjustSchema.Properties["rep_min"], "integer")
+	setNonNullableType(adjustSchema.Properties["rep_max"], "integer")
+	setNonNullableType(adjustSchema.Properties["target_rpe"], "number")
+	setNonNullableType(adjustSchema.Properties["skipped"], "boolean")
+	mcp.AddTool(s, &mcp.Tool{Name: "adjust_session_exercise", Description: "Change one exercise of today's session: its set count, rep range, RPE, or whether it is skipped. Omitted fields stay as they are. Use when the session does not go as planned.", InputSchema: adjustSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in AdjustItemInput) (*mcp.CallToolResult, ItemOut, error) {
+		err := service.AdjustSessionItem(ctx, in.SessionID, in.Exercise, training.SessionItemPatch{
+			TargetSets: in.TargetSets, RepMin: in.RepMin, RepMax: in.RepMax,
+			TargetRPE: in.TargetRPE, Skipped: in.Skipped,
+		})
+		return nil, ItemOut{SessionID: in.SessionID, Exercise: in.Exercise}, toolError(err)
+	})
+	swapSchema := mustInputSchema[SwapItemInput]()
+	setPositiveID(swapSchema.Properties["session_id"])
+	swapSchema.Properties["exercise"].Pattern = `.*\S.*`
+	swapSchema.Properties["replacement"].Pattern = `.*\S.*`
+	mcp.AddTool(s, &mcp.Tool{Name: "swap_session_exercise", Description: "Substitute one exercise for another in today's session, keeping the same prescription. Use when the planned machine is taken or the movement does not feel right.", InputSchema: swapSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in SwapItemInput) (*mcp.CallToolResult, ItemOut, error) {
+		err := service.SwapSessionItem(ctx, in.SessionID, in.Exercise, in.Replacement)
+		return nil, ItemOut{SessionID: in.SessionID, Exercise: in.Replacement}, toolError(err)
+	})
+	removeItemSchema := mustInputSchema[RemoveItemInput]()
+	setPositiveID(removeItemSchema.Properties["session_id"])
+	removeItemSchema.Properties["exercise"].Pattern = `.*\S.*`
+	mcp.AddTool(s, &mcp.Tool{Name: "remove_session_exercise", Description: "Drop an exercise from today's session plan. Sets already logged against it are kept and reappear as off-plan work.", InputSchema: removeItemSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in RemoveItemInput) (*mcp.CallToolResult, ItemOut, error) {
+		err := service.RemoveSessionItem(ctx, in.SessionID, in.Exercise)
+		return nil, ItemOut{SessionID: in.SessionID, Exercise: in.Exercise}, toolError(err)
+	})
+	saveAsPlanSchema := mustInputSchema[SaveAsPlanInput]()
+	setPositiveID(saveAsPlanSchema.Properties["session_id"])
+	saveAsPlanSchema.Properties["name"].Pattern = `.*\S.*`
+	mcp.AddTool(s, &mcp.Tool{Name: "save_session_as_plan", Description: "Turn a session — including any in-session adjustments and off-plan work — into a new reusable plan. Skipped exercises are left out.", InputSchema: saveAsPlanSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in SaveAsPlanInput) (*mcp.CallToolResult, PlanOut, error) {
+		v, err := service.SaveSessionAsPlan(ctx, in.SessionID, in.Name)
+		return nil, PlanOut{Plan: v}, toolError(err)
+	})
+
 	deleteSessionSchema := mustInputSchema[SessionInput]()
 	setPositiveID(deleteSessionSchema.Properties["session_id"])
 	mcp.AddTool(s, &mcp.Tool{Name: "delete_session", Description: "Permanently delete a training session and every set in it. Irreversible; returns how many sets were destroyed. Use to remove an empty or mistaken session.", InputSchema: deleteSessionSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in SessionInput) (*mcp.CallToolResult, DeleteSessionOut, error) {
@@ -273,7 +356,9 @@ func (s *Server) ToolNames() []string {
 	return []string{"start_session", "add_set", "update_set", "delete_set", "delete_session",
 		"get_session", "list_sessions", "exercise_history", "weekly_volume",
 		"set_exercise_group", "list_exercise_groups", "volume_by_muscle",
-		"create_plan", "list_plans", "get_plan", "delete_plan", "session_progress"}
+		"create_plan", "list_plans", "get_plan", "delete_plan", "session_progress",
+		"add_session_exercise", "adjust_session_exercise", "swap_session_exercise",
+		"remove_session_exercise", "save_session_as_plan"}
 }
 func muscleGroupEnum() []any {
 	out := make([]any, 0, len(training.MuscleGroups))

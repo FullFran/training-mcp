@@ -125,10 +125,27 @@ type PlanProgress struct {
 	RepMin      int     `json:"rep_min,omitempty"`
 	RepMax      int     `json:"rep_max,omitempty"`
 	TargetRPE   float64 `json:"target_rpe,omitempty"`
+	// Skipped marks an exercise consciously dropped today. It stays listed so
+	// the session records what was decided, not just what was done.
+	Skipped bool `json:"skipped,omitempty"`
 }
 
 // Done reports whether the prescribed number of sets has been completed.
 func (p PlanProgress) Done() bool { return p.TargetSets > 0 && p.DoneSets >= p.TargetSets }
+
+// SessionItemPatch adjusts one exercise of today's session. Nil fields are left
+// unchanged, so a caller can bump only the set count without restating the rest.
+type SessionItemPatch struct {
+	TargetSets *int
+	RepMin     *int
+	RepMax     *int
+	TargetRPE  *float64
+	Skipped    *bool
+}
+
+func (p SessionItemPatch) Empty() bool {
+	return p.TargetSets == nil && p.RepMin == nil && p.RepMax == nil && p.TargetRPE == nil && p.Skipped == nil
+}
 
 // Epley1RM estimates a one-rep max from a set. It is descriptive only and is
 // never stored: SI remains the single recorded intensity metric. Reps of 1

@@ -443,3 +443,35 @@ button { font: inherit; cursor: pointer; }
 .planned .rx { display: block; color: var(--muted); font-size: 13px; }
 .planned .count { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; }
 .planned li.ok .count { color: var(--accent); font-weight: 700; }
+
+/* --- in-session plan adjustments --------------------------------------- */
+.planned li { grid-template-columns: 22px 1fr auto auto; position: relative; }
+.planned li.skipped { opacity: .55; }
+.planned li.skipped .ex { text-decoration: line-through; }
+.more {
+  min-width: 34px; min-height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+}
+.item-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 8px;
+}
+.mini {
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--text);
+  font-size: 14px;
+}
+.mini.danger { color: var(--danger); }
+.plan.card { background: var(--card); }

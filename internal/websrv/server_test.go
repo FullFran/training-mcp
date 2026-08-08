@@ -505,3 +505,152 @@ func TestChoosingAPlanIsRefusedOnceSetsExist(t *testing.T) {
 		t.Fatalf("existing work must be left alone: %#v", sessions[0])
 	}
 }
+
+func startPlan(t *testing.T, h http.Handler, service *training.Service, items ...training.PlanItem) training.Plan {
+	t.Helper()
+	plan, err := service.CreatePlan(t.Context(), training.Plan{Name: "Empuje A", Items: items})
+	if err != nil {
+		t.Fatal(err)
+	}
+	post(t, h, base+"/plan", url.Values{"plan_id": {itoa(plan.ID)}}, false)
+	return plan
+}
+
+func TestSessionPlanCanBeAdjustedWithoutTouchingTheTemplate(t *testing.T) {
+	h, service := newServer(t)
+	plan := startPlan(t, h, service,
+		training.PlanItem{Exercise: "banca", TargetSets: 4, RepMin: 8, RepMax: 10, TargetRPE: 9})
+
+	// Fewer sets today because the session is not going well.
+	post(t, h, base+"/plan/item", url.Values{
+		"action": {"sets"}, "delta": {"-1"}, "current": {"4"}, "exercise": {"banca"},
+	}, true)
+	body := get(t, h, base+"/").Body.String()
+	if !strings.Contains(body, `<span class="count">0/3`) {
+		t.Fatalf("target should have dropped to 3: %q", body)
+	}
+
+	// The saved plan is untouched: today's change is today's only.
+	saved, err := service.GetPlan(t.Context(), plan.ID)
+	if err != nil || saved.Items[0].TargetSets != 4 {
+		t.Fatalf("template was modified by an in-session change: %#v, %v", saved, err)
+	}
+}
+
+func TestSessionExerciseCanBeSkippedAndResumed(t *testing.T) {
+	h, service := newServer(t)
+	startPlan(t, h, service, training.PlanItem{Exercise: "banca", TargetSets: 3})
+
+	post(t, h, base+"/plan/item", url.Values{"action": {"skip"}, "exercise": {"banca"}}, true)
+	body := get(t, h, base+"/").Body.String()
+	if !strings.Contains(body, "skipped") {
+		t.Fatalf("skipped exercise should be marked: %q", body)
+	}
+	post(t, h, base+"/plan/item", url.Values{"action": {"unskip"}, "exercise": {"banca"}}, true)
+	if strings.Contains(get(t, h, base+"/").Body.String(), "skipped") {
+		t.Fatalf("exercise should be resumable")
+	}
+}
+
+// The occupied-machine case: substitute the movement, keep the prescription.
+func TestSessionExerciseCanBeSwappedKeepingItsPrescription(t *testing.T) {
+	h, service := newServer(t)
+	startPlan(t, h, service,
+		training.PlanItem{Exercise: "banca máquina", TargetSets: 4, RepMin: 8, RepMax: 12, TargetRPE: 9})
+
+	post(t, h, base+"/plan/item", url.Values{
+		"action": {"swap"}, "exercise": {"banca máquina"}, "replacement": {" Banca Libre "},
+	}, true)
+
+	body := get(t, h, base+"/").Body.String()
+	if strings.Contains(body, "banca máquina") {
+		t.Fatalf("swapped-out exercise should be gone: %q", body)
+	}
+	// Normalized like any other exercise name, and the prescription survives.
+	if !strings.Contains(body, "banca libre") || !strings.Contains(body, "8-12 reps @9") {
+		t.Fatalf("replacement should keep the prescription: %q", body)
+	}
+}
+
+func TestOffPlanExerciseCanBeAdoptedIntoTodaysPlan(t *testing.T) {
+	h, service := newServer(t)
+	startPlan(t, h, service, training.PlanItem{Exercise: "banca", TargetSets: 3})
+	post(t, h, base+"/sets", setForm("curl bayesian", "12", "12", "8"), true)
+	post(t, h, base+"/sets", setForm("curl bayesian", "12", "10", "9"), true)
+
+	post(t, h, base+"/plan/item", url.Values{
+		"action": {"adopt"}, "done": {"2"}, "exercise": {"curl bayesian"},
+	}, true)
+
+	body := get(t, h, base+"/").Body.String()
+	if strings.Contains(body, "fuera de plan") {
+		t.Fatalf("adopted exercise should no longer read as off-plan: %q", body)
+	}
+	if !strings.Contains(body, `<span class="count">2/2`) {
+		t.Fatalf("adopted at the volume already performed: %q", body)
+	}
+}
+
+func TestRemovingAPlannedExerciseKeepsItsLoggedSets(t *testing.T) {
+	h, service := newServer(t)
+	startPlan(t, h, service, training.PlanItem{Exercise: "banca", TargetSets: 3})
+	post(t, h, base+"/sets", setForm("banca", "80", "8", "8"), true)
+
+	post(t, h, base+"/plan/item", url.Values{"action": {"remove"}, "exercise": {"banca"}}, true)
+
+	sessions, _ := service.ListSessions(t.Context(), training.ListFilter{Limit: 1})
+	if sessions[0].SetCount != 1 {
+		t.Fatalf("logged sets must survive removal from the plan: %#v", sessions[0])
+	}
+	// It reappears as off-plan work rather than vanishing.
+	if !strings.Contains(get(t, h, base+"/").Body.String(), "fuera de plan") {
+		t.Fatalf("removed exercise with logged sets should show as off-plan")
+	}
+}
+
+// Adopting another plan mid-session is safe now that the plan is a per-session
+// snapshot: its exercises are added and no logged set is touched.
+func TestAdoptingAnotherPlanMidSessionKeepsLoggedWork(t *testing.T) {
+	h, service := newServer(t)
+	startPlan(t, h, service, training.PlanItem{Exercise: "banca", TargetSets: 3})
+	post(t, h, base+"/sets", setForm("banca", "80", "8", "8"), true)
+
+	other, err := service.CreatePlan(t.Context(), training.Plan{
+		Name:  "Tirón A",
+		Items: []training.PlanItem{{Exercise: "remo máquina", TargetSets: 4, RepMin: 8, RepMax: 12}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	post(t, h, base+"/plan", url.Values{"plan_id": {itoa(other.ID)}}, false)
+
+	body := get(t, h, base+"/").Body.String()
+	if !strings.Contains(body, "remo máquina") || !strings.Contains(body, "banca") {
+		t.Fatalf("both the new plan and prior work should be present: %q", body)
+	}
+	sessions, _ := service.ListSessions(t.Context(), training.ListFilter{Limit: 10})
+	if len(sessions) != 1 || sessions[0].SetCount != 1 {
+		t.Fatalf("no session or set should be lost: %#v", sessions)
+	}
+}
+
+func TestSaveSessionAsPlanCapturesTheAdjustedSession(t *testing.T) {
+	h, service := newServer(t)
+	startPlan(t, h, service,
+		training.PlanItem{Exercise: "banca", TargetSets: 4, RepMin: 8, RepMax: 10, TargetRPE: 9},
+		training.PlanItem{Exercise: "aperturas", TargetSets: 3})
+	post(t, h, base+"/plan/item", url.Values{"action": {"sets"}, "delta": {"-1"}, "current": {"4"}, "exercise": {"banca"}}, true)
+	post(t, h, base+"/plan/item", url.Values{"action": {"skip"}, "exercise": {"aperturas"}}, true)
+
+	sessions, _ := service.ListSessions(t.Context(), training.ListFilter{Limit: 1})
+	saved, err := service.SaveSessionAsPlan(t.Context(), sessions[0].ID, "Empuje B")
+	if err != nil {
+		t.Fatalf("SaveSessionAsPlan() error = %v", err)
+	}
+	if len(saved.Items) != 1 || saved.Items[0].Exercise != "banca" || saved.Items[0].TargetSets != 3 {
+		t.Fatalf("new plan should capture the adjustment and drop the skip: %#v", saved.Items)
+	}
+	if saved.Items[0].RepMin != 8 || saved.Items[0].TargetRPE != 9 {
+		t.Fatalf("prescription should carry over: %#v", saved.Items[0])
+	}
+}

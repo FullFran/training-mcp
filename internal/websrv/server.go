@@ -162,6 +162,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST "+b+"/sets/{id}/update", s.updateSet)
 	s.mux.HandleFunc("GET "+b+"/history", s.history)
 	s.mux.HandleFunc("POST "+b+"/plan", s.choosePlan)
+	s.mux.HandleFunc("POST "+b+"/plan/item", s.adjustItem)
 	s.mux.HandleFunc("GET "+b+"/s/{id}", s.session)
 	s.mux.HandleFunc("GET "+b+"/manifest.webmanifest", s.manifest)
 	s.mux.HandleFunc("GET "+b+"/sw.js", s.serviceWorker)
@@ -337,6 +338,10 @@ func (s *Server) session(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := pageData{Base: s.base, Today: session.Date, Session: session, ReadOnly: true}
+	if data.Progress, err = s.service.SessionProgress(r.Context(), session.ID); err != nil {
+		s.fail(w, err)
+		return
+	}
 	if err := s.decorate(r.Context(), &data); err != nil {
 		s.fail(w, err)
 		return
@@ -407,13 +412,29 @@ func (s *Server) choosePlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(sessions) > 0 {
-		if sessions[0].SetCount > 0 {
+		if sessions[0].SetCount == 0 {
+			// Nothing logged yet: replace the empty session outright.
+			if _, err := s.service.DeleteSession(r.Context(), sessions[0].ID); err != nil {
+				s.fail(w, err)
+				return
+			}
+		} else {
+			// Work already logged. The plan is a per-session snapshot and sets
+			// are never touched, so adopting another plan mid-session is safe:
+			// its exercises are added and anything already done that the new
+			// plan does not include simply shows as off-plan.
+			plan, err := s.service.GetPlan(r.Context(), planID)
+			if err != nil {
+				s.fail(w, err)
+				return
+			}
+			for _, it := range plan.Items {
+				if err := s.service.SetSessionItem(r.Context(), sessions[0].ID, it); err != nil {
+					s.fail(w, err)
+					return
+				}
+			}
 			http.Redirect(w, r, s.base+"/", http.StatusSeeOther)
-			return
-		}
-		// An empty session from an earlier choice is replaced, not stacked.
-		if _, err := s.service.DeleteSession(r.Context(), sessions[0].ID); err != nil {
-			s.fail(w, err)
 			return
 		}
 	}
@@ -422,6 +443,62 @@ func (s *Server) choosePlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, s.base+"/", http.StatusSeeOther)
+}
+
+// adjustItem applies one in-session change: more or fewer sets, skip, swap for
+// another movement, or adopt an off-plan exercise into today's plan.
+func (s *Server) adjustItem(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.fail(w, err)
+		return
+	}
+	exercise := r.PostFormValue("exercise")
+	action := r.PostFormValue("action")
+	session, err := s.ensureToday(r.Context())
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+
+	message := ""
+	switch action {
+	case "sets":
+		delta, convErr := strconv.Atoi(r.PostFormValue("delta"))
+		current, _ := strconv.Atoi(r.PostFormValue("current"))
+		next := current + delta
+		if convErr != nil || next < 1 {
+			message = "No se puede bajar de una serie."
+			break
+		}
+		err = s.service.AdjustSessionItem(r.Context(), session.ID, exercise, training.SessionItemPatch{TargetSets: &next})
+	case "skip", "unskip":
+		skipped := action == "skip"
+		err = s.service.AdjustSessionItem(r.Context(), session.ID, exercise, training.SessionItemPatch{Skipped: &skipped})
+	case "swap":
+		err = s.service.SwapSessionItem(r.Context(), session.ID, exercise, r.PostFormValue("replacement"))
+	case "adopt":
+		// An exercise done off-plan becomes part of today's plan at the volume
+		// already performed.
+		done, _ := strconv.Atoi(r.PostFormValue("done"))
+		if done < 1 {
+			done = 1
+		}
+		err = s.service.SetSessionItem(r.Context(), session.ID, training.PlanItem{Exercise: exercise, TargetSets: done})
+	case "remove":
+		err = s.service.RemoveSessionItem(r.Context(), session.ID, exercise)
+	default:
+		message = "Acción desconocida."
+	}
+	switch {
+	case errors.Is(err, training.ErrNotFound):
+		message = "Ese ejercicio ya no está en el plan de hoy."
+	case errors.Is(err, training.ErrValidation):
+		message = "Ajuste inválido."
+	case err != nil:
+		s.fail(w, err)
+		return
+	}
+	s.renderPanel(w, r, message)
 }
 
 // decorate builds the per-exercise blocks and the "last time / record" map. It

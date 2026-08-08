@@ -3,6 +3,53 @@
 
   {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
 
+  {{if .Progress}}
+  <section class="plan card" aria-label="Plan de hoy">
+    <header class="plan-head">
+      <strong>{{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Plan de hoy{{end}}</strong>
+      <span class="muted">{{doneCount .Progress}}/{{len .Progress}} ejercicios</span>
+    </header>
+    <ol class="planned">
+      {{range .Progress}}
+      <li class="{{if .Skipped}}skipped{{else if .Done}}ok{{end}}{{if eq .TargetSets 0}} extra{{end}}"
+          data-exercise="{{.Exercise}}"
+          data-reps="{{targetReps .}}"
+          data-rpe="{{num .TargetRPE}}">
+        <span class="chk">{{if .Skipped}}—{{else if .Done}}✓{{else}}○{{end}}</span>
+        <span class="what">
+          <span class="ex">{{.Exercise}}</span>
+          <span class="rx">
+            {{- if eq .TargetSets 0}}fuera de plan
+            {{- else}}{{.RepMin}}{{if ne .RepMax .RepMin}}-{{.RepMax}}{{end}} reps{{if .TargetRPE}} @{{num .TargetRPE}}{{end}}{{end -}}
+          </span>
+        </span>
+        <span class="count">{{.DoneSets}}{{if .TargetSets}}/{{.TargetSets}}{{end}}</span>
+        {{if not $.ReadOnly}}
+        <button type="button" class="more" aria-label="Ajustar {{.Exercise}}">⋯</button>
+        <div class="item-actions" hidden>
+          {{if .TargetSets}}
+          <button type="button" class="mini" hx-post="{{$.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML"
+                  hx-vals='{"action":"sets","delta":"-1","current":"{{.TargetSets}}","exercise":"{{.Exercise}}"}'>− serie</button>
+          <button type="button" class="mini" hx-post="{{$.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML"
+                  hx-vals='{"action":"sets","delta":"1","current":"{{.TargetSets}}","exercise":"{{.Exercise}}"}'>+ serie</button>
+          <button type="button" class="mini" hx-post="{{$.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML"
+                  hx-vals='{"action":"{{if .Skipped}}unskip{{else}}skip{{end}}","exercise":"{{.Exercise}}"}'>{{if .Skipped}}retomar{{else}}saltar{{end}}</button>
+          <button type="button" class="mini swap" data-exercise="{{.Exercise}}">sustituir</button>
+          <button type="button" class="mini danger" hx-post="{{$.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML"
+                  hx-vals='{"action":"remove","exercise":"{{.Exercise}}"}'
+                  hx-confirm="¿Quitar del plan de hoy? Las series ya hechas se conservan.">quitar</button>
+          {{else}}
+          <button type="button" class="mini" hx-post="{{$.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML"
+                  hx-vals='{"action":"adopt","done":"{{.DoneSets}}","exercise":"{{.Exercise}}"}'>añadir al plan</button>
+          {{end}}
+        </div>
+        {{end}}
+      </li>
+      {{end}}
+    </ol>
+  </section>
+  {{end}}
+
   <div class="total">
     <span>{{len .Session.Sets}} serie{{if ne (len .Session.Sets) 1}}s{{end}} · {{len .Blocks}} ejercicio{{if ne (len .Blocks) 1}}s{{end}}</span>
     <strong>SI {{num .Session.TotalSI}}</strong>

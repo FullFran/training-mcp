@@ -92,6 +92,97 @@ func (s *Service) DeletePlan(ctx context.Context, id int64) error {
 	return s.store.DeletePlan(ctx, id)
 }
 
+// SetSessionItem adds an exercise to today's session plan or replaces its
+// prescription. Adjusting a session never touches the plan it came from.
+func (s *Service) SetSessionItem(ctx context.Context, sessionID int64, it PlanItem) error {
+	it.Exercise = strings.ToLower(strings.TrimSpace(it.Exercise))
+	if sessionID <= 0 || it.Exercise == "" || it.TargetSets <= 0 || it.TargetSets > 20 {
+		return ErrValidation
+	}
+	if it.RepMin < 0 || it.RepMax < 0 || (it.RepMax > 0 && it.RepMin > it.RepMax) {
+		return fmt.Errorf("%w: rep range is inverted", ErrValidation)
+	}
+	if it.TargetRPE != 0 && (it.TargetRPE < 1 || it.TargetRPE > 10) {
+		return ErrValidation
+	}
+	return s.store.SetSessionItem(ctx, sessionID, it)
+}
+
+// AdjustSessionItem changes only what is given: the set count, the rep range,
+// the RPE, or whether the exercise is skipped today.
+func (s *Service) AdjustSessionItem(ctx context.Context, sessionID int64, exercise string, p SessionItemPatch) error {
+	exercise = strings.ToLower(strings.TrimSpace(exercise))
+	if sessionID <= 0 || exercise == "" || p.Empty() {
+		return ErrValidation
+	}
+	if p.TargetSets != nil && (*p.TargetSets <= 0 || *p.TargetSets > 20) {
+		return ErrValidation
+	}
+	if p.RepMin != nil && *p.RepMin < 0 {
+		return ErrValidation
+	}
+	if p.RepMax != nil && *p.RepMax < 0 {
+		return ErrValidation
+	}
+	if p.RepMin != nil && p.RepMax != nil && *p.RepMax > 0 && *p.RepMin > *p.RepMax {
+		return fmt.Errorf("%w: rep range is inverted", ErrValidation)
+	}
+	if p.TargetRPE != nil && *p.TargetRPE != 0 && (*p.TargetRPE < 1 || *p.TargetRPE > 10) {
+		return ErrValidation
+	}
+	return s.store.PatchSessionItem(ctx, sessionID, exercise, p)
+}
+
+// SwapSessionItem substitutes an exercise in today's session, keeping its
+// prescription. Use it when the planned machine is taken.
+func (s *Service) SwapSessionItem(ctx context.Context, sessionID int64, from, to string) error {
+	from = strings.ToLower(strings.TrimSpace(from))
+	to = strings.ToLower(strings.TrimSpace(to))
+	if sessionID <= 0 || from == "" || to == "" || from == to {
+		return ErrValidation
+	}
+	return s.store.SwapSessionItem(ctx, sessionID, from, to)
+}
+
+// RemoveSessionItem drops an exercise from today's plan. Sets already logged
+// against it are kept and reappear as off-plan work.
+func (s *Service) RemoveSessionItem(ctx context.Context, sessionID int64, exercise string) error {
+	exercise = strings.ToLower(strings.TrimSpace(exercise))
+	if sessionID <= 0 || exercise == "" {
+		return ErrValidation
+	}
+	return s.store.RemoveSessionItem(ctx, sessionID, exercise)
+}
+
+// SaveSessionAsPlan promotes what a session actually planned — after any
+// in-session adjustments — into a reusable plan.
+func (s *Service) SaveSessionAsPlan(ctx context.Context, sessionID int64, name string) (Plan, error) {
+	progress, err := s.SessionProgress(ctx, sessionID)
+	if err != nil {
+		return Plan{}, err
+	}
+	plan := Plan{Name: name}
+	for _, p := range progress {
+		if p.Skipped {
+			continue
+		}
+		sets := p.TargetSets
+		if sets == 0 {
+			// Off-plan work becomes part of the template at the volume it was
+			// actually performed.
+			sets = p.DoneSets
+		}
+		if sets == 0 {
+			continue
+		}
+		plan.Items = append(plan.Items, PlanItem{
+			Exercise: p.Exercise, TargetSets: sets,
+			RepMin: p.RepMin, RepMax: p.RepMax, TargetRPE: p.TargetRPE,
+		})
+	}
+	return s.CreatePlan(ctx, plan)
+}
+
 // SessionProgress reports planned versus completed sets for a session.
 func (s *Service) SessionProgress(ctx context.Context, sessionID int64) ([]PlanProgress, error) {
 	if sessionID <= 0 {

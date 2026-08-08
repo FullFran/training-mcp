@@ -25,7 +25,7 @@ The unauthenticated `GET /health` endpoint returns `{"status":"ok"}`. MCP is onl
 
 `start_session`, `add_set`, `update_set`, `delete_set`, `get_session`, and `list_sessions` cover logging. Exercises are trimmed/lowercased, positions remain dense, and totals are recalculated from stored SI values.
 
-`create_plan`, `list_plans`, `get_plan` and `delete_plan` manage reusable workout plans: an ordered list of exercises with a target set count and an optional rep range and RPE. Load is deliberately not planned — the prescription is effort and reps, and the weight that meets it is discovered at the gym. `start_session` takes an optional `plan_id`; `session_progress` then reports planned versus completed sets per exercise, listing anything done off-plan with `target_sets` 0 so it stays visible.
+`create_plan`, `list_plans`, `get_plan` and `delete_plan` manage reusable workout plans: an ordered list of exercises with a target set count and an optional rep range and RPE. Load is deliberately not planned — the prescription is effort and reps, and the weight that meets it is discovered at the gym. `start_session` takes an optional `plan_id`, which **copies** the plan into the session. From then on the session owns its prescription: `add_session_exercise`, `adjust_session_exercise` (sets, rep range, RPE, skip), `swap_session_exercise` and `remove_session_exercise` change today only and never edit the template, while editing a template never rewrites a past session. `session_progress` reports planned versus completed sets per exercise, listing anything done off-plan with `target_sets` 0 so it stays visible. `save_session_as_plan` promotes an adjusted session into a new reusable plan.
 
 `delete_session` removes a session and every set in it, reporting how many were destroyed. `exercise_history` returns one exercise's sets newest first with each set's estimated 1RM plus its all-time best, so progression can be judged in one call instead of reading every session. `weekly_volume` buckets SI per muscle group by training week.
 
@@ -41,6 +41,10 @@ shared with the MCP tools and cannot drift apart.
 - Served only under the configured secret prefix; unset means not served at all.
 - A plan can be started for the day; its exercises become a checklist showing
   done/target sets, and tapping one loads its prescription into the form.
+- The day's plan is fully adjustable mid-session: add or drop an exercise,
+  change its set count, skip it, or substitute it when a machine is taken.
+  Sets already logged are never touched by any of this — an exercise removed
+  from the plan simply reappears as off-plan work.
 - Sets are grouped by exercise, the way a workout is performed and read back.
 - The entry form shows what was done last time for that exercise and the
   standing estimated-1RM record; a set matching the record is badged `PR`.

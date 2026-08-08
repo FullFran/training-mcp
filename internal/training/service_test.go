@@ -159,6 +159,11 @@ type memoryStore struct {
 	planCreated          Plan
 	plans                []Plan
 	progress             []PlanProgress
+	itemSet              PlanItem
+	itemPatched          string
+	itemPatch            SessionItemPatch
+	swapFrom, swapTo     string
+	itemRemoved          string
 }
 
 func newMemoryStore() *memoryStore {
@@ -465,5 +470,112 @@ func TestServicePlanLookupsValidateIDs(t *testing.T) {
 	}
 	if _, err := svc.StartPlannedSession(ctx, "2026-08-08", -1); !errors.Is(err, ErrValidation) {
 		t.Fatalf("negative plan id error = %v, want validation", err)
+	}
+}
+
+func (m *memoryStore) SetSessionItem(_ context.Context, id int64, it PlanItem) error {
+	m.itemSet = it
+	return nil
+}
+func (m *memoryStore) PatchSessionItem(_ context.Context, id int64, ex string, p SessionItemPatch) error {
+	m.itemPatched, m.itemPatch = ex, p
+	return nil
+}
+func (m *memoryStore) SwapSessionItem(_ context.Context, id int64, from, to string) error {
+	m.swapFrom, m.swapTo = from, to
+	return nil
+}
+func (m *memoryStore) RemoveSessionItem(_ context.Context, id int64, ex string) error {
+	m.itemRemoved = ex
+	return nil
+}
+
+func intPtr(v int) *int    { return &v }
+func boolPtr(v bool) *bool { return &v }
+
+func TestServiceSessionItemValidation(t *testing.T) {
+	store := newMemoryStore()
+	svc := NewService(store, time.Now)
+	ctx := context.Background()
+
+	if err := svc.SetSessionItem(ctx, 1, PlanItem{Exercise: " Press Banca ", TargetSets: 3}); err != nil {
+		t.Fatalf("SetSessionItem() error = %v", err)
+	}
+	if store.itemSet.Exercise != "press banca" {
+		t.Fatalf("exercise not normalized: %#v", store.itemSet)
+	}
+	for _, tt := range []struct {
+		name string
+		id   int64
+		item PlanItem
+	}{
+		{"bad session", 0, PlanItem{Exercise: "banca", TargetSets: 1}},
+		{"empty exercise", 1, PlanItem{TargetSets: 1}},
+		{"zero sets", 1, PlanItem{Exercise: "banca"}},
+		{"inverted range", 1, PlanItem{Exercise: "banca", TargetSets: 3, RepMin: 12, RepMax: 8}},
+		{"rpe out of range", 1, PlanItem{Exercise: "banca", TargetSets: 3, TargetRPE: 11}},
+	} {
+		if err := svc.SetSessionItem(ctx, tt.id, tt.item); !errors.Is(err, ErrValidation) {
+			t.Fatalf("SetSessionItem(%s) error = %v, want validation", tt.name, err)
+		}
+	}
+}
+
+func TestServiceAdjustSessionItem(t *testing.T) {
+	store := newMemoryStore()
+	svc := NewService(store, time.Now)
+	ctx := context.Background()
+
+	if err := svc.AdjustSessionItem(ctx, 1, " Banca ", SessionItemPatch{TargetSets: intPtr(3)}); err != nil {
+		t.Fatalf("AdjustSessionItem() error = %v", err)
+	}
+	if store.itemPatched != "banca" || *store.itemPatch.TargetSets != 3 {
+		t.Fatalf("patch not forwarded normalized: %q %#v", store.itemPatched, store.itemPatch)
+	}
+	// An empty patch is a caller mistake, not a silent no-op.
+	if err := svc.AdjustSessionItem(ctx, 1, "banca", SessionItemPatch{}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("empty patch error = %v, want validation", err)
+	}
+	for _, tt := range []struct {
+		name  string
+		patch SessionItemPatch
+	}{
+		{"zero sets", SessionItemPatch{TargetSets: intPtr(0)}},
+		{"too many sets", SessionItemPatch{TargetSets: intPtr(21)}},
+		{"inverted range", SessionItemPatch{RepMin: intPtr(12), RepMax: intPtr(8)}},
+	} {
+		if err := svc.AdjustSessionItem(ctx, 1, "banca", tt.patch); !errors.Is(err, ErrValidation) {
+			t.Fatalf("AdjustSessionItem(%s) error = %v, want validation", tt.name, err)
+		}
+	}
+	// Skipping only needs the flag.
+	if err := svc.AdjustSessionItem(ctx, 1, "banca", SessionItemPatch{Skipped: boolPtr(true)}); err != nil {
+		t.Fatalf("skip error = %v", err)
+	}
+}
+
+func TestServiceSwapAndRemoveSessionItem(t *testing.T) {
+	store := newMemoryStore()
+	svc := NewService(store, time.Now)
+	ctx := context.Background()
+
+	if err := svc.SwapSessionItem(ctx, 1, " Banca ", " Press Plano "); err != nil {
+		t.Fatalf("SwapSessionItem() error = %v", err)
+	}
+	if store.swapFrom != "banca" || store.swapTo != "press plano" {
+		t.Fatalf("swap not normalized: %q -> %q", store.swapFrom, store.swapTo)
+	}
+	// Swapping an exercise for itself is a no-op the caller did not mean.
+	if err := svc.SwapSessionItem(ctx, 1, "banca", "banca"); !errors.Is(err, ErrValidation) {
+		t.Fatalf("self swap error = %v, want validation", err)
+	}
+	if err := svc.SwapSessionItem(ctx, 1, "banca", ""); !errors.Is(err, ErrValidation) {
+		t.Fatalf("empty replacement error = %v, want validation", err)
+	}
+	if err := svc.RemoveSessionItem(ctx, 1, " Banca "); err != nil || store.itemRemoved != "banca" {
+		t.Fatalf("RemoveSessionItem() = %v, removed %q", err, store.itemRemoved)
+	}
+	if err := svc.RemoveSessionItem(ctx, 1, ""); !errors.Is(err, ErrValidation) {
+		t.Fatalf("empty exercise error = %v, want validation", err)
 	}
 }

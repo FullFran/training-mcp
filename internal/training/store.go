@@ -16,6 +16,10 @@ type Store interface {
 	GetPlan(context.Context, int64) (Plan, error)
 	DeletePlan(context.Context, int64) error
 	SessionProgress(context.Context, int64) ([]PlanProgress, error)
+	SetSessionItem(context.Context, int64, PlanItem) error
+	PatchSessionItem(context.Context, int64, string, SessionItemPatch) error
+	SwapSessionItem(context.Context, int64, string, string) error
+	RemoveSessionItem(context.Context, int64, string) error
 	ExerciseHistory(context.Context, string, int) (ExerciseHistory, error)
 	WeeklyVolume(context.Context, ListFilter) ([]WeeklyVolume, error)
 	SetExerciseGroup(context.Context, ExerciseGroup) error

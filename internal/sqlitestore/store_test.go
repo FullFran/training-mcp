@@ -443,3 +443,83 @@ func TestStoreMigrationsAreAppliedOnceAcrossReopen(t *testing.T) {
 		t.Fatalf("plans after reopen = %#v, %v", plans, err)
 	}
 }
+
+func TestStoreSessionItemsAreASnapshotOfThePlan(t *testing.T) {
+	store, err := Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	plan, err := store.CreatePlan(ctx, training.Plan{
+		Name: "Empuje A",
+		Items: []training.PlanItem{
+			{Exercise: "banca", TargetSets: 4, RepMin: 8, RepMax: 10, TargetRPE: 9},
+			{Exercise: "aperturas", TargetSets: 3},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := store.Start(ctx, training.Session{Date: "2026-08-08", PlanID: plan.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Fewer sets today.
+	if err := store.PatchSessionItem(ctx, session.ID, "banca", training.SessionItemPatch{TargetSets: intPtr(3)}); err != nil {
+		t.Fatal(err)
+	}
+	// Machine taken: substitute, keeping the prescription.
+	if err := store.SwapSessionItem(ctx, session.ID, "aperturas", "contractora pecho"); err != nil {
+		t.Fatal(err)
+	}
+	progress, err := store.SessionProgress(ctx, session.ID)
+	if err != nil || len(progress) != 2 {
+		t.Fatalf("progress = %#v, %v", progress, err)
+	}
+	if progress[0].TargetSets != 3 || progress[0].RepMin != 8 || progress[0].TargetRPE != 9 {
+		t.Fatalf("adjusted item lost its prescription: %#v", progress[0])
+	}
+	if progress[1].Exercise != "contractora pecho" || progress[1].TargetSets != 3 {
+		t.Fatalf("swap did not keep position and target: %#v", progress[1])
+	}
+
+	// The template is untouched by any of it.
+	saved, err := store.GetPlan(ctx, plan.ID)
+	if err != nil || saved.Items[0].TargetSets != 4 || saved.Items[1].Exercise != "aperturas" {
+		t.Fatalf("template was mutated by session edits: %#v, %v", saved.Items, err)
+	}
+
+	// Skipping keeps the exercise listed, so the decision is recorded.
+	if err := store.PatchSessionItem(ctx, session.ID, "banca", training.SessionItemPatch{Skipped: boolPtr(true)}); err != nil {
+		t.Fatal(err)
+	}
+	progress, _ = store.SessionProgress(ctx, session.ID)
+	if !progress[0].Skipped {
+		t.Fatalf("skip not recorded: %#v", progress[0])
+	}
+
+	// Removing an item leaves its logged sets, which resurface as off-plan.
+	if _, _, err := store.AddSet(ctx, training.AddSetInput{SessionID: session.ID, Exercise: "banca", WeightKG: 80, Reps: 8, RPE: 8}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RemoveSessionItem(ctx, session.ID, "banca"); err != nil {
+		t.Fatal(err)
+	}
+	progress, _ = store.SessionProgress(ctx, session.ID)
+	var offPlan *training.PlanProgress
+	for i := range progress {
+		if progress[i].Exercise == "banca" {
+			offPlan = &progress[i]
+		}
+	}
+	if offPlan == nil || offPlan.TargetSets != 0 || offPlan.DoneSets != 1 {
+		t.Fatalf("removed exercise should resurface as off-plan work: %#v", progress)
+	}
+	if err := store.RemoveSessionItem(ctx, session.ID, "no existe"); !errors.Is(err, training.ErrNotFound) {
+		t.Fatalf("removing an absent item = %v, want not found", err)
+	}
+}
+
+func intPtr(v int) *int    { return &v }
+func boolPtr(v bool) *bool { return &v }
