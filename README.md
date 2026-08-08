@@ -67,6 +67,8 @@ shared with the MCP tools and cannot drift apart.
 taken with `VACUUM INTO` so it is safe while the server is running. The result
 is a plain SQLite file: **restoring is copying it back into the data volume.**
 Nothing else in this deployment keeps a second copy, so this is the backup.
+`scripts/backup.sh` downloads one, verifies it opens and passes an integrity
+check, and keeps the last 30 daily copies.
 
 **Authentication is currently the secret URL itself.** The reverse proxy injects
 the bearer token, so anyone holding the URL has full access. This is tracked
