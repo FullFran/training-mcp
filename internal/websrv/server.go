@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	texttemplate "text/template"
@@ -72,6 +73,15 @@ type pageData struct {
 	Blocks   []ExerciseBlock
 	Plans    []training.Plan
 	Progress []training.PlanProgress
+	// Catalogue is every exercise ever logged, offered as autocomplete. Picking
+	// an existing name is what stops the catalogue fragmenting into near
+	// duplicates like "remo maquina" beside "remo máquina".
+	Catalogue []string
+	// TrainedGroups are the muscle groups worked today, the only ones worth
+	// rating. Feedback stays a few taps by never asking about the rest.
+	TrainedGroups []string
+	Feedback      map[string]training.Feedback
+	Recommend     []training.SetChange
 	// InfoJSON is a name -> ExerciseInfo map the client uses to show "last
 	// time" and the record without another round trip.
 	InfoJSON template.JS
@@ -96,9 +106,27 @@ func (b ExerciseBlock) IsRecord(s training.Set) bool {
 
 func New(service *training.Service, clock training.Clock, basePath string) (*Server, error) {
 	funcs := map[string]any{
-		"num":      formatNumber,
-		"rpeScale": rpeScale,
-		"add":      func(a, b int) int { return a + b },
+		"num":         formatNumber,
+		"rpeScale":    rpeScale,
+		"ratingScale": func() []int { return []int{0, 1, 2, 3} },
+		"ratingDims": func() [][2]string {
+			return [][2]string{
+				{"fatigue", "fatiga"},
+				{"pump", "bombeo"},
+				{"recovery", "agujetas"},
+			}
+		},
+		"fbValue": func(f training.Feedback, dim string) int {
+			switch dim {
+			case "fatigue":
+				return f.Fatigue
+			case "pump":
+				return f.Pump
+			default:
+				return f.Recovery
+			}
+		},
+		"add": func(a, b int) int { return a + b },
 		"doneCount": func(items []training.PlanProgress) int {
 			n := 0
 			for _, it := range items {
@@ -163,6 +191,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET "+b+"/history", s.history)
 	s.mux.HandleFunc("POST "+b+"/plan", s.choosePlan)
 	s.mux.HandleFunc("POST "+b+"/plan/item", s.adjustItem)
+	s.mux.HandleFunc("POST "+b+"/feedback", s.recordFeedback)
 	s.mux.HandleFunc("GET "+b+"/s/{id}", s.session)
 	s.mux.HandleFunc("GET "+b+"/manifest.webmanifest", s.manifest)
 	s.mux.HandleFunc("GET "+b+"/sw.js", s.serviceWorker)
@@ -319,7 +348,15 @@ func (s *Server) history(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	s.render(w, "history.html", pageData{Base: s.base, Today: s.todayDate(), History: sessions, Volume: volume})
+	recommend, err := s.service.VolumeRecommendation(r.Context())
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	s.render(w, "history.html", pageData{
+		Base: s.base, Today: s.todayDate(), History: sessions,
+		Volume: volume, Recommend: recommend,
+	})
 }
 
 func (s *Server) session(w http.ResponseWriter, r *http.Request) {
@@ -389,7 +426,54 @@ func (s *Server) todayData(ctx context.Context, message string) (pageData, error
 	if err = s.decorate(ctx, &data); err != nil {
 		return data, err
 	}
+	if data.Session.ID > 0 {
+		seen := map[string]bool{}
+		for _, b := range data.Blocks {
+			if b.MuscleGroup != "" && !seen[b.MuscleGroup] {
+				seen[b.MuscleGroup] = true
+				data.TrainedGroups = append(data.TrainedGroups, b.MuscleGroup)
+			}
+		}
+		given, err := s.service.SessionFeedback(ctx, data.Session.ID)
+		if err != nil {
+			return data, err
+		}
+		data.Feedback = map[string]training.Feedback{}
+		for _, f := range given {
+			data.Feedback[f.MuscleGroup] = f
+		}
+	}
 	return data, nil
+}
+
+// recordFeedback rates one muscle group's response to today's session.
+func (s *Server) recordFeedback(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.fail(w, err)
+		return
+	}
+	session, err := s.ensureToday(r.Context())
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	rating := func(name string) int {
+		v, _ := strconv.Atoi(r.PostFormValue(name))
+		return v
+	}
+	message := ""
+	err = s.service.RecordFeedback(r.Context(), session.ID, training.Feedback{
+		MuscleGroup: r.PostFormValue("muscle_group"),
+		Fatigue:     rating("fatigue"), Pump: rating("pump"), Recovery: rating("recovery"),
+	})
+	switch {
+	case errors.Is(err, training.ErrValidation):
+		message = "Valoración inválida: usa 0 a 3."
+	case err != nil:
+		s.fail(w, err)
+		return
+	}
+	s.renderPanel(w, r, message)
 }
 
 // choosePlan starts today's session from a plan. It refuses once sets exist,
@@ -519,6 +603,22 @@ func (s *Server) decorate(ctx context.Context, data *pageData) error {
 			names = append(names, r.Exercise)
 		}
 	}
+
+	groups, err := s.service.ExerciseGroups(ctx)
+	if err != nil {
+		return err
+	}
+	catalogue := map[string]bool{}
+	for _, g := range groups {
+		catalogue[g.Exercise] = true
+	}
+	for _, n := range names {
+		catalogue[n] = true
+	}
+	for n := range catalogue {
+		data.Catalogue = append(data.Catalogue, n)
+	}
+	sort.Strings(data.Catalogue)
 
 	info := map[string]ExerciseInfo{}
 	for _, name := range names {

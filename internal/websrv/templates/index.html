@@ -56,10 +56,13 @@
 
     <label class="field">
       <span>Ejercicio</span>
-      <input id="exercise" name="exercise" type="text" required
+      <input id="exercise" name="exercise" type="text" required list="catalogue"
              enterkeyhint="done" autocapitalize="none" spellcheck="false"
              placeholder="press inclinado mancuernas">
     </label>
+    <datalist id="catalogue">
+      {{range .Catalogue}}<option value="{{.}}"></option>{{end}}
+    </datalist>
 
     <p id="previous" class="previous" hidden></p>
 

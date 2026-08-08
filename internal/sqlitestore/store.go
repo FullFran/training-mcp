@@ -585,6 +585,61 @@ func (s *Store) RemoveSessionItem(ctx context.Context, sessionID int64, exercise
 	return nil
 }
 
+func (s *Store) SetFeedback(ctx context.Context, sessionID int64, f training.Feedback) error {
+	var exists int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions WHERE id=?`, sessionID).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 0 {
+		return training.ErrNotFound
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO session_feedback (session_id,muscle_group,fatigue,pump,recovery,created_at)
+VALUES (?,?,?,?,?,CURRENT_TIMESTAMP)
+ON CONFLICT(session_id,muscle_group) DO UPDATE SET
+ fatigue=excluded.fatigue, pump=excluded.pump, recovery=excluded.recovery, created_at=CURRENT_TIMESTAMP`,
+		sessionID, f.MuscleGroup, f.Fatigue, f.Pump, f.Recovery)
+	return err
+}
+
+func (s *Store) SessionFeedback(ctx context.Context, sessionID int64) ([]training.Feedback, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT muscle_group,fatigue,pump,recovery FROM session_feedback WHERE session_id=? ORDER BY muscle_group`, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []training.Feedback
+	for rows.Next() {
+		var f training.Feedback
+		if err = rows.Scan(&f.MuscleGroup, &f.Fatigue, &f.Pump, &f.Recovery); err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+
+// LatestFeedback returns the most recent rating per muscle group, which is what
+// next week's volume should respond to.
+func (s *Store) LatestFeedback(ctx context.Context) (map[string]training.Feedback, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT muscle_group,fatigue,pump,recovery FROM session_feedback
+WHERE id IN (SELECT MAX(id) FROM session_feedback GROUP BY muscle_group)`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]training.Feedback{}
+	for rows.Next() {
+		var f training.Feedback
+		if err = rows.Scan(&f.MuscleGroup, &f.Fatigue, &f.Pump, &f.Recovery); err != nil {
+			return nil, err
+		}
+		out[f.MuscleGroup] = f
+	}
+	return out, rows.Err()
+}
+
 // DeleteSession removes a session and, by ON DELETE CASCADE, all of its sets.
 // It returns how many sets went with it so the caller can report the cost of an
 // irreversible delete.

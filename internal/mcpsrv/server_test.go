@@ -38,7 +38,7 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_session_exercise", "add_set", "adjust_session_exercise", "create_plan", "delete_plan", "delete_session", "delete_set", "exercise_history", "get_plan", "get_session", "list_exercise_groups", "list_plans", "list_sessions", "remove_session_exercise", "save_session_as_plan", "session_progress", "set_exercise_group", "start_session", "swap_session_exercise", "update_set", "volume_by_muscle", "weekly_volume"}) {
+	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_session_exercise", "add_set", "adjust_session_exercise", "create_plan", "delete_plan", "delete_session", "delete_set", "exercise_history", "get_plan", "get_session", "list_exercise_groups", "list_plans", "list_sessions", "log_set", "record_feedback", "remove_session_exercise", "save_session_as_plan", "session_progress", "set_exercise_group", "start_session", "swap_session_exercise", "update_set", "volume_by_muscle", "volume_recommendation", "weekly_volume"}) {
 		t.Fatalf("tools=%v", toolNames(tools))
 	}
 	for _, tool := range tools.Tools {
@@ -438,3 +438,11 @@ func (testStore) PatchSessionItem(context.Context, int64, string, training.Sessi
 }
 func (testStore) SwapSessionItem(context.Context, int64, string, string) error { return nil }
 func (testStore) RemoveSessionItem(context.Context, int64, string) error       { return nil }
+
+func (testStore) SetFeedback(context.Context, int64, training.Feedback) error { return nil }
+func (testStore) SessionFeedback(context.Context, int64) ([]training.Feedback, error) {
+	return nil, nil
+}
+func (testStore) LatestFeedback(context.Context) (map[string]training.Feedback, error) {
+	return nil, nil
+}

@@ -147,6 +147,59 @@ func (p SessionItemPatch) Empty() bool {
 	return p.TargetSets == nil && p.RepMin == nil && p.RepMax == nil && p.TargetRPE == nil && p.Skipped == nil
 }
 
+// Feedback is the post-session response of one muscle group, each dimension
+// rated 0-3 exactly as the source spreadsheet asks: how much fatigue it took,
+// how much pump it gave, and how recovered it felt afterwards.
+type Feedback struct {
+	MuscleGroup string `json:"muscle_group"`
+	Fatigue     int    `json:"fatigue"`
+	Pump        int    `json:"pump"`
+	Recovery    int    `json:"recovery"`
+}
+
+// Magnitude is the 0-9 sum the recommendation is derived from.
+func (f Feedback) Magnitude() int { return f.Fatigue + f.Pump + f.Recovery }
+
+func validRating(v int) bool { return v >= 0 && v <= 3 }
+
+// Valid reports whether every dimension is inside the 0-3 scale.
+func (f Feedback) Valid() bool {
+	return ValidMuscleGroup(f.MuscleGroup) && validRating(f.Fatigue) && validRating(f.Pump) && validRating(f.Recovery)
+}
+
+// SetChange is how many sets to add or remove next week for a muscle group.
+type SetChange struct {
+	MuscleGroup string `json:"muscle_group"`
+	Magnitude   int    `json:"magnitude"`
+	SetsDelta   int    `json:"sets_delta"`
+	Advice      string `json:"advice"`
+	// LastWeekSets is the volume the magnitude was a response to, so the
+	// recommendation can be read as "from N to N+delta".
+	LastWeekSets int `json:"last_week_sets"`
+}
+
+// RecommendSets maps a 0-9 feedback magnitude to a change in weekly sets.
+//
+// This mirrors the source spreadsheet, whose two visible anchors are magnitude
+// 0 -> "Sube 3 series" and magnitude 7 -> "Mantén o reduce 1 serie". The
+// thresholds between them are an interpolation, not a value read off the sheet:
+// low magnitude means the stimulus barely registered so volume can climb toward
+// MAV, while high magnitude means fatigue is outpacing recovery near MRV.
+func RecommendSets(magnitude int) (int, string) {
+	switch {
+	case magnitude <= 1:
+		return 3, "Estímulo muy bajo: sube 3 series"
+	case magnitude <= 3:
+		return 2, "Estímulo bajo: sube 2 series"
+	case magnitude <= 5:
+		return 1, "Estímulo correcto: sube 1 serie"
+	case magnitude <= 7:
+		return 0, "Cerca del máximo recuperable: mantén el volumen"
+	default:
+		return -1, "Fatiga por encima de la recuperación: baja 1 serie"
+	}
+}
+
 // Epley1RM estimates a one-rep max from a set. It is descriptive only and is
 // never stored: SI remains the single recorded intensity metric. Reps of 1
 // return the weight unchanged.

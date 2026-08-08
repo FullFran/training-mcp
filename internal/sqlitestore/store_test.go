@@ -523,3 +523,43 @@ func TestStoreSessionItemsAreASnapshotOfThePlan(t *testing.T) {
 
 func intPtr(v int) *int    { return &v }
 func boolPtr(v bool) *bool { return &v }
+
+func TestStoreFeedbackUpsertsAndReportsTheLatestPerGroup(t *testing.T) {
+	store, err := Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	older, _ := store.Start(ctx, training.Session{Date: "2026-08-01"})
+	newer, _ := store.Start(ctx, training.Session{Date: "2026-08-08"})
+
+	if err := store.SetFeedback(ctx, older.ID, training.Feedback{MuscleGroup: "pecho", Fatigue: 1, Pump: 1, Recovery: 1}); err != nil {
+		t.Fatal(err)
+	}
+	// Rating the same group twice in one session replaces, never duplicates.
+	if err := store.SetFeedback(ctx, older.ID, training.Feedback{MuscleGroup: "pecho", Fatigue: 2, Pump: 2, Recovery: 2}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.SessionFeedback(ctx, older.ID)
+	if err != nil || len(got) != 1 || got[0].Magnitude() != 6 {
+		t.Fatalf("SessionFeedback() = %#v, %v", got, err)
+	}
+
+	if err := store.SetFeedback(ctx, newer.ID, training.Feedback{MuscleGroup: "pecho", Fatigue: 3, Pump: 3, Recovery: 3}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetFeedback(ctx, newer.ID, training.Feedback{MuscleGroup: "espalda", Fatigue: 0, Pump: 0, Recovery: 0}); err != nil {
+		t.Fatal(err)
+	}
+	latest, err := store.LatestFeedback(ctx)
+	if err != nil || len(latest) != 2 {
+		t.Fatalf("LatestFeedback() = %#v, %v", latest, err)
+	}
+	// The newest rating wins, not the first one recorded.
+	if latest["pecho"].Magnitude() != 9 || latest["espalda"].Magnitude() != 0 {
+		t.Fatalf("latest = %#v", latest)
+	}
+	if err := store.SetFeedback(ctx, 9999, training.Feedback{MuscleGroup: "pecho"}); !errors.Is(err, training.ErrNotFound) {
+		t.Fatalf("feedback for a missing session = %v, want not found", err)
+	}
+}

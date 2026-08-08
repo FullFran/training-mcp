@@ -654,3 +654,69 @@ func TestSaveSessionAsPlanCapturesTheAdjustedSession(t *testing.T) {
 		t.Fatalf("prescription should carry over: %#v", saved.Items[0])
 	}
 }
+
+func TestFeedbackOnlyAsksAboutMusclesTrainedToday(t *testing.T) {
+	h, service := newServer(t)
+	if err := service.SetExerciseGroup(t.Context(), "banca", "pecho"); err != nil {
+		t.Fatal(err)
+	}
+	post(t, h, base+"/sets", setForm("banca", "80", "8", "8"), true)
+
+	body := get(t, h, base+"/").Body.String()
+	if !strings.Contains(body, `class="feedback"`) || !strings.Contains(body, "0/1") {
+		t.Fatalf("feedback should offer exactly the trained groups: %q", body)
+	}
+	// Fifteen groups exist; only the trained one is asked about.
+	if strings.Contains(body, "isquios") {
+		t.Fatalf("untrained groups must not be asked about")
+	}
+
+	w := post(t, h, base+"/feedback", url.Values{
+		"muscle_group": {"pecho"}, "fatigue": {"2"}, "pump": {"3"}, "recovery": {"1"},
+	}, true)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "magnitud 6") {
+		t.Fatalf("feedback not recorded: %d %q", w.Code, w.Body.String())
+	}
+	if !strings.Contains(get(t, h, base+"/").Body.String(), "1/1") {
+		t.Fatalf("feedback count should advance")
+	}
+}
+
+func TestHistoryShowsNextWeekSetRecommendation(t *testing.T) {
+	h, service := newServer(t)
+	if err := service.SetExerciseGroup(t.Context(), "banca", "pecho"); err != nil {
+		t.Fatal(err)
+	}
+	post(t, h, base+"/sets", setForm("banca", "80", "8", "8"), true)
+	// Magnitude 0 is the spreadsheet's "sube 3 series" anchor.
+	post(t, h, base+"/feedback", url.Values{
+		"muscle_group": {"pecho"}, "fatigue": {"0"}, "pump": {"0"}, "recovery": {"0"},
+	}, true)
+
+	body := get(t, h, base+"/history").Body.String()
+	if !strings.Contains(body, `class="recommend"`) || !strings.Contains(body, "sube 3 series") {
+		t.Fatalf("history should recommend next week's volume: %q", body)
+	}
+	if !strings.Contains(body, "+3") {
+		t.Fatalf("delta should be shown: %q", body)
+	}
+}
+
+func TestExerciseFieldOffersTheKnownCatalogue(t *testing.T) {
+	h, service := newServer(t)
+	post(t, h, base+"/sets", setForm("remo máquina", "60", "10", "8"), true)
+	if err := service.SetExerciseGroup(t.Context(), "jalón máquina", "espalda"); err != nil {
+		t.Fatal(err)
+	}
+	body := get(t, h, base+"/").Body.String()
+	if !strings.Contains(body, `list="catalogue"`) {
+		t.Fatalf("exercise field should autocomplete")
+	}
+	// Both a logged exercise and one only present in the catalogue are offered,
+	// which is what stops near-duplicate names being typed in.
+	for _, want := range []string{`<option value="remo máquina">`, `<option value="jalón máquina">`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("catalogue missing %q", want)
+		}
+	}
+}

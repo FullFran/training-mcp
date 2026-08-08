@@ -91,5 +91,34 @@
   {{else}}
   <p class="empty">Sin series todavía. Añade la primera.</p>
   {{end}}
+
+  {{if and .TrainedGroups (not .ReadOnly)}}
+  <details class="feedback">
+    <summary>Valorar la sesión <span class="muted">({{len .Feedback}}/{{len .TrainedGroups}})</span></summary>
+    <p class="hint">Solo los músculos que has entrenado hoy. 0 = nada, 3 = mucho.</p>
+    {{range $group := .TrainedGroups}}
+    {{$given := index $.Feedback $group}}
+    <form class="fb" hx-post="{{$.Base}}/feedback" hx-target="#panel" hx-swap="outerHTML">
+      <input type="hidden" name="muscle_group" value="{{$group}}">
+      <div class="fb-head">
+        <strong>{{$group}}</strong>
+        {{if $given.MuscleGroup}}<span class="mag">magnitud {{$given.Magnitude}}</span>{{end}}
+      </div>
+      {{range $dim := ratingDims}}
+      <div class="fb-row">
+        <span>{{index $dim 1}}</span>
+        <div class="scale">
+          {{range $v := ratingScale}}
+          <label><input type="radio" name="{{index $dim 0}}" value="{{$v}}"
+            {{if eq $v (fbValue $given (index $dim 0))}}checked{{end}}><span>{{$v}}</span></label>
+          {{end}}
+        </div>
+      </div>
+      {{end}}
+      <button type="submit" class="mini">Guardar</button>
+    </form>
+    {{end}}
+  </details>
+  {{end}}
 </section>
 {{end}}

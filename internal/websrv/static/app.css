@@ -475,3 +475,63 @@ button { font: inherit; cursor: pointer; }
 }
 .mini.danger { color: var(--danger); }
 .plan.card { background: var(--card); }
+
+/* --- session feedback --------------------------------------------------- */
+.feedback { margin-top: 6px; }
+.feedback > summary {
+  min-height: 48px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  font-size: 15px;
+  cursor: pointer;
+}
+.feedback .hint { color: var(--muted); font-size: 13px; margin: 10px 2px 6px; }
+.fb {
+  display: grid; gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+.fb-head { display: flex; align-items: baseline; justify-content: space-between; text-transform: capitalize; }
+.fb .mag { color: var(--accent); font-size: 13px; font-variant-numeric: tabular-nums; }
+.fb-row { display: grid; grid-template-columns: 5.5rem 1fr; align-items: center; gap: 8px; }
+.fb-row > span { color: var(--muted); font-size: 13px; }
+.scale { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.scale input { position: absolute; opacity: 0; pointer-events: none; }
+.scale label > span {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #10131a;
+  font-variant-numeric: tabular-nums;
+}
+.scale input:checked + span {
+  background: var(--accent); border-color: var(--accent);
+  color: var(--accent-ink); font-weight: 700;
+}
+
+/* --- volume recommendation ---------------------------------------------- */
+.recommend { margin: 0 0 16px; }
+.recommend h2 { font-size: 15px; margin: 0 0 8px; }
+.recommend ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.recommend li {
+  display: grid;
+  grid-template-columns: 8rem auto 1fr;
+  align-items: baseline; gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  font-size: 14px;
+}
+.recommend .name { text-transform: capitalize; }
+.recommend .delta { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--muted); }
+.recommend li.up .delta { color: var(--accent); }
+.recommend li.down .delta { color: var(--danger); }
+.recommend .why { color: var(--muted); font-size: 13px; }

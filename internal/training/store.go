@@ -20,6 +20,9 @@ type Store interface {
 	PatchSessionItem(context.Context, int64, string, SessionItemPatch) error
 	SwapSessionItem(context.Context, int64, string, string) error
 	RemoveSessionItem(context.Context, int64, string) error
+	SetFeedback(context.Context, int64, Feedback) error
+	SessionFeedback(context.Context, int64) ([]Feedback, error)
+	LatestFeedback(context.Context) (map[string]Feedback, error)
 	ExerciseHistory(context.Context, string, int) (ExerciseHistory, error)
 	WeeklyVolume(context.Context, ListFilter) ([]WeeklyVolume, error)
 	SetExerciseGroup(context.Context, ExerciseGroup) error

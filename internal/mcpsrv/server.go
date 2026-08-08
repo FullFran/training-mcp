@@ -30,6 +30,18 @@ type AddInput struct {
 	Reps      int     `json:"reps" jsonschema:"Repetition count; must be strictly positive."`
 	RPE       float64 `json:"rpe" jsonschema:"Numeric rate of perceived exertion from 1 through 10; determines the set's SI."`
 }
+type LogInput struct {
+	Exercise string  `json:"exercise" jsonschema:"Non-empty exercise name; it is trimmed and lowercased before storage."`
+	WeightKG float64 `json:"weight_kg" jsonschema:"Weight in kilograms; must be strictly positive."`
+	Reps     int     `json:"reps" jsonschema:"Repetition count; must be strictly positive."`
+	RPE      float64 `json:"rpe" jsonschema:"Numeric rate of perceived exertion from 1 through 10; determines the set's SI."`
+	Count    int     `json:"count,omitempty" jsonschema:"How many identical sets to record; defaults to 1, accepts up to 20. Use it for '3x10 at 80kg'."`
+}
+type LogOut struct {
+	Session training.Session `json:"session"`
+	Sets    []training.Set   `json:"sets"`
+	TotalSI float64          `json:"total_si"`
+}
 type SetOut struct {
 	Set     training.Set `json:"set"`
 	TotalSI float64      `json:"total_si"`
@@ -123,6 +135,20 @@ type ItemOut struct {
 	SessionID int64  `json:"session_id"`
 	Exercise  string `json:"exercise"`
 }
+type FeedbackInput struct {
+	SessionID   int64  `json:"session_id" jsonschema:"Positive ID of the session being rated."`
+	MuscleGroup string `json:"muscle_group" jsonschema:"Muscle group trained; must be one of the supported values."`
+	Fatigue     int    `json:"fatigue" jsonschema:"How much fatigue the muscle took, 0 to 3. 0 = barely noticed it, 3 = severe."`
+	Pump        int    `json:"pump" jsonschema:"How much pump the muscle got, 0 to 3. 0 = none, 3 = extreme."`
+	Recovery    int    `json:"recovery" jsonschema:"How sore and unrecovered it felt afterwards, 0 to 3. 0 = nothing, 3 = still wrecked days later."`
+}
+type FeedbackOut struct {
+	SessionID int64               `json:"session_id"`
+	Feedback  []training.Feedback `json:"feedback"`
+}
+type RecommendOut struct {
+	Recommendations []training.SetChange `json:"recommendations"`
+}
 type DeleteSessionOut struct {
 	SessionID   int64 `json:"session_id"`
 	DeletedSets int   `json:"deleted_sets"`
@@ -174,6 +200,19 @@ func New(service *training.Service) *Server {
 		v, total, err := service.AddSet(ctx, training.AddSetInput{SessionID: in.SessionID, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE})
 		return nil, SetOut{Set: v, TotalSI: total}, toolError(err)
 	})
+	logSchema := mustInputSchema[LogInput]()
+	logSchema.Properties["exercise"].Pattern = `.*\S.*`
+	logSchema.Properties["weight_kg"].ExclusiveMinimum = jsonschema.Ptr(0.0)
+	logSchema.Properties["reps"].Minimum = jsonschema.Ptr(1.0)
+	setRPERange(logSchema.Properties["rpe"])
+	logSchema.Properties["count"].Default = json.RawMessage("1")
+	logSchema.Properties["count"].Minimum = jsonschema.Ptr(1.0)
+	logSchema.Properties["count"].Maximum = jsonschema.Ptr(20.0)
+	mcp.AddTool(s, &mcp.Tool{Name: "log_set", Description: "Record one or more identical sets into today's session, creating that session if it does not exist yet. This is the simplest way to log training: it needs no session id. Prefer it over start_session plus add_set.", InputSchema: logSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in LogInput) (*mcp.CallToolResult, LogOut, error) {
+		session, sets, err := service.LogSet(ctx, in.Exercise, in.WeightKG, in.Reps, in.RPE, in.Count)
+		return nil, LogOut{Session: session, Sets: sets, TotalSI: session.TotalSI}, toolError(err)
+	})
+
 	updateSchema := mustInputSchema[UpdateInput]()
 	updateSchema.MinProperties = jsonschema.Ptr(2)
 	setPositiveID(updateSchema.Properties["set_id"])
@@ -300,6 +339,28 @@ func New(service *training.Service) *Server {
 		return nil, PlanOut{Plan: v}, toolError(err)
 	})
 
+	feedbackSchema := mustInputSchema[FeedbackInput]()
+	setPositiveID(feedbackSchema.Properties["session_id"])
+	feedbackSchema.Properties["muscle_group"].Enum = muscleGroupEnum()
+	for _, dim := range []string{"fatigue", "pump", "recovery"} {
+		feedbackSchema.Properties[dim].Minimum = jsonschema.Ptr(0.0)
+		feedbackSchema.Properties[dim].Maximum = jsonschema.Ptr(3.0)
+	}
+	mcp.AddTool(s, &mcp.Tool{Name: "record_feedback", Description: "Rate how one muscle group responded to a session: fatigue, pump and recovery, each 0 to 3. Only rate groups actually trained. This drives next week's set-count recommendation.", InputSchema: feedbackSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in FeedbackInput) (*mcp.CallToolResult, FeedbackOut, error) {
+		err := service.RecordFeedback(ctx, in.SessionID, training.Feedback{
+			MuscleGroup: in.MuscleGroup, Fatigue: in.Fatigue, Pump: in.Pump, Recovery: in.Recovery,
+		})
+		if err != nil {
+			return nil, FeedbackOut{SessionID: in.SessionID}, toolError(err)
+		}
+		all, err := service.SessionFeedback(ctx, in.SessionID)
+		return nil, FeedbackOut{SessionID: in.SessionID, Feedback: all}, toolError(err)
+	})
+	mcp.AddTool(s, &mcp.Tool{Name: "volume_recommendation", Description: "Set-count change per muscle group for next week, derived from the most recent feedback and the volume it responded to. Follows the volume-landmark logic of the source spreadsheet."}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, RecommendOut, error) {
+		v, err := service.VolumeRecommendation(ctx)
+		return nil, RecommendOut{Recommendations: v}, toolError(err)
+	})
+
 	deleteSessionSchema := mustInputSchema[SessionInput]()
 	setPositiveID(deleteSessionSchema.Properties["session_id"])
 	mcp.AddTool(s, &mcp.Tool{Name: "delete_session", Description: "Permanently delete a training session and every set in it. Irreversible; returns how many sets were destroyed. Use to remove an empty or mistaken session.", InputSchema: deleteSessionSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in SessionInput) (*mcp.CallToolResult, DeleteSessionOut, error) {
@@ -353,12 +414,13 @@ func New(service *training.Service) *Server {
 }
 func (s *Server) Handler() http.Handler { return s.handler }
 func (s *Server) ToolNames() []string {
-	return []string{"start_session", "add_set", "update_set", "delete_set", "delete_session",
+	return []string{"log_set", "start_session", "add_set", "update_set", "delete_set", "delete_session",
 		"get_session", "list_sessions", "exercise_history", "weekly_volume",
 		"set_exercise_group", "list_exercise_groups", "volume_by_muscle",
 		"create_plan", "list_plans", "get_plan", "delete_plan", "session_progress",
 		"add_session_exercise", "adjust_session_exercise", "swap_session_exercise",
-		"remove_session_exercise", "save_session_as_plan"}
+		"remove_session_exercise", "save_session_as_plan",
+		"record_feedback", "volume_recommendation"}
 }
 func muscleGroupEnum() []any {
 	out := make([]any, 0, len(training.MuscleGroups))

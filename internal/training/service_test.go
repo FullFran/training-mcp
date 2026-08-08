@@ -164,6 +164,7 @@ type memoryStore struct {
 	itemPatch            SessionItemPatch
 	swapFrom, swapTo     string
 	itemRemoved          string
+	feedback             map[string]Feedback
 }
 
 func newMemoryStore() *memoryStore {
@@ -577,5 +578,92 @@ func TestServiceSwapAndRemoveSessionItem(t *testing.T) {
 	}
 	if err := svc.RemoveSessionItem(ctx, 1, ""); !errors.Is(err, ErrValidation) {
 		t.Fatalf("empty exercise error = %v, want validation", err)
+	}
+}
+
+func (m *memoryStore) SetFeedback(_ context.Context, id int64, f Feedback) error {
+	if m.feedback == nil {
+		m.feedback = map[string]Feedback{}
+	}
+	m.feedback[f.MuscleGroup] = f
+	return nil
+}
+func (m *memoryStore) SessionFeedback(context.Context, int64) ([]Feedback, error) {
+	var out []Feedback
+	for _, f := range m.feedback {
+		out = append(out, f)
+	}
+	return out, nil
+}
+func (m *memoryStore) LatestFeedback(context.Context) (map[string]Feedback, error) {
+	return m.feedback, nil
+}
+
+func TestRecommendSetsFollowsTheSpreadsheetAnchors(t *testing.T) {
+	for _, tt := range []struct {
+		magnitude int
+		delta     int
+	}{
+		{0, 3}, {1, 3}, // sheet anchor: magnitude 0 -> "Sube 3 series"
+		{2, 2}, {3, 2},
+		{4, 1}, {5, 1},
+		{6, 0}, {7, 0}, // sheet anchor: magnitude 7 -> "Mantén o reduce 1 serie"
+		{8, -1}, {9, -1},
+	} {
+		if delta, advice := RecommendSets(tt.magnitude); delta != tt.delta || advice == "" {
+			t.Fatalf("RecommendSets(%d) = %d %q, want %d", tt.magnitude, delta, advice, tt.delta)
+		}
+	}
+}
+
+func TestFeedbackValidation(t *testing.T) {
+	svc := NewService(newMemoryStore(), time.Now)
+	ctx := context.Background()
+
+	if err := svc.RecordFeedback(ctx, 1, Feedback{MuscleGroup: " PECHO ", Fatigue: 2, Pump: 3, Recovery: 1}); err != nil {
+		t.Fatalf("RecordFeedback() error = %v", err)
+	}
+	if got := (Feedback{Fatigue: 2, Pump: 3, Recovery: 1}).Magnitude(); got != 6 {
+		t.Fatalf("Magnitude() = %d, want 6", got)
+	}
+	for _, tt := range []struct {
+		name string
+		id   int64
+		f    Feedback
+	}{
+		{"bad session", 0, Feedback{MuscleGroup: "pecho"}},
+		{"unknown group", 1, Feedback{MuscleGroup: "biceps femoral"}},
+		{"rating too high", 1, Feedback{MuscleGroup: "pecho", Fatigue: 4}},
+		{"negative rating", 1, Feedback{MuscleGroup: "pecho", Pump: -1}},
+	} {
+		if err := svc.RecordFeedback(ctx, tt.id, tt.f); !errors.Is(err, ErrValidation) {
+			t.Fatalf("RecordFeedback(%s) error = %v, want validation", tt.name, err)
+		}
+	}
+}
+
+func TestServiceLogSetCreatesTodaysSessionOnceAndRecordsRepeats(t *testing.T) {
+	store := newMemoryStore()
+	svc := NewService(store, func() time.Time { return time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC) })
+	ctx := context.Background()
+
+	session, sets, err := svc.LogSet(ctx, " Press Banca ", 80, 10, 9, 3)
+	if err != nil || len(sets) != 3 {
+		t.Fatalf("LogSet() = %#v, %v", sets, err)
+	}
+	if session.Date != "2026-08-08" || sets[0].Exercise != "press banca" {
+		t.Fatalf("session/exercise wrong: %#v %#v", session, sets[0])
+	}
+	// Invalid input must not leave an empty session behind.
+	store2 := newMemoryStore()
+	svc2 := NewService(store2, func() time.Time { return time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC) })
+	if _, _, err := svc2.LogSet(ctx, "", 80, 10, 9, 1); !errors.Is(err, ErrValidation) {
+		t.Fatalf("LogSet with empty exercise = %v, want validation", err)
+	}
+	if len(store2.sessions) != 0 {
+		t.Fatalf("a rejected log created a session: %#v", store2.sessions)
+	}
+	if _, _, err := svc.LogSet(ctx, "banca", 80, 10, 9, 21); !errors.Is(err, ErrValidation) {
+		t.Fatalf("count above the cap = %v, want validation", err)
 	}
 }

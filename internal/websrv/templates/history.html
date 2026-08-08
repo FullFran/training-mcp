@@ -17,6 +17,21 @@
 </header>
 
 <main>
+  {{if .Recommend}}
+  <section class="recommend" aria-label="Recomendación de volumen">
+    <h2>Semana que viene</h2>
+    <ul>
+      {{range .Recommend}}
+      <li class="{{if gt .SetsDelta 0}}up{{else if lt .SetsDelta 0}}down{{end}}">
+        <span class="name">{{.MuscleGroup}}</span>
+        <span class="delta">{{if gt .SetsDelta 0}}+{{end}}{{.SetsDelta}}</span>
+        <span class="why">{{.Advice}}{{if .LastWeekSets}} · hiciste {{.LastWeekSets}}{{end}}</span>
+      </li>
+      {{end}}
+    </ul>
+  </section>
+  {{end}}
+
   {{if .Volume}}
   <section class="volume" aria-label="Volumen por grupo muscular">
     {{$max := 0.0}}{{range .Volume}}{{if gt .TotalSI $max}}{{$max = .TotalSI}}{{end}}{{end}}

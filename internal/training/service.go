@@ -183,6 +183,63 @@ func (s *Service) SaveSessionAsPlan(ctx context.Context, sessionID int64, name s
 	return s.CreatePlan(ctx, plan)
 }
 
+// RecordFeedback stores how one muscle group responded to a session. Only the
+// groups actually trained need rating, which keeps this a few taps.
+func (s *Service) RecordFeedback(ctx context.Context, sessionID int64, f Feedback) error {
+	f.MuscleGroup = strings.ToLower(strings.TrimSpace(f.MuscleGroup))
+	if sessionID <= 0 || !f.Valid() {
+		return ErrValidation
+	}
+	return s.store.SetFeedback(ctx, sessionID, f)
+}
+
+func (s *Service) SessionFeedback(ctx context.Context, sessionID int64) ([]Feedback, error) {
+	if sessionID <= 0 {
+		return nil, ErrValidation
+	}
+	out, err := s.store.SessionFeedback(ctx, sessionID)
+	if err == nil && out == nil {
+		out = []Feedback{}
+	}
+	return out, err
+}
+
+// VolumeRecommendation turns the latest feedback per muscle group into a set
+// change for next week, alongside the volume that feedback was a response to.
+func (s *Service) VolumeRecommendation(ctx context.Context) ([]SetChange, error) {
+	latest, err := s.store.LatestFeedback(ctx)
+	if err != nil {
+		return nil, err
+	}
+	weeks, err := s.store.WeeklyVolume(ctx, ListFilter{})
+	if err != nil {
+		return nil, err
+	}
+	// Sets from the most recent week each group was trained, which is the
+	// volume the rating responded to.
+	lastSets := map[string]int{}
+	seen := map[string]bool{}
+	for _, w := range weeks {
+		if !seen[w.MuscleGroup] {
+			seen[w.MuscleGroup] = true
+			lastSets[w.MuscleGroup] = w.Sets
+		}
+	}
+	out := []SetChange{}
+	for _, group := range MuscleGroups {
+		f, ok := latest[group]
+		if !ok {
+			continue
+		}
+		delta, advice := RecommendSets(f.Magnitude())
+		out = append(out, SetChange{
+			MuscleGroup: group, Magnitude: f.Magnitude(),
+			SetsDelta: delta, Advice: advice, LastWeekSets: lastSets[group],
+		})
+	}
+	return out, nil
+}
+
 // SessionProgress reports planned versus completed sets for a session.
 func (s *Service) SessionProgress(ctx context.Context, sessionID int64) ([]PlanProgress, error) {
 	if sessionID <= 0 {
@@ -194,9 +251,58 @@ func (s *Service) SessionProgress(ctx context.Context, sessionID int64) ([]PlanP
 	}
 	return out, err
 }
+
+// LogSet is the one-call entry path: it finds today's session, creates it if
+// needed, and records count identical sets. Callers never handle a session id,
+// which is what makes conversational logging a single step.
+func (s *Service) LogSet(ctx context.Context, exercise string, weightKG float64, reps int, rpe float64, count int) (Session, []Set, error) {
+	if count <= 0 {
+		count = 1
+	}
+	if count > 20 {
+		return Session{}, nil, ErrValidation
+	}
+	today := s.clock().Format("2006-01-02")
+	existing, err := s.ListSessions(ctx, ListFilter{From: today, To: today, Limit: 1})
+	if err != nil {
+		return Session{}, nil, err
+	}
+	var session Session
+	if len(existing) > 0 {
+		session = Session{ID: existing[0].ID, Date: existing[0].Date, PlanName: existing[0].PlanName}
+	} else {
+		// Validate before creating, so a bad call never leaves an empty session
+		// behind as a side effect of a typo.
+		if !validSetFields(exercise, weightKG, reps, rpe) {
+			return Session{}, nil, ErrValidation
+		}
+		if session, err = s.StartSession(ctx, today); err != nil {
+			return Session{}, nil, err
+		}
+	}
+	var out []Set
+	for range count {
+		set, total, err := s.AddSet(ctx, AddSetInput{
+			SessionID: session.ID, Exercise: exercise, WeightKG: weightKG, Reps: reps, RPE: rpe,
+		})
+		if err != nil {
+			return session, out, err
+		}
+		session.TotalSI = total
+		out = append(out, set)
+	}
+	return session, out, nil
+}
+
+// validSetFields holds the rules a recorded set must satisfy, shared by every
+// entry path so none of them can drift.
+func validSetFields(exercise string, weightKG float64, reps int, rpe float64) bool {
+	return strings.TrimSpace(exercise) != "" && weightKG > 0 && reps > 0 && rpe >= 1 && rpe <= 10
+}
+
 func (s *Service) AddSet(ctx context.Context, in AddSetInput) (Set, float64, error) {
 	in.Exercise = strings.ToLower(strings.TrimSpace(in.Exercise))
-	if in.SessionID <= 0 || in.Exercise == "" || in.WeightKG <= 0 || in.Reps <= 0 || in.RPE < 1 || in.RPE > 10 {
+	if in.SessionID <= 0 || !validSetFields(in.Exercise, in.WeightKG, in.Reps, in.RPE) {
 		return Set{}, 0, ErrValidation
 	}
 	return s.store.AddSet(ctx, in)

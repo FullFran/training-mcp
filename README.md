@@ -23,11 +23,13 @@ The unauthenticated `GET /health` endpoint returns `{"status":"ok"}`. MCP is onl
 
 ## Tools
 
-`start_session`, `add_set`, `update_set`, `delete_set`, `get_session`, and `list_sessions` cover logging. Exercises are trimmed/lowercased, positions remain dense, and totals are recalculated from stored SI values.
+`log_set` is the simplest way to record training: it takes an exercise, weight, reps and RPE, finds or creates today's session, and can record several identical sets at once. It needs no session id, so conversational logging is one call. `start_session`, `add_set`, `update_set`, `delete_set`, `get_session` and `list_sessions` remain for explicit control. Exercises are trimmed/lowercased, positions remain dense, and totals are recalculated from stored SI values.
 
 `create_plan`, `list_plans`, `get_plan` and `delete_plan` manage reusable workout plans: an ordered list of exercises with a target set count and an optional rep range and RPE. Load is deliberately not planned — the prescription is effort and reps, and the weight that meets it is discovered at the gym. `start_session` takes an optional `plan_id`, which **copies** the plan into the session. From then on the session owns its prescription: `add_session_exercise`, `adjust_session_exercise` (sets, rep range, RPE, skip), `swap_session_exercise` and `remove_session_exercise` change today only and never edit the template, while editing a template never rewrites a past session. `session_progress` reports planned versus completed sets per exercise, listing anything done off-plan with `target_sets` 0 so it stays visible. `save_session_as_plan` promotes an adjusted session into a new reusable plan.
 
 `delete_session` removes a session and every set in it, reporting how many were destroyed. `exercise_history` returns one exercise's sets newest first with each set's estimated 1RM plus its all-time best, so progression can be judged in one call instead of reading every session. `weekly_volume` buckets SI per muscle group by training week.
+
+`record_feedback` and `volume_recommendation` close the loop the source spreadsheet automated: rate a trained muscle group 0-3 on fatigue, pump and recovery, and get next week's set-count change. The mapping from the 0-9 magnitude is in `training.RecommendSets`; its two anchors come from the sheet, the thresholds between them are an interpolation.
 
 `set_exercise_group`, `list_exercise_groups`, and `volume_by_muscle` add per-muscle-group volume. Each exercise maps to exactly one muscle group, so group SI is a true partition of session SI — every set counts once and the group totals add up to the session total. Sets whose exercise has no mapping are reported under an empty group rather than dropped, so gaps in the catalogue stay visible.
 
@@ -48,7 +50,10 @@ shared with the MCP tools and cannot drift apart.
 - Sets are grouped by exercise, the way a workout is performed and read back.
 - The entry form shows what was done last time for that exercise and the
   standing estimated-1RM record; a set matching the record is badged `PR`.
+- The exercise field autocompletes from every exercise already known, which is
+  what stops the catalogue fragmenting into near-duplicate names.
 - Quick-pick chips restore the last weight, reps and RPE per exercise.
+- Session feedback asks only about the muscle groups actually trained that day.
 - A rest timer starts on every logged set and remembers the adjusted duration.
 - Sets can be edited in place instead of deleted and re-entered.
 - Today's session is created lazily on the first set, so opening the app never
@@ -70,10 +75,9 @@ Three exclusions were deliberately lifted as the tool proved useful:
 frontend/mobile clients (the PWA), analytics (per-muscle volume and exercise
 progression), and planned workouts (plans). Everything else still stands.
 
-Plans record prescriptions only. The volume-landmark feedback loop that the
-original spreadsheet automated — rating fatigue, pump and recovery per muscle
-group to compute next week's set counts — is **not** implemented; the numbers a
-plan carries are the ones you decide.
+Plans record prescriptions you decide. The volume-landmark feedback loop is
+implemented as an advisory: it reports a set-count change per muscle group, but
+never edits a plan on its own.
 
 ## Documentation
 
