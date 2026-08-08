@@ -446,3 +446,5 @@ func (testStore) SessionFeedback(context.Context, int64) ([]training.Feedback, e
 func (testStore) LatestFeedback(context.Context) (map[string]training.Feedback, error) {
 	return nil, nil
 }
+
+func (testStore) Snapshot(context.Context, string) error { return nil }

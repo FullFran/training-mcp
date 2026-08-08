@@ -240,6 +240,14 @@ func (s *Service) VolumeRecommendation(ctx context.Context) ([]SetChange, error)
 	return out, nil
 }
 
+// Snapshot writes a consistent copy of the database to path, for backup.
+func (s *Service) Snapshot(ctx context.Context, path string) error {
+	if strings.TrimSpace(path) == "" {
+		return ErrValidation
+	}
+	return s.store.Snapshot(ctx, path)
+}
+
 // SessionProgress reports planned versus completed sets for a session.
 func (s *Service) SessionProgress(ctx context.Context, sessionID int64) ([]PlanProgress, error) {
 	if sessionID <= 0 {

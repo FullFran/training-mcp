@@ -556,3 +556,4 @@ button { font: inherit; cursor: pointer; }
   font-size: 11px;
 }
 .edit-form.wide-edit { grid-template-columns: 1fr 1fr 1fr 1.4fr auto; }
+.bar-actions { display: flex; gap: 8px; }

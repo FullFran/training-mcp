@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -777,5 +778,41 @@ func TestTechniqueCanBeEditedAndCleared(t *testing.T) {
 	w = post(t, h, base+"/sets/"+id+"/update", url.Values{"technique": {""}}, true)
 	if strings.Contains(w.Body.String(), "tech-tag") {
 		t.Fatalf("technique should be cleared: %q", w.Body.String())
+	}
+}
+
+func TestExportStreamsARestorableDatabase(t *testing.T) {
+	h, _ := newServer(t)
+	post(t, h, base+"/sets", setForm("banca", "80", "8", "9"), true)
+
+	w := get(t, h, base+"/export.db")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	if ct := w.Header().Get("Content-Type"); ct != "application/vnd.sqlite3" {
+		t.Fatalf("content type = %q", ct)
+	}
+	if cd := w.Header().Get("Content-Disposition"); !strings.Contains(cd, "training-2026-08-07.db") {
+		t.Fatalf("filename should carry the date: %q", cd)
+	}
+	body := w.Body.Bytes()
+	// A real SQLite file, not a rendered page: the format's magic header.
+	if len(body) < 16 || string(body[:15]) != "SQLite format 3" {
+		t.Fatalf("export is not a SQLite database, got %d bytes", len(body))
+	}
+
+	// The snapshot must be openable and contain the data, or it is not a backup.
+	path := t.TempDir() + "/restored.db"
+	if err := os.WriteFile(path, body, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := sqlitestore.Open(path)
+	if err != nil {
+		t.Fatalf("restored copy does not open: %v", err)
+	}
+	defer restored.Close()
+	sessions, err := restored.ListSessions(t.Context(), training.ListFilter{Limit: 10})
+	if err != nil || len(sessions) != 1 || sessions[0].SetCount != 1 {
+		t.Fatalf("restored data = %#v, %v", sessions, err)
 	}
 }

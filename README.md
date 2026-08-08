@@ -63,6 +63,11 @@ shared with the MCP tools and cannot drift apart.
 - The service worker caches the shell and the last viewed pages for offline
   *reading*. Writes always require the network — a set only counts once stored.
 
+`GET {base}/export.db` streams a consistent snapshot of the whole database,
+taken with `VACUUM INTO` so it is safe while the server is running. The result
+is a plain SQLite file: **restoring is copying it back into the data volume.**
+Nothing else in this deployment keeps a second copy, so this is the backup.
+
 **Authentication is currently the secret URL itself.** The reverse proxy injects
 the bearer token, so anyone holding the URL has full access. This is tracked
 debt, not a design: see the open issues.

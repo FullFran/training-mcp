@@ -166,6 +166,7 @@ type memoryStore struct {
 	swapFrom, swapTo     string
 	itemRemoved          string
 	feedback             map[string]Feedback
+	snapshotPath         string
 }
 
 func newMemoryStore() *memoryStore {
@@ -689,4 +690,9 @@ func TestServiceNormalizesAndBoundsTechnique(t *testing.T) {
 	if !errors.Is(err, ErrValidation) {
 		t.Fatalf("over-long technique = %v, want validation", err)
 	}
+}
+
+func (m *memoryStore) Snapshot(_ context.Context, path string) error {
+	m.snapshotPath = path
+	return nil
 }

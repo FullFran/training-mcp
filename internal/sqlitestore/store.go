@@ -107,6 +107,17 @@ func mustMigrationNames() []string {
 }
 func (s *Store) Close() error { return s.db.Close() }
 
+// Snapshot writes a consistent copy of the whole database to path. VACUUM INTO
+// takes the copy inside a read transaction, so it is safe while the server is
+// serving and the result is a plain SQLite file that can simply be copied back.
+func (s *Store) Snapshot(ctx context.Context, path string) error {
+	if strings.ContainsAny(path, "'\"") {
+		return training.ErrValidation
+	}
+	_, err := s.db.ExecContext(ctx, `VACUUM INTO '`+path+`'`)
+	return err
+}
+
 func (s *Store) Start(ctx context.Context, session training.Session) (training.Session, error) {
 	// The plan name is snapshotted alongside the id so history stays readable
 	// even if the plan is later renamed or deleted.

@@ -28,4 +28,5 @@ type Store interface {
 	SetExerciseGroup(context.Context, ExerciseGroup) error
 	ExerciseGroups(context.Context) ([]ExerciseGroup, error)
 	VolumeByGroup(context.Context, ListFilter) ([]GroupVolume, error)
+	Snapshot(context.Context, string) error
 }

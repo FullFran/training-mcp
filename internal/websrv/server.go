@@ -13,6 +13,8 @@ import (
 	"io/fs"
 	"math"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -190,6 +192,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST "+b+"/sets/{id}/delete", s.deleteSet)
 	s.mux.HandleFunc("POST "+b+"/sets/{id}/update", s.updateSet)
 	s.mux.HandleFunc("GET "+b+"/history", s.history)
+	s.mux.HandleFunc("GET "+b+"/export.db", s.export)
 	s.mux.HandleFunc("POST "+b+"/plan", s.choosePlan)
 	s.mux.HandleFunc("POST "+b+"/plan/item", s.adjustItem)
 	s.mux.HandleFunc("POST "+b+"/feedback", s.recordFeedback)
@@ -343,6 +346,39 @@ func (s *Server) renderPanel(w http.ResponseWriter, r *http.Request, message str
 		return
 	}
 	s.render(w, "panel.html", data)
+}
+
+// export streams a consistent copy of the whole database. It is the backup
+// path: the response is a plain SQLite file, so restoring is copying it back
+// into the data volume. Nothing else in this deployment keeps a second copy.
+func (s *Server) export(w http.ResponseWriter, r *http.Request) {
+	dir, err := os.MkdirTemp("", "training-export")
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	defer os.RemoveAll(dir)
+	path := filepath.Join(dir, "training.db")
+	if err := s.service.Snapshot(r.Context(), path); err != nil {
+		s.fail(w, err)
+		return
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/vnd.sqlite3")
+	w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
+	w.Header().Set("Content-Disposition",
+		`attachment; filename="training-`+s.todayDate()+`.db"`)
+	http.ServeContent(w, r, "training.db", info.ModTime(), f)
 }
 
 func (s *Server) history(w http.ResponseWriter, r *http.Request) {

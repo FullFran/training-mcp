@@ -13,7 +13,10 @@
 
 <header class="bar">
   <div><strong>Historial</strong></div>
-  <a class="ghost" href="{{.Base}}/">Hoy</a>
+  <div class="bar-actions">
+    <a class="ghost" href="{{.Base}}/export.db" download>Backup</a>
+    <a class="ghost" href="{{.Base}}/">Hoy</a>
+  </div>
 </header>
 
 <main>
