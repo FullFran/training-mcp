@@ -312,13 +312,42 @@ func validSetFields(exercise string, weightKG float64, reps int, rpe float64) bo
 func (s *Service) AddSet(ctx context.Context, in AddSetInput) (Set, float64, error) {
 	in.Exercise = strings.ToLower(strings.TrimSpace(in.Exercise))
 	in.Technique = normalizeTechnique(in.Technique)
+	in.Superset = normalizeTechnique(in.Superset)
 	if in.SessionID <= 0 || !validSetFields(in.Exercise, in.WeightKG, in.Reps, in.RPE) {
 		return Set{}, 0, ErrValidation
 	}
-	if len(in.Technique) > maxTechniqueLen {
+	if len(in.Technique) > maxTechniqueLen || len(in.Superset) > maxTechniqueLen {
 		return Set{}, 0, ErrValidation
 	}
+	if in.Superset == "" {
+		// Derive the round from the session's plan, so logging a superset set
+		// never costs an extra field.
+		label, err := s.store.SupersetFor(ctx, in.SessionID, in.Exercise)
+		if err != nil {
+			return Set{}, 0, err
+		}
+		in.Superset = label
+	}
 	return s.store.AddSet(ctx, in)
+}
+
+// SetExerciseNote stores a persistent setup reminder for an exercise. An empty
+// note removes it.
+func (s *Service) SetExerciseNote(ctx context.Context, exercise, note string) error {
+	exercise = strings.ToLower(strings.TrimSpace(exercise))
+	note = strings.TrimSpace(note)
+	if exercise == "" || len(note) > maxNoteLen {
+		return ErrValidation
+	}
+	return s.store.SetExerciseNote(ctx, ExerciseNote{Exercise: exercise, Note: note})
+}
+
+func (s *Service) ExerciseNotes(ctx context.Context) ([]ExerciseNote, error) {
+	out, err := s.store.ExerciseNotes(ctx)
+	if err == nil && out == nil {
+		out = []ExerciseNote{}
+	}
+	return out, err
 }
 
 // normalizeTechnique lowercases and trims so "Drop Set" and "drop set" are the

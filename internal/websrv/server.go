@@ -63,6 +63,8 @@ type ExerciseInfo struct {
 	Last     *training.ExerciseSet `json:"last,omitempty"`
 	BestE1RM float64               `json:"best_e1rm,omitempty"`
 	Group    string                `json:"group,omitempty"`
+	// Note is the persistent setup reminder: seat height, grip, pin.
+	Note string `json:"note,omitempty"`
 }
 
 type pageData struct {
@@ -196,6 +198,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST "+b+"/plan", s.choosePlan)
 	s.mux.HandleFunc("POST "+b+"/plan/item", s.adjustItem)
 	s.mux.HandleFunc("POST "+b+"/feedback", s.recordFeedback)
+	s.mux.HandleFunc("POST "+b+"/note", s.saveNote)
 	s.mux.HandleFunc("GET "+b+"/s/{id}", s.session)
 	s.mux.HandleFunc("GET "+b+"/manifest.webmanifest", s.manifest)
 	s.mux.HandleFunc("GET "+b+"/sw.js", s.serviceWorker)
@@ -490,6 +493,24 @@ func (s *Server) todayData(ctx context.Context, message string) (pageData, error
 	return data, nil
 }
 
+// saveNote stores a setup reminder for an exercise. Written once, shown every
+// time that exercise comes up again.
+func (s *Server) saveNote(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.fail(w, err)
+		return
+	}
+	message := ""
+	switch err := s.service.SetExerciseNote(r.Context(), r.PostFormValue("exercise"), r.PostFormValue("note")); {
+	case errors.Is(err, training.ErrValidation):
+		message = "Nota inválida: elige un ejercicio y usa 280 caracteres como mucho."
+	case err != nil:
+		s.fail(w, err)
+		return
+	}
+	s.renderPanel(w, r, message)
+}
+
 // recordFeedback rates one muscle group's response to today's session.
 func (s *Server) recordFeedback(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
@@ -659,6 +680,16 @@ func (s *Server) decorate(ctx context.Context, data *pageData) error {
 	for _, n := range names {
 		catalogue[n] = true
 	}
+	notes, err := s.service.ExerciseNotes(ctx)
+	if err != nil {
+		return err
+	}
+	noteByExercise := map[string]string{}
+	for _, n := range notes {
+		noteByExercise[n.Exercise] = n.Note
+		catalogue[n.Exercise] = true
+	}
+
 	for n := range catalogue {
 		data.Catalogue = append(data.Catalogue, n)
 	}
@@ -670,7 +701,7 @@ func (s *Server) decorate(ctx context.Context, data *pageData) error {
 		if err != nil {
 			return err
 		}
-		entry := ExerciseInfo{Group: h.MuscleGroup}
+		entry := ExerciseInfo{Group: h.MuscleGroup, Note: noteByExercise[name]}
 		if h.Best != nil {
 			entry.BestE1RM = h.Best.Est1RM
 		}

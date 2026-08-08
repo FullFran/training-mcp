@@ -816,3 +816,63 @@ func TestExportStreamsARestorableDatabase(t *testing.T) {
 		t.Fatalf("restored data = %#v, %v", sessions, err)
 	}
 }
+
+func TestSupersetIsShownAndStampedOntoLoggedSets(t *testing.T) {
+	h, service := newServer(t)
+	plan, err := service.CreatePlan(t.Context(), training.Plan{
+		Name: "Tirón A",
+		Items: []training.PlanItem{
+			{Exercise: "pull over", TargetSets: 3, Superset: "A"},
+			{Exercise: "remo normal", TargetSets: 3, Superset: "A"},
+			{Exercise: "curl", TargetSets: 3},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	post(t, h, base+"/plan", url.Values{"plan_id": {itoa(plan.ID)}}, false)
+
+	body := get(t, h, base+"/").Body.String()
+	if strings.Count(body, `data-superset="A"`) != 2 {
+		t.Fatalf("both members of the round should carry the label: %q", body)
+	}
+	if !strings.Contains(body, `class="ss">A<`) {
+		t.Fatalf("superset label should be visible: %q", body)
+	}
+
+	// Logging never states the round; it is derived from the session's plan.
+	post(t, h, base+"/sets", setForm("pull over", "40", "10", "8"), true)
+	sessions, _ := service.ListSessions(t.Context(), training.ListFilter{Limit: 1})
+	session, _ := service.GetSession(t.Context(), sessions[0].ID)
+	if session.Sets[0].Superset != "A" {
+		t.Fatalf("set should be stamped with its round: %#v", session.Sets[0])
+	}
+
+	// An exercise outside any round stays unstamped.
+	post(t, h, base+"/sets", setForm("curl", "10", "12", "8"), true)
+	session, _ = service.GetSession(t.Context(), sessions[0].ID)
+	if session.Sets[1].Superset != "" {
+		t.Fatalf("standalone exercise must not be stamped: %#v", session.Sets[1])
+	}
+}
+
+func TestExerciseSetupNoteIsStoredAndOffered(t *testing.T) {
+	h, _ := newServer(t)
+	post(t, h, base+"/sets", setForm("prensa", "100", "10", "8"), true)
+
+	w := post(t, h, base+"/note", url.Values{
+		"exercise": {"prensa"}, "note": {"asiento en 4, pies altos"},
+	}, true)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	body := get(t, h, base+"/").Body.String()
+	if !strings.Contains(body, "asiento en 4, pies altos") {
+		t.Fatalf("note should be offered with the exercise: %q", body)
+	}
+	// Empty clears it.
+	post(t, h, base+"/note", url.Values{"exercise": {"prensa"}, "note": {""}}, true)
+	if strings.Contains(get(t, h, base+"/").Body.String(), "asiento en 4") {
+		t.Fatalf("empty note should remove it")
+	}
+}

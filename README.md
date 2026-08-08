@@ -23,6 +23,8 @@ The unauthenticated `GET /health` endpoint returns `{"status":"ok"}`. MCP is onl
 
 ## Tools
 
+Plan items can share a **superset label**, marking exercises done back to back. Logging never states it: a set is stamped with the label its exercise carries in the session's plan, so entry stays the same size. `set_exercise_note` stores a persistent setup reminder per exercise — seat height, grip width — shown every time that exercise comes up.
+
 A set can carry an optional **intensity technique** (`drop set`, `rest-pause`, `myo-reps`, `sin parar`…). It is a property of the set, not a separate exercise, so the volume still counts toward the right muscle group while progression on the base movement stays comparable — a set with a technique never becomes the exercise's record.
 
 `log_set` is the simplest way to record training: it takes an exercise, weight, reps and RPE, finds or creates today's session, and can record several identical sets at once. It needs no session id, so conversational logging is one call. `start_session`, `add_set`, `update_set`, `delete_set`, `get_session` and `list_sessions` remain for explicit control. Exercises are trimmed/lowercased, positions remain dense, and totals are recalculated from stored SI values.
@@ -56,6 +58,10 @@ shared with the MCP tools and cannot drift apart.
   what stops the catalogue fragmenting into near-duplicate names.
 - Quick-pick chips restore the last weight, reps and RPE per exercise.
 - Session feedback asks only about the muscle groups actually trained that day.
+- Superset members are marked in the checklist; after logging one, the next
+  movement of the round loads immediately and the rest timer is held back
+  until the round is finished.
+- An exercise's setup note is shown whenever that exercise is selected.
 - A rest timer starts on every logged set and remembers the adjusted duration.
 - Sets can be edited in place instead of deleted and re-entered.
 - Today's session is created lazily on the first set, so opening the app never

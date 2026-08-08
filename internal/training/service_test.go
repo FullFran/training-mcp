@@ -167,6 +167,8 @@ type memoryStore struct {
 	itemRemoved          string
 	feedback             map[string]Feedback
 	snapshotPath         string
+	notes                map[string]string
+	supersets            map[string]string
 }
 
 func newMemoryStore() *memoryStore {
@@ -180,7 +182,7 @@ func (m *memoryStore) Start(_ context.Context, s Session) (Session, error) {
 }
 func (m *memoryStore) AddSet(_ context.Context, in AddSetInput) (Set, float64, error) {
 	m.nextSet++
-	s := Set{ID: m.nextSet, SessionID: in.SessionID, Position: 1, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, SI: CalculateSI(in.RPE), Technique: in.Technique}
+	s := Set{ID: m.nextSet, SessionID: in.SessionID, Position: 1, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, SI: CalculateSI(in.RPE), Technique: in.Technique, Superset: in.Superset}
 	m.sets[s.ID] = s
 	return s, s.SI, nil
 }
@@ -695,4 +697,69 @@ func TestServiceNormalizesAndBoundsTechnique(t *testing.T) {
 func (m *memoryStore) Snapshot(_ context.Context, path string) error {
 	m.snapshotPath = path
 	return nil
+}
+
+func (m *memoryStore) SetExerciseNote(_ context.Context, n ExerciseNote) error {
+	if m.notes == nil {
+		m.notes = map[string]string{}
+	}
+	if n.Note == "" {
+		delete(m.notes, n.Exercise)
+		return nil
+	}
+	m.notes[n.Exercise] = n.Note
+	return nil
+}
+func (m *memoryStore) ExerciseNotes(context.Context) ([]ExerciseNote, error) {
+	var out []ExerciseNote
+	for e, n := range m.notes {
+		out = append(out, ExerciseNote{Exercise: e, Note: n})
+	}
+	return out, nil
+}
+func (m *memoryStore) SupersetFor(_ context.Context, _ int64, exercise string) (string, error) {
+	return m.supersets[exercise], nil
+}
+
+func TestServiceDerivesSupersetFromTheSessionPlan(t *testing.T) {
+	store := newMemoryStore()
+	store.supersets = map[string]string{"pull over": "A"}
+	svc := NewService(store, time.Now)
+	ctx := context.Background()
+	session, _ := svc.StartSession(ctx, "2026-08-08")
+
+	set, _, err := svc.AddSet(ctx, AddSetInput{SessionID: session.ID, Exercise: "pull over", WeightKG: 40, Reps: 10, RPE: 8})
+	if err != nil || set.Superset != "A" {
+		t.Fatalf("superset = %q, %v, want derived 'A'", set.Superset, err)
+	}
+	// An explicit label wins, for work done off any plan.
+	set, _, err = svc.AddSet(ctx, AddSetInput{SessionID: session.ID, Exercise: "pull over", WeightKG: 40, Reps: 10, RPE: 8, Superset: " B "})
+	if err != nil || set.Superset != "b" {
+		t.Fatalf("explicit superset = %q, %v", set.Superset, err)
+	}
+	other, _, err := svc.AddSet(ctx, AddSetInput{SessionID: session.ID, Exercise: "curl", WeightKG: 10, Reps: 12, RPE: 8})
+	if err != nil || other.Superset != "" {
+		t.Fatalf("unlabelled exercise = %q", other.Superset)
+	}
+}
+
+func TestServiceExerciseNoteValidation(t *testing.T) {
+	store := newMemoryStore()
+	svc := NewService(store, time.Now)
+	ctx := context.Background()
+	if err := svc.SetExerciseNote(ctx, " Prensa ", "  asiento 4  "); err != nil {
+		t.Fatalf("SetExerciseNote() error = %v", err)
+	}
+	if store.notes["prensa"] != "asiento 4" {
+		t.Fatalf("note not normalized: %#v", store.notes)
+	}
+	if err := svc.SetExerciseNote(ctx, "", "x"); !errors.Is(err, ErrValidation) {
+		t.Fatalf("empty exercise = %v, want validation", err)
+	}
+	if err := svc.SetExerciseNote(ctx, "prensa", strings.Repeat("x", 281)); !errors.Is(err, ErrValidation) {
+		t.Fatalf("over-long note = %v, want validation", err)
+	}
+	if err := svc.SetExerciseNote(ctx, "prensa", ""); err != nil || len(store.notes) != 0 {
+		t.Fatalf("empty note should remove: %v %#v", err, store.notes)
+	}
 }

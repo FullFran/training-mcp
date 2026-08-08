@@ -29,4 +29,7 @@ type Store interface {
 	ExerciseGroups(context.Context) ([]ExerciseGroup, error)
 	VolumeByGroup(context.Context, ListFilter) ([]GroupVolume, error)
 	Snapshot(context.Context, string) error
+	SetExerciseNote(context.Context, ExerciseNote) error
+	ExerciseNotes(context.Context) ([]ExerciseNote, error)
+	SupersetFor(context.Context, int64, string) (string, error)
 }

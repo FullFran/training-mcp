@@ -33,6 +33,9 @@ type Set struct {
 	// Technique is an optional intensity method applied to this set. Empty
 	// means a normal straight set.
 	Technique string `json:"technique,omitempty"`
+	// Superset labels the round this set belonged to. Stamped from the
+	// session's plan, so logging never has to state it.
+	Superset string `json:"superset,omitempty"`
 }
 
 // Techniques are the intensity methods offered as suggestions. The field is not
@@ -59,6 +62,7 @@ type AddSetInput struct {
 	Reps      int
 	RPE       float64
 	Technique string
+	Superset  string
 }
 type SetPatch struct {
 	Exercise  *string
@@ -111,6 +115,9 @@ type GroupVolume struct {
 // RPE. Load is deliberately absent — the prescription is effort and reps, and
 // the weight that meets it is discovered at the gym.
 type PlanItem struct {
+	// Superset groups exercises performed back to back. Items sharing a label
+	// are one round; empty means the exercise stands alone.
+	Superset   string  `json:"superset,omitempty"`
 	Position   int     `json:"position"`
 	Exercise   string  `json:"exercise"`
 	TargetSets int     `json:"target_sets"`
@@ -134,6 +141,7 @@ type Plan struct {
 // exercise. Exercises done but not planned appear with TargetSets 0, so going
 // off-plan is visible instead of hidden.
 type PlanProgress struct {
+	Superset    string  `json:"superset,omitempty"`
 	Exercise    string  `json:"exercise"`
 	MuscleGroup string  `json:"muscle_group,omitempty"`
 	TargetSets  int     `json:"target_sets"`
@@ -230,6 +238,7 @@ func Epley1RM(weightKG float64, reps int) float64 {
 // exercise's progression can be read without walking every session.
 type ExerciseSet struct {
 	Technique string  `json:"technique,omitempty"`
+	Superset  string  `json:"superset,omitempty"`
 	SetID     int64   `json:"set_id"`
 	SessionID int64   `json:"session_id"`
 	Date      string  `json:"date"`
@@ -257,6 +266,15 @@ type WeeklyVolume struct {
 	TotalSI     float64 `json:"total_si"`
 	Sets        int     `json:"sets"`
 }
+
+// ExerciseNote is a persistent setup reminder for an exercise: seat height,
+// grip width, which pin. Written once, shown every time.
+type ExerciseNote struct {
+	Exercise string `json:"exercise"`
+	Note     string `json:"note"`
+}
+
+const maxNoteLen = 280
 
 // ExerciseMemory is the last recorded set for one exercise. It powers the web
 // UI's quick-pick chips, so a repeated exercise can be logged without retyping

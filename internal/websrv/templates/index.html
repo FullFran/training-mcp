@@ -99,12 +99,16 @@
     </fieldset>
 
     <details class="tech">
-      <summary>Técnica de intensidad <span class="muted">(opcional)</span></summary>
+      <summary>Técnica y nota <span class="muted">(opcional)</span></summary>
       <input id="technique" name="technique" type="text" list="techniques"
              autocapitalize="none" spellcheck="false" placeholder="drop set, rest-pause…">
       <datalist id="techniques">
         {{range techniques}}<option value="{{.}}"></option>{{end}}
       </datalist>
+      <div class="note-edit">
+        <input id="note" type="text" maxlength="280" placeholder="montaje: asiento 4, agarre ancho…">
+        <button type="button" id="save-note" class="mini">Guardar nota</button>
+      </div>
     </details>
 
     <button type="submit" class="primary">Añadir serie</button>

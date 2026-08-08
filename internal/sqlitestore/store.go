@@ -144,8 +144,8 @@ func (s *Store) Start(ctx context.Context, session training.Session) (training.S
 		// Copy the plan into the session so adjusting today never edits the
 		// template, and editing the template never rewrites this session.
 		if _, err = s.db.ExecContext(ctx, `
-INSERT INTO session_items (session_id,position,exercise,target_sets,rep_min,rep_max,target_rpe)
-SELECT ?,position,exercise,target_sets,rep_min,rep_max,target_rpe FROM plan_items WHERE plan_id=?`,
+INSERT INTO session_items (session_id,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset)
+SELECT ?,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset FROM plan_items WHERE plan_id=?`,
 			session.ID, session.PlanID); err != nil {
 			return training.Session{}, err
 		}
@@ -170,7 +170,7 @@ func (s *Store) AddSet(ctx context.Context, in training.AddSetInput) (training.S
 		return training.Set{}, 0, err
 	}
 	si := training.CalculateSI(in.RPE)
-	res, err := tx.ExecContext(ctx, `INSERT INTO sets(session_id,position,exercise,weight_kg,reps,rpe,si,technique,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`, in.SessionID, pos, in.Exercise, in.WeightKG, in.Reps, in.RPE, si, in.Technique)
+	res, err := tx.ExecContext(ctx, `INSERT INTO sets(session_id,position,exercise,weight_kg,reps,rpe,si,technique,superset,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`, in.SessionID, pos, in.Exercise, in.WeightKG, in.Reps, in.RPE, si, in.Technique, in.Superset)
 	if err != nil {
 		return training.Set{}, 0, err
 	}
@@ -186,7 +186,7 @@ func (s *Store) AddSet(ctx context.Context, in training.AddSetInput) (training.S
 	if err = tx.Commit(); err != nil {
 		return training.Set{}, 0, err
 	}
-	return training.Set{ID: id, SessionID: in.SessionID, Position: pos, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, SI: si, Technique: in.Technique}, total, nil
+	return training.Set{ID: id, SessionID: in.SessionID, Position: pos, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, SI: si, Technique: in.Technique, Superset: in.Superset}, total, nil
 }
 func (s *Store) UpdateSet(ctx context.Context, id int64, p training.SetPatch) (training.Set, float64, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -293,14 +293,14 @@ func (s *Store) GetSession(ctx context.Context, id int64) (training.Session, err
 	if err != nil {
 		return out, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,session_id,position,exercise,weight_kg,reps,rpe,si,technique FROM sets WHERE session_id=? ORDER BY position`, id)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,session_id,position,exercise,weight_kg,reps,rpe,si,technique,superset FROM sets WHERE session_id=? ORDER BY position`, id)
 	if err != nil {
 		return out, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var v training.Set
-		if err = rows.Scan(&v.ID, &v.SessionID, &v.Position, &v.Exercise, &v.WeightKG, &v.Reps, &v.RPE, &v.SI, &v.Technique); err != nil {
+		if err = rows.Scan(&v.ID, &v.SessionID, &v.Position, &v.Exercise, &v.WeightKG, &v.Reps, &v.RPE, &v.SI, &v.Technique, &v.Superset); err != nil {
 			return out, err
 		}
 		v.SI = training.NormalizeSI(v.SI)
@@ -382,8 +382,8 @@ func (s *Store) CreatePlan(ctx context.Context, p training.Plan) (training.Plan,
 	for i := range p.Items {
 		p.Items[i].Position = i + 1
 		it := p.Items[i]
-		if _, err = tx.ExecContext(ctx, `INSERT INTO plan_items(plan_id,position,exercise,target_sets,rep_min,rep_max,target_rpe) VALUES (?,?,?,?,?,?,?)`,
-			p.ID, it.Position, it.Exercise, it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE); err != nil {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO plan_items(plan_id,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset) VALUES (?,?,?,?,?,?,?,?)`,
+			p.ID, it.Position, it.Exercise, it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE, it.Superset); err != nil {
 			return training.Plan{}, err
 		}
 		p.TotalSets += it.TargetSets
@@ -423,14 +423,14 @@ func (s *Store) GetPlan(ctx context.Context, id int64) (training.Plan, error) {
 	if err != nil {
 		return p, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT position,exercise,target_sets,rep_min,rep_max,target_rpe FROM plan_items WHERE plan_id=? ORDER BY position`, id)
+	rows, err := s.db.QueryContext(ctx, `SELECT position,exercise,target_sets,rep_min,rep_max,target_rpe,superset FROM plan_items WHERE plan_id=? ORDER BY position`, id)
 	if err != nil {
 		return p, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var it training.PlanItem
-		if err = rows.Scan(&it.Position, &it.Exercise, &it.TargetSets, &it.RepMin, &it.RepMax, &it.TargetRPE); err != nil {
+		if err = rows.Scan(&it.Position, &it.Exercise, &it.TargetSets, &it.RepMin, &it.RepMax, &it.TargetRPE, &it.Superset); err != nil {
 			return p, err
 		}
 		p.Items = append(p.Items, it)
@@ -465,7 +465,7 @@ func (s *Store) SessionProgress(ctx context.Context, sessionID int64) ([]trainin
 		return nil, training.ErrNotFound
 	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT i.exercise, i.target_sets, i.rep_min, i.rep_max, i.target_rpe, i.skipped,
+SELECT i.superset, i.exercise, i.target_sets, i.rep_min, i.rep_max, i.target_rpe, i.skipped,
        (SELECT COUNT(*) FROM sets st WHERE st.session_id=i.session_id AND st.exercise=i.exercise),
        COALESCE(g.muscle_group,'')
 FROM session_items i LEFT JOIN exercise_groups g ON g.exercise=i.exercise
@@ -478,7 +478,7 @@ WHERE i.session_id=? ORDER BY i.position`, sessionID)
 	var out []training.PlanProgress
 	for rows.Next() {
 		var v training.PlanProgress
-		if err = rows.Scan(&v.Exercise, &v.TargetSets, &v.RepMin, &v.RepMax, &v.TargetRPE, &v.Skipped, &v.DoneSets, &v.MuscleGroup); err != nil {
+		if err = rows.Scan(&v.Superset, &v.Exercise, &v.TargetSets, &v.RepMin, &v.RepMax, &v.TargetRPE, &v.Skipped, &v.DoneSets, &v.MuscleGroup); err != nil {
 			return nil, err
 		}
 		planned[v.Exercise] = true
@@ -523,12 +523,12 @@ func (s *Store) SetSessionItem(ctx context.Context, sessionID int64, it training
 		return err
 	}
 	_, err := s.db.ExecContext(ctx, `
-INSERT INTO session_items (session_id,position,exercise,target_sets,rep_min,rep_max,target_rpe)
-VALUES (?,?,?,?,?,?,?)
+INSERT INTO session_items (session_id,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset)
+VALUES (?,?,?,?,?,?,?,?)
 ON CONFLICT(session_id,exercise) DO UPDATE SET
  target_sets=excluded.target_sets, rep_min=excluded.rep_min,
- rep_max=excluded.rep_max, target_rpe=excluded.target_rpe`,
-		sessionID, pos, it.Exercise, it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE)
+ rep_max=excluded.rep_max, target_rpe=excluded.target_rpe, superset=excluded.superset`,
+		sessionID, pos, it.Exercise, it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE, it.Superset)
 	return err
 }
 
@@ -654,6 +654,47 @@ WHERE id IN (SELECT MAX(id) FROM session_feedback GROUP BY muscle_group)`)
 	return out, rows.Err()
 }
 
+func (s *Store) SetExerciseNote(ctx context.Context, n training.ExerciseNote) error {
+	if strings.TrimSpace(n.Note) == "" {
+		_, err := s.db.ExecContext(ctx, `DELETE FROM exercise_notes WHERE exercise=?`, n.Exercise)
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO exercise_notes(exercise,note,updated_at) VALUES (?,?,CURRENT_TIMESTAMP)
+ON CONFLICT(exercise) DO UPDATE SET note=excluded.note, updated_at=CURRENT_TIMESTAMP`,
+		n.Exercise, n.Note)
+	return err
+}
+
+func (s *Store) ExerciseNotes(ctx context.Context) ([]training.ExerciseNote, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT exercise,note FROM exercise_notes ORDER BY exercise`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []training.ExerciseNote
+	for rows.Next() {
+		var n training.ExerciseNote
+		if err = rows.Scan(&n.Exercise, &n.Note); err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
+// SupersetFor reports the superset label an exercise carries in a session's
+// plan, so a logged set can be stamped without the caller stating it.
+func (s *Store) SupersetFor(ctx context.Context, sessionID int64, exercise string) (string, error) {
+	var label string
+	err := s.db.QueryRowContext(ctx, `SELECT superset FROM session_items WHERE session_id=? AND exercise=?`,
+		sessionID, exercise).Scan(&label)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return label, err
+}
+
 // DeleteSession removes a session and, by ON DELETE CASCADE, all of its sets.
 // It returns how many sets went with it so the caller can report the cost of an
 // irreversible delete.
@@ -689,7 +730,7 @@ func (s *Store) ExerciseHistory(ctx context.Context, exercise string, limit int)
 		return out, err
 	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT st.id,st.session_id,se.date,st.weight_kg,st.reps,st.rpe,st.si,st.technique
+SELECT st.id,st.session_id,se.date,st.weight_kg,st.reps,st.rpe,st.si,st.technique,st.superset
 FROM sets st JOIN sessions se ON se.id=st.session_id
 WHERE st.exercise=?
 ORDER BY se.date DESC, st.position DESC LIMIT ?`, exercise, limit)
@@ -699,7 +740,7 @@ ORDER BY se.date DESC, st.position DESC LIMIT ?`, exercise, limit)
 	defer rows.Close()
 	for rows.Next() {
 		var v training.ExerciseSet
-		if err = rows.Scan(&v.SetID, &v.SessionID, &v.Date, &v.WeightKG, &v.Reps, &v.RPE, &v.SI, &v.Technique); err != nil {
+		if err = rows.Scan(&v.SetID, &v.SessionID, &v.Date, &v.WeightKG, &v.Reps, &v.RPE, &v.SI, &v.Technique, &v.Superset); err != nil {
 			return out, err
 		}
 		v.SI = training.NormalizeSI(v.SI)
@@ -712,11 +753,11 @@ ORDER BY se.date DESC, st.position DESC LIMIT ?`, exercise, limit)
 	// The record is computed over the whole history, not just the page returned.
 	var best training.ExerciseSet
 	err = s.db.QueryRowContext(ctx, `
-SELECT st.id,st.session_id,se.date,st.weight_kg,st.reps,st.rpe,st.si,st.technique
+SELECT st.id,st.session_id,se.date,st.weight_kg,st.reps,st.rpe,st.si,st.technique,st.superset
 FROM sets st JOIN sessions se ON se.id=st.session_id
 WHERE st.exercise=? AND st.technique=''
 ORDER BY st.weight_kg*(1+CAST(st.reps AS REAL)/30) DESC, se.date DESC LIMIT 1`, exercise).
-		Scan(&best.SetID, &best.SessionID, &best.Date, &best.WeightKG, &best.Reps, &best.RPE, &best.SI, &best.Technique)
+		Scan(&best.SetID, &best.SessionID, &best.Date, &best.WeightKG, &best.Reps, &best.RPE, &best.SI, &best.Technique, &best.Superset)
 	if errors.Is(err, sql.ErrNoRows) {
 		return out, nil
 	}

@@ -46,9 +46,46 @@
     }
     if (entry.best_e1rm) bits.push(`Récord 1RM est. <strong>${entry.best_e1rm} kg</strong>`);
     if (entry.group) bits.push(entry.group);
-    if (!bits.length) { previous.hidden = true; return; }
-    previous.innerHTML = bits.join(' · ');
+    let html = bits.join(' · ');
+    // The setup note goes on its own line: it is an instruction, not a stat.
+    if (entry.note) html += `<span class="note-line">🛠 ${entry.note}</span>`;
+    if (!html) { previous.hidden = true; return; }
+    previous.innerHTML = html;
     previous.hidden = false;
+    const noteInput = document.getElementById('note');
+    if (noteInput) noteInput.value = entry.note || '';
+  }
+
+  // Saving a setup note is deliberately its own action: it belongs to the
+  // exercise for good, not to the set being logged.
+  const saveNote = document.getElementById('save-note');
+  if (saveNote) {
+    saveNote.addEventListener('click', () => {
+      const name = (exercise.value || '').trim();
+      if (!name || !window.htmx) return;
+      window.htmx.ajax('POST', base + '/note', {
+        target: '#panel', swap: 'outerHTML',
+        values: { exercise: name, note: document.getElementById('note').value }
+      });
+      buzz(8);
+    });
+  }
+
+  // Within a superset you move straight to the next exercise of the round, so
+  // the next one is pre-loaded and the rest timer is held back.
+  function nextInSuperset(justLogged) {
+    const items = Array.from(document.querySelectorAll('.planned li'));
+    const current = items.find((li) => li.dataset.exercise === justLogged);
+    if (!current || !current.dataset.superset) return null;
+    const round = items.filter((li) => li.dataset.superset === current.dataset.superset);
+    const from = round.indexOf(current);
+    for (let i = 1; i <= round.length; i++) {
+      const candidate = round[(from + i) % round.length];
+      if (candidate !== current && !candidate.classList.contains('ok') && !candidate.classList.contains('skipped')) {
+        return candidate;
+      }
+    }
+    return null;
   }
 
   // Steppers. Weight moves in 2.5 kg jumps by default because that is the
@@ -225,7 +262,20 @@
     if (event.target.id !== 'panel') return;
     syncRepeat();
     const failed = document.querySelector('#panel .alert');
-    if (!failed) startRest();
+    if (failed) { buzz(18); return; }
+    const next = nextInSuperset((exercise.value || '').trim().toLowerCase());
+    if (next) {
+      // Same round: no rest, load the next movement instead.
+      const known = info[next.dataset.exercise] || {};
+      fill({
+        exercise: next.dataset.exercise,
+        weight: known.last ? known.last.weight_kg : null,
+        reps: next.dataset.reps !== '0' ? next.dataset.reps : null,
+        rpe: next.dataset.rpe !== '0' ? next.dataset.rpe : null
+      });
+    } else {
+      startRest();
+    }
     buzz(18);
   });
 

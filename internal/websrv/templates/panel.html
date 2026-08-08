@@ -11,13 +11,14 @@
     </header>
     <ol class="planned">
       {{range .Progress}}
-      <li class="{{if .Skipped}}skipped{{else if .Done}}ok{{end}}{{if eq .TargetSets 0}} extra{{end}}"
+      <li class="{{if .Skipped}}skipped{{else if .Done}}ok{{end}}{{if eq .TargetSets 0}} extra{{end}}{{if .Superset}} in-ss{{end}}"
           data-exercise="{{.Exercise}}"
+          data-superset="{{.Superset}}"
           data-reps="{{targetReps .}}"
           data-rpe="{{num .TargetRPE}}">
         <span class="chk">{{if .Skipped}}—{{else if .Done}}✓{{else}}○{{end}}</span>
         <span class="what">
-          <span class="ex">{{.Exercise}}</span>
+          <span class="ex">{{if .Superset}}<span class="ss">{{.Superset}}</span>{{end}}{{.Exercise}}</span>
           <span class="rx">
             {{- if eq .TargetSets 0}}fuera de plan
             {{- else}}{{.RepMin}}{{if ne .RepMax .RepMin}}-{{.RepMax}}{{end}} reps{{if .TargetRPE}} @{{num .TargetRPE}}{{end}}{{end -}}

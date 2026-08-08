@@ -81,6 +81,7 @@ type PlanItemInput struct {
 	RepMin     int     `json:"rep_min,omitempty" jsonschema:"Lower bound of the target rep range, e.g. 10 for '10 to 12'."`
 	RepMax     int     `json:"rep_max,omitempty" jsonschema:"Upper bound of the target rep range, e.g. 12 for '10 to 12'."`
 	TargetRPE  float64 `json:"target_rpe,omitempty" jsonschema:"Prescribed RPE from 1 through 10. Omit if the plan does not prescribe one."`
+	Superset   string  `json:"superset,omitempty" jsonschema:"Label grouping exercises done back to back, e.g. 'A'. Items sharing a label are one superset; omit for a standalone exercise."`
 }
 type CreatePlanInput struct {
 	Name  string          `json:"name" jsonschema:"Name of the plan, e.g. 'Empuje A'."`
@@ -111,6 +112,7 @@ type SessionItemInput struct {
 	RepMin     int     `json:"rep_min,omitempty" jsonschema:"Lower bound of the target rep range."`
 	RepMax     int     `json:"rep_max,omitempty" jsonschema:"Upper bound of the target rep range."`
 	TargetRPE  float64 `json:"target_rpe,omitempty" jsonschema:"Target RPE from 1 through 10."`
+	Superset   string  `json:"superset,omitempty" jsonschema:"Label grouping exercises done back to back. Omit for a standalone exercise."`
 }
 type AdjustItemInput struct {
 	SessionID  int64    `json:"session_id" jsonschema:"Positive ID of the session to adjust."`
@@ -151,6 +153,13 @@ type FeedbackOut struct {
 }
 type RecommendOut struct {
 	Recommendations []training.SetChange `json:"recommendations"`
+}
+type NoteInput struct {
+	Exercise string `json:"exercise" jsonschema:"Non-empty exercise name; trimmed and lowercased to match stored sets."`
+	Note     string `json:"note" jsonschema:"Setup reminder, e.g. 'asiento en 4, agarre ancho'. Pass an empty string to remove it."`
+}
+type NotesOut struct {
+	Notes []training.ExerciseNote `json:"notes"`
 }
 type DeleteSessionOut struct {
 	SessionID   int64 `json:"session_id"`
@@ -262,6 +271,7 @@ func New(service *training.Service) *Server {
 			plan.Items = append(plan.Items, training.PlanItem{
 				Exercise: it.Exercise, TargetSets: it.TargetSets,
 				RepMin: it.RepMin, RepMax: it.RepMax, TargetRPE: it.TargetRPE,
+				Superset: it.Superset,
 			})
 		}
 		v, err := service.CreatePlan(ctx, plan)
@@ -301,6 +311,7 @@ func New(service *training.Service) *Server {
 		err := service.SetSessionItem(ctx, in.SessionID, training.PlanItem{
 			Exercise: in.Exercise, TargetSets: in.TargetSets,
 			RepMin: in.RepMin, RepMax: in.RepMax, TargetRPE: in.TargetRPE,
+			Superset: in.Superset,
 		})
 		return nil, ItemOut{SessionID: in.SessionID, Exercise: in.Exercise}, toolError(err)
 	})
@@ -341,6 +352,20 @@ func New(service *training.Service) *Server {
 	mcp.AddTool(s, &mcp.Tool{Name: "save_session_as_plan", Description: "Turn a session — including any in-session adjustments and off-plan work — into a new reusable plan. Skipped exercises are left out.", InputSchema: saveAsPlanSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in SaveAsPlanInput) (*mcp.CallToolResult, PlanOut, error) {
 		v, err := service.SaveSessionAsPlan(ctx, in.SessionID, in.Name)
 		return nil, PlanOut{Plan: v}, toolError(err)
+	})
+
+	noteSchema := mustInputSchema[NoteInput]()
+	noteSchema.Properties["exercise"].Pattern = `.*\S.*`
+	mcp.AddTool(s, &mcp.Tool{Name: "set_exercise_note", Description: "Store a persistent setup reminder for an exercise, such as seat height or grip width. It is shown every time that exercise is logged. An empty note removes it.", InputSchema: noteSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in NoteInput) (*mcp.CallToolResult, NotesOut, error) {
+		if err := service.SetExerciseNote(ctx, in.Exercise, in.Note); err != nil {
+			return nil, NotesOut{}, toolError(err)
+		}
+		v, err := service.ExerciseNotes(ctx)
+		return nil, NotesOut{Notes: v}, toolError(err)
+	})
+	mcp.AddTool(s, &mcp.Tool{Name: "list_exercise_notes", Description: "List every exercise that has a setup note."}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, NotesOut, error) {
+		v, err := service.ExerciseNotes(ctx)
+		return nil, NotesOut{Notes: v}, toolError(err)
 	})
 
 	feedbackSchema := mustInputSchema[FeedbackInput]()
@@ -424,7 +449,8 @@ func (s *Server) ToolNames() []string {
 		"create_plan", "list_plans", "get_plan", "delete_plan", "session_progress",
 		"add_session_exercise", "adjust_session_exercise", "swap_session_exercise",
 		"remove_session_exercise", "save_session_as_plan",
-		"record_feedback", "volume_recommendation"}
+		"record_feedback", "volume_recommendation",
+		"set_exercise_note", "list_exercise_notes"}
 }
 func muscleGroupEnum() []any {
 	out := make([]any, 0, len(training.MuscleGroups))
