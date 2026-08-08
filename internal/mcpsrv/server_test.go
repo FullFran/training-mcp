@@ -38,7 +38,7 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_session_exercise", "add_set", "adjust_session_exercise", "create_plan", "delete_plan", "delete_session", "delete_set", "exercise_history", "get_plan", "get_session", "list_exercise_groups", "list_exercise_notes", "list_plans", "list_sessions", "log_set", "move_plan_exercise", "record_feedback", "remove_plan_exercise", "remove_session_exercise", "save_session_as_plan", "session_progress", "set_exercise_group", "set_exercise_note", "set_plan_exercise", "start_session", "suggest_load", "swap_session_exercise", "update_plan", "update_set", "volume_by_muscle", "volume_recommendation", "weekly_volume"}) {
+	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_session_exercise", "add_set", "adjust_session_exercise", "create_plan", "delete_plan", "delete_session", "delete_set", "exercise_history", "get_plan", "get_session", "list_exercise_groups", "list_exercise_notes", "list_plans", "list_sessions", "list_volume_landmarks", "log_set", "move_plan_exercise", "record_feedback", "remove_plan_exercise", "remove_session_exercise", "save_session_as_plan", "session_progress", "set_exercise_group", "set_exercise_note", "set_plan_exercise", "set_volume_landmarks", "start_session", "suggest_load", "swap_session_exercise", "update_plan", "update_set", "volume_by_muscle", "volume_recommendation", "weekly_volume"}) {
 		t.Fatalf("tools=%v", toolNames(tools))
 	}
 	for _, tool := range tools.Tools {
@@ -460,3 +460,11 @@ func (testStore) UpdatePlan(context.Context, int64, training.PlanPatch) error { 
 func (testStore) SetPlanItem(context.Context, int64, training.PlanItem) error { return nil }
 func (testStore) RemovePlanItem(context.Context, int64, string) error         { return nil }
 func (testStore) MovePlanItem(context.Context, int64, string, int) error      { return nil }
+
+func (testStore) RecentFeedback(context.Context, int) (map[string][]training.Feedback, error) {
+	return nil, nil
+}
+func (testStore) SetLandmarks(context.Context, training.Landmarks) error { return nil }
+func (testStore) AllLandmarks(context.Context) (map[string]training.Landmarks, error) {
+	return nil, nil
+}

@@ -204,15 +204,70 @@ func (f Feedback) Valid() bool {
 	return ValidMuscleGroup(f.MuscleGroup) && validRating(f.Fatigue) && validRating(f.Pump) && validRating(f.Recovery)
 }
 
-// SetChange is how many sets to add or remove next week for a muscle group.
-type SetChange struct {
+// Landmarks are a muscle group's personal volume boundaries in weekly sets.
+// Zero means unknown, and unknown is treated as "do not clamp" rather than as
+// a default that would silently invent a limit.
+type Landmarks struct {
 	MuscleGroup string `json:"muscle_group"`
-	Magnitude   int    `json:"magnitude"`
-	SetsDelta   int    `json:"sets_delta"`
-	Advice      string `json:"advice"`
+	MEV         int    `json:"mev,omitempty"`
+	MRV         int    `json:"mrv,omitempty"`
+}
+
+// SetChange is how many sets to add or remove next week for a muscle group,
+// with everything needed to judge whether to believe it.
+type SetChange struct {
+	MuscleGroup string  `json:"muscle_group"`
+	Magnitude   float64 `json:"magnitude"`
+	SetsDelta   int     `json:"sets_delta"`
+	Advice      string  `json:"advice"`
 	// LastWeekSets is the volume the magnitude was a response to, so the
-	// recommendation can be read as "from N to N+delta".
+	// recommendation reads as "from N to N+delta".
 	LastWeekSets int `json:"last_week_sets"`
+	// Samples is how many rated sessions the magnitude averages, and
+	// Confidence is the plain-language reading of that.
+	Samples    int    `json:"samples"`
+	Confidence string `json:"confidence"`
+	// MEV and MRV are the landmarks applied; Clamped says whether one of them
+	// overrode the raw advice.
+	MEV     int  `json:"mev,omitempty"`
+	MRV     int  `json:"mrv,omitempty"`
+	Clamped bool `json:"clamped,omitempty"`
+}
+
+// feedbackWeights favour recent sessions without discarding the ones before.
+// A single bad night should bend the recommendation, not rewrite it.
+var feedbackWeights = []float64{3, 2, 1}
+
+// WeightedMagnitude averages the magnitudes of the most recent ratings, newest
+// first, weighting recency.
+func WeightedMagnitude(history []Feedback) float64 {
+	var sum, weight float64
+	for i, f := range history {
+		if i >= len(feedbackWeights) {
+			break
+		}
+		sum += float64(f.Magnitude()) * feedbackWeights[i]
+		weight += feedbackWeights[i]
+	}
+	if weight == 0 {
+		return 0
+	}
+	return math.Round(sum/weight*10) / 10
+}
+
+// ConfidenceFor reads the sample count in plain language. One rated session is
+// an anecdote, and the recommendation says so instead of dressing it up.
+func ConfidenceFor(samples int) string {
+	switch {
+	case samples <= 1:
+		return "insuficiente"
+	case samples == 2:
+		return "baja"
+	case samples == 3:
+		return "media"
+	default:
+		return "alta"
+	}
 }
 
 // RecommendSets maps a 0-9 feedback magnitude to a change in weekly sets.

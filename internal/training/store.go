@@ -27,6 +27,9 @@ type Store interface {
 	SetFeedback(context.Context, int64, Feedback) error
 	SessionFeedback(context.Context, int64) ([]Feedback, error)
 	LatestFeedback(context.Context) (map[string]Feedback, error)
+	RecentFeedback(context.Context, int) (map[string][]Feedback, error)
+	SetLandmarks(context.Context, Landmarks) error
+	AllLandmarks(context.Context) (map[string]Landmarks, error)
 	ExerciseHistory(context.Context, string, int) (ExerciseHistory, error)
 	WeeklyVolume(context.Context, ListFilter) ([]WeeklyVolume, error)
 	SetExerciseGroup(context.Context, ExerciseGroup) error

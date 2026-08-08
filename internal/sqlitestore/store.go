@@ -855,6 +855,53 @@ func (s *Store) SupersetFor(ctx context.Context, sessionID int64, exercise strin
 	return label, err
 }
 
+// RecentFeedback returns up to limit most recent ratings per muscle group,
+// newest first, so a recommendation can look at a trend rather than a moment.
+func (s *Store) RecentFeedback(ctx context.Context, limit int) (map[string][]training.Feedback, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT muscle_group,fatigue,pump,recovery FROM session_feedback ORDER BY muscle_group, id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string][]training.Feedback{}
+	for rows.Next() {
+		var f training.Feedback
+		if err = rows.Scan(&f.MuscleGroup, &f.Fatigue, &f.Pump, &f.Recovery); err != nil {
+			return nil, err
+		}
+		if len(out[f.MuscleGroup]) < limit {
+			out[f.MuscleGroup] = append(out[f.MuscleGroup], f)
+		}
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) SetLandmarks(ctx context.Context, l training.Landmarks) error {
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO volume_landmarks(muscle_group,mev,mrv,updated_at) VALUES (?,?,?,CURRENT_TIMESTAMP)
+ON CONFLICT(muscle_group) DO UPDATE SET mev=excluded.mev, mrv=excluded.mrv, updated_at=CURRENT_TIMESTAMP`,
+		l.MuscleGroup, l.MEV, l.MRV)
+	return err
+}
+
+func (s *Store) AllLandmarks(ctx context.Context) (map[string]training.Landmarks, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT muscle_group,mev,mrv FROM volume_landmarks`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]training.Landmarks{}
+	for rows.Next() {
+		var l training.Landmarks
+		if err = rows.Scan(&l.MuscleGroup, &l.MEV, &l.MRV); err != nil {
+			return nil, err
+		}
+		out[l.MuscleGroup] = l
+	}
+	return out, rows.Err()
+}
+
 // DeleteSession removes a session and, by ON DELETE CASCADE, all of its sets.
 // It returns how many sets went with it so the caller can report the cost of an
 // irreversible delete.

@@ -637,3 +637,5 @@ button { font: inherit; cursor: pointer; }
   .add-item input[name="exercise"] { grid-column: 1 / -1; }
   .add-item button { grid-column: 1 / -1; min-height: 46px; }
 }
+.recommend .conf { display: block; margin-top: 2px; font-size: 12px; opacity: .8; }
+.recommend .conf-insuficiente { color: var(--danger); }

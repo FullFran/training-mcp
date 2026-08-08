@@ -174,6 +174,8 @@ type memoryStore struct {
 	planItemRemoved      string
 	planItemMoved        string
 	planItemDelta        int
+	feedbackHistory      map[string][]Feedback
+	landmarks            map[string]Landmarks
 }
 
 func newMemoryStore() *memoryStore {
@@ -880,4 +882,126 @@ func (m *memoryStore) RemovePlanItem(_ context.Context, _ int64, ex string) erro
 func (m *memoryStore) MovePlanItem(_ context.Context, _ int64, ex string, d int) error {
 	m.planItemMoved, m.planItemDelta = ex, d
 	return nil
+}
+
+func (m *memoryStore) RecentFeedback(_ context.Context, limit int) (map[string][]Feedback, error) {
+	out := map[string][]Feedback{}
+	for g, list := range m.feedbackHistory {
+		if len(list) > limit {
+			list = list[:limit]
+		}
+		out[g] = list
+	}
+	return out, nil
+}
+func (m *memoryStore) SetLandmarks(_ context.Context, l Landmarks) error {
+	if m.landmarks == nil {
+		m.landmarks = map[string]Landmarks{}
+	}
+	m.landmarks[l.MuscleGroup] = l
+	return nil
+}
+func (m *memoryStore) AllLandmarks(context.Context) (map[string]Landmarks, error) {
+	return m.landmarks, nil
+}
+
+func TestWeightedMagnitudeFavoursRecentWithoutErasingHistory(t *testing.T) {
+	fb := func(v int) Feedback { return Feedback{Fatigue: v, Pump: v, Recovery: v} }
+	// Newest first. One bad session bends the number, it does not become it.
+	got := WeightedMagnitude([]Feedback{fb(3), fb(0), fb(0)})
+	if got != 4.5 {
+		t.Fatalf("weighted magnitude = %v, want 4.5", got)
+	}
+	// Whereas reading only the latest would have said 9.
+	if only := WeightedMagnitude([]Feedback{fb(3)}); only != 9 {
+		t.Fatalf("single rating = %v, want 9", only)
+	}
+	if none := WeightedMagnitude(nil); none != 0 {
+		t.Fatalf("no ratings = %v, want 0", none)
+	}
+	// Beyond the weights the oldest ratings are ignored, not averaged in.
+	if capped := WeightedMagnitude([]Feedback{fb(0), fb(0), fb(0), fb(3)}); capped != 0 {
+		t.Fatalf("ratings past the window should not count: %v", capped)
+	}
+}
+
+func TestConfidenceReflectsHowMuchWasRated(t *testing.T) {
+	for samples, want := range map[int]string{0: "insuficiente", 1: "insuficiente", 2: "baja", 3: "media", 5: "alta"} {
+		if got := ConfidenceFor(samples); got != want {
+			t.Fatalf("ConfidenceFor(%d) = %q, want %q", samples, got, want)
+		}
+	}
+}
+
+func TestVolumeRecommendationDeclinesOnASingleRating(t *testing.T) {
+	store := newMemoryStore()
+	store.feedbackHistory = map[string][]Feedback{"pecho": {{Fatigue: 0, Pump: 0, Recovery: 0}}}
+	store.weeklyResults = []WeeklyVolume{{MuscleGroup: "pecho", Sets: 12}}
+	svc := NewService(store, time.Now)
+
+	got, err := svc.VolumeRecommendation(context.Background())
+	if err != nil || len(got) != 1 {
+		t.Fatalf("VolumeRecommendation() = %#v, %v", got, err)
+	}
+	if got[0].SetsDelta != 0 || got[0].Confidence != "insuficiente" {
+		t.Fatalf("one rating must not produce advice: %#v", got[0])
+	}
+	if !strings.Contains(got[0].Advice, "Solo una sesión valorada") {
+		t.Fatalf("it should say why: %q", got[0].Advice)
+	}
+}
+
+func TestVolumeRecommendationRespectsPersonalLandmarks(t *testing.T) {
+	easy := []Feedback{{}, {}} // magnitude 0 -> raw advice is +3 sets
+	for _, tt := range []struct {
+		name       string
+		current    int
+		landmarks  Landmarks
+		wantDelta  int
+		wantClamp  bool
+		wantAdvice string
+	}{
+		{"unknown landmarks do not clamp", 12, Landmarks{}, 3, false, "sube 3 series"},
+		{"MRV caps the increase", 12, Landmarks{MuscleGroup: "pecho", MRV: 14}, 2, true, "MRV es 14"},
+		{"already at MRV means no increase", 14, Landmarks{MuscleGroup: "pecho", MRV: 14}, 0, true, "MRV es 14"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			store := newMemoryStore()
+			store.feedbackHistory = map[string][]Feedback{"pecho": easy}
+			store.weeklyResults = []WeeklyVolume{{MuscleGroup: "pecho", Sets: tt.current}}
+			if tt.landmarks.MuscleGroup != "" {
+				store.landmarks = map[string]Landmarks{"pecho": tt.landmarks}
+			}
+			got, err := NewService(store, time.Now).VolumeRecommendation(context.Background())
+			if err != nil || len(got) != 1 {
+				t.Fatalf("= %#v, %v", got, err)
+			}
+			if got[0].SetsDelta != tt.wantDelta || got[0].Clamped != tt.wantClamp {
+				t.Fatalf("delta = %d clamped = %v, want %d/%v", got[0].SetsDelta, got[0].Clamped, tt.wantDelta, tt.wantClamp)
+			}
+			if !strings.Contains(got[0].Advice, tt.wantAdvice) {
+				t.Fatalf("advice = %q, want it to mention %q", got[0].Advice, tt.wantAdvice)
+			}
+		})
+	}
+}
+
+func TestSetLandmarksValidation(t *testing.T) {
+	svc := NewService(newMemoryStore(), time.Now)
+	ctx := context.Background()
+	if err := svc.SetLandmarks(ctx, Landmarks{MuscleGroup: " PECHO ", MEV: 10, MRV: 20}); err != nil {
+		t.Fatalf("SetLandmarks() error = %v", err)
+	}
+	for _, tt := range []struct {
+		name string
+		l    Landmarks
+	}{
+		{"unknown group", Landmarks{MuscleGroup: "biceps femoral"}},
+		{"negative MEV", Landmarks{MuscleGroup: "pecho", MEV: -1}},
+		{"MEV above MRV", Landmarks{MuscleGroup: "pecho", MEV: 20, MRV: 10}},
+	} {
+		if err := svc.SetLandmarks(ctx, tt.l); !errors.Is(err, ErrValidation) {
+			t.Fatalf("SetLandmarks(%s) = %v, want validation", tt.name, err)
+		}
+	}
 }

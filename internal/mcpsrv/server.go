@@ -177,6 +177,14 @@ type FeedbackOut struct {
 	SessionID int64               `json:"session_id"`
 	Feedback  []training.Feedback `json:"feedback"`
 }
+type LandmarksInput struct {
+	MuscleGroup string `json:"muscle_group" jsonschema:"Muscle group; must be one of the supported values."`
+	MEV         int    `json:"mev,omitempty" jsonschema:"Minimum effective volume in weekly sets: below this the muscle stops growing. 0 means unknown."`
+	MRV         int    `json:"mrv,omitempty" jsonschema:"Maximum recoverable volume in weekly sets: above this fatigue outpaces recovery. 0 means unknown."`
+}
+type LandmarksOut struct {
+	Landmarks []training.Landmarks `json:"landmarks"`
+}
 type RecommendOut struct {
 	Recommendations []training.SetChange `json:"recommendations"`
 }
@@ -477,7 +485,22 @@ func New(service *training.Service) *Server {
 		all, err := service.SessionFeedback(ctx, in.SessionID)
 		return nil, FeedbackOut{SessionID: in.SessionID, Feedback: all}, toolError(err)
 	})
-	mcp.AddTool(s, &mcp.Tool{Name: "volume_recommendation", Description: "Set-count change per muscle group for next week, derived from the most recent feedback and the volume it responded to. Follows the volume-landmark logic of the source spreadsheet."}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, RecommendOut, error) {
+	landmarksSchema := mustInputSchema[LandmarksInput]()
+	landmarksSchema.Properties["muscle_group"].Enum = muscleGroupEnum()
+	landmarksSchema.Properties["mev"].Minimum = jsonschema.Ptr(0.0)
+	landmarksSchema.Properties["mrv"].Minimum = jsonschema.Ptr(0.0)
+	mcp.AddTool(s, &mcp.Tool{Name: "set_volume_landmarks", Description: "Record a muscle group's personal weekly-set boundaries: MEV below which it stops growing, MRV above which fatigue outpaces recovery. These are individual, and volume_recommendation refuses to push past them. Leave a value at 0 if unknown.", InputSchema: landmarksSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in LandmarksInput) (*mcp.CallToolResult, LandmarksOut, error) {
+		if err := service.SetLandmarks(ctx, training.Landmarks{MuscleGroup: in.MuscleGroup, MEV: in.MEV, MRV: in.MRV}); err != nil {
+			return nil, LandmarksOut{}, toolError(err)
+		}
+		v, err := service.Landmarks(ctx)
+		return nil, LandmarksOut{Landmarks: v}, toolError(err)
+	})
+	mcp.AddTool(s, &mcp.Tool{Name: "list_volume_landmarks", Description: "List the muscle groups that have personal volume landmarks recorded."}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, LandmarksOut, error) {
+		v, err := service.Landmarks(ctx)
+		return nil, LandmarksOut{Landmarks: v}, toolError(err)
+	})
+	mcp.AddTool(s, &mcp.Tool{Name: "volume_recommendation", Description: "Set-count change per muscle group for next week. Weights recent feedback over older rather than reading only the last, reports how many rated sessions it is based on and the resulting confidence, declines to advise on a single rating, and never pushes volume past a recorded MEV or MRV."}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, RecommendOut, error) {
 		v, err := service.VolumeRecommendation(ctx)
 		return nil, RecommendOut{Recommendations: v}, toolError(err)
 	})
@@ -543,6 +566,7 @@ func (s *Server) ToolNames() []string {
 		"add_session_exercise", "adjust_session_exercise", "swap_session_exercise",
 		"remove_session_exercise", "save_session_as_plan",
 		"record_feedback", "volume_recommendation",
+		"set_volume_landmarks", "list_volume_landmarks",
 		"set_exercise_note", "list_exercise_notes", "suggest_load"}
 }
 func muscleGroupEnum() []any {

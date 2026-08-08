@@ -71,7 +71,9 @@ Rate a trained muscle group 0-3 on fatigue, pump and recovery, and get next week
 | Tool | What it does |
 |---|---|
 | `record_feedback` | Rate how one muscle group responded to a session: fatigue, pump and recovery, each 0 to 3. Only rate groups actually trained. This drives next week's set-count recommendation. |
-| `volume_recommendation` | Set-count change per muscle group for next week, derived from the most recent feedback and the volume it responded to. Follows the volume-landmark logic of the source spreadsheet. |
+| `volume_recommendation` | Set-count change per muscle group for next week. Weights recent feedback over older rather than reading only the last, reports how many rated sessions it is based on and the resulting confidence, declines to advise on a single rating, and never pushes volume past a recorded MEV or MRV. |
+| `set_volume_landmarks` | Record a muscle group's personal weekly-set boundaries: MEV below which it stops growing, MRV above which fatigue outpaces recovery. These are individual, and `volume_recommendation` refuses to push past them. Leave a value at 0 if unknown. |
+| `list_volume_landmarks` | List the muscle groups that have personal volume landmarks recorded. |
 
 ## Catalogue
 
@@ -106,6 +108,21 @@ A set can carry an optional **intensity technique** (`drop set`, `rest-pause`, `
 
 `suggest_load` advises the next working weight for an exercise, judged against the rep range and RPE it is prescribed at: hit the top of the range below target RPE and it says add weight; fall short or exceed the RPE and it says drop it. Sets carrying an intensity technique are ignored, since a drop set is not comparable to a straight set. Like every other recommendation here it is advisory and explains itself; it never edits a plan. With no previous set or no prescription to judge against it declines rather than guessing.
 
-`record_feedback` and `volume_recommendation` close the loop the source spreadsheet automated: rate a trained muscle group 0-3 on fatigue, pump and recovery, and get next week's set-count change. The mapping from the 0-9 magnitude is in `training.RecommendSets`; its two anchors come from the sheet, the thresholds between them are an interpolation.
+`record_feedback` and `volume_recommendation` close the loop the source spreadsheet automated: rate a trained muscle group 0-3 on fatigue, pump and recovery, and get next week's set-count change.
+
+The recommendation is deliberately cautious about its own certainty:
+
+- The magnitude weights the last three ratings **3:2:1**, so one bad night bends
+  the advice instead of rewriting the week.
+- Every result carries its sample count and a confidence reading, and on a
+  **single rating it declines to advise at all** — one session is an anecdote.
+- Personal **MEV and MRV** clamp the result, because the same 15 weekly sets can
+  be under one lifter's minimum and over another's ceiling. Unknown landmarks
+  clamp nothing rather than inventing a default, and a clamped answer says which
+  boundary stopped it.
+- The mapping from magnitude to sets lives in `training.RecommendSets`. Only two
+  anchors were legible in the source sheet (magnitude 0 → "sube 3 series",
+  7 → "mantén o reduce 1"); the bands between them are an interpolation, and the
+  code says so.
 
 `set_exercise_group`, `list_exercise_groups`, and `volume_by_muscle` add per-muscle-group volume. Each exercise maps to exactly one muscle group, so group SI is a true partition of session SI — every set counts once and the group totals add up to the session total. Sets whose exercise has no mapping are reported under an empty group rather than dropped, so gaps in the catalogue stay visible.

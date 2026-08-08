@@ -268,10 +268,43 @@ func (s *Service) SessionFeedback(ctx context.Context, sessionID int64) ([]Feedb
 	return out, err
 }
 
-// VolumeRecommendation turns the latest feedback per muscle group into a set
-// change for next week, alongside the volume that feedback was a response to.
+// SetLandmarks records a muscle group's personal weekly-set boundaries.
+func (s *Service) SetLandmarks(ctx context.Context, l Landmarks) error {
+	l.MuscleGroup = strings.ToLower(strings.TrimSpace(l.MuscleGroup))
+	if !ValidMuscleGroup(l.MuscleGroup) || l.MEV < 0 || l.MRV < 0 {
+		return ErrValidation
+	}
+	if l.MEV > 0 && l.MRV > 0 && l.MEV > l.MRV {
+		return fmt.Errorf("%w: MEV must not exceed MRV", ErrValidation)
+	}
+	return s.store.SetLandmarks(ctx, l)
+}
+
+func (s *Service) Landmarks(ctx context.Context) ([]Landmarks, error) {
+	all, err := s.store.AllLandmarks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := []Landmarks{}
+	for _, g := range MuscleGroups {
+		if l, ok := all[g]; ok {
+			out = append(out, l)
+		}
+	}
+	return out, nil
+}
+
+// VolumeRecommendation turns recent feedback into a set change for next week.
+//
+// It weights recent sessions over older ones instead of reading only the last,
+// says how many ratings it is based on, declines to advise on a single one, and
+// refuses to push volume past a muscle group's known landmarks.
 func (s *Service) VolumeRecommendation(ctx context.Context) ([]SetChange, error) {
-	latest, err := s.store.LatestFeedback(ctx)
+	history, err := s.store.RecentFeedback(ctx, len(feedbackWeights))
+	if err != nil {
+		return nil, err
+	}
+	landmarks, err := s.store.AllLandmarks(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -279,8 +312,6 @@ func (s *Service) VolumeRecommendation(ctx context.Context) ([]SetChange, error)
 	if err != nil {
 		return nil, err
 	}
-	// Sets from the most recent week each group was trained, which is the
-	// volume the rating responded to.
 	lastSets := map[string]int{}
 	seen := map[string]bool{}
 	for _, w := range weeks {
@@ -289,19 +320,59 @@ func (s *Service) VolumeRecommendation(ctx context.Context) ([]SetChange, error)
 			lastSets[w.MuscleGroup] = w.Sets
 		}
 	}
+
 	out := []SetChange{}
 	for _, group := range MuscleGroups {
-		f, ok := latest[group]
-		if !ok {
+		rated, ok := history[group]
+		if !ok || len(rated) == 0 {
 			continue
 		}
-		delta, advice := RecommendSets(f.Magnitude())
-		out = append(out, SetChange{
-			MuscleGroup: group, Magnitude: f.Magnitude(),
-			SetsDelta: delta, Advice: advice, LastWeekSets: lastSets[group],
-		})
+		magnitude := WeightedMagnitude(rated)
+		change := SetChange{
+			MuscleGroup:  group,
+			Magnitude:    magnitude,
+			LastWeekSets: lastSets[group],
+			Samples:      len(rated),
+			Confidence:   ConfidenceFor(len(rated)),
+			MEV:          landmarks[group].MEV,
+			MRV:          landmarks[group].MRV,
+		}
+		if len(rated) < 2 {
+			// One rated session is an anecdote. Say so rather than dress it up.
+			change.Advice = "Solo una sesión valorada: entrena otra y vuelve a valorar antes de cambiar el volumen."
+			out = append(out, change)
+			continue
+		}
+		delta, advice := RecommendSets(int(math.Round(magnitude)))
+		change.SetsDelta, change.Advice = delta, advice
+		change.SetsDelta, change.Clamped = clampToLandmarks(change.LastWeekSets, delta, change.MEV, change.MRV)
+		if change.Clamped {
+			change.Advice = clampAdvice(delta, change.MEV, change.MRV)
+		}
+		out = append(out, change)
 	}
 	return out, nil
+}
+
+// clampToLandmarks refuses to push weekly volume past what this muscle group is
+// known to tolerate, or below what it needs to grow.
+func clampToLandmarks(current, delta, mev, mrv int) (int, bool) {
+	proposed := current + delta
+	switch {
+	case mrv > 0 && proposed > mrv:
+		return mrv - current, true
+	case mev > 0 && proposed < mev:
+		return mev - current, true
+	default:
+		return delta, false
+	}
+}
+
+func clampAdvice(delta, mev, mrv int) string {
+	if delta > 0 {
+		return fmt.Sprintf("Tu MRV es %d series: no subas más aunque el estímulo lo pida.", mrv)
+	}
+	return fmt.Sprintf("Tu MEV es %d series: no bajes de ahí o dejarás de crecer.", mev)
 }
 
 // Snapshot writes a consistent copy of the database to path, for backup.

@@ -689,12 +689,31 @@ func TestHistoryShowsNextWeekSetRecommendation(t *testing.T) {
 		t.Fatal(err)
 	}
 	post(t, h, base+"/sets", setForm("banca", "80", "8", "8"), true)
-	// Magnitude 0 is the spreadsheet's "sube 3 series" anchor.
+	// One rating is an anecdote: the tool must decline rather than advise.
 	post(t, h, base+"/feedback", url.Values{
 		"muscle_group": {"pecho"}, "fatigue": {"0"}, "pump": {"0"}, "recovery": {"0"},
 	}, true)
-
 	body := get(t, h, base+"/history").Body.String()
+	if !strings.Contains(body, "Solo una sesión valorada") {
+		t.Fatalf("a single rating should decline to advise: %q", body)
+	}
+
+	// A second rated session makes the trend advisable. Magnitude 0 is the
+	// spreadsheet's "sube 3 series" anchor.
+	earlier, err := service.StartSession(t.Context(), "2026-08-05")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := service.AddSet(t.Context(), training.AddSetInput{
+		SessionID: earlier.ID, Exercise: "banca", WeightKG: 80, Reps: 8, RPE: 8,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.RecordFeedback(t.Context(), earlier.ID, training.Feedback{MuscleGroup: "pecho"}); err != nil {
+		t.Fatal(err)
+	}
+
+	body = get(t, h, base+"/history").Body.String()
 	if !strings.Contains(body, `class="recommend"`) || !strings.Contains(body, "sube 3 series") {
 		t.Fatalf("history should recommend next week's volume: %q", body)
 	}
