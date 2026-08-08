@@ -7,7 +7,9 @@ Training MCP is a small, single-user Go service that replaces a workout spreadsh
 1. Install Go 1.26 or newer.
 2. Set `MCP_BEARER_TOKEN` and run `go run ./cmd/training-mcp` (default `:8080`).
 3. Expose `/mcp` through HTTPS for a public ChatGPT connector; local tunnel-only development is documented in `docs/connection-paths.md`.
-4. Verify with `go test ./...` and `go vet ./...`.
+4. Verify with `go test ./...` and `go vet ./...`. CI runs the same checks on
+   every push, plus `-race`, `gofmt`, a Docker build, and a 70% statement
+   coverage floor on `internal/sqlitestore` — the layer that touches the data.
 
 ## Configuration
 
@@ -77,6 +79,8 @@ is a plain SQLite file: **restoring is copying it back into the data volume.**
 Nothing else in this deployment keeps a second copy, so this is the backup.
 `scripts/backup.sh` downloads one, verifies it opens and passes an integrity
 check, and keeps the last 30 daily copies.
+`scripts/install-backup-cron.sh` schedules it daily — a backup you have to
+remember to take is not a backup.
 
 **Authentication is currently the secret URL itself.** The reverse proxy injects
 the bearer token, so anyone holding the URL has full access. This is tracked

@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Formatting is not a matter of taste here: an unformatted diff makes
+      # every later review noisier than it needs to be.
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "these files are not gofmt'd:" >&2
+            echo "$unformatted" >&2
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      # -race because the HTTP server and the MCP handler are concurrent, and a
+      # data race there corrupts training data rather than crashing loudly.
+      - name: go test
+        run: go test -race -count=1 -coverprofile=coverage.out ./...
+
+      # The store is the layer that touches the data. Let coverage rot anywhere
+      # else, but not there.
+      - name: coverage floor for the store
+        run: |
+          pct="$(go tool cover -func=coverage.out \
+            | awk '/internal\/sqlitestore/ {gsub("%","",$3); s+=$3; n++} END {if (n) printf "%.1f", s/n; else print 0}')"
+          echo "sqlitestore statement coverage: ${pct}%"
+          awk -v p="$pct" 'BEGIN {exit !(p < 70)}' && {
+            echo "below the 70% floor" >&2
+            exit 1
+          }
+          echo "ok"
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The image is what actually ships, so a broken Dockerfile must fail here
+      # and not at deploy time.
+      - name: docker build
+        run: docker build -t training-mcp:ci .

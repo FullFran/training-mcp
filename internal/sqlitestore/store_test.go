@@ -563,3 +563,162 @@ func TestStoreFeedbackUpsertsAndReportsTheLatestPerGroup(t *testing.T) {
 		t.Fatalf("feedback for a missing session = %v, want not found", err)
 	}
 }
+
+func TestStoreUpdateSetRecalculatesAndCarriesTechnique(t *testing.T) {
+	store, err := Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	session, _ := store.Start(ctx, training.Session{Date: "2026-08-08"})
+	set, _, err := store.AddSet(ctx, training.AddSetInput{
+		SessionID: session.ID, Exercise: "banca", WeightKG: 80, Reps: 8, RPE: 8,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rpe, tech := 10.0, "drop set"
+	updated, total, err := store.UpdateSet(ctx, set.ID, training.SetPatch{RPE: &rpe, Technique: &tech})
+	if err != nil || updated.SI != 1.4 || total != 1.4 || updated.Technique != "drop set" {
+		t.Fatalf("UpdateSet() = %#v, %v, %v", updated, total, err)
+	}
+	// Untouched fields survive a partial patch.
+	if updated.WeightKG != 80 || updated.Reps != 8 || updated.Exercise != "banca" {
+		t.Fatalf("partial patch clobbered other fields: %#v", updated)
+	}
+	if _, _, err := store.UpdateSet(ctx, 9999, training.SetPatch{RPE: &rpe}); !errors.Is(err, training.ErrNotFound) {
+		t.Fatalf("updating a missing set = %v, want not found", err)
+	}
+}
+
+func TestStoreSessionItemsAddedAdHocAndSupersetLookup(t *testing.T) {
+	store, err := Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	session, _ := store.Start(ctx, training.Session{Date: "2026-08-08"})
+
+	// An exercise added to a session that follows no plan at all.
+	if err := store.SetSessionItem(ctx, session.ID, training.PlanItem{
+		Exercise: "curl", TargetSets: 3, RepMin: 10, RepMax: 12, Superset: "A", Notes: "control",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// Re-adding replaces the prescription rather than duplicating the row.
+	if err := store.SetSessionItem(ctx, session.ID, training.PlanItem{
+		Exercise: "curl", TargetSets: 5, Superset: "B",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	progress, err := store.SessionProgress(ctx, session.ID)
+	if err != nil || len(progress) != 1 || progress[0].TargetSets != 5 || progress[0].Superset != "B" {
+		t.Fatalf("progress = %#v, %v", progress, err)
+	}
+
+	label, err := store.SupersetFor(ctx, session.ID, "curl")
+	if err != nil || label != "B" {
+		t.Fatalf("SupersetFor() = %q, %v, want B", label, err)
+	}
+	// An exercise not in the session's plan carries no round, and that is not
+	// an error — most exercises are standalone.
+	label, err = store.SupersetFor(ctx, session.ID, "desconocido")
+	if err != nil || label != "" {
+		t.Fatalf("SupersetFor(unknown) = %q, %v", label, err)
+	}
+	if err := store.SetSessionItem(ctx, 9999, training.PlanItem{Exercise: "x", TargetSets: 1}); !errors.Is(err, training.ErrNotFound) {
+		t.Fatalf("adding to a missing session = %v, want not found", err)
+	}
+}
+
+func TestStoreExerciseNotesRoundTripAndDeleteOnEmpty(t *testing.T) {
+	store, err := Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if err := store.SetExerciseNote(ctx, training.ExerciseNote{Exercise: "prensa", Note: "asiento 4"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetExerciseNote(ctx, training.ExerciseNote{Exercise: "prensa", Note: "asiento 5"}); err != nil {
+		t.Fatal(err)
+	}
+	notes, err := store.ExerciseNotes(ctx)
+	if err != nil || len(notes) != 1 || notes[0].Note != "asiento 5" {
+		t.Fatalf("notes = %#v, %v", notes, err)
+	}
+	// An empty note removes the row rather than storing emptiness.
+	if err := store.SetExerciseNote(ctx, training.ExerciseNote{Exercise: "prensa", Note: "  "}); err != nil {
+		t.Fatal(err)
+	}
+	if notes, _ := store.ExerciseNotes(ctx); len(notes) != 0 {
+		t.Fatalf("empty note should delete: %#v", notes)
+	}
+}
+
+func TestStoreUpdatePlanLeavesExercisesAlone(t *testing.T) {
+	store, err := Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	plan, err := store.CreatePlan(ctx, training.Plan{
+		Name: "Empuje", Notes: "v1",
+		Items: []training.PlanItem{{Exercise: "banca", TargetSets: 3}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := "Empuje A"
+	if err := store.UpdatePlan(ctx, plan.ID, training.PlanPatch{Name: &name}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.GetPlan(ctx, plan.ID)
+	if err != nil || got.Name != "Empuje A" || got.Notes != "v1" || len(got.Items) != 1 {
+		t.Fatalf("GetPlan() = %#v, %v", got, err)
+	}
+	notes := "v2"
+	if err := store.UpdatePlan(ctx, plan.ID, training.PlanPatch{Notes: &notes}); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := store.GetPlan(ctx, plan.ID); got.Notes != "v2" || got.Name != "Empuje A" {
+		t.Fatalf("patching notes changed the name: %#v", got)
+	}
+	if err := store.UpdatePlan(ctx, 9999, training.PlanPatch{Notes: &notes}); !errors.Is(err, training.ErrNotFound) {
+		t.Fatalf("updating a missing plan = %v, want not found", err)
+	}
+}
+
+func TestStoreSnapshotProducesAReadableCopy(t *testing.T) {
+	dir := t.TempDir()
+	store, err := Open(dir + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	session, _ := store.Start(ctx, training.Session{Date: "2026-08-08"})
+	if _, _, err := store.AddSet(ctx, training.AddSetInput{
+		SessionID: session.ID, Exercise: "banca", WeightKG: 80, Reps: 8, RPE: 9,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	copyPath := dir + "/backup.db"
+	if err := store.Snapshot(ctx, copyPath); err != nil {
+		t.Fatalf("Snapshot() error = %v", err)
+	}
+	// A snapshot that cannot be opened and read is not a backup.
+	restored, err := Open(copyPath)
+	if err != nil {
+		t.Fatalf("snapshot does not open: %v", err)
+	}
+	defer restored.Close()
+	got, err := restored.GetSession(ctx, session.ID)
+	if err != nil || len(got.Sets) != 1 || got.Sets[0].Exercise != "banca" {
+		t.Fatalf("restored session = %#v, %v", got, err)
+	}
+	// A path that could break out of the quoted SQL literal is refused.
+	if err := store.Snapshot(ctx, dir+"/ev'il.db"); !errors.Is(err, training.ErrValidation) {
+		t.Fatalf("quoted path = %v, want validation", err)
+	}
+}
