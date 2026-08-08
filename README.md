@@ -1,6 +1,50 @@
 # Training MCP
 
-Training MCP is a small, single-user Go service that replaces a workout spreadsheet with six conversational MCP tools over Streamable HTTP. It stores sessions and sets in SQLite and preserves the descriptive SI formula `max(0, 0.2 * RPE - 0.6)`.
+[![CI](https://github.com/FullFran/training-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/FullFran/training-mcp/actions/workflows/ci.yml)
+[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](go.mod)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+**Log your training by talking to it.** A single-user Go service that replaces a
+workout spreadsheet with 32 conversational MCP tools over Streamable HTTP,
+plus an installable PWA for the gym floor. SQLite for storage, no framework,
+no mock library.
+
+```
+you:  "tres por ocho en press banca a 80, RPE 8"
+→ log_set  → today's session, created if needed, SI recalculated
+```
+
+## Why it is built this way
+
+The same workout gets logged two ways — talking to ChatGPT on the sofa, tapping
+a phone between sets — and both must apply **identical** rules. Same validation,
+same exercise normalization, same SI arithmetic. So the rules live in one
+domain package and both interfaces are adapters over it:
+
+```mermaid
+flowchart LR
+    MCP["mcpsrv<br/>32 MCP tools"] --> SVC
+    WEB["websrv<br/>PWA"] --> SVC
+    SVC["training.Service<br/>rules · validation · SI"] --> PORT(["Store · Clock"])
+    PORT -.-> SQL["sqlitestore<br/>SQLite + migrations"]
+```
+
+`training` imports no adapter. That is what makes it testable without a
+database, and what makes the two front ends provably unable to disagree about
+what a set is worth.
+
+Full write-up: **[docs/architecture.md](docs/architecture.md)**.
+
+## What is worth a look
+
+| | |
+|---|---|
+| **Ports and adapters, honestly applied** | The dependency arrow only points inwards. [architecture](docs/architecture.md) |
+| **`Clock` as a function type** | One method, so `time.Now` satisfies it directly. No mock framework in the repo — tests pass a closure. |
+| **Prescription copying** | Starting a session from a plan copies it. Editing a template never rewrites history; adjusting today never edits the template. |
+| **Totals recalculated, never incremented** | A deleted or edited set cannot leave a session total wrong. |
+| **Advisory, never automatic** | `suggest_load` and `volume_recommendation` explain themselves and decline when they lack evidence. Neither ever edits a plan. |
+| **Config absence removes surface** | Unset `WEB_BASE_PATH` means the PWA is not mounted at all, rather than served on a default path. |
 
 ## Quick path
 
@@ -25,23 +69,28 @@ The unauthenticated `GET /health` endpoint returns `{"status":"ok"}`. MCP is onl
 
 ## Tools
 
-A plan carries free-text **notes** at two levels: the routine as a whole (its intent, the phase of the block) and each exercise inside it (cues, tempo, whether to push the last set). Both are returned by `get_plan` and `list_plans`, and both are copied into the session, so `session_progress` exposes the intent behind the numbers while training — an assistant reading the MCP sees why, not just what. `update_plan` edits them without touching the exercises, and `set_plan_exercise`, `remove_plan_exercise` and `move_plan_exercise` edit a saved routine's exercises and their order — the order is the order the session is performed in.
+32 tools, grouped by what you are doing: logging sets, managing plans,
+adjusting today's session, progression and analysis, the feedback loop, and the
+exercise catalogue.
 
-Plan items can share a **superset label**, marking exercises done back to back. Logging never states it: a set is stamped with the label its exercise carries in the session's plan, so entry stays the same size. `set_exercise_note` stores a persistent setup reminder per exercise — seat height, grip width — shown every time that exercise comes up.
+**Full reference: [docs/tools.md](docs/tools.md)** — every tool with the
+description the model actually receives, extracted from the source so it cannot
+drift, followed by the design notes explaining why the surface looks like this.
 
-A set can carry an optional **intensity technique** (`drop set`, `rest-pause`, `myo-reps`, `sin parar`…). It is a property of the set, not a separate exercise, so the volume still counts toward the right muscle group while progression on the base movement stays comparable — a set with a technique never becomes the exercise's record.
+A few shapes worth knowing before reading it:
 
-`log_set` is the simplest way to record training: it takes an exercise, weight, reps and RPE, finds or creates today's session, and can record several identical sets at once. It needs no session id, so conversational logging is one call. `start_session`, `add_set`, `update_set`, `delete_set`, `get_session` and `list_sessions` remain for explicit control. Exercises are trimmed/lowercased, positions remain dense, and totals are recalculated from stored SI values.
-
-`create_plan`, `list_plans`, `get_plan` and `delete_plan` manage reusable workout plans: an ordered list of exercises with a target set count and an optional rep range and RPE. Load is deliberately not planned — the prescription is effort and reps, and the weight that meets it is discovered at the gym. `start_session` takes an optional `plan_id`, which **copies** the plan into the session. From then on the session owns its prescription: `add_session_exercise`, `adjust_session_exercise` (sets, rep range, RPE, skip), `swap_session_exercise` and `remove_session_exercise` change today only and never edit the template, while editing a template never rewrites a past session. `session_progress` reports planned versus completed sets per exercise, listing anything done off-plan with `target_sets` 0 so it stays visible. `save_session_as_plan` promotes an adjusted session into a new reusable plan.
-
-`delete_session` removes a session and every set in it, reporting how many were destroyed. `exercise_history` returns one exercise's sets newest first with each set's estimated 1RM plus its all-time best, so progression can be judged in one call instead of reading every session. `weekly_volume` buckets SI per muscle group by training week.
-
-`suggest_load` advises the next working weight for an exercise, judged against the rep range and RPE it is prescribed at: hit the top of the range below target RPE and it says add weight; fall short or exceed the RPE and it says drop it. Sets carrying an intensity technique are ignored, since a drop set is not comparable to a straight set. Like every other recommendation here it is advisory and explains itself; it never edits a plan. With no previous set or no prescription to judge against it declines rather than guessing.
-
-`record_feedback` and `volume_recommendation` close the loop the source spreadsheet automated: rate a trained muscle group 0-3 on fatigue, pump and recovery, and get next week's set-count change. The mapping from the 0-9 magnitude is in `training.RecommendSets`; its two anchors come from the sheet, the thresholds between them are an interpolation.
-
-`set_exercise_group`, `list_exercise_groups`, and `volume_by_muscle` add per-muscle-group volume. Each exercise maps to exactly one muscle group, so group SI is a true partition of session SI — every set counts once and the group totals add up to the session total. Sets whose exercise has no mapping are reported under an empty group rather than dropped, so gaps in the catalogue stay visible.
+- `log_set` needs no session id. It finds or creates today's session, so
+  conversational logging is one call. The explicit `start_session` + `add_set`
+  path remains for when you want control.
+- Load is never planned. A prescription is sets, reps and RPE; the weight that
+  meets it is discovered at the gym.
+- A set can carry an intensity technique (drop set, rest-pause, myo-reps). It
+  is a property of the set, not a separate exercise, so volume still counts
+  toward the right muscle group while a technique set never becomes the
+  exercise's record.
+- Every exercise maps to exactly one muscle group, so group SI is a true
+  partition of session SI. Unmapped exercises are reported under an empty
+  group rather than dropped, keeping catalogue gaps visible.
 
 ## Web UI (PWA)
 
@@ -107,6 +156,8 @@ never edits a plan on its own.
 
 ## Documentation
 
+- [Architecture](docs/architecture.md) — ports and adapters, package layout, testing
+- [MCP tool reference](docs/tools.md) — all 32 tools
 - [ChatGPT setup](docs/chatgpt-setup.md)
 - [Connection paths and tunnel safety](docs/connection-paths.md)
 - [SI formula](docs/si-formula.md)
