@@ -103,6 +103,25 @@ type UpdatePlanInput struct {
 	Name   *string `json:"name,omitempty" jsonschema:"New name. Omit to leave unchanged."`
 	Notes  *string `json:"notes,omitempty" jsonschema:"New notes for the whole routine: intent, phase of the block, what to watch. Pass an empty string to clear. Omit to leave unchanged."`
 }
+type PlanItemEditInput struct {
+	PlanID     int64   `json:"plan_id" jsonschema:"Positive ID of the plan to edit."`
+	Exercise   string  `json:"exercise" jsonschema:"Non-empty exercise name; trimmed and lowercased to match stored sets."`
+	TargetSets int     `json:"target_sets" jsonschema:"Planned number of sets; 1 through 20."`
+	RepMin     int     `json:"rep_min,omitempty" jsonschema:"Lower bound of the target rep range."`
+	RepMax     int     `json:"rep_max,omitempty" jsonschema:"Upper bound of the target rep range."`
+	TargetRPE  float64 `json:"target_rpe,omitempty" jsonschema:"Prescribed RPE from 1 through 10."`
+	Superset   string  `json:"superset,omitempty" jsonschema:"Label grouping exercises done back to back."`
+	Notes      string  `json:"notes,omitempty" jsonschema:"Free-text intent for this exercise."`
+}
+type PlanItemRefInput struct {
+	PlanID   int64  `json:"plan_id" jsonschema:"Positive ID of the plan to edit."`
+	Exercise string `json:"exercise" jsonschema:"Exercise currently in the plan."`
+}
+type PlanMoveInput struct {
+	PlanID    int64  `json:"plan_id" jsonschema:"Positive ID of the plan to edit."`
+	Exercise  string `json:"exercise" jsonschema:"Exercise currently in the plan."`
+	Direction string `json:"direction" jsonschema:"Where to move it: 'up' or 'down'. Order is the order the session is performed in."`
+}
 type PlanDeleteOut struct {
 	PlanID int64 `json:"plan_id"`
 }
@@ -313,6 +332,46 @@ func New(service *training.Service) *Server {
 		return nil, PlanOut{Plan: v}, toolError(err)
 	})
 
+	planItemSchema := mustInputSchema[PlanItemEditInput]()
+	setPositiveID(planItemSchema.Properties["plan_id"])
+	planItemSchema.Properties["exercise"].Pattern = `.*\S.*`
+	mcp.AddTool(s, &mcp.Tool{Name: "set_plan_exercise", Description: "Add an exercise to a saved plan, or replace its prescription. Editing a template never changes sessions already started from it.", InputSchema: planItemSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in PlanItemEditInput) (*mcp.CallToolResult, PlanOut, error) {
+		err := service.SetPlanItem(ctx, in.PlanID, training.PlanItem{
+			Exercise: in.Exercise, TargetSets: in.TargetSets, RepMin: in.RepMin,
+			RepMax: in.RepMax, TargetRPE: in.TargetRPE, Superset: in.Superset, Notes: in.Notes,
+		})
+		if err != nil {
+			return nil, PlanOut{}, toolError(err)
+		}
+		v, err := service.GetPlan(ctx, in.PlanID)
+		return nil, PlanOut{Plan: v}, toolError(err)
+	})
+	planRefSchema := mustInputSchema[PlanItemRefInput]()
+	setPositiveID(planRefSchema.Properties["plan_id"])
+	planRefSchema.Properties["exercise"].Pattern = `.*\S.*`
+	mcp.AddTool(s, &mcp.Tool{Name: "remove_plan_exercise", Description: "Remove an exercise from a saved plan and close the gap in its order.", InputSchema: planRefSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in PlanItemRefInput) (*mcp.CallToolResult, PlanOut, error) {
+		if err := service.RemovePlanItem(ctx, in.PlanID, in.Exercise); err != nil {
+			return nil, PlanOut{}, toolError(err)
+		}
+		v, err := service.GetPlan(ctx, in.PlanID)
+		return nil, PlanOut{Plan: v}, toolError(err)
+	})
+	planMoveSchema := mustInputSchema[PlanMoveInput]()
+	setPositiveID(planMoveSchema.Properties["plan_id"])
+	planMoveSchema.Properties["exercise"].Pattern = `.*\S.*`
+	planMoveSchema.Properties["direction"].Enum = []any{"up", "down"}
+	mcp.AddTool(s, &mcp.Tool{Name: "move_plan_exercise", Description: "Move an exercise one place up or down within a plan. The order is the order the session is performed in.", InputSchema: planMoveSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in PlanMoveInput) (*mcp.CallToolResult, PlanOut, error) {
+		delta := 1
+		if in.Direction == "up" {
+			delta = -1
+		}
+		if err := service.MovePlanItem(ctx, in.PlanID, in.Exercise, delta); err != nil {
+			return nil, PlanOut{}, toolError(err)
+		}
+		v, err := service.GetPlan(ctx, in.PlanID)
+		return nil, PlanOut{Plan: v}, toolError(err)
+	})
+
 	deletePlanSchema := mustInputSchema[PlanInput]()
 	setPositiveID(deletePlanSchema.Properties["plan_id"])
 	mcp.AddTool(s, &mcp.Tool{Name: "delete_plan", Description: "Permanently delete a plan. Sessions that followed it keep their recorded plan name.", InputSchema: deletePlanSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in PlanInput) (*mcp.CallToolResult, PlanDeleteOut, error) {
@@ -480,6 +539,7 @@ func (s *Server) ToolNames() []string {
 		"get_session", "list_sessions", "exercise_history", "weekly_volume",
 		"set_exercise_group", "list_exercise_groups", "volume_by_muscle",
 		"create_plan", "list_plans", "get_plan", "update_plan", "delete_plan", "session_progress",
+		"set_plan_exercise", "remove_plan_exercise", "move_plan_exercise",
 		"add_session_exercise", "adjust_session_exercise", "swap_session_exercise",
 		"remove_session_exercise", "save_session_as_plan",
 		"record_feedback", "volume_recommendation",

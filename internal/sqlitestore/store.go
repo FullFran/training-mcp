@@ -459,6 +459,145 @@ func (s *Store) UpdatePlan(ctx context.Context, id int64, p training.PlanPatch) 
 	return err
 }
 
+// SetPlanItem adds an exercise to a plan, or replaces its prescription if it is
+// already there. New items go last. Matched by exercise name in code rather
+// than by a unique constraint, so existing plans need no schema change.
+func (s *Store) SetPlanItem(ctx context.Context, planID int64, it training.PlanItem) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var exists int
+	if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM plans WHERE id=?`, planID).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 0 {
+		return training.ErrNotFound
+	}
+	var pos int
+	err = tx.QueryRowContext(ctx, `SELECT position FROM plan_items WHERE plan_id=? AND exercise=?`, planID, it.Exercise).Scan(&pos)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		if err = tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(position),0)+1 FROM plan_items WHERE plan_id=?`, planID).Scan(&pos); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO plan_items(plan_id,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset,notes) VALUES (?,?,?,?,?,?,?,?,?)`,
+			planID, pos, it.Exercise, it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE, it.Superset, it.Notes)
+	case err != nil:
+		return err
+	default:
+		_, err = tx.ExecContext(ctx, `UPDATE plan_items SET target_sets=?,rep_min=?,rep_max=?,target_rpe=?,superset=?,notes=? WHERE plan_id=? AND exercise=?`,
+			it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE, it.Superset, it.Notes, planID, it.Exercise)
+	}
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// RemovePlanItem drops an exercise and closes the gap in the ordering.
+func (s *Store) RemovePlanItem(ctx context.Context, planID int64, exercise string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, `DELETE FROM plan_items WHERE plan_id=? AND exercise=?`, planID, exercise)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return training.ErrNotFound
+	}
+	if err = resequencePlan(ctx, tx, planID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// MovePlanItem shifts an exercise up or down by one place. Order matters: it is
+// the order the session is performed in.
+func (s *Store) MovePlanItem(ctx context.Context, planID int64, exercise string, delta int) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var pos int
+	err = tx.QueryRowContext(ctx, `SELECT position FROM plan_items WHERE plan_id=? AND exercise=?`, planID, exercise).Scan(&pos)
+	if errors.Is(err, sql.ErrNoRows) {
+		return training.ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	var neighbour string
+	var neighbourPos int
+	order := "ASC"
+	cmp := ">"
+	if delta < 0 {
+		order, cmp = "DESC", "<"
+	}
+	err = tx.QueryRowContext(ctx,
+		`SELECT exercise,position FROM plan_items WHERE plan_id=? AND position`+cmp+`? ORDER BY position `+order+` LIMIT 1`,
+		planID, pos).Scan(&neighbour, &neighbourPos)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil // already at the end; moving further is a no-op, not an error
+	}
+	if err != nil {
+		return err
+	}
+	// Park one row out of the way: (plan_id, position) is unique.
+	if _, err = tx.ExecContext(ctx, `UPDATE plan_items SET position=-1 WHERE plan_id=? AND exercise=?`, planID, exercise); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE plan_items SET position=? WHERE plan_id=? AND exercise=?`, pos, planID, neighbour); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE plan_items SET position=? WHERE plan_id=? AND exercise=?`, neighbourPos, planID, exercise); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// resequencePlan compacts positions to 1..n in their current order.
+func resequencePlan(ctx context.Context, tx *sql.Tx, planID int64) error {
+	rows, err := tx.QueryContext(ctx, `SELECT exercise FROM plan_items WHERE plan_id=? ORDER BY position`, planID)
+	if err != nil {
+		return err
+	}
+	var names []string
+	for rows.Next() {
+		var n string
+		if err = rows.Scan(&n); err != nil {
+			rows.Close()
+			return err
+		}
+		names = append(names, n)
+	}
+	rows.Close()
+	if err = rows.Err(); err != nil {
+		return err
+	}
+	// Park them all negative first, or renumbering collides with the unique key.
+	for i, n := range names {
+		if _, err = tx.ExecContext(ctx, `UPDATE plan_items SET position=? WHERE plan_id=? AND exercise=?`, -(i + 1), planID, n); err != nil {
+			return err
+		}
+	}
+	for i, n := range names {
+		if _, err = tx.ExecContext(ctx, `UPDATE plan_items SET position=? WHERE plan_id=? AND exercise=?`, i+1, planID, n); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *Store) DeletePlan(ctx context.Context, id int64) error {
 	res, err := s.db.ExecContext(ctx, `DELETE FROM plans WHERE id=?`, id)
 	if err != nil {

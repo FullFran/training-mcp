@@ -1,0 +1,27 @@
+{{define "plans.html"}}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rutinas</title>
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="{{.Base}}/manifest.webmanifest">
+<link rel="icon" href="{{.Base}}/static/icon-192.png">
+<link rel="stylesheet" href="{{.Base}}/static/app.css">
+</head>
+<body data-base="{{.Base}}">
+
+<header class="bar">
+  <div><strong>Rutinas</strong></div>
+  <div class="bar-actions">
+    <a class="ghost" href="{{.Base}}/history">Historial</a>
+    <a class="ghost" href="{{.Base}}/">Hoy</a>
+  </div>
+</header>
+
+{{template "plans-main.html" .}}
+
+<script src="{{.Base}}/static/htmx.min.js" defer></script>
+</body>
+</html>
+{{end}}

@@ -198,6 +198,13 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST "+b+"/sets/{id}/update", s.updateSet)
 	s.mux.HandleFunc("GET "+b+"/history", s.history)
 	s.mux.HandleFunc("GET "+b+"/export.db", s.export)
+	s.mux.HandleFunc("GET "+b+"/plans", s.plansPage)
+	s.mux.HandleFunc("POST "+b+"/plans/create", s.planAction)
+	s.mux.HandleFunc("POST "+b+"/plans/update", s.planAction)
+	s.mux.HandleFunc("POST "+b+"/plans/delete", s.planAction)
+	s.mux.HandleFunc("POST "+b+"/plans/item", s.planAction)
+	s.mux.HandleFunc("POST "+b+"/plans/item/remove", s.planAction)
+	s.mux.HandleFunc("POST "+b+"/plans/move", s.planAction)
 	s.mux.HandleFunc("POST "+b+"/plan", s.choosePlan)
 	s.mux.HandleFunc("POST "+b+"/plan/item", s.adjustItem)
 	s.mux.HandleFunc("POST "+b+"/feedback", s.recordFeedback)
@@ -353,6 +360,108 @@ func (s *Server) renderPanel(w http.ResponseWriter, r *http.Request, message str
 		return
 	}
 	s.render(w, "panel.html", data)
+}
+
+// plansPage lists every routine with its exercises, editable in place. Plan
+// building is a deliberate activity, so it lives on its own screen instead of
+// crowding the logging form.
+func (s *Server) plansPage(w http.ResponseWriter, r *http.Request) {
+	data, err := s.plansData(r.Context(), "")
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	s.render(w, "plans.html", data)
+}
+
+func (s *Server) plansData(ctx context.Context, message string) (pageData, error) {
+	data := pageData{Base: s.base, Today: s.todayDate(), Error: message}
+	summaries, err := s.service.ListPlans(ctx)
+	if err != nil {
+		return data, err
+	}
+	// ListPlans returns totals only; the page needs each plan's exercises.
+	for _, summary := range summaries {
+		plan, err := s.service.GetPlan(ctx, summary.ID)
+		if err != nil {
+			return data, err
+		}
+		data.Plans = append(data.Plans, plan)
+	}
+	groups, err := s.service.ExerciseGroups(ctx)
+	if err != nil {
+		return data, err
+	}
+	for _, g := range groups {
+		data.Catalogue = append(data.Catalogue, g.Exercise)
+	}
+	sort.Strings(data.Catalogue)
+	return data, nil
+}
+
+// planAction applies one edit to the routines and re-renders the whole page.
+func (s *Server) planAction(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.fail(w, err)
+		return
+	}
+	planID, _ := strconv.ParseInt(r.PostFormValue("plan_id"), 10, 64)
+	exercise := r.PostFormValue("exercise")
+	atoi := func(name string) int {
+		v, _ := strconv.Atoi(strings.TrimSpace(r.PostFormValue(name)))
+		return v
+	}
+
+	var err error
+	switch strings.TrimSuffix(r.URL.Path, "/") {
+	case s.base + "/plans/create":
+		// A routine starts empty; exercises are added from the page itself.
+		_, err = s.service.CreatePlan(r.Context(), training.Plan{
+			Name:  r.PostFormValue("name"),
+			Items: []training.PlanItem{{Exercise: "por definir", TargetSets: 1}},
+		})
+	case s.base + "/plans/update":
+		name, notes := r.PostFormValue("name"), r.PostFormValue("notes")
+		err = s.service.UpdatePlan(r.Context(), planID, training.PlanPatch{Name: &name, Notes: &notes})
+	case s.base + "/plans/delete":
+		err = s.service.DeletePlan(r.Context(), planID)
+	case s.base + "/plans/item":
+		rpe, _ := strconv.ParseFloat(strings.TrimSpace(r.PostFormValue("target_rpe")), 64)
+		err = s.service.SetPlanItem(r.Context(), planID, training.PlanItem{
+			Exercise: exercise, TargetSets: atoi("target_sets"),
+			RepMin: atoi("rep_min"), RepMax: atoi("rep_max"), TargetRPE: rpe,
+			Superset: r.PostFormValue("superset"), Notes: r.PostFormValue("notes"),
+		})
+	case s.base + "/plans/item/remove":
+		err = s.service.RemovePlanItem(r.Context(), planID, exercise)
+	case s.base + "/plans/move":
+		delta := 1
+		if r.PostFormValue("direction") == "up" {
+			delta = -1
+		}
+		err = s.service.MovePlanItem(r.Context(), planID, exercise, delta)
+	}
+
+	message := ""
+	switch {
+	case errors.Is(err, training.ErrNotFound):
+		message = "Esa rutina o ejercicio ya no existe."
+	case errors.Is(err, training.ErrValidation):
+		message = "Datos inválidos: revisa nombre, series (1-20), rango de reps y RPE (1-10)."
+	case err != nil:
+		s.fail(w, err)
+		return
+	}
+	if r.Header.Get("HX-Request") == "" {
+		http.Redirect(w, r, s.base+"/plans", http.StatusSeeOther)
+		return
+	}
+	data, dataErr := s.plansData(r.Context(), message)
+	if dataErr != nil {
+		s.fail(w, dataErr)
+		return
+	}
+	s.render(w, "plans-main.html", data)
 }
 
 // export streams a consistent copy of the whole database. It is the backup

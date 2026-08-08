@@ -722,3 +722,70 @@ func TestStoreSnapshotProducesAReadableCopy(t *testing.T) {
 		t.Fatalf("quoted path = %v, want validation", err)
 	}
 }
+
+func TestStorePlanItemsCanBeEditedReorderedAndRemoved(t *testing.T) {
+	store, err := Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	plan, err := store.CreatePlan(ctx, training.Plan{
+		Name:  "Empuje",
+		Items: []training.PlanItem{{Exercise: "banca", TargetSets: 3}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ex := range []string{"aperturas", "laterales"} {
+		if err := store.SetPlanItem(ctx, plan.ID, training.PlanItem{Exercise: ex, TargetSets: 3}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, _ := store.GetPlan(ctx, plan.ID)
+	if len(got.Items) != 3 || got.Items[2].Exercise != "laterales" {
+		t.Fatalf("new items should go last: %#v", got.Items)
+	}
+
+	// Re-adding replaces the prescription rather than duplicating the row.
+	if err := store.SetPlanItem(ctx, plan.ID, training.PlanItem{Exercise: "banca", TargetSets: 5, Superset: "A"}); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = store.GetPlan(ctx, plan.ID)
+	if len(got.Items) != 3 || got.Items[0].TargetSets != 5 || got.Items[0].Superset != "A" {
+		t.Fatalf("re-add should replace in place: %#v", got.Items)
+	}
+
+	if err := store.MovePlanItem(ctx, plan.ID, "laterales", -1); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = store.GetPlan(ctx, plan.ID)
+	if got.Items[1].Exercise != "laterales" || got.Items[2].Exercise != "aperturas" {
+		t.Fatalf("move up did not swap: %#v", got.Items)
+	}
+	// Moving past the end is a no-op, not an error.
+	if err := store.MovePlanItem(ctx, plan.ID, "banca", -1); err != nil {
+		t.Fatalf("moving the first item up = %v, want no-op", err)
+	}
+
+	// Removing closes the gap so positions stay dense.
+	if err := store.RemovePlanItem(ctx, plan.ID, "laterales"); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = store.GetPlan(ctx, plan.ID)
+	if len(got.Items) != 2 || got.Items[0].Position != 1 || got.Items[1].Position != 2 {
+		t.Fatalf("positions should be resequenced: %#v", got.Items)
+	}
+
+	for _, tt := range []struct {
+		name string
+		err  error
+	}{
+		{"remove missing", store.RemovePlanItem(ctx, plan.ID, "no existe")},
+		{"move missing", store.MovePlanItem(ctx, plan.ID, "no existe", 1)},
+		{"add to missing plan", store.SetPlanItem(ctx, 9999, training.PlanItem{Exercise: "x", TargetSets: 1})},
+	} {
+		if !errors.Is(tt.err, training.ErrNotFound) {
+			t.Fatalf("%s = %v, want not found", tt.name, tt.err)
+		}
+	}
+}

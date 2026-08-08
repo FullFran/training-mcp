@@ -170,6 +170,10 @@ type memoryStore struct {
 	notes                map[string]string
 	supersets            map[string]string
 	planPatch            PlanPatch
+	planItemSet          PlanItem
+	planItemRemoved      string
+	planItemMoved        string
+	planItemDelta        int
 }
 
 func newMemoryStore() *memoryStore {
@@ -735,7 +739,7 @@ func TestServiceDerivesSupersetFromTheSessionPlan(t *testing.T) {
 	}
 	// An explicit label wins, for work done off any plan.
 	set, _, err = svc.AddSet(ctx, AddSetInput{SessionID: session.ID, Exercise: "pull over", WeightKG: 40, Reps: 10, RPE: 8, Superset: " B "})
-	if err != nil || set.Superset != "b" {
+	if err != nil || set.Superset != "B" {
 		t.Fatalf("explicit superset = %q, %v", set.Superset, err)
 	}
 	other, _, err := svc.AddSet(ctx, AddSetInput{SessionID: session.ID, Exercise: "curl", WeightKG: 10, Reps: 12, RPE: 8})
@@ -863,4 +867,17 @@ func TestServiceSuggestLoadIgnoresTechniqueSets(t *testing.T) {
 	if _, err := svc.SuggestLoad(ctx, "  "); !errors.Is(err, ErrValidation) {
 		t.Fatalf("empty exercise = %v, want validation", err)
 	}
+}
+
+func (m *memoryStore) SetPlanItem(_ context.Context, _ int64, it PlanItem) error {
+	m.planItemSet = it
+	return nil
+}
+func (m *memoryStore) RemovePlanItem(_ context.Context, _ int64, ex string) error {
+	m.planItemRemoved = ex
+	return nil
+}
+func (m *memoryStore) MovePlanItem(_ context.Context, _ int64, ex string, d int) error {
+	m.planItemMoved, m.planItemDelta = ex, d
+	return nil
 }

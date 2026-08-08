@@ -1002,3 +1002,93 @@ func TestNoLoadSuggestionWhenTheWeightIsRight(t *testing.T) {
 		t.Fatalf("a correct weight should not prompt a change")
 	}
 }
+
+func TestPlansPageCreatesEditsReordersAndRemoves(t *testing.T) {
+	h, service := newServer(t)
+
+	// A new routine starts as a placeholder so it can be filled in on the page.
+	post(t, h, base+"/plans/create", url.Values{"name": {"Empuje A"}}, true)
+	plans, err := service.ListPlans(t.Context())
+	if err != nil || len(plans) != 1 || plans[0].Name != "Empuje A" {
+		t.Fatalf("plans = %#v, %v", plans, err)
+	}
+	id := plans[0].ID
+
+	for _, ex := range []string{"banca", "aperturas", "laterales"} {
+		post(t, h, base+"/plans/item", url.Values{
+			"plan_id": {itoa(id)}, "exercise": {ex}, "target_sets": {"3"},
+			"rep_min": {"8"}, "rep_max": {"12"}, "target_rpe": {"9"},
+		}, true)
+	}
+	post(t, h, base+"/plans/item/remove", url.Values{"plan_id": {itoa(id)}, "exercise": {"por definir"}}, true)
+
+	plan, err := service.GetPlan(t.Context(), id)
+	if err != nil || len(plan.Items) != 3 {
+		t.Fatalf("plan = %#v, %v", plan, err)
+	}
+	if plan.Items[0].Exercise != "banca" || plan.Items[2].Exercise != "laterales" {
+		t.Fatalf("order = %#v", plan.Items)
+	}
+
+	// Order is the order the session is performed in, so it must be editable.
+	post(t, h, base+"/plans/move", url.Values{
+		"plan_id": {itoa(id)}, "exercise": {"laterales"}, "direction": {"up"},
+	}, true)
+	plan, _ = service.GetPlan(t.Context(), id)
+	if plan.Items[1].Exercise != "laterales" || plan.Items[2].Exercise != "aperturas" {
+		t.Fatalf("move up did not swap: %#v", plan.Items)
+	}
+
+	// Re-adding an exercise replaces its prescription instead of duplicating.
+	post(t, h, base+"/plans/item", url.Values{
+		"plan_id": {itoa(id)}, "exercise": {"banca"}, "target_sets": {"5"}, "superset": {"a"},
+	}, true)
+	plan, _ = service.GetPlan(t.Context(), id)
+	if len(plan.Items) != 3 || plan.Items[0].TargetSets != 5 {
+		t.Fatalf("re-add should replace: %#v", plan.Items)
+	}
+	// Round labels read as uppercase wherever they are shown.
+	if plan.Items[0].Superset != "A" {
+		t.Fatalf("superset = %q, want uppercase", plan.Items[0].Superset)
+	}
+
+	post(t, h, base+"/plans/update", url.Values{
+		"plan_id": {itoa(id)}, "name": {"Empuje B"}, "notes": {"bloque de acumulación"},
+	}, true)
+	plan, _ = service.GetPlan(t.Context(), id)
+	if plan.Name != "Empuje B" || plan.Notes != "bloque de acumulación" || len(plan.Items) != 3 {
+		t.Fatalf("update touched the exercises: %#v", plan)
+	}
+
+	body := get(t, h, base+"/plans").Body.String()
+	for _, want := range []string{"Empuje B", "bloque de acumulación", "banca", `list="catalogue"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("plans page missing %q", want)
+		}
+	}
+
+	post(t, h, base+"/plans/delete", url.Values{"plan_id": {itoa(id)}}, true)
+	if plans, _ := service.ListPlans(t.Context()); len(plans) != 0 {
+		t.Fatalf("plan should be gone: %#v", plans)
+	}
+}
+
+func TestPlanEditsReportInvalidInputInline(t *testing.T) {
+	h, service := newServer(t)
+	post(t, h, base+"/plans/create", url.Values{"name": {"Empuje A"}}, true)
+	plans, _ := service.ListPlans(t.Context())
+
+	w := post(t, h, base+"/plans/item", url.Values{
+		"plan_id": {itoa(plans[0].ID)}, "exercise": {"banca"},
+		"target_sets": {"3"}, "rep_min": {"12"}, "rep_max": {"8"},
+	}, true)
+	if !strings.Contains(w.Body.String(), `class="alert"`) {
+		t.Fatalf("inverted rep range should be reported: %q", w.Body.String())
+	}
+	w = post(t, h, base+"/plans/item/remove", url.Values{
+		"plan_id": {itoa(plans[0].ID)}, "exercise": {"no existe"},
+	}, true)
+	if !strings.Contains(w.Body.String(), `class="alert"`) {
+		t.Fatalf("removing a missing exercise should be reported")
+	}
+}

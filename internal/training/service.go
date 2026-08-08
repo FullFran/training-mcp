@@ -55,20 +55,8 @@ func (s *Service) CreatePlan(ctx context.Context, p Plan) (Plan, error) {
 		return Plan{}, ErrValidation
 	}
 	for i := range p.Items {
-		it := &p.Items[i]
-		it.Exercise = strings.ToLower(strings.TrimSpace(it.Exercise))
-		if it.Exercise == "" || it.TargetSets <= 0 || it.TargetSets > 20 {
-			return Plan{}, ErrValidation
-		}
-		if it.RepMin < 0 || it.RepMax < 0 || (it.RepMax > 0 && it.RepMin > it.RepMax) {
-			return Plan{}, fmt.Errorf("%w: rep range for %q is inverted", ErrValidation, it.Exercise)
-		}
-		if it.TargetRPE != 0 && (it.TargetRPE < 1 || it.TargetRPE > 10) {
-			return Plan{}, ErrValidation
-		}
-		it.Notes = strings.TrimSpace(it.Notes)
-		if len(it.Notes) > maxPlanNotesLen {
-			return Plan{}, ErrValidation
+		if err := validPlanItem(&p.Items[i]); err != nil {
+			return Plan{}, err
 		}
 	}
 	p.Notes = strings.TrimSpace(p.Notes)
@@ -115,6 +103,56 @@ func (s *Service) UpdatePlan(ctx context.Context, id int64, p PlanPatch) error {
 	return s.store.UpdatePlan(ctx, id, p)
 }
 
+// validPlanItem holds the rules a prescription must satisfy, shared by plan
+// creation, plan editing and in-session adjustments so none can drift.
+func validPlanItem(it *PlanItem) error {
+	it.Exercise = strings.ToLower(strings.TrimSpace(it.Exercise))
+	it.Notes = strings.TrimSpace(it.Notes)
+	it.Superset = normalizeSuperset(it.Superset)
+	if it.Exercise == "" || it.TargetSets <= 0 || it.TargetSets > 20 {
+		return ErrValidation
+	}
+	if it.RepMin < 0 || it.RepMax < 0 || (it.RepMax > 0 && it.RepMin > it.RepMax) {
+		return fmt.Errorf("%w: rep range for %q is inverted", ErrValidation, it.Exercise)
+	}
+	if it.TargetRPE != 0 && (it.TargetRPE < 1 || it.TargetRPE > 10) {
+		return ErrValidation
+	}
+	if len(it.Notes) > maxPlanNotesLen {
+		return ErrValidation
+	}
+	return nil
+}
+
+// SetPlanItem adds an exercise to a saved plan or replaces its prescription.
+// Editing a template does not touch sessions already started from it.
+func (s *Service) SetPlanItem(ctx context.Context, planID int64, it PlanItem) error {
+	if planID <= 0 {
+		return ErrValidation
+	}
+	if err := validPlanItem(&it); err != nil {
+		return err
+	}
+	return s.store.SetPlanItem(ctx, planID, it)
+}
+
+func (s *Service) RemovePlanItem(ctx context.Context, planID int64, exercise string) error {
+	exercise = strings.ToLower(strings.TrimSpace(exercise))
+	if planID <= 0 || exercise == "" {
+		return ErrValidation
+	}
+	return s.store.RemovePlanItem(ctx, planID, exercise)
+}
+
+// MovePlanItem shifts an exercise one place up or down in the plan's order.
+func (s *Service) MovePlanItem(ctx context.Context, planID int64, exercise string, delta int) error {
+	exercise = strings.ToLower(strings.TrimSpace(exercise))
+	if planID <= 0 || exercise == "" || (delta != 1 && delta != -1) {
+		return ErrValidation
+	}
+	return s.store.MovePlanItem(ctx, planID, exercise, delta)
+}
+
 func (s *Service) DeletePlan(ctx context.Context, id int64) error {
 	if id <= 0 {
 		return ErrValidation
@@ -125,19 +163,11 @@ func (s *Service) DeletePlan(ctx context.Context, id int64) error {
 // SetSessionItem adds an exercise to today's session plan or replaces its
 // prescription. Adjusting a session never touches the plan it came from.
 func (s *Service) SetSessionItem(ctx context.Context, sessionID int64, it PlanItem) error {
-	it.Exercise = strings.ToLower(strings.TrimSpace(it.Exercise))
-	if sessionID <= 0 || it.Exercise == "" || it.TargetSets <= 0 || it.TargetSets > 20 {
+	if sessionID <= 0 {
 		return ErrValidation
 	}
-	if it.RepMin < 0 || it.RepMax < 0 || (it.RepMax > 0 && it.RepMin > it.RepMax) {
-		return fmt.Errorf("%w: rep range is inverted", ErrValidation)
-	}
-	if it.TargetRPE != 0 && (it.TargetRPE < 1 || it.TargetRPE > 10) {
-		return ErrValidation
-	}
-	it.Notes = strings.TrimSpace(it.Notes)
-	if len(it.Notes) > maxPlanNotesLen {
-		return ErrValidation
+	if err := validPlanItem(&it); err != nil {
+		return err
 	}
 	return s.store.SetSessionItem(ctx, sessionID, it)
 }
@@ -404,7 +434,7 @@ func validSetFields(exercise string, weightKG float64, reps int, rpe float64) bo
 func (s *Service) AddSet(ctx context.Context, in AddSetInput) (Set, float64, error) {
 	in.Exercise = strings.ToLower(strings.TrimSpace(in.Exercise))
 	in.Technique = normalizeTechnique(in.Technique)
-	in.Superset = normalizeTechnique(in.Superset)
+	in.Superset = normalizeSuperset(in.Superset)
 	if in.SessionID <= 0 || !validSetFields(in.Exercise, in.WeightKG, in.Reps, in.RPE) {
 		return Set{}, 0, ErrValidation
 	}
@@ -446,6 +476,12 @@ func (s *Service) ExerciseNotes(ctx context.Context) ([]ExerciseNote, error) {
 // same technique, the same rule exercise names follow.
 func normalizeTechnique(v string) string {
 	return strings.Join(strings.Fields(strings.ToLower(strings.TrimSpace(v))), " ")
+}
+
+// normalizeSuperset uppercases instead. A round label is an identifier, so "a"
+// and "A" must group together, but it reads as "A" everywhere it is shown.
+func normalizeSuperset(v string) string {
+	return strings.Join(strings.Fields(strings.ToUpper(strings.TrimSpace(v))), " ")
 }
 func (s *Service) UpdateSet(ctx context.Context, id int64, p SetPatch) (Set, float64, error) {
 	if id <= 0 || p.Empty() || (p.Exercise != nil && strings.TrimSpace(*p.Exercise) == "") || (p.WeightKG != nil && *p.WeightKG <= 0) || (p.Reps != nil && *p.Reps <= 0) || (p.RPE != nil && (*p.RPE < 1 || *p.RPE > 10)) {

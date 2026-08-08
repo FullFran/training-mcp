@@ -596,3 +596,44 @@ button { font: inherit; cursor: pointer; }
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
+
+/* --- routine editing ---------------------------------------------------- */
+.plan-card { gap: 10px; }
+.plan-id { display: grid; gap: 8px; }
+.plan-id input, .plan-id textarea {
+  width: 100%; padding: 10px 12px;
+  border-radius: 10px; border: 1px solid var(--line);
+  background: #10131a; color: var(--text); font: inherit;
+}
+.plan-id input { min-height: 46px; font-size: 16px; font-weight: 600; }
+.plan-id textarea { resize: vertical; font-size: 14px; }
+.plan-id-actions { display: flex; align-items: center; gap: 8px; }
+.plan-id-actions .muted { margin-right: auto; }
+
+.plan-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.plan-items li {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: 10px; background: #10131a;
+}
+.plan-items .ex { display: block; font-size: 15px; }
+.plan-items .rx { display: block; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.row-actions { display: flex; gap: 4px; }
+.row-actions .mini { min-width: 38px; padding: 0 8px; }
+
+.add-item {
+  display: grid;
+  grid-template-columns: 1fr 3.2rem 3.2rem 3.2rem 3.6rem 3rem auto;
+  gap: 5px;
+}
+.add-item input {
+  min-height: 44px; padding: 0 6px;
+  border-radius: 9px; border: 1px solid var(--line);
+  background: #10131a; color: var(--text); font-size: 14px; text-align: center;
+}
+.add-item input[name="exercise"] { text-align: left; padding: 0 10px; }
+@media (max-width: 560px) {
+  .add-item { grid-template-columns: 1fr 1fr 1fr; }
+  .add-item input[name="exercise"] { grid-column: 1 / -1; }
+  .add-item button { grid-column: 1 / -1; min-height: 46px; }
+}

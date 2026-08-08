@@ -25,7 +25,7 @@ The unauthenticated `GET /health` endpoint returns `{"status":"ok"}`. MCP is onl
 
 ## Tools
 
-A plan carries free-text **notes** at two levels: the routine as a whole (its intent, the phase of the block) and each exercise inside it (cues, tempo, whether to push the last set). Both are returned by `get_plan` and `list_plans`, and both are copied into the session, so `session_progress` exposes the intent behind the numbers while training — an assistant reading the MCP sees why, not just what. `update_plan` edits them without touching the exercises.
+A plan carries free-text **notes** at two levels: the routine as a whole (its intent, the phase of the block) and each exercise inside it (cues, tempo, whether to push the last set). Both are returned by `get_plan` and `list_plans`, and both are copied into the session, so `session_progress` exposes the intent behind the numbers while training — an assistant reading the MCP sees why, not just what. `update_plan` edits them without touching the exercises, and `set_plan_exercise`, `remove_plan_exercise` and `move_plan_exercise` edit a saved routine's exercises and their order — the order is the order the session is performed in.
 
 Plan items can share a **superset label**, marking exercises done back to back. Logging never states it: a set is stamped with the label its exercise carries in the session's plan, so entry stays the same size. `set_exercise_note` stores a persistent setup reminder per exercise — seat height, grip width — shown every time that exercise comes up.
 
@@ -68,6 +68,9 @@ shared with the MCP tools and cannot drift apart.
   movement of the round loads immediately and the rest timer is held back
   until the round is finished.
 - An exercise's setup note is shown whenever that exercise is selected.
+- `/plans` builds and edits routines from the phone: rename, add, reorder and
+  remove exercises, and write the routine's notes. It is a separate screen
+  because planning is deliberate work, not something done between sets.
 - A rest timer starts on every logged set and remembers the adjusted duration.
 - Sets can be edited in place instead of deleted and re-entered.
 - Today's session is created lazily on the first set, so opening the app never
