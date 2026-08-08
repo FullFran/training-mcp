@@ -169,6 +169,7 @@ type memoryStore struct {
 	snapshotPath         string
 	notes                map[string]string
 	supersets            map[string]string
+	planPatch            PlanPatch
 }
 
 func newMemoryStore() *memoryStore {
@@ -761,5 +762,38 @@ func TestServiceExerciseNoteValidation(t *testing.T) {
 	}
 	if err := svc.SetExerciseNote(ctx, "prensa", ""); err != nil || len(store.notes) != 0 {
 		t.Fatalf("empty note should remove: %v %#v", err, store.notes)
+	}
+}
+
+func (m *memoryStore) UpdatePlan(_ context.Context, id int64, p PlanPatch) error {
+	m.planPatch = p
+	return nil
+}
+
+func TestServiceUpdatePlanEditsIdentityOnly(t *testing.T) {
+	store := newMemoryStore()
+	svc := NewService(store, time.Now)
+	ctx := context.Background()
+
+	notes := "  Bloque de acumulación, semana 3  "
+	if err := svc.UpdatePlan(ctx, 1, PlanPatch{Notes: &notes}); err != nil {
+		t.Fatalf("UpdatePlan() error = %v", err)
+	}
+	if *store.planPatch.Notes != "Bloque de acumulación, semana 3" {
+		t.Fatalf("notes not trimmed: %q", *store.planPatch.Notes)
+	}
+	if store.planPatch.Name != nil {
+		t.Fatalf("omitted field must stay nil, got %#v", store.planPatch.Name)
+	}
+	empty := ""
+	if err := svc.UpdatePlan(ctx, 1, PlanPatch{Name: &empty}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("blank name = %v, want validation", err)
+	}
+	if err := svc.UpdatePlan(ctx, 1, PlanPatch{}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("empty patch = %v, want validation", err)
+	}
+	long := strings.Repeat("x", 2001)
+	if err := svc.UpdatePlan(ctx, 1, PlanPatch{Notes: &long}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("over-long notes = %v, want validation", err)
 	}
 }

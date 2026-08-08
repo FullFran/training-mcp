@@ -144,8 +144,8 @@ func (s *Store) Start(ctx context.Context, session training.Session) (training.S
 		// Copy the plan into the session so adjusting today never edits the
 		// template, and editing the template never rewrites this session.
 		if _, err = s.db.ExecContext(ctx, `
-INSERT INTO session_items (session_id,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset)
-SELECT ?,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset FROM plan_items WHERE plan_id=?`,
+INSERT INTO session_items (session_id,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset,notes)
+SELECT ?,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset,notes FROM plan_items WHERE plan_id=?`,
 			session.ID, session.PlanID); err != nil {
 			return training.Session{}, err
 		}
@@ -382,8 +382,8 @@ func (s *Store) CreatePlan(ctx context.Context, p training.Plan) (training.Plan,
 	for i := range p.Items {
 		p.Items[i].Position = i + 1
 		it := p.Items[i]
-		if _, err = tx.ExecContext(ctx, `INSERT INTO plan_items(plan_id,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset) VALUES (?,?,?,?,?,?,?,?)`,
-			p.ID, it.Position, it.Exercise, it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE, it.Superset); err != nil {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO plan_items(plan_id,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset,notes) VALUES (?,?,?,?,?,?,?,?,?)`,
+			p.ID, it.Position, it.Exercise, it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE, it.Superset, it.Notes); err != nil {
 			return training.Plan{}, err
 		}
 		p.TotalSets += it.TargetSets
@@ -423,20 +423,40 @@ func (s *Store) GetPlan(ctx context.Context, id int64) (training.Plan, error) {
 	if err != nil {
 		return p, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT position,exercise,target_sets,rep_min,rep_max,target_rpe,superset FROM plan_items WHERE plan_id=? ORDER BY position`, id)
+	rows, err := s.db.QueryContext(ctx, `SELECT position,exercise,target_sets,rep_min,rep_max,target_rpe,superset,notes FROM plan_items WHERE plan_id=? ORDER BY position`, id)
 	if err != nil {
 		return p, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var it training.PlanItem
-		if err = rows.Scan(&it.Position, &it.Exercise, &it.TargetSets, &it.RepMin, &it.RepMax, &it.TargetRPE, &it.Superset); err != nil {
+		if err = rows.Scan(&it.Position, &it.Exercise, &it.TargetSets, &it.RepMin, &it.RepMax, &it.TargetRPE, &it.Superset, &it.Notes); err != nil {
 			return p, err
 		}
 		p.Items = append(p.Items, it)
 		p.TotalSets += it.TargetSets
 	}
 	return p, rows.Err()
+}
+
+// UpdatePlan edits a plan's name and notes, leaving its exercises alone.
+func (s *Store) UpdatePlan(ctx context.Context, id int64, p training.PlanPatch) error {
+	var name, notes string
+	err := s.db.QueryRowContext(ctx, `SELECT name,notes FROM plans WHERE id=?`, id).Scan(&name, &notes)
+	if errors.Is(err, sql.ErrNoRows) {
+		return training.ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if p.Name != nil {
+		name = *p.Name
+	}
+	if p.Notes != nil {
+		notes = *p.Notes
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE plans SET name=?,notes=? WHERE id=?`, name, notes, id)
+	return err
 }
 
 func (s *Store) DeletePlan(ctx context.Context, id int64) error {
@@ -465,7 +485,7 @@ func (s *Store) SessionProgress(ctx context.Context, sessionID int64) ([]trainin
 		return nil, training.ErrNotFound
 	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT i.superset, i.exercise, i.target_sets, i.rep_min, i.rep_max, i.target_rpe, i.skipped,
+SELECT i.superset, i.notes, i.exercise, i.target_sets, i.rep_min, i.rep_max, i.target_rpe, i.skipped,
        (SELECT COUNT(*) FROM sets st WHERE st.session_id=i.session_id AND st.exercise=i.exercise),
        COALESCE(g.muscle_group,'')
 FROM session_items i LEFT JOIN exercise_groups g ON g.exercise=i.exercise
@@ -478,7 +498,7 @@ WHERE i.session_id=? ORDER BY i.position`, sessionID)
 	var out []training.PlanProgress
 	for rows.Next() {
 		var v training.PlanProgress
-		if err = rows.Scan(&v.Superset, &v.Exercise, &v.TargetSets, &v.RepMin, &v.RepMax, &v.TargetRPE, &v.Skipped, &v.DoneSets, &v.MuscleGroup); err != nil {
+		if err = rows.Scan(&v.Superset, &v.Notes, &v.Exercise, &v.TargetSets, &v.RepMin, &v.RepMax, &v.TargetRPE, &v.Skipped, &v.DoneSets, &v.MuscleGroup); err != nil {
 			return nil, err
 		}
 		planned[v.Exercise] = true
@@ -523,12 +543,13 @@ func (s *Store) SetSessionItem(ctx context.Context, sessionID int64, it training
 		return err
 	}
 	_, err := s.db.ExecContext(ctx, `
-INSERT INTO session_items (session_id,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset)
-VALUES (?,?,?,?,?,?,?,?)
+INSERT INTO session_items (session_id,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset,notes)
+VALUES (?,?,?,?,?,?,?,?,?)
 ON CONFLICT(session_id,exercise) DO UPDATE SET
  target_sets=excluded.target_sets, rep_min=excluded.rep_min,
- rep_max=excluded.rep_max, target_rpe=excluded.target_rpe, superset=excluded.superset`,
-		sessionID, pos, it.Exercise, it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE, it.Superset)
+ rep_max=excluded.rep_max, target_rpe=excluded.target_rpe,
+ superset=excluded.superset, notes=excluded.notes`,
+		sessionID, pos, it.Exercise, it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE, it.Superset, it.Notes)
 	return err
 }
 

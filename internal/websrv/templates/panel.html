@@ -9,6 +9,7 @@
       <strong>{{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Plan de hoy{{end}}</strong>
       <span class="muted">{{doneCount .Progress}}/{{len .Progress}} ejercicios</span>
     </header>
+    {{if .PlanNotes}}<p class="plan-note">{{.PlanNotes}}</p>{{end}}
     <ol class="planned">
       {{range .Progress}}
       <li class="{{if .Skipped}}skipped{{else if .Done}}ok{{end}}{{if eq .TargetSets 0}} extra{{end}}{{if .Superset}} in-ss{{end}}"
@@ -23,6 +24,7 @@
             {{- if eq .TargetSets 0}}fuera de plan
             {{- else}}{{.RepMin}}{{if ne .RepMax .RepMin}}-{{.RepMax}}{{end}} reps{{if .TargetRPE}} @{{num .TargetRPE}}{{end}}{{end -}}
           </span>
+          {{if .Notes}}<span class="item-note">{{.Notes}}</span>{{end}}
         </span>
         <span class="count">{{.DoneSets}}{{if .TargetSets}}/{{.TargetSets}}{{end}}</span>
         {{if not $.ReadOnly}}

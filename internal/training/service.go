@@ -66,6 +66,14 @@ func (s *Service) CreatePlan(ctx context.Context, p Plan) (Plan, error) {
 		if it.TargetRPE != 0 && (it.TargetRPE < 1 || it.TargetRPE > 10) {
 			return Plan{}, ErrValidation
 		}
+		it.Notes = strings.TrimSpace(it.Notes)
+		if len(it.Notes) > maxPlanNotesLen {
+			return Plan{}, ErrValidation
+		}
+	}
+	p.Notes = strings.TrimSpace(p.Notes)
+	if len(p.Notes) > maxPlanNotesLen {
+		return Plan{}, ErrValidation
 	}
 	return s.store.CreatePlan(ctx, p)
 }
@@ -83,6 +91,28 @@ func (s *Service) GetPlan(ctx context.Context, id int64) (Plan, error) {
 		return Plan{}, ErrValidation
 	}
 	return s.store.GetPlan(ctx, id)
+}
+
+// UpdatePlan edits a plan's name or notes without touching its exercises.
+func (s *Service) UpdatePlan(ctx context.Context, id int64, p PlanPatch) error {
+	if id <= 0 || p.Empty() {
+		return ErrValidation
+	}
+	if p.Name != nil {
+		v := strings.TrimSpace(*p.Name)
+		if v == "" {
+			return ErrValidation
+		}
+		p.Name = &v
+	}
+	if p.Notes != nil {
+		v := strings.TrimSpace(*p.Notes)
+		if len(v) > maxPlanNotesLen {
+			return ErrValidation
+		}
+		p.Notes = &v
+	}
+	return s.store.UpdatePlan(ctx, id, p)
 }
 
 func (s *Service) DeletePlan(ctx context.Context, id int64) error {
@@ -103,6 +133,10 @@ func (s *Service) SetSessionItem(ctx context.Context, sessionID int64, it PlanIt
 		return fmt.Errorf("%w: rep range is inverted", ErrValidation)
 	}
 	if it.TargetRPE != 0 && (it.TargetRPE < 1 || it.TargetRPE > 10) {
+		return ErrValidation
+	}
+	it.Notes = strings.TrimSpace(it.Notes)
+	if len(it.Notes) > maxPlanNotesLen {
 		return ErrValidation
 	}
 	return s.store.SetSessionItem(ctx, sessionID, it)

@@ -117,7 +117,10 @@ type GroupVolume struct {
 type PlanItem struct {
 	// Superset groups exercises performed back to back. Items sharing a label
 	// are one round; empty means the exercise stands alone.
-	Superset   string  `json:"superset,omitempty"`
+	Superset string `json:"superset,omitempty"`
+	// Notes carry the intent behind the prescription: cues, tempo, whether to
+	// push the last set. Read by anything consuming the plan.
+	Notes      string  `json:"notes,omitempty"`
 	Position   int     `json:"position"`
 	Exercise   string  `json:"exercise"`
 	TargetSets int     `json:"target_sets"`
@@ -137,11 +140,21 @@ type Plan struct {
 	TotalSets int `json:"total_sets"`
 }
 
+// PlanPatch edits a plan's identity without touching its exercises. Nil fields
+// are left unchanged.
+type PlanPatch struct {
+	Name  *string
+	Notes *string
+}
+
+func (p PlanPatch) Empty() bool { return p.Name == nil && p.Notes == nil }
+
 // PlanProgress compares what a session planned against what it has logged, per
 // exercise. Exercises done but not planned appear with TargetSets 0, so going
 // off-plan is visible instead of hidden.
 type PlanProgress struct {
 	Superset    string  `json:"superset,omitempty"`
+	Notes       string  `json:"notes,omitempty"`
 	Exercise    string  `json:"exercise"`
 	MuscleGroup string  `json:"muscle_group,omitempty"`
 	TargetSets  int     `json:"target_sets"`
@@ -275,6 +288,9 @@ type ExerciseNote struct {
 }
 
 const maxNoteLen = 280
+
+// maxPlanNotesLen is generous: plan notes carry coaching intent, not a label.
+const maxPlanNotesLen = 2000
 
 // ExerciseMemory is the last recorded set for one exercise. It powers the web
 // UI's quick-pick chips, so a repeated exercise can be logged without retyping

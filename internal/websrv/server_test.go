@@ -915,3 +915,40 @@ func TestExerciseInfoIsAvailableOnDemandForAnyExercise(t *testing.T) {
 		t.Fatalf("empty name should answer empty, got %q", got)
 	}
 }
+
+func TestRoutineAndExerciseNotesTravelIntoTheSession(t *testing.T) {
+	h, service := newServer(t)
+	plan, err := service.CreatePlan(t.Context(), training.Plan{
+		Name:  "Empuje A",
+		Notes: "Semana 3 del bloque: acumulación, no llegar al fallo salvo la última serie.",
+		Items: []training.PlanItem{
+			{Exercise: "banca", TargetSets: 3, Notes: "excéntrica 3s, pausa en el pecho"},
+			{Exercise: "laterales", TargetSets: 4},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	post(t, h, base+"/plan", url.Values{"plan_id": {itoa(plan.ID)}}, false)
+
+	body := get(t, h, base+"/").Body.String()
+	if !strings.Contains(body, "acumulación, no llegar al fallo") {
+		t.Fatalf("routine notes should be shown: %q", body)
+	}
+	if !strings.Contains(body, "excéntrica 3s, pausa en el pecho") {
+		t.Fatalf("per-exercise notes should be shown: %q", body)
+	}
+
+	// They must also be readable from the session, not only from the template.
+	sessions, _ := service.ListSessions(t.Context(), training.ListFilter{Limit: 1})
+	progress, err := service.SessionProgress(t.Context(), sessions[0].ID)
+	if err != nil || len(progress) != 2 {
+		t.Fatalf("progress = %#v, %v", progress, err)
+	}
+	if progress[0].Notes != "excéntrica 3s, pausa en el pecho" {
+		t.Fatalf("session item lost its note: %#v", progress[0])
+	}
+	if progress[1].Notes != "" {
+		t.Fatalf("an item without a note should carry none: %#v", progress[1])
+	}
+}

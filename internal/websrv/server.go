@@ -68,15 +68,16 @@ type ExerciseInfo struct {
 }
 
 type pageData struct {
-	Base     string
-	Today    string
-	Session  training.Session
-	Recent   []training.ExerciseMemory
-	History  []training.SessionSummary
-	Volume   []training.GroupVolume
-	Blocks   []ExerciseBlock
-	Plans    []training.Plan
-	Progress []training.PlanProgress
+	Base      string
+	Today     string
+	Session   training.Session
+	Recent    []training.ExerciseMemory
+	History   []training.SessionSummary
+	Volume    []training.GroupVolume
+	Blocks    []ExerciseBlock
+	Plans     []training.Plan
+	Progress  []training.PlanProgress
+	PlanNotes string
 	// Catalogue is every exercise ever logged, offered as autocomplete. Picking
 	// an existing name is what stops the catalogue fragmenting into near
 	// duplicates like "remo maquina" beside "remo máquina".
@@ -469,6 +470,10 @@ func (s *Server) todayData(ctx context.Context, message string) (pageData, error
 	if data.Session.ID > 0 && data.Session.PlanID > 0 {
 		if data.Progress, err = s.service.SessionProgress(ctx, data.Session.ID); err != nil {
 			return data, err
+		}
+		// The routine's own notes, shown above its exercises.
+		if plan, err := s.service.GetPlan(ctx, data.Session.PlanID); err == nil {
+			data.PlanNotes = plan.Notes
 		}
 	}
 	if err = s.decorate(ctx, &data); err != nil {

@@ -14,6 +14,7 @@ type Store interface {
 	CreatePlan(context.Context, Plan) (Plan, error)
 	ListPlans(context.Context) ([]Plan, error)
 	GetPlan(context.Context, int64) (Plan, error)
+	UpdatePlan(context.Context, int64, PlanPatch) error
 	DeletePlan(context.Context, int64) error
 	SessionProgress(context.Context, int64) ([]PlanProgress, error)
 	SetSessionItem(context.Context, int64, PlanItem) error

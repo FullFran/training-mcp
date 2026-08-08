@@ -572,3 +572,16 @@ button { font: inherit; cursor: pointer; }
 }
 .note-line { display: block; margin-top: 4px; color: var(--text); }
 .note-edit { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin-top: 8px; }
+
+/* --- routine and exercise intent ---------------------------------------- */
+.plan-note {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #10131a;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.item-note { display: block; margin-top: 2px; color: var(--accent); font-size: 12px; }

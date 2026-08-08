@@ -82,6 +82,7 @@ type PlanItemInput struct {
 	RepMax     int     `json:"rep_max,omitempty" jsonschema:"Upper bound of the target rep range, e.g. 12 for '10 to 12'."`
 	TargetRPE  float64 `json:"target_rpe,omitempty" jsonschema:"Prescribed RPE from 1 through 10. Omit if the plan does not prescribe one."`
 	Superset   string  `json:"superset,omitempty" jsonschema:"Label grouping exercises done back to back, e.g. 'A'. Items sharing a label are one superset; omit for a standalone exercise."`
+	Notes      string  `json:"notes,omitempty" jsonschema:"Free-text intent for this exercise: cues, tempo, whether to push the last set. Travels into the session and is readable while training."`
 }
 type CreatePlanInput struct {
 	Name  string          `json:"name" jsonschema:"Name of the plan, e.g. 'Empuje A'."`
@@ -96,6 +97,11 @@ type PlansOut struct {
 }
 type PlanInput struct {
 	PlanID int64 `json:"plan_id" jsonschema:"Positive ID of the plan."`
+}
+type UpdatePlanInput struct {
+	PlanID int64   `json:"plan_id" jsonschema:"Positive ID of the plan to edit."`
+	Name   *string `json:"name,omitempty" jsonschema:"New name. Omit to leave unchanged."`
+	Notes  *string `json:"notes,omitempty" jsonschema:"New notes for the whole routine: intent, phase of the block, what to watch. Pass an empty string to clear. Omit to leave unchanged."`
 }
 type PlanDeleteOut struct {
 	PlanID int64 `json:"plan_id"`
@@ -113,6 +119,7 @@ type SessionItemInput struct {
 	RepMax     int     `json:"rep_max,omitempty" jsonschema:"Upper bound of the target rep range."`
 	TargetRPE  float64 `json:"target_rpe,omitempty" jsonschema:"Target RPE from 1 through 10."`
 	Superset   string  `json:"superset,omitempty" jsonschema:"Label grouping exercises done back to back. Omit for a standalone exercise."`
+	Notes      string  `json:"notes,omitempty" jsonschema:"Free-text intent for this exercise in today's session."`
 }
 type AdjustItemInput struct {
 	SessionID  int64    `json:"session_id" jsonschema:"Positive ID of the session to adjust."`
@@ -271,7 +278,7 @@ func New(service *training.Service) *Server {
 			plan.Items = append(plan.Items, training.PlanItem{
 				Exercise: it.Exercise, TargetSets: it.TargetSets,
 				RepMin: it.RepMin, RepMax: it.RepMax, TargetRPE: it.TargetRPE,
-				Superset: it.Superset,
+				Superset: it.Superset, Notes: it.Notes,
 			})
 		}
 		v, err := service.CreatePlan(ctx, plan)
@@ -287,6 +294,19 @@ func New(service *training.Service) *Server {
 		v, err := service.GetPlan(ctx, in.PlanID)
 		return nil, PlanOut{Plan: v}, toolError(err)
 	})
+	updatePlanSchema := mustInputSchema[UpdatePlanInput]()
+	setPositiveID(updatePlanSchema.Properties["plan_id"])
+	updatePlanSchema.MinProperties = jsonschema.Ptr(2)
+	setNonNullableType(updatePlanSchema.Properties["name"], "string")
+	setNonNullableType(updatePlanSchema.Properties["notes"], "string")
+	mcp.AddTool(s, &mcp.Tool{Name: "update_plan", Description: "Edit a plan's name or notes without touching its exercises. Plan notes are free text describing the routine's intent, and are returned by get_plan and list_plans.", InputSchema: updatePlanSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in UpdatePlanInput) (*mcp.CallToolResult, PlanOut, error) {
+		if err := service.UpdatePlan(ctx, in.PlanID, training.PlanPatch{Name: in.Name, Notes: in.Notes}); err != nil {
+			return nil, PlanOut{}, toolError(err)
+		}
+		v, err := service.GetPlan(ctx, in.PlanID)
+		return nil, PlanOut{Plan: v}, toolError(err)
+	})
+
 	deletePlanSchema := mustInputSchema[PlanInput]()
 	setPositiveID(deletePlanSchema.Properties["plan_id"])
 	mcp.AddTool(s, &mcp.Tool{Name: "delete_plan", Description: "Permanently delete a plan. Sessions that followed it keep their recorded plan name.", InputSchema: deletePlanSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in PlanInput) (*mcp.CallToolResult, PlanDeleteOut, error) {
@@ -311,7 +331,7 @@ func New(service *training.Service) *Server {
 		err := service.SetSessionItem(ctx, in.SessionID, training.PlanItem{
 			Exercise: in.Exercise, TargetSets: in.TargetSets,
 			RepMin: in.RepMin, RepMax: in.RepMax, TargetRPE: in.TargetRPE,
-			Superset: in.Superset,
+			Superset: in.Superset, Notes: in.Notes,
 		})
 		return nil, ItemOut{SessionID: in.SessionID, Exercise: in.Exercise}, toolError(err)
 	})
@@ -446,7 +466,7 @@ func (s *Server) ToolNames() []string {
 	return []string{"log_set", "start_session", "add_set", "update_set", "delete_set", "delete_session",
 		"get_session", "list_sessions", "exercise_history", "weekly_volume",
 		"set_exercise_group", "list_exercise_groups", "volume_by_muscle",
-		"create_plan", "list_plans", "get_plan", "delete_plan", "session_progress",
+		"create_plan", "list_plans", "get_plan", "update_plan", "delete_plan", "session_progress",
 		"add_session_exercise", "adjust_session_exercise", "swap_session_exercise",
 		"remove_session_exercise", "save_session_as_plan",
 		"record_feedback", "volume_recommendation",
