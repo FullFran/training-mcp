@@ -1,6 +1,7 @@
 package websrv_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -1109,5 +1110,21 @@ func TestPlanEditsReportInvalidInputInline(t *testing.T) {
 	}, true)
 	if !strings.Contains(w.Body.String(), `class="alert"`) {
 		t.Fatalf("removing a missing exercise should be reported")
+	}
+}
+
+func TestImputedRPEIsShownAsUnknownAndNotPrefilledForEditing(t *testing.T) {
+	h, service := newServer(t)
+	if _, err := service.LogSets(context.Background(), training.LogSetsInput{
+		Key: "k", Exercise: "remo", Sets: []training.LoggedSet{{WeightKG: 70, Reps: 10}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	body := get(t, h, base+"/").Body.String()
+	if !strings.Contains(body, "× 10 @?") {
+		t.Fatalf("an unknown RPE is not shown as unknown:\n%s", body)
+	}
+	if !strings.Contains(body, `data-rpe=""`) {
+		t.Fatal("the edit form would resubmit the placeholder as a measurement")
 	}
 }

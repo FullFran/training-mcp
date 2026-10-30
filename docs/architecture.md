@@ -25,7 +25,7 @@ flowchart TB
     end
 
     subgraph driven["Driven adapters — the way out"]
-        SQL["sqlitestore<br/>SQLite + 10 migrations"]
+        SQL["sqlitestore<br/>SQLite + 11 migrations"]
     end
 
     HTTP --> MCP
@@ -89,7 +89,7 @@ is how they end up implemented twice, slightly differently:
 
 ## Persistence
 
-SQLite, single file, ten forward-only migrations under
+SQLite, single file, eleven forward-only migrations under
 `internal/sqlitestore/migrations/`. Each numbered file is an additive step
 (`001_init`, `002_exercise_groups`, … `008_plan_item_notes`), which is what lets
 the schema grow without the single user ever having to reset their history.

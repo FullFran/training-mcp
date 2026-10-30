@@ -8,7 +8,7 @@ import (
 
 // serverInstructions is cross-tool guidance sent to clients on connect. ChatGPT
 // only guarantees the first 512 characters count, so it must stay under that.
-const serverInstructions = `Personal strength-training log. To record training call log_sets: it needs no session id, its sets may differ, and it creates today's session. Generate one idempotency_key per request and resend the same one when retrying. Call start_session first only to follow a plan. To judge progress use exercise_history and weekly_volume. Call suggest_load before proposing a weight and volume_recommendation before changing weekly sets. Weights are kilograms. Deletions are permanent.`
+const serverInstructions = `Personal strength-training log. To record training call log_sets: it needs no session id, its sets may differ, and it creates today's session. Omit rpe unless the user stated it. Generate one idempotency_key per request and resend it when retrying. Call start_session first only to follow a plan. To judge progress use exercise_history and weekly_volume. Call suggest_load before proposing a weight and volume_recommendation before changing weekly sets. Weights are kilograms.`
 
 // toolBehavior is what a tool declares to the client. Hosts use it to decide
 // when to ask the user for confirmation; it never replaces server validation.

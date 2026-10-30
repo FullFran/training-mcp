@@ -14,12 +14,18 @@ var (
 	ErrIdempotencyConflict = errors.New("this idempotency_key was already used for different sets; use a new key to record them")
 )
 
-// LoggedSet is one set of a batch. Every field may differ between sets.
+// ImputedRPE stands in for an RPE nobody stated. It is the RPE whose SI is exactly
+// 1, so an unrated set counts as one plain unit, weighted neither up nor down.
+const ImputedRPE = 8
+
+// LoggedSet is one set of a batch. Every field may differ between sets. An RPE of
+// zero means it was not stated.
 type LoggedSet struct {
-	WeightKG  float64 `json:"weight_kg"`
-	Reps      int     `json:"reps"`
-	RPE       float64 `json:"rpe"`
-	Technique string  `json:"technique,omitempty"`
+	WeightKG   float64 `json:"weight_kg"`
+	Reps       int     `json:"reps"`
+	RPE        float64 `json:"rpe"`
+	RPEImputed bool    `json:"rpe_imputed,omitempty"`
+	Technique  string  `json:"technique,omitempty"`
 }
 
 // LogSetsInput asks to record a batch of sets of one exercise into today's
@@ -65,7 +71,10 @@ type Set struct {
 	WeightKG  float64 `json:"weight_kg"`
 	Reps      int     `json:"reps"`
 	RPE       float64 `json:"rpe"`
-	SI        float64 `json:"si"`
+	// RPEImputed marks RPE as a placeholder for a value nobody stated, so it must
+	// never be read as a measurement.
+	RPEImputed bool    `json:"rpe_imputed,omitempty"`
+	SI         float64 `json:"si"`
 	// Technique is an optional intensity method applied to this set. Empty
 	// means a normal straight set.
 	Technique string `json:"technique,omitempty"`
@@ -102,8 +111,10 @@ type AddSetInput struct {
 	WeightKG  float64
 	Reps      int
 	RPE       float64
-	Technique string
-	Superset  string
+	// RPEImputed marks RPE as a placeholder, not something the user stated.
+	RPEImputed bool
+	Technique  string
+	Superset   string
 }
 type SetPatch struct {
 	Exercise  *string
@@ -377,7 +388,10 @@ func SuggestLoad(last *ExerciseSet, repMin, repMax int, targetRPE float64) LoadS
 		out.Reason = "Sin series previas de este ejercicio: elige un peso que te deje en el rango objetivo."
 		return out
 	}
-	out.LastWeightKG, out.LastReps, out.LastRPE = last.WeightKG, last.Reps, last.RPE
+	out.LastWeightKG, out.LastReps = last.WeightKG, last.Reps
+	if !last.RPEImputed {
+		out.LastRPE = last.RPE
+	}
 	out.SuggestedKG = last.WeightKG
 	if repMax == 0 || targetRPE == 0 {
 		out.Reason = "Sin prescripción de reps o RPE, no puedo juzgar si el peso fue el adecuado."
@@ -385,6 +399,11 @@ func SuggestLoad(last *ExerciseSet, repMin, repMax int, targetRPE float64) LoadS
 	}
 	step := LoadStep(last.WeightKG)
 	switch {
+	case last.RPEImputed && last.Reps < repMin:
+		out.DeltaKG = -step
+		out.Reason = "Te quedaste corto de reps: baja el peso."
+	case last.RPEImputed:
+		out.Reason = "Sin RPE real de la última serie no puedo juzgar el esfuerzo: mantén el peso y anota cómo te fue."
 	case last.Reps >= repMax && last.RPE <= targetRPE-1:
 		out.DeltaKG = step
 		out.Reason = "Llegaste al tope del rango sobrado de RPE: sube el peso."
@@ -421,8 +440,11 @@ type ExerciseSet struct {
 	WeightKG  float64 `json:"weight_kg"`
 	Reps      int     `json:"reps"`
 	RPE       float64 `json:"rpe"`
-	SI        float64 `json:"si"`
-	Est1RM    float64 `json:"est_1rm"`
+	// RPEImputed marks RPE as a placeholder for a value nobody stated, so it must
+	// never be read as a measurement.
+	RPEImputed bool    `json:"rpe_imputed,omitempty"`
+	SI         float64 `json:"si"`
+	Est1RM     float64 `json:"est_1rm"`
 }
 
 // ExerciseHistory is one exercise's recorded sets, newest first, plus its best
