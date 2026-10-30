@@ -9,10 +9,13 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 log="$HOME/.local/state/training-mcp/backup.log"
 mkdir -p "$(dirname "$log")"
 
-entry="17 7 * * * $root/scripts/backup.sh >>$log 2>&1"
+# Hourly, because the machine is not always on at any one time. --daily makes
+# every run after the day's first success a no-op.
+entry="17 * * * * $root/scripts/backup.sh --daily >>$log 2>&1"
 
-# Replace any previous entry for this script rather than stacking duplicates.
-current="$(crontab -l 2>/dev/null | grep -v "training-mcp/scripts/backup.sh" || true)"
+# Replace any previous entry for this script, from this or another clone, rather
+# than stacking duplicates. Other projects may have a scripts/backup.sh too.
+current="$(crontab -l 2>/dev/null | grep -vF -e "training-mcp/scripts/backup.sh" -e "$root/scripts/backup.sh" || true)"
 printf '%s\n%s\n' "$current" "$entry" | grep -v '^$' | crontab -
 
 echo "installed:"

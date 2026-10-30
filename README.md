@@ -132,9 +132,11 @@ taken with `VACUUM INTO` so it is safe while the server is running. The result
 is a plain SQLite file: **restoring is copying it back into the data volume.**
 Nothing else in this deployment keeps a second copy, so this is the backup.
 `scripts/backup.sh` downloads one, verifies it opens and passes an integrity
-check, and keeps the last 30 daily copies.
-`scripts/install-backup-cron.sh` schedules it daily — a backup you have to
-remember to take is not a backup.
+check, and keeps the last 30 daily copies. A failed run keeps the existing copy
+and raises a desktop notification.
+`scripts/install-backup-cron.sh` schedules it hourly with `--daily`, which stops
+after the day's first success, so a machine that was off at one hour still gets
+its copy — a backup you have to remember to take is not a backup.
 
 **Authentication is currently the secret URL itself.** The reverse proxy injects
 the bearer token, so anyone holding the URL has full access. This is tracked
