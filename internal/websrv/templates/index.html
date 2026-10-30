@@ -52,7 +52,7 @@
               data-exercise="{{.Exercise}}"
               data-weight="{{num .WeightKG}}"
               data-reps="{{.Reps}}"
-              data-rpe="{{num .RPE}}">{{.Exercise}}</button>
+              data-rpe="{{if not .RPEImputed}}{{num .RPE}}{{end}}">{{.Exercise}}</button>
       {{end}}
     </div>
     {{end}}

@@ -485,6 +485,8 @@ type ExerciseMemory struct {
 	WeightKG float64 `json:"weight_kg"`
 	Reps     int     `json:"reps"`
 	RPE      float64 `json:"rpe"`
+	// RPEImputed marks RPE as a placeholder, so it must not be offered as a value.
+	RPEImputed bool `json:"rpe_imputed,omitempty"`
 }
 type Clock func() time.Time
 
