@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Log your training by talking to it.** A single-user Go service that replaces a
-workout spreadsheet with 34 conversational MCP tools over Streamable HTTP,
+workout spreadsheet with 35 conversational MCP tools over Streamable HTTP,
 plus an installable PWA for the gym floor. SQLite for storage, no framework,
 no mock library.
 
@@ -23,7 +23,7 @@ domain package and both interfaces are adapters over it:
 
 ```mermaid
 flowchart LR
-    MCP["mcpsrv<br/>34 MCP tools"] --> SVC
+    MCP["mcpsrv<br/>35 MCP tools"] --> SVC
     WEB["websrv<br/>PWA"] --> SVC
     SVC["training.Service<br/>rules · validation · SI"] --> PORT(["Store · Clock"])
     PORT -.-> SQL["sqlitestore<br/>SQLite + migrations"]
@@ -69,7 +69,7 @@ The unauthenticated `GET /health` endpoint returns `{"status":"ok"}`. MCP is onl
 
 ## Tools
 
-34 tools, grouped by what you are doing: logging sets, managing plans,
+35 tools, grouped by what you are doing: logging sets, managing plans,
 adjusting today's session, progression and analysis, the feedback loop, and the
 exercise catalogue.
 
@@ -174,7 +174,7 @@ never edits a plan on its own.
 ## Documentation
 
 - [Architecture](docs/architecture.md) — ports and adapters, package layout, testing
-- [MCP tool reference](docs/tools.md) — all 34 tools
+- [MCP tool reference](docs/tools.md) — all 35 tools
 - [ChatGPT setup](docs/chatgpt-setup.md)
 - [Connection paths and tunnel safety](docs/connection-paths.md)
 - [SI formula](docs/si-formula.md)

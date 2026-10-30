@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -158,8 +159,23 @@ func (s *Store) AddSet(ctx context.Context, in training.AddSetInput) (training.S
 		return training.Set{}, 0, err
 	}
 	defer tx.Rollback()
+	set, total, err := insertSet(ctx, tx, in)
+	if err != nil {
+		return training.Set{}, 0, err
+	}
+	if err = tx.Commit(); err != nil {
+		return training.Set{}, 0, err
+	}
+	return set, total, nil
+}
+
+// insertSet appends one set to a session inside an open transaction, returning
+// it with the session's recalculated total. Every path that records a set goes
+// through here so position and SI cannot be computed two ways.
+func insertSet(ctx context.Context, tx *sql.Tx, in training.AddSetInput) (training.Set, float64, error) {
 	var pos int
-	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(position),0)+1 FROM sets WHERE session_id=?`, in.SessionID).Scan(&pos); err != nil {
+	err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(position),0)+1 FROM sets WHERE session_id=?`, in.SessionID).Scan(&pos)
+	if err != nil {
 		return training.Set{}, 0, err
 	}
 	var exists int
@@ -183,10 +199,96 @@ func (s *Store) AddSet(ctx context.Context, in training.AddSetInput) (training.S
 		return training.Set{}, 0, err
 	}
 	total = training.NormalizeSI(total)
-	if err = tx.Commit(); err != nil {
-		return training.Set{}, 0, err
-	}
 	return training.Set{ID: id, SessionID: in.SessionID, Position: pos, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, SI: si, Technique: in.Technique, Superset: in.Superset}, total, nil
+}
+
+// LogSets records a batch of sets into the given date's session, creating it if
+// needed, all or nothing. A key already recorded returns its original result.
+//
+// The first statement is a write on purpose: it takes SQLite's write lock before
+// anything is read, so concurrent calls queue on busy_timeout rather than failing
+// when a read transaction tries to upgrade, and each one sees the previous result.
+func (s *Store) LogSets(ctx context.Context, in training.LogSetsRecord) (training.LogSetsResult, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return training.LogSetsResult{}, err
+	}
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, `INSERT INTO idempotency_keys(key,fingerprint,response,created_at) VALUES (?,?,'',CURRENT_TIMESTAMP) ON CONFLICT(key) DO NOTHING`, in.Key, in.Fingerprint)
+	if err != nil {
+		return training.LogSetsResult{}, err
+	}
+	inserted, err := res.RowsAffected()
+	if err != nil {
+		return training.LogSetsResult{}, err
+	}
+	if inserted == 0 {
+		var fingerprint, response string
+		if err = tx.QueryRowContext(ctx, `SELECT fingerprint,response FROM idempotency_keys WHERE key=?`, in.Key).Scan(&fingerprint, &response); err != nil {
+			return training.LogSetsResult{}, err
+		}
+		if fingerprint != in.Fingerprint {
+			return training.LogSetsResult{}, training.ErrIdempotencyConflict
+		}
+		var out training.LogSetsResult
+		if err = json.Unmarshal([]byte(response), &out); err != nil {
+			return training.LogSetsResult{}, err
+		}
+		out.Replayed = true
+		return out, nil
+	}
+
+	out := training.LogSetsResult{}
+	err = tx.QueryRowContext(ctx, `SELECT id,date,plan_name FROM sessions WHERE date=? ORDER BY id DESC LIMIT 1`, in.Date).Scan(&out.Session.ID, &out.Session.Date, &out.Session.PlanName)
+	if errors.Is(err, sql.ErrNoRows) {
+		created, err := tx.ExecContext(ctx, `INSERT INTO sessions(date, started_at, plan_id, plan_name) VALUES (?, CURRENT_TIMESTAMP, NULL, '')`, in.Date)
+		if err != nil {
+			return training.LogSetsResult{}, err
+		}
+		if out.Session.ID, err = created.LastInsertId(); err != nil {
+			return training.LogSetsResult{}, err
+		}
+		out.Session.Date = in.Date
+	} else if err != nil {
+		return training.LogSetsResult{}, err
+	}
+
+	// A session started from a plan carries each exercise's superset round.
+	var superset string
+	err = tx.QueryRowContext(ctx, `SELECT superset FROM session_items WHERE session_id=? AND exercise=?`, out.Session.ID, in.Exercise).Scan(&superset)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return training.LogSetsResult{}, err
+	}
+	for _, set := range in.Sets {
+		stored, total, err := insertSet(ctx, tx, training.AddSetInput{
+			SessionID: out.Session.ID, Exercise: in.Exercise, WeightKG: set.WeightKG,
+			Reps: set.Reps, RPE: set.RPE, Technique: set.Technique, Superset: superset,
+		})
+		if err != nil {
+			return training.LogSetsResult{}, err
+		}
+		out.Sets = append(out.Sets, stored)
+		out.Session.TotalSI = total
+	}
+	if s.failpoint != nil {
+		if err = s.failpoint("log-sets-inserted"); err != nil {
+			return training.LogSetsResult{}, err
+		}
+	}
+	response, err := json.Marshal(out)
+	if err != nil {
+		return training.LogSetsResult{}, err
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE idempotency_keys SET response=? WHERE key=?`, string(response), in.Key); err != nil {
+		return training.LogSetsResult{}, err
+	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM idempotency_keys WHERE created_at < datetime('now','-30 days')`); err != nil {
+		return training.LogSetsResult{}, err
+	}
+	if err = tx.Commit(); err != nil {
+		return training.LogSetsResult{}, err
+	}
+	return out, nil
 }
 func (s *Store) UpdateSet(ctx context.Context, id int64, p training.SetPatch) (training.Set, float64, error) {
 	tx, err := s.db.BeginTx(ctx, nil)

@@ -17,7 +17,7 @@ Assumption: the order S1, S2, S3, S4 is the one proposed to and accepted by the 
 
 - [~] T1 (S1, S5) inline: off-site upload, restore check, doc counts. Risk: item 2 (secrets), item 5 (scheduled job). Pending: real R2 upload needs the user's bucket and token; editing issue #1 moves to T4.
 - [ ] T2 (S2) inline: migration and SI decision. Risk: item 1 (persisted format).
-- [ ] T3 (S3) inline: heterogeneous logging with idempotency.
+- [~] T3 (S3) inline: heterogeneous logging with idempotency. Tool, migration 010 and tests done; whether ChatGPT reuses a key on retry is unobserved.
 - [ ] T4 (S4) inline: authentication. Risk: item 2.
 
 Route: inline; no parallel units with disjoint surfaces, so no writer trigger holds.

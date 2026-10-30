@@ -38,7 +38,7 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_session_exercise", "add_set", "adjust_session_exercise", "create_plan", "delete_plan", "delete_session", "delete_set", "exercise_history", "get_plan", "get_session", "list_exercise_groups", "list_exercise_notes", "list_plans", "list_sessions", "list_volume_landmarks", "log_set", "move_plan_exercise", "record_feedback", "remove_plan_exercise", "remove_session_exercise", "save_session_as_plan", "session_progress", "set_exercise_group", "set_exercise_note", "set_plan_exercise", "set_volume_landmarks", "start_session", "suggest_load", "swap_session_exercise", "update_plan", "update_set", "volume_by_muscle", "volume_recommendation", "weekly_volume"}) {
+	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_session_exercise", "add_set", "adjust_session_exercise", "create_plan", "delete_plan", "delete_session", "delete_set", "exercise_history", "get_plan", "get_session", "list_exercise_groups", "list_exercise_notes", "list_plans", "list_sessions", "list_volume_landmarks", "log_set", "log_sets", "move_plan_exercise", "record_feedback", "remove_plan_exercise", "remove_session_exercise", "save_session_as_plan", "session_progress", "set_exercise_group", "set_exercise_note", "set_plan_exercise", "set_volume_landmarks", "start_session", "suggest_load", "swap_session_exercise", "update_plan", "update_set", "volume_by_muscle", "volume_recommendation", "weekly_volume"}) {
 		t.Fatalf("tools=%v", toolNames(tools))
 	}
 	for _, tool := range tools.Tools {
@@ -115,8 +115,9 @@ func TestServerToolsDeclareHowTheyBehave(t *testing.T) {
 		"start_session": true, "add_set": true, "log_set": true, "create_plan": true,
 		"move_plan_exercise": true, "save_session_as_plan": true,
 	}
-	if len(result.Tools) != 34 {
-		t.Fatalf("got %d tools, want 34", len(result.Tools))
+	nonDestructive := func(name string) bool { return additive[name] || name == "log_sets" }
+	if len(result.Tools) != 35 {
+		t.Fatalf("got %d tools, want 35", len(result.Tools))
 	}
 	for _, tool := range result.Tools {
 		a := tool.Annotations
@@ -130,7 +131,7 @@ func TestServerToolsDeclareHowTheyBehave(t *testing.T) {
 		if a.ReadOnlyHint != readOnly[tool.Name] {
 			t.Errorf("%s readOnlyHint=%v", tool.Name, a.ReadOnlyHint)
 		}
-		wantDestructive := !readOnly[tool.Name] && !additive[tool.Name]
+		wantDestructive := !readOnly[tool.Name] && !nonDestructive(tool.Name)
 		if a.DestructiveHint == nil || *a.DestructiveHint != wantDestructive {
 			t.Errorf("%s destructiveHint=%v, want %v", tool.Name, a.DestructiveHint, wantDestructive)
 		}
@@ -401,6 +402,9 @@ func (errorStore) Start(context.Context, training.Session) (training.Session, er
 
 func (testStore) Start(context.Context, training.Session) (training.Session, error) {
 	return training.Session{}, nil
+}
+func (testStore) LogSets(context.Context, training.LogSetsRecord) (training.LogSetsResult, error) {
+	return training.LogSetsResult{}, nil
 }
 func (testStore) AddSet(context.Context, training.AddSetInput) (training.Set, float64, error) {
 	return training.Set{}, 0, nil

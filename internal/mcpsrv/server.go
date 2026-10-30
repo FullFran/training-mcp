@@ -44,6 +44,23 @@ type LogOut struct {
 	Sets    []training.Set   `json:"sets"`
 	TotalSI float64          `json:"total_si"`
 }
+type LoggedSetInput struct {
+	WeightKG  float64 `json:"weight_kg" jsonschema:"Weight in kilograms; must be strictly positive."`
+	Reps      int     `json:"reps" jsonschema:"Repetition count; must be strictly positive."`
+	RPE       float64 `json:"rpe" jsonschema:"Numeric rate of perceived exertion from 1 through 10; determines the set's SI."`
+	Technique string  `json:"technique,omitempty" jsonschema:"Optional intensity technique applied to the set, e.g. 'drop set', 'rest-pause'. Omit for a normal straight set."`
+}
+type LogSetsInput struct {
+	IdempotencyKey string           `json:"idempotency_key" jsonschema:"A unique value you generate once for this request, such as a UUID. Send the exact same value if you retry after an error or timeout, so nothing is recorded twice. Never reuse it for different sets."`
+	Exercise       string           `json:"exercise" jsonschema:"Non-empty exercise name; it is trimmed and lowercased before storage."`
+	Sets           []LoggedSetInput `json:"sets" jsonschema:"The sets in the order performed; 1 through 20. Each one may have its own weight, reps and RPE."`
+}
+type LogSetsOut struct {
+	Session  training.Session `json:"session"`
+	Sets     []training.Set   `json:"sets"`
+	TotalSI  float64          `json:"total_si"`
+	Replayed bool             `json:"replayed"`
+}
 type SetOut struct {
 	Set     training.Set `json:"set"`
 	TotalSI float64      `json:"total_si"`
@@ -260,9 +277,27 @@ func New(service *training.Service) *Server {
 	logSchema.Properties["count"].Default = json.RawMessage("1")
 	logSchema.Properties["count"].Minimum = jsonschema.Ptr(1.0)
 	logSchema.Properties["count"].Maximum = jsonschema.Ptr(20.0)
-	addTool(s, &mcp.Tool{Name: "log_set", Description: "Record one or more identical sets into today's session, creating that session if it does not exist yet. This is the simplest way to log training: it needs no session id. Prefer it over start_session plus add_set.", InputSchema: logSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in LogInput) (*mcp.CallToolResult, LogOut, error) {
+	addTool(s, &mcp.Tool{Name: "log_set", Description: "Record one or more identical sets into today's session, creating that session if it does not exist yet. It needs no session id but is not safe to retry, since repeating it records the sets again. Prefer log_sets, which is.", InputSchema: logSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in LogInput) (*mcp.CallToolResult, LogOut, error) {
 		session, sets, err := service.LogSet(ctx, in.Exercise, in.WeightKG, in.Reps, in.RPE, in.Count, in.Technique)
 		return nil, LogOut{Session: session, Sets: sets, TotalSI: session.TotalSI}, toolError(err)
+	})
+	logSetsSchema := mustInputSchema[LogSetsInput]()
+	logSetsSchema.Properties["idempotency_key"].Pattern = `.*\S.*`
+	logSetsSchema.Properties["idempotency_key"].MaxLength = jsonschema.Ptr(128)
+	logSetsSchema.Properties["exercise"].Pattern = `.*\S.*`
+	logSetsSchema.Properties["sets"].MinItems = jsonschema.Ptr(1)
+	logSetsSchema.Properties["sets"].MaxItems = jsonschema.Ptr(20)
+	loggedSetSchema := logSetsSchema.Properties["sets"].Items
+	loggedSetSchema.Properties["weight_kg"].ExclusiveMinimum = jsonschema.Ptr(0.0)
+	loggedSetSchema.Properties["reps"].Minimum = jsonschema.Ptr(1.0)
+	setRPERange(loggedSetSchema.Properties["rpe"])
+	addTool(s, &mcp.Tool{Name: "log_sets", Description: "Record the sets of one exercise into today's session in a single call, creating the session if needed. The sets may differ, as in '12, 12, 10 and 8 reps'. All are stored or none. Repeating a call with the same idempotency_key returns the original result with replayed true and stores nothing new, so retrying is always safe. Prefer this over log_set.", InputSchema: logSetsSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in LogSetsInput) (*mcp.CallToolResult, LogSetsOut, error) {
+		batch := training.LogSetsInput{Key: in.IdempotencyKey, Exercise: in.Exercise}
+		for _, set := range in.Sets {
+			batch.Sets = append(batch.Sets, training.LoggedSet{WeightKG: set.WeightKG, Reps: set.Reps, RPE: set.RPE, Technique: set.Technique})
+		}
+		v, err := service.LogSets(ctx, batch)
+		return nil, LogSetsOut{Session: v.Session, Sets: v.Sets, TotalSI: v.Session.TotalSI, Replayed: v.Replayed}, toolError(err)
 	})
 
 	updateSchema := mustInputSchema[UpdateInput]()
@@ -558,7 +593,7 @@ func New(service *training.Service) *Server {
 }
 func (s *Server) Handler() http.Handler { return s.handler }
 func (s *Server) ToolNames() []string {
-	return []string{"log_set", "start_session", "add_set", "update_set", "delete_set", "delete_session",
+	return []string{"log_sets", "log_set", "start_session", "add_set", "update_set", "delete_set", "delete_session",
 		"get_session", "list_sessions", "exercise_history", "weekly_volume",
 		"set_exercise_group", "list_exercise_groups", "volume_by_muscle",
 		"create_plan", "list_plans", "get_plan", "update_plan", "delete_plan", "session_progress",
@@ -596,7 +631,7 @@ func toolError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, training.ErrValidation) || errors.Is(err, training.ErrNotFound) {
+	if errors.Is(err, training.ErrValidation) || errors.Is(err, training.ErrNotFound) || errors.Is(err, training.ErrIdempotencyConflict) {
 		return err
 	}
 	return fmt.Errorf("internal tool error")
