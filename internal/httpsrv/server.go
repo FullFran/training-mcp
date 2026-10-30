@@ -33,7 +33,7 @@ func BearerWithPolicy(token string, disabled bool, authorize func(*http.Request)
 }
 
 // staticTokenMatches compares in constant time. An empty configured token never
-// matches, so a deployment with OAuth alone cannot be opened by an empty header.
+// matches, so an empty header can never open anything.
 func staticTokenMatches(r *http.Request, token string) bool {
 	auth := r.Header.Get("Authorization")
 	const prefix = "Bearer "

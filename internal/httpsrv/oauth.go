@@ -69,7 +69,12 @@ func NewOAuth(cfg OAuthConfig) *OAuth {
 			jwt.WithExpirationRequired(),
 			jwt.WithLeeway(30*time.Second),
 		),
-		client:      &http.Client{Timeout: 5 * time.Second},
+		client: &http.Client{
+			Timeout: 5 * time.Second,
+			// Trust in these keys comes from where they were fetched, so they are
+			// never accepted from wherever a redirect happens to point.
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+		},
 		metadataURL: metadataURLFor(cfg.Resource),
 	}
 }
@@ -123,7 +128,10 @@ func (o *OAuth) keyFor(token *jwt.Token) (any, error) {
 		o.lastMiss = time.Now()
 		return nil, fmt.Errorf("fetching signing keys: %w", err)
 	}
-	o.keys = keys
+	// An empty answer says nothing about the keys already trusted, so keep them.
+	if len(keys) > 0 {
+		o.keys = keys
+	}
 	key, ok := keys[kid]
 	if !ok {
 		o.lastMiss = time.Now()
@@ -144,6 +152,7 @@ func (o *OAuth) fetchKeys() (map[string]*rsa.PublicKey, error) {
 	var doc struct {
 		Keys []struct {
 			Kty string `json:"kty"`
+			Use string `json:"use"`
 			Kid string `json:"kid"`
 			N   string `json:"n"`
 			E   string `json:"e"`
@@ -154,7 +163,7 @@ func (o *OAuth) fetchKeys() (map[string]*rsa.PublicKey, error) {
 	}
 	keys := make(map[string]*rsa.PublicKey, len(doc.Keys))
 	for _, k := range doc.Keys {
-		if k.Kty != "RSA" || k.Kid == "" {
+		if k.Kty != "RSA" || k.Kid == "" || (k.Use != "" && k.Use != "sig") {
 			continue
 		}
 		n, errN := base64.RawURLEncoding.DecodeString(k.N)
@@ -162,11 +171,12 @@ func (o *OAuth) fetchKeys() (map[string]*rsa.PublicKey, error) {
 		if errN != nil || errE != nil {
 			continue
 		}
-		key := &rsa.PublicKey{N: new(big.Int).SetBytes(n), E: int(new(big.Int).SetBytes(e).Int64())}
-		if key.N.BitLen() < minRSAKeyBits || key.E < 3 {
+		exponent := new(big.Int).SetBytes(e)
+		modulus := new(big.Int).SetBytes(n)
+		if modulus.BitLen() < minRSAKeyBits || exponent.BitLen() > 31 || exponent.Int64() < 3 {
 			continue
 		}
-		keys[k.Kid] = key
+		keys[k.Kid] = &rsa.PublicKey{N: modulus, E: int(exponent.Int64())}
 	}
 	return keys, nil
 }
@@ -179,6 +189,7 @@ func (o *OAuth) guard(token string, next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		challenge := fmt.Sprintf(`Bearer resource_metadata=%q`, o.metadataURL)
 		if raw, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
 			err := o.verify(strings.TrimSpace(raw))
 			if err == nil {
@@ -186,8 +197,9 @@ func (o *OAuth) guard(token string, next http.Handler) http.Handler {
 				return
 			}
 			o.cfg.Logger.Printf("oauth token rejected: %v", err)
+			challenge += `, error="invalid_token"`
 		}
-		w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer resource_metadata=%q`, o.metadataURL))
+		w.Header().Set("WWW-Authenticate", challenge)
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 	})
 }
