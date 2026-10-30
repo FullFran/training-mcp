@@ -1128,3 +1128,35 @@ func TestImputedRPEIsShownAsUnknownAndNotPrefilledForEditing(t *testing.T) {
 		t.Fatal("the edit form would resubmit the placeholder as a measurement")
 	}
 }
+
+func TestImputedRPEIsNeverPrefilledAsIfMeasured(t *testing.T) {
+	h, service := newServer(t)
+	if _, err := service.LogSets(context.Background(), training.LogSetsInput{
+		Key: "k", Exercise: "remo", Sets: []training.LoggedSet{{WeightKG: 70, Reps: 10}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	body := get(t, h, base+"/").Body.String()
+	if !strings.Contains(body, `data-last-rpe=""`) {
+		t.Fatal("repeat-last would resubmit the placeholder as a measurement")
+	}
+	if strings.Contains(body, `data-rpe="8"`) {
+		t.Fatal("the exercise chip would resubmit the placeholder as a measurement")
+	}
+	script, err := os.ReadFile("static/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(script), "entry.last.rpe_imputed ? '?'") {
+		t.Fatal(`"Anterior" would show the placeholder as a real RPE`)
+	}
+}
+
+func TestChipsStillCarryAMeasuredRPE(t *testing.T) {
+	h, _ := newServer(t)
+	post(t, h, base+"/sets", setForm("squat", "100", "5", "8"), true)
+	body := get(t, h, base+"/").Body.String()
+	if !strings.Contains(body, `data-rpe="8"`) || !strings.Contains(body, `data-last-rpe="8"`) {
+		t.Fatalf("a measured RPE is no longer prefilled:\n%s", body)
+	}
+}

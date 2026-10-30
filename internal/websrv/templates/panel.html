@@ -1,5 +1,5 @@
 {{define "panel.html"}}<section id="panel" class="panel"
-  {{with .LastSet}}data-last-exercise="{{.Exercise}}" data-last-weight="{{num .WeightKG}}" data-last-reps="{{.Reps}}" data-last-rpe="{{num .RPE}}"{{end}}>
+  {{with .LastSet}}data-last-exercise="{{.Exercise}}" data-last-weight="{{num .WeightKG}}" data-last-reps="{{.Reps}}" data-last-rpe="{{if not .RPEImputed}}{{num .RPE}}{{end}}"{{end}}>
 
   {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
 

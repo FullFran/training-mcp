@@ -451,7 +451,7 @@ func (s *Store) ListSessions(ctx context.Context, f training.ListFilter) ([]trai
 // are monotonic within a table lifetime.
 func (s *Store) RecentExercises(ctx context.Context, limit int) ([]training.ExerciseMemory, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT exercise,weight_kg,reps,rpe FROM sets
+SELECT exercise,weight_kg,reps,rpe,rpe_imputed FROM sets
 WHERE id IN (SELECT MAX(id) FROM sets GROUP BY exercise)
 ORDER BY id DESC LIMIT ?`, limit)
 	if err != nil {
@@ -461,7 +461,7 @@ ORDER BY id DESC LIMIT ?`, limit)
 	var out []training.ExerciseMemory
 	for rows.Next() {
 		var v training.ExerciseMemory
-		if err = rows.Scan(&v.Exercise, &v.WeightKG, &v.Reps, &v.RPE); err != nil {
+		if err = rows.Scan(&v.Exercise, &v.WeightKG, &v.Reps, &v.RPE, &v.RPEImputed); err != nil {
 			return nil, err
 		}
 		out = append(out, v)

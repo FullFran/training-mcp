@@ -42,7 +42,7 @@
     if (!entry) { previous.hidden = true; return; }
     const bits = [];
     if (entry.last) {
-      bits.push(`Anterior: <strong>${num(entry.last.weight_kg)} kg × ${entry.last.reps} @${num(entry.last.rpe)}</strong> (${entry.last.date})`);
+      bits.push(`Anterior: <strong>${num(entry.last.weight_kg)} kg × ${entry.last.reps} @${entry.last.rpe_imputed ? '?' : num(entry.last.rpe)}</strong> (${entry.last.date})`);
     }
     if (entry.best_e1rm) bits.push(`Récord 1RM est. <strong>${entry.best_e1rm} kg</strong>`);
     if (entry.suggest && entry.suggest.delta_kg) {
