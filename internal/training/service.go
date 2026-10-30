@@ -2,6 +2,9 @@ package training
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -503,6 +506,39 @@ func (s *Service) LogSet(ctx context.Context, exercise string, weightKG float64,
 		out = append(out, set)
 	}
 	return session, out, nil
+}
+
+// LogSets records a batch of sets of one exercise into today's session, all or
+// nothing. Unlike LogSet, the sets may differ, and repeating a call with the same
+// key returns the original result instead of recording them twice.
+func (s *Service) LogSets(ctx context.Context, in LogSetsInput) (LogSetsResult, error) {
+	key := strings.TrimSpace(in.Key)
+	exercise := strings.ToLower(strings.TrimSpace(in.Exercise))
+	if key == "" || len(key) > maxIdempotencyKeyLen || len(in.Sets) == 0 || len(in.Sets) > maxSetsPerLog {
+		return LogSetsResult{}, ErrValidation
+	}
+	sets := make([]LoggedSet, len(in.Sets))
+	for i, set := range in.Sets {
+		set.Technique = normalizeTechnique(set.Technique)
+		if !validSetFields(exercise, set.WeightKG, set.Reps, set.RPE) || len(set.Technique) > maxTechniqueLen {
+			return LogSetsResult{}, ErrValidation
+		}
+		sets[i] = set
+	}
+	// The date stays out of the fingerprint: a retry after midnight is the same
+	// call and must find the original result, not conflict with it.
+	canonical, err := json.Marshal(struct {
+		Exercise string      `json:"exercise"`
+		Sets     []LoggedSet `json:"sets"`
+	}{exercise, sets})
+	if err != nil {
+		return LogSetsResult{}, err
+	}
+	sum := sha256.Sum256(canonical)
+	return s.store.LogSets(ctx, LogSetsRecord{
+		Key: key, Fingerprint: hex.EncodeToString(sum[:]),
+		Date: s.clock().Format("2006-01-02"), Exercise: exercise, Sets: sets,
+	})
 }
 
 // validSetFields holds the rules a recorded set must satisfy, shared by every

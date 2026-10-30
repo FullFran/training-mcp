@@ -1,18 +1,19 @@
 # MCP tool reference
 
-34 tools over Streamable HTTP at `/mcp`. Descriptions below are the ones the
+35 tools over Streamable HTTP at `/mcp`. Descriptions below are the ones the
 model actually receives — they are extracted from `internal/mcpsrv/server.go`,
 so this page cannot drift from the surface it documents.
 
 
 ## Logging sets
 
-The everyday path. `log_set` is the one to reach for: it needs no session id, so recording a set is a single call.
+The everyday path. `log_sets` is the one to reach for: it needs no session id, its sets may differ, and repeating a call with the same `idempotency_key` stores nothing new, so a client that lost the response can safely retry.
 
 
 | Tool | What it does |
 |---|---|
-| `log_set` | Record one or more identical sets into today's session, creating that session if it does not exist yet. This is the simplest way to log training: it needs no session id. Prefer it over start_session plus add_set. |
+| `log_sets` | Record the sets of one exercise into today's session in a single call, creating the session if needed. The sets may differ, as in '12, 12, 10 and 8 reps'. All are stored or none. Repeating a call with the same idempotency_key returns the original result with replayed true and stores nothing new, so retrying is always safe. Prefer this over log_set. |
+| `log_set` | Record one or more identical sets into today's session, creating that session if it does not exist yet. It needs no session id but is not safe to retry, since repeating it records the sets again. Prefer log_sets, which is. |
 | `start_session` | Start a training session on an optional date, optionally following a plan. Omit date to use the server's current local date. |
 | `add_set` | Add a set to an existing training session and return the set plus the session's recalculated total SI. |
 | `update_set` | Update one or more fields of an existing set. Omitted fields remain unchanged; RPE changes recalculate SI. |

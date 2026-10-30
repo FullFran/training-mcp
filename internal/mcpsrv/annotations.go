@@ -8,7 +8,7 @@ import (
 
 // serverInstructions is cross-tool guidance sent to clients on connect. ChatGPT
 // only guarantees the first 512 characters count, so it must stay under that.
-const serverInstructions = `Personal strength-training log. To record training call log_set: it needs no session id and creates today's session. Use start_session and add_set only to follow a plan or log a past date. To judge progress use exercise_history and weekly_volume instead of reading whole sessions. Call suggest_load before proposing a weight and volume_recommendation before changing weekly sets. Weights are kilograms. Deletions are permanent.`
+const serverInstructions = `Personal strength-training log. To record training call log_sets: it needs no session id, its sets may differ, and it creates today's session. Generate one idempotency_key per request and resend the same one when retrying. Call start_session first only to follow a plan. To judge progress use exercise_history and weekly_volume. Call suggest_load before proposing a weight and volume_recommendation before changing weekly sets. Weights are kilograms. Deletions are permanent.`
 
 // toolBehavior is what a tool declares to the client. Hosts use it to decide
 // when to ask the user for confirmation; it never replaces server validation.
@@ -25,6 +25,10 @@ func read(title string) toolBehavior {
 
 // additive tools only add or reorder data: nothing stored is lost.
 func additive(title string) toolBehavior { return toolBehavior{title: title} }
+
+// keyed tools only add data and are safe to repeat, because a repeated call with
+// the same idempotency key stores nothing new.
+func keyed(title string) toolBehavior { return toolBehavior{title: title, idempotent: true} }
 
 // overwriting tools delete or replace stored data, so the previous value is
 // gone, though repeating the same call changes nothing further.
@@ -50,6 +54,7 @@ var toolBehaviors = map[string]toolBehavior{
 	"start_session":        additive("Start session"),
 	"add_set":              additive("Add set"),
 	"log_set":              additive("Log set"),
+	"log_sets":             keyed("Log sets"),
 	"create_plan":          additive("Create plan"),
 	"move_plan_exercise":   additive("Move plan exercise"),
 	"save_session_as_plan": additive("Save session as plan"),

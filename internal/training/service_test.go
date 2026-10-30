@@ -187,6 +187,9 @@ func (m *memoryStore) Start(_ context.Context, s Session) (Session, error) {
 	m.sessions[s.ID] = s
 	return s, nil
 }
+func (m *memoryStore) LogSets(context.Context, LogSetsRecord) (LogSetsResult, error) {
+	return LogSetsResult{}, nil
+}
 func (m *memoryStore) AddSet(_ context.Context, in AddSetInput) (Set, float64, error) {
 	m.nextSet++
 	s := Set{ID: m.nextSet, SessionID: in.SessionID, Position: 1, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, SI: CalculateSI(in.RPE), Technique: in.Technique, Superset: in.Superset}

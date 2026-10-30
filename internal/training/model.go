@@ -9,7 +9,43 @@ import (
 var (
 	ErrValidation = errors.New("validation error")
 	ErrNotFound   = errors.New("not found")
+	// ErrIdempotencyConflict means a key was reused for different content, which
+	// is a caller mistake: replaying would silently drop the new sets.
+	ErrIdempotencyConflict = errors.New("this idempotency_key was already used for different sets; use a new key to record them")
 )
+
+// LoggedSet is one set of a batch. Every field may differ between sets.
+type LoggedSet struct {
+	WeightKG  float64 `json:"weight_kg"`
+	Reps      int     `json:"reps"`
+	RPE       float64 `json:"rpe"`
+	Technique string  `json:"technique,omitempty"`
+}
+
+// LogSetsInput asks to record a batch of sets of one exercise into today's
+// session, identified by a key that stays the same across retries.
+type LogSetsInput struct {
+	Key      string
+	Exercise string
+	Sets     []LoggedSet
+}
+
+// LogSetsRecord is a validated and normalized batch, ready to be stored.
+type LogSetsRecord struct {
+	Key         string
+	Fingerprint string
+	Date        string
+	Exercise    string
+	Sets        []LoggedSet
+}
+
+// LogSetsResult is what a batch recorded. Replayed marks a result returned from
+// an earlier call with the same key, in which case nothing new was stored.
+type LogSetsResult struct {
+	Session  Session `json:"session"`
+	Sets     []Set   `json:"sets"`
+	Replayed bool    `json:"replayed"`
+}
 
 type Session struct {
 	ID      int64   `json:"id"`
@@ -47,6 +83,11 @@ var Techniques = []string{
 }
 
 const maxTechniqueLen = 40
+
+const (
+	maxIdempotencyKeyLen = 128
+	maxSetsPerLog        = 20
+)
 
 type SessionSummary struct {
 	ID       int64   `json:"id"`
