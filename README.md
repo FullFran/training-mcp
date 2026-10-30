@@ -63,6 +63,7 @@ Full write-up: **[docs/architecture.md](docs/architecture.md)**.
 | `TRAINING_DB_PATH` | `~/.local/share/training-mcp/training.db` | SQLite file |
 | `MCP_BEARER_TOKEN` | required | Static bearer credential |
 | `MCP_AUTH_DISABLED=1` | disabled | Unsafe tunnel-only development bypass; never use in production |
+| `MCP_OAUTH_ISSUER`, `MCP_OAUTH_RESOURCE`, `MCP_OAUTH_SUBJECT` | off | Also accept OAuth access tokens on `/mcp`; set all three or none, see [connection paths](docs/connection-paths.md) |
 | `WEB_BASE_PATH` | empty (web UI disabled) | Secret prefix the PWA is served from, e.g. `/a1b2c3…` |
 
 The unauthenticated `GET /health` endpoint returns `{"status":"ok"}`. MCP is only available at `/mcp` for GET, POST, and DELETE. Public ChatGPT access requires HTTPS at the TLS termination boundary.

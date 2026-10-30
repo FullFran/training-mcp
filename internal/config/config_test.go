@@ -97,3 +97,40 @@ func TestLoadLeavesOAuthOffByDefault(t *testing.T) {
 		t.Fatalf("cfg = %+v", cfg)
 	}
 }
+
+func TestLoadRefusesOAuthWithAuthDisabled(t *testing.T) {
+	t.Setenv("MCP_AUTH_DISABLED", "1")
+	t.Setenv("MCP_BEARER_TOKEN", "")
+	t.Setenv("MCP_OAUTH_ISSUER", "https://auth.example.test")
+	t.Setenv("MCP_OAUTH_RESOURCE", "https://training.example.test/mcp")
+	t.Setenv("MCP_OAUTH_SUBJECT", "user_owner")
+	if _, err := Load(":0"); err == nil {
+		t.Fatal("accepted OAuth settings on a server with authentication disabled")
+	}
+}
+
+func TestLoadRejectsAResourceWithoutAHostOrPath(t *testing.T) {
+	t.Setenv("MCP_BEARER_TOKEN", "x")
+	t.Setenv("MCP_OAUTH_ISSUER", "https://auth.example.test")
+	t.Setenv("MCP_OAUTH_SUBJECT", "user_owner")
+	for _, resource := range []string{"https://", "https://x y/mcp", "https://training.example.test", "https://training.example.test/other"} {
+		t.Setenv("MCP_OAUTH_RESOURCE", resource)
+		if _, err := Load(":0"); err == nil {
+			t.Errorf("accepted resource %q", resource)
+		}
+	}
+}
+
+func TestLoadTrimsOAuthValues(t *testing.T) {
+	t.Setenv("MCP_BEARER_TOKEN", "x")
+	t.Setenv("MCP_OAUTH_ISSUER", " https://auth.example.test ")
+	t.Setenv("MCP_OAUTH_RESOURCE", "https://training.example.test/mcp\n")
+	t.Setenv("MCP_OAUTH_SUBJECT", " user_owner ")
+	cfg, err := Load(":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.OAuthIssuer != "https://auth.example.test" || cfg.OAuthResource != "https://training.example.test/mcp" || cfg.OAuthSubject != "user_owner" {
+		t.Fatalf("cfg = %+v", cfg)
+	}
+}

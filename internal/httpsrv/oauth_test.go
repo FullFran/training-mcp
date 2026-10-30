@@ -25,15 +25,18 @@ const (
 )
 
 type oauthFixture struct {
-	t        *testing.T
-	key      *rsa.PrivateKey
-	kid      string
-	jwks     *httptest.Server
-	requests atomic.Int32
-	failing  atomic.Bool
-	handler  http.Handler
-	logs     *bytes.Buffer
-	reached  *atomic.Bool
+	t          *testing.T
+	key        *rsa.PrivateKey
+	kid        string
+	jwks       *httptest.Server
+	requests   atomic.Int32
+	failing    atomic.Bool
+	serveEmpty atomic.Bool
+	redirectTo atomic.Value
+	keyUse     atomic.Value
+	handler    http.Handler
+	logs       *bytes.Buffer
+	reached    *atomic.Bool
 }
 
 func newOAuthFixture(t *testing.T) *oauthFixture {
@@ -43,14 +46,26 @@ func newOAuthFixture(t *testing.T) *oauthFixture {
 		t.Fatal(err)
 	}
 	f := &oauthFixture{t: t, key: key, kid: "key-1", logs: &bytes.Buffer{}, reached: &atomic.Bool{}}
-	f.jwks = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	f.jwks = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.requests.Add(1)
 		if f.failing.Load() {
 			http.Error(w, "down", http.StatusInternalServerError)
 			return
 		}
+		if to, ok := f.redirectTo.Load().(string); ok {
+			http.Redirect(w, r, to, http.StatusFound)
+			return
+		}
+		if f.serveEmpty.Load() {
+			json.NewEncoder(w).Encode(map[string]any{"keys": []any{}})
+			return
+		}
+		use, _ := f.keyUse.Load().(string)
+		if use == "" {
+			use = "sig"
+		}
 		json.NewEncoder(w).Encode(map[string]any{"keys": []map[string]string{{
-			"kty": "RSA", "use": "sig", "alg": "RS256", "kid": f.kid,
+			"kty": "RSA", "use": use, "alg": "RS256", "kid": f.kid,
 			"n": base64.RawURLEncoding.EncodeToString(f.key.N.Bytes()),
 			"e": base64.RawURLEncoding.EncodeToString(big.NewInt(int64(f.key.E)).Bytes()),
 		}}})
@@ -316,5 +331,65 @@ func TestUnknownKeyIDsCannotHammerTheKeyEndpoint(t *testing.T) {
 	}
 	if got := f.requests.Load() - before; got > 1 {
 		t.Fatalf("20 unknown key ids caused %d fetches", got)
+	}
+}
+
+func TestInvalidTokenIsReportedAsSuch(t *testing.T) {
+	f := newOAuthFixture(t)
+	got := f.post("/mcp", "not-a-jwt")
+	if h := got.Header().Get("WWW-Authenticate"); !strings.Contains(h, `error="invalid_token"`) || !strings.Contains(h, "resource_metadata=") {
+		t.Fatalf("WWW-Authenticate = %q", h)
+	}
+	if h := f.post("/mcp", "").Header().Get("WWW-Authenticate"); strings.Contains(h, "error=") {
+		t.Fatalf("a request with no credential reported an error: %q", h)
+	}
+}
+
+func TestEmptyKeySetDoesNotDropKnownKeys(t *testing.T) {
+	f := newOAuthFixture(t)
+	f.post("/mcp", f.sign(goodClaims()))
+	oauthKeysEmpty := f.emptyKeys(t)
+	oauthKeysEmpty()
+	if got := f.post("/mcp", f.sign(goodClaims())); got.Code != http.StatusOK {
+		t.Fatalf("known key dropped: status = %d, logs = %s", got.Code, f.logs)
+	}
+}
+
+// emptyKeys makes the provider serve no keys and forces one refresh attempt.
+func (f *oauthFixture) emptyKeys(t *testing.T) func() {
+	t.Helper()
+	return func() {
+		f.serveEmpty.Store(true)
+		token := jwt.NewWithClaims(jwt.SigningMethodRS256, goodClaims())
+		token.Header["kid"] = "unknown"
+		signed, err := token.SignedString(f.key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.post("/mcp", signed)
+	}
+}
+
+func TestKeyFetchDoesNotFollowRedirects(t *testing.T) {
+	f := newOAuthFixture(t)
+	evil := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"keys": []map[string]string{{
+			"kty": "RSA", "kid": f.kid,
+			"n": base64.RawURLEncoding.EncodeToString(f.key.N.Bytes()),
+			"e": base64.RawURLEncoding.EncodeToString(big.NewInt(int64(f.key.E)).Bytes()),
+		}}})
+	}))
+	defer evil.Close()
+	f.redirectTo.Store(evil.URL)
+	if got := f.post("/mcp", f.sign(goodClaims())); got.Code != http.StatusUnauthorized || f.reached.Load() {
+		t.Fatalf("a redirected key set was trusted: status = %d", got.Code)
+	}
+}
+
+func TestKeysNotMeantForSigningAreIgnored(t *testing.T) {
+	f := newOAuthFixture(t)
+	f.keyUse.Store("enc")
+	if got := f.post("/mcp", f.sign(goodClaims())); got.Code != http.StatusUnauthorized {
+		t.Fatalf("an encryption key verified a token: status = %d", got.Code)
 	}
 }

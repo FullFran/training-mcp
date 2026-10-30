@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"flag"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,8 +40,15 @@ func Load(addr string) (Config, error) {
 	if token == "" && !disabled {
 		return Config{}, errors.New("MCP_BEARER_TOKEN is required unless MCP_AUTH_DISABLED=1")
 	}
-	issuer, resource, subject := os.Getenv("MCP_OAUTH_ISSUER"), os.Getenv("MCP_OAUTH_RESOURCE"), os.Getenv("MCP_OAUTH_SUBJECT")
+	issuer := strings.TrimSpace(os.Getenv("MCP_OAUTH_ISSUER"))
+	resource := strings.TrimSpace(os.Getenv("MCP_OAUTH_RESOURCE"))
+	subject := strings.TrimSpace(os.Getenv("MCP_OAUTH_SUBJECT"))
 	if issuer != "" || resource != "" || subject != "" {
+		if disabled {
+			// The bypass would leave /mcp open while the operator believes tokens
+			// are being checked.
+			return Config{}, errors.New("MCP_AUTH_DISABLED=1 cannot be combined with MCP_OAUTH_* settings")
+		}
 		// Half a configuration must stop the server: quietly running without one of
 		// these would either lock the owner out or stop checking who is calling.
 		if issuer == "" || resource == "" || subject == "" {
@@ -48,6 +56,11 @@ func Load(addr string) (Config, error) {
 		}
 		if !strings.HasPrefix(issuer, "https://") || !strings.HasPrefix(resource, "https://") {
 			return Config{}, errors.New("MCP_OAUTH_ISSUER and MCP_OAUTH_RESOURCE must be https URLs")
+		}
+		// Only /mcp is served, so any other resource would advertise metadata at a
+		// path that does not exist.
+		if u, err := url.Parse(resource); err != nil || u.Host == "" || u.Path != "/mcp" {
+			return Config{}, errors.New("MCP_OAUTH_RESOURCE must be this server's public /mcp URL")
 		}
 	}
 	return Config{
