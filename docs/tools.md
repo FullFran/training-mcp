@@ -1,6 +1,6 @@
 # MCP tool reference
 
-32 tools over Streamable HTTP at `/mcp`. Descriptions below are the ones the
+34 tools over Streamable HTTP at `/mcp`. Descriptions below are the ones the
 model actually receives — they are extracted from `internal/mcpsrv/server.go`,
 so this page cannot drift from the surface it documents.
 

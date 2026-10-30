@@ -99,6 +99,50 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 	}
 }
 
+func TestServerToolsDeclareHowTheyBehave(t *testing.T) {
+	session := mustConnect(t, New(training.NewService(testStore{}, nil)).Handler())
+	result, err := session.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	readOnly := map[string]bool{
+		"get_session": true, "list_sessions": true, "list_plans": true, "get_plan": true,
+		"session_progress": true, "suggest_load": true, "list_exercise_notes": true,
+		"list_volume_landmarks": true, "volume_recommendation": true, "exercise_history": true,
+		"weekly_volume": true, "list_exercise_groups": true, "volume_by_muscle": true,
+	}
+	additive := map[string]bool{
+		"start_session": true, "add_set": true, "log_set": true, "create_plan": true,
+		"move_plan_exercise": true, "save_session_as_plan": true,
+	}
+	if len(result.Tools) != 34 {
+		t.Fatalf("got %d tools, want 34", len(result.Tools))
+	}
+	for _, tool := range result.Tools {
+		a := tool.Annotations
+		if a == nil {
+			t.Errorf("%s has no annotations", tool.Name)
+			continue
+		}
+		if tool.Title == "" {
+			t.Errorf("%s has no title", tool.Name)
+		}
+		if a.ReadOnlyHint != readOnly[tool.Name] {
+			t.Errorf("%s readOnlyHint=%v", tool.Name, a.ReadOnlyHint)
+		}
+		wantDestructive := !readOnly[tool.Name] && !additive[tool.Name]
+		if a.DestructiveHint == nil || *a.DestructiveHint != wantDestructive {
+			t.Errorf("%s destructiveHint=%v, want %v", tool.Name, a.DestructiveHint, wantDestructive)
+		}
+		if a.OpenWorldHint == nil || *a.OpenWorldHint {
+			t.Errorf("%s openWorldHint=%v, want false", tool.Name, a.OpenWorldHint)
+		}
+		if a.IdempotentHint != !additive[tool.Name] {
+			t.Errorf("%s idempotentHint=%v", tool.Name, a.IdempotentHint)
+		}
+	}
+}
+
 func rawMCP(t *testing.T, url, method, host string) *http.Response {
 	t.Helper()
 	req, err := http.NewRequest(method, url, strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"raw","version":"1"}}}`))
@@ -141,6 +185,17 @@ func TestLoopbackConnectionRejectsAForeignHost(t *testing.T) {
 	}
 	if got := rawMCP(t, server.URL, http.MethodPost, "localhost").StatusCode; got != http.StatusOK {
 		t.Fatalf("localhost Host over loopback status = %d, want 200", got)
+	}
+}
+
+func TestServerInstructionsLeadWithTheLoggingPath(t *testing.T) {
+	session := mustConnect(t, New(training.NewService(testStore{}, nil)).Handler())
+	got := session.InitializeResult().Instructions
+	if !strings.Contains(got, "log_set") {
+		t.Fatalf("instructions do not name log_set: %q", got)
+	}
+	if len(got) > 512 {
+		t.Fatalf("instructions are %d characters; only the first 512 are guaranteed to count", len(got))
 	}
 }
 
