@@ -172,3 +172,58 @@ func TestLogSetsStampsTheSupersetFromTheSessionPlan(t *testing.T) {
 		t.Fatalf("superset = %q", out.Sets[0].Superset)
 	}
 }
+
+func TestMigrationMarksOnlyTheConfirmedImputedSets(t *testing.T) {
+	path := t.TempDir() + "/training.db"
+	store, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	type row struct {
+		date, created string
+		rpe           float64
+		want          bool
+	}
+	rows := []row{
+		{"2025-02-04", "2026-10-29 23:52:15", 8, true},
+		{"2026-10-29", "2026-10-29 23:42:23", 8, true},
+		{"2025-02-04", "2026-10-29 23:52:15", 9, false}, // a stated RPE
+		{"2025-02-04", "2026-11-02 10:00:00", 8, false}, // added later by hand
+		{"2023-09-01", "2026-10-29 23:00:00", 8, false}, // outside the backfill
+		{"2023-09-01", "2023-09-01 18:00:00", 8, false}, // ordinary history
+	}
+	for i, r := range rows {
+		res, err := store.db.Exec(`INSERT INTO sessions(date,started_at,plan_id,plan_name) VALUES (?,CURRENT_TIMESTAMP,NULL,'')`, r.date)
+		if err != nil {
+			t.Fatal(err)
+		}
+		session, err := res.LastInsertId()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = store.db.Exec(`INSERT INTO sets(id,session_id,position,exercise,weight_kg,reps,rpe,si,created_at,updated_at) VALUES (?,?,1,'remo',70,10,?,?,?,?)`,
+			i+1, session, r.rpe, training.CalculateSI(r.rpe), r.created, r.created); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Replays the migration against rows that existed before it ran.
+	if _, err = store.db.Exec(`DELETE FROM schema_migrations WHERE version=12`); err != nil {
+		t.Fatal(err)
+	}
+	store.Close()
+	store, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	for i, r := range rows {
+		var imputed bool
+		var rpe, si float64
+		if err := store.db.QueryRow(`SELECT rpe_imputed,rpe,si FROM sets WHERE id=?`, i+1).Scan(&imputed, &rpe, &si); err != nil {
+			t.Fatal(err)
+		}
+		if imputed != r.want || rpe != r.rpe || si != training.CalculateSI(r.rpe) {
+			t.Errorf("row %d (%+v): imputed=%v rpe=%v si=%v", i, r, imputed, rpe, si)
+		}
+	}
+}
