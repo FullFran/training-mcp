@@ -40,10 +40,8 @@ source "$root/.credentials/dokploy.env"
 offsite=false
 if [ -f "$root/.credentials/r2.env" ]; then
   # shellcheck disable=SC1091
-  source "$root/.credentials/r2.env"
-  : "${R2_ENDPOINT:?missing in r2.env}" "${R2_BUCKET:?missing in r2.env}"
-  : "${R2_ACCESS_KEY_ID:?missing in r2.env}" "${R2_SECRET_ACCESS_KEY:?missing in r2.env}"
-  : "${BACKUP_PASSPHRASE:?missing in r2.env}"
+  source "$root/scripts/r2-env.sh"
+  load_r2_env "$root/.credentials/r2.env"
   offsite=true
 fi
 
@@ -73,6 +71,8 @@ if [ "$download" = true ]; then
   # mktemp already made it private, which suits a copy of personal training data.
   mv "$tmp" "$out"
   tmp=""
+  # This copy has not gone off-site yet, whatever happened earlier today.
+  rm -f "$marker"
 
   printf '%s  %s sesiones, %s series\n' "$out" \
     "$(sqlite3 "$out" 'SELECT COUNT(*) FROM sessions;')" \
@@ -86,6 +86,10 @@ if [ "$offsite" = false ]; then
   echo "warning: no off-site copy configured, this machine holds the only backup" >&2
   exit 0
 fi
+
+# Checked only now, so a bad configuration never costs the local copy.
+require_r2_env
+: "${BACKUP_PASSPHRASE:?missing in r2.env}"
 
 # Encrypted here, so the bucket only ever holds ciphertext. Secrets go through
 # file descriptors because anything in argv is visible to every local process.

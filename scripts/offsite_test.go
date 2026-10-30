@@ -170,6 +170,61 @@ func TestIncompleteOffsiteConfigurationFailsLoudly(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(s.home, "bucket")); err == nil {
 		t.Fatal("uploaded with an incomplete configuration")
 	}
+	if got := s.read(s.today()); got != "SQLite format 3 fresh" {
+		t.Fatalf("a bad configuration cost the local copy: %q", got)
+	}
+}
+
+func TestOffsiteConfigurationIsReadNeverExecuted(t *testing.T) {
+	s := newSandbox(t)
+	s.configureOffsite()
+	s.write(filepath.Join(s.root, ".credentials", "r2.env"), strings.Join([]string{
+		"# a comment",
+		"",
+		"R2_ENDPOINT=https://account.r2.example.invalid",
+		"R2_BUCKET=training-backups",
+		"R2_ACCESS_KEY_ID=access-id",
+		"R2_SECRET_ACCESS_KEY=" + fakeSecret,
+		"BACKUP_PASSPHRASE=correct horse=battery $(touch \"$HOME/executed\")",
+	}, "\n")+"\n", 0o600)
+	out, err := s.run("backup.sh")
+	if err != nil {
+		t.Fatalf("backup failed: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "horse") || strings.Contains(out, "not found") {
+		t.Fatalf("part of the passphrase reached the output:\n%s", out)
+	}
+	if _, err := os.Stat(filepath.Join(s.home, "executed")); err == nil {
+		t.Fatal("a value in r2.env was executed")
+	}
+	got := s.read(filepath.Join(s.home, "gpg-passphrase"))
+	if !strings.Contains(got, `correct horse=battery $(touch "$HOME/executed")`) {
+		t.Fatalf("passphrase = %q", got)
+	}
+}
+
+func TestManualRunWithAFailedUploadIsRetriedByDailyMode(t *testing.T) {
+	s := newSandbox(t)
+	s.configureOffsite()
+	if out, err := s.run("backup.sh", "--daily"); err != nil {
+		t.Fatalf("first run failed: %v\n%s", err, out)
+	}
+	s.write(filepath.Join(s.home, "upload-fails"), "", 0o644)
+	if out, err := s.run("backup.sh"); err == nil {
+		t.Fatalf("a failed upload reported success:\n%s", out)
+	}
+	if err := os.Remove(filepath.Join(s.home, "upload-fails")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(s.uploaded()); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := s.run("backup.sh", "--daily"); err != nil {
+		t.Fatalf("retry failed: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(s.uploaded()); err != nil {
+		t.Fatalf("the newer copy never went off-site: %v", err)
+	}
 }
 
 func TestRestoreCheckFetchesTheNewestObjectAndVerifiesIt(t *testing.T) {
@@ -204,11 +259,28 @@ func TestRestoreCheckRejectsWhatItCannotRestore(t *testing.T) {
 			s.configureOffsite()
 			s.write(filepath.Join(s.home, "bucket", "stored"), "ENCRYPTED:SQLite format 3 fresh", 0o644)
 			breakIt(s)
-			if out, err := s.run("restore-check.sh", "--no-boot"); err == nil {
+			out, err := s.run("restore-check.sh", "--no-boot")
+			if err == nil {
 				t.Fatalf("restore check passed:\n%s", out)
+			}
+			if strings.TrimSpace(out) == "" {
+				t.Fatal("failed without saying why")
 			}
 			s.assertTmpEmpty()
 		})
+	}
+}
+
+func TestRestoreCheckExplainsAnEmptyBucket(t *testing.T) {
+	s := newSandbox(t)
+	s.configureOffsite()
+	s.tool("curl", `cat >/dev/null; printf '<ListBucketResult></ListBucketResult>'`)
+	out, err := s.run("restore-check.sh", "--no-boot")
+	if err == nil {
+		t.Fatalf("restore check passed on an empty bucket:\n%s", out)
+	}
+	if !strings.Contains(out, "no backups found") {
+		t.Fatalf("output = %q", out)
 	}
 }
 

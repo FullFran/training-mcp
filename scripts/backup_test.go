@@ -32,7 +32,7 @@ func newSandbox(t *testing.T) *sandbox {
 			t.Fatal(err)
 		}
 	}
-	for _, name := range []string{"backup.sh", "install-backup-cron.sh", "restore-check.sh"} {
+	for _, name := range []string{"backup.sh", "install-backup-cron.sh", "restore-check.sh", "r2-env.sh"} {
 		body, err := os.ReadFile(name)
 		if err != nil {
 			t.Fatal(err)
