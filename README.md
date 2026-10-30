@@ -140,8 +140,9 @@ its copy — a backup you have to remember to take is not a backup.
 
 With `.credentials/r2.env` present, each daily copy is also encrypted with `gpg`
 and uploaded to Cloudflare R2, so the bucket only ever holds ciphertext. A failed
-upload notifies and retries on the next run. The file needs `R2_ENDPOINT`,
-`R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `BACKUP_PASSPHRASE`.
+upload notifies and retries on the next run that day; the next day's copy is a full snapshot either way. The file needs `R2_ENDPOINT`,
+`R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `BACKUP_PASSPHRASE`,
+as `NAME=value` lines taken literally, with no quotes.
 Keep the passphrase somewhere other than this machine: without it the copies
 cannot be read. Expire old objects with a lifecycle rule on the bucket.
 
@@ -159,7 +160,7 @@ debt, not a design: see the open issues.
 ## Scope boundary
 
 This MVP excludes recommendations, multi-user identity/RBAC, REST/GraphQL,
-OAuth/JWT/token rotation, audit history, cloud sync/backups, concurrent-writer
+OAuth/JWT/token rotation, audit history, cloud sync, concurrent-writer
 controls, and formula changes.
 
 Three exclusions were deliberately lifted as the tool proved useful:

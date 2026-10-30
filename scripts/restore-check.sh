@@ -18,7 +18,8 @@ fi
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
-source "$root/.credentials/r2.env"
+source "$root/scripts/r2-env.sh"
+load_r2_env "$root/.credentials/r2.env"
 : "${BACKUP_PASSPHRASE:?missing in r2.env}"
 
 work="$(mktemp -d)"
@@ -37,18 +38,20 @@ r2() {
 if [ $# -gt 0 ]; then
   cp "$1" "$work/copy.gpg"
 else
-  : "${R2_ENDPOINT:?missing in r2.env}" "${R2_BUCKET:?missing in r2.env}"
-  : "${R2_ACCESS_KEY_ID:?missing in r2.env}" "${R2_SECRET_ACCESS_KEY:?missing in r2.env}"
+  require_r2_env
   base="${R2_ENDPOINT%/}/$R2_BUCKET"
-  # Names carry the date, so the last in sort order is the newest.
-  key="$(r2 "$base/?list-type=2&prefix=training-" | grep -o '<Key>[^<]*</Key>' | sed 's/<[^>]*>//g' | sort | tail -n 1)"
+  listing="$(r2 "$base/?list-type=2&prefix=training-")"
+  # Names carry the date, so the last in sort order is the newest. Finding none
+  # is not an error yet: the check below says what it means.
+  key="$(printf '%s' "$listing" | { grep -o '<Key>[^<]*</Key>' || true; } | sed 's/<[^>]*>//g' | sort | tail -n 1)"
   [ -n "$key" ] || { echo "no backups found in the bucket" >&2; exit 1; }
   r2 -o "$work/copy.gpg" "$base/$key"
   echo "fetched $key"
 fi
 
 gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 --decrypt \
-  --output "$work/training.db" "$work/copy.gpg" 3<<<"$BACKUP_PASSPHRASE" 2>/dev/null
+  --output "$work/training.db" "$work/copy.gpg" 3<<<"$BACKUP_PASSPHRASE" 2>/dev/null ||
+  { echo "could not decrypt: wrong BACKUP_PASSPHRASE or a damaged file" >&2; exit 1; }
 
 head -c 15 "$work/training.db" | grep -q 'SQLite format 3' || { echo "not a SQLite file" >&2; exit 1; }
 sqlite3 "$work/training.db" 'PRAGMA integrity_check;' | grep -qx ok || { echo "integrity check failed" >&2; exit 1; }
