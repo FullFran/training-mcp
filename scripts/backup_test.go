@@ -32,7 +32,7 @@ func newSandbox(t *testing.T) *sandbox {
 			t.Fatal(err)
 		}
 	}
-	for _, name := range []string{"backup.sh", "install-backup-cron.sh"} {
+	for _, name := range []string{"backup.sh", "install-backup-cron.sh", "restore-check.sh"} {
 		body, err := os.ReadFile(name)
 		if err != nil {
 			t.Fatal(err)
@@ -77,7 +77,11 @@ func (s *sandbox) run(script string, args ...string) (string, error) {
 		// so the installer must always find the fake first.
 		path = s.tools + ":" + path
 	}
-	cmd.Env = []string{"HOME=" + s.home, "PATH=" + path}
+	tmp := filepath.Join(s.home, "tmp")
+	if err := os.MkdirAll(tmp, 0o755); err != nil {
+		s.t.Fatal(err)
+	}
+	cmd.Env = []string{"HOME=" + s.home, "PATH=" + path, "TMPDIR=" + tmp}
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
