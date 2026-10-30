@@ -3,6 +3,7 @@ module github.com/fullfran/training-mcp
 go 1.26
 
 require (
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/jsonschema-go v0.4.3
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	modernc.org/sqlite v1.39.1

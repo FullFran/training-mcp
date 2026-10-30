@@ -48,3 +48,52 @@ func TestLoadNormalizesWebBasePath(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadRequiresOAuthSettingsTogether(t *testing.T) {
+	t.Setenv("MCP_BEARER_TOKEN", "x")
+	t.Setenv("MCP_AUTH_DISABLED", "")
+	full := map[string]string{
+		"MCP_OAUTH_ISSUER":   "https://auth.example.test",
+		"MCP_OAUTH_RESOURCE": "https://training.example.test/mcp",
+		"MCP_OAUTH_SUBJECT":  "user_owner",
+	}
+	for missing := range full {
+		for k, v := range full {
+			if k == missing {
+				v = ""
+			}
+			t.Setenv(k, v)
+		}
+		if _, err := Load(":0"); err == nil {
+			t.Errorf("accepted a configuration without %s", missing)
+		}
+	}
+	for k, v := range full {
+		t.Setenv(k, v)
+	}
+	cfg, err := Load(":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.OAuthIssuer != full["MCP_OAUTH_ISSUER"] || cfg.OAuthResource != full["MCP_OAUTH_RESOURCE"] || cfg.OAuthSubject != full["MCP_OAUTH_SUBJECT"] {
+		t.Fatalf("cfg = %+v", cfg)
+	}
+	t.Setenv("MCP_OAUTH_ISSUER", "http://auth.example.test")
+	if _, err := Load(":0"); err == nil {
+		t.Error("accepted a plain http issuer")
+	}
+}
+
+func TestLoadLeavesOAuthOffByDefault(t *testing.T) {
+	t.Setenv("MCP_BEARER_TOKEN", "x")
+	t.Setenv("MCP_OAUTH_ISSUER", "")
+	t.Setenv("MCP_OAUTH_RESOURCE", "")
+	t.Setenv("MCP_OAUTH_SUBJECT", "")
+	cfg, err := Load(":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.OAuthIssuer != "" {
+		t.Fatalf("cfg = %+v", cfg)
+	}
+}
