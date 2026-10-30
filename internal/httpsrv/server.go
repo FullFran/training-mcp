@@ -20,15 +20,7 @@ func BearerWithPolicy(token string, disabled bool, authorize func(*http.Request)
 			next.ServeHTTP(w, r)
 			return
 		}
-		auth := r.Header.Get("Authorization")
-		const prefix = "Bearer "
-		if !strings.HasPrefix(auth, prefix) {
-			unauthorized(w)
-			return
-		}
-		provided := []byte(strings.TrimSpace(strings.TrimPrefix(auth, prefix)))
-		expected := []byte(token)
-		if len(provided) != len(expected) || subtle.ConstantTimeCompare(provided, expected) != 1 {
+		if !staticTokenMatches(r, token) {
 			unauthorized(w)
 			return
 		}
@@ -38,6 +30,19 @@ func BearerWithPolicy(token string, disabled bool, authorize func(*http.Request)
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// staticTokenMatches compares in constant time. An empty configured token never
+// matches, so a deployment with OAuth alone cannot be opened by an empty header.
+func staticTokenMatches(r *http.Request, token string) bool {
+	auth := r.Header.Get("Authorization")
+	const prefix = "Bearer "
+	if token == "" || !strings.HasPrefix(auth, prefix) {
+		return false
+	}
+	provided := []byte(strings.TrimSpace(strings.TrimPrefix(auth, prefix)))
+	expected := []byte(token)
+	return len(provided) == len(expected) && subtle.ConstantTimeCompare(provided, expected) == 1
 }
 func unauthorized(w http.ResponseWriter) {
 	w.Header().Set("WWW-Authenticate", "Bearer")
@@ -58,8 +63,21 @@ type WebUI struct {
 }
 
 func Routes(mcp http.Handler, authDisabled bool, token string, web *WebUI) http.Handler {
+	return RoutesWithOAuth(mcp, authDisabled, token, web, nil)
+}
+
+// RoutesWithOAuth also accepts access tokens on /mcp when oauth is set. The web UI
+// stays behind the static token: these tokens are issued for the MCP resource.
+func RoutesWithOAuth(mcp http.Handler, authDisabled bool, token string, web *WebUI, oauth *OAuth) http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("/mcp", MaxBody(Bearer(token, authDisabled, mcp)))
+	if oauth != nil && !authDisabled {
+		mux.Handle("/mcp", MaxBody(oauth.guard(token, mcp)))
+		metadata := oauth.metadataHandler()
+		mux.Handle("/.well-known/oauth-protected-resource", metadata)
+		mux.Handle("/.well-known/oauth-protected-resource/mcp", metadata)
+	} else {
+		mux.Handle("/mcp", MaxBody(Bearer(token, authDisabled, mcp)))
+	}
 	if web != nil && web.Handler != nil && web.BasePath != "" {
 		// The secret path is the outer gate, but the same bearer still guards
 		// these routes so the app is never reachable from inside the network

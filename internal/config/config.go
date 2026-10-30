@@ -14,6 +14,8 @@ type Config struct {
 	// WebBasePath mounts the PWA under a secret, unguessable prefix. Empty
 	// disables the web UI entirely, so it is never exposed by accident.
 	WebBasePath string
+	// OAuth settings are all set or all empty; empty leaves OAuth off.
+	OAuthIssuer, OAuthResource, OAuthSubject string
 }
 
 func Load(addr string) (Config, error) {
@@ -37,7 +39,21 @@ func Load(addr string) (Config, error) {
 	if token == "" && !disabled {
 		return Config{}, errors.New("MCP_BEARER_TOKEN is required unless MCP_AUTH_DISABLED=1")
 	}
-	return Config{Addr: addr, DBPath: db, Token: token, AuthDisabled: disabled, WebBasePath: webBase}, nil
+	issuer, resource, subject := os.Getenv("MCP_OAUTH_ISSUER"), os.Getenv("MCP_OAUTH_RESOURCE"), os.Getenv("MCP_OAUTH_SUBJECT")
+	if issuer != "" || resource != "" || subject != "" {
+		// Half a configuration must stop the server: quietly running without one of
+		// these would either lock the owner out or stop checking who is calling.
+		if issuer == "" || resource == "" || subject == "" {
+			return Config{}, errors.New("MCP_OAUTH_ISSUER, MCP_OAUTH_RESOURCE and MCP_OAUTH_SUBJECT must be set together")
+		}
+		if !strings.HasPrefix(issuer, "https://") || !strings.HasPrefix(resource, "https://") {
+			return Config{}, errors.New("MCP_OAUTH_ISSUER and MCP_OAUTH_RESOURCE must be https URLs")
+		}
+	}
+	return Config{
+		Addr: addr, DBPath: db, Token: token, AuthDisabled: disabled, WebBasePath: webBase,
+		OAuthIssuer: issuer, OAuthResource: resource, OAuthSubject: subject,
+	}, nil
 }
 
 // normalizeBasePath accepts "", "app", "/app" or "/app/" and returns "" or

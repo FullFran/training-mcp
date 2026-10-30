@@ -70,7 +70,14 @@ func runWithContext(ctx context.Context, args []string) error {
 		logger.Printf("web UI mounted under a secret base path (%d chars)", len(cfg.WebBasePath))
 	}
 
-	handler := httpsrv.Routes(mcpServer.Handler(), cfg.AuthDisabled, cfg.Token, web)
+	var oauth *httpsrv.OAuth
+	if cfg.OAuthIssuer != "" {
+		oauth = httpsrv.NewOAuth(httpsrv.OAuthConfig{
+			Issuer: cfg.OAuthIssuer, Resource: cfg.OAuthResource, Subject: cfg.OAuthSubject, Logger: logger,
+		})
+		logger.Printf("oauth enabled for resource %s", cfg.OAuthResource)
+	}
+	handler := httpsrv.RoutesWithOAuth(mcpServer.Handler(), cfg.AuthDisabled, cfg.Token, web, oauth)
 	httpServer := &http.Server{Addr: cfg.Addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
 	errCh := make(chan error, 1)
 	go func() { errCh <- httpServer.ListenAndServe() }()
