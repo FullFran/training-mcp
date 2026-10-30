@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Log your training by talking to it.** A single-user Go service that replaces a
-workout spreadsheet with 32 conversational MCP tools over Streamable HTTP,
+workout spreadsheet with 34 conversational MCP tools over Streamable HTTP,
 plus an installable PWA for the gym floor. SQLite for storage, no framework,
 no mock library.
 
@@ -23,7 +23,7 @@ domain package and both interfaces are adapters over it:
 
 ```mermaid
 flowchart LR
-    MCP["mcpsrv<br/>32 MCP tools"] --> SVC
+    MCP["mcpsrv<br/>34 MCP tools"] --> SVC
     WEB["websrv<br/>PWA"] --> SVC
     SVC["training.Service<br/>rules · validation · SI"] --> PORT(["Store · Clock"])
     PORT -.-> SQL["sqlitestore<br/>SQLite + migrations"]
@@ -69,7 +69,7 @@ The unauthenticated `GET /health` endpoint returns `{"status":"ok"}`. MCP is onl
 
 ## Tools
 
-32 tools, grouped by what you are doing: logging sets, managing plans,
+34 tools, grouped by what you are doing: logging sets, managing plans,
 adjusting today's session, progression and analysis, the feedback loop, and the
 exercise catalogue.
 
@@ -138,6 +138,20 @@ and raises a desktop notification.
 after the day's first success, so a machine that was off at one hour still gets
 its copy — a backup you have to remember to take is not a backup.
 
+With `.credentials/r2.env` present, each daily copy is also encrypted with `gpg`
+and uploaded to Cloudflare R2, so the bucket only ever holds ciphertext. A failed
+upload notifies and retries on the next run. The file needs `R2_ENDPOINT`,
+`R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `BACKUP_PASSPHRASE`.
+Keep the passphrase somewhere other than this machine: without it the copies
+cannot be read. Expire old objects with a lifecycle rule on the bucket.
+
+`scripts/restore-check.sh` proves a copy is restorable without touching
+production: it fetches the newest object, decrypts and verifies it, boots the
+server on it in a temp dir, and reads it back through MCP. Run it after setting
+this up and periodically afterwards. To really restore: decrypt with
+`gpg --decrypt`, stop the app, copy the file into the `/data` volume as
+`training.db`, and start the app again.
+
 **Authentication is currently the secret URL itself.** The reverse proxy injects
 the bearer token, so anyone holding the URL has full access. This is tracked
 debt, not a design: see the open issues.
@@ -159,7 +173,7 @@ never edits a plan on its own.
 ## Documentation
 
 - [Architecture](docs/architecture.md) — ports and adapters, package layout, testing
-- [MCP tool reference](docs/tools.md) — all 32 tools
+- [MCP tool reference](docs/tools.md) — all 34 tools
 - [ChatGPT setup](docs/chatgpt-setup.md)
 - [Connection paths and tunnel safety](docs/connection-paths.md)
 - [SI formula](docs/si-formula.md)
