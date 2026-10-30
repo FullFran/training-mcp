@@ -139,3 +139,89 @@ func TestLogSetsRequiresAKeyAndAtLeastOneSet(t *testing.T) {
 		t.Fatalf("stored sets = %d", got)
 	}
 }
+
+func unknownRPEArgs(key string) map[string]any {
+	return map[string]any{"idempotency_key": key, "exercise": "remo", "sets": []map[string]any{
+		{"weight_kg": 70, "reps": 10},
+		{"weight_kg": 70, "reps": 8, "rpe": 9},
+	}}
+}
+
+func TestLogSetsMarksAnUnstatedRPEAsImputedAndCountsOneUnit(t *testing.T) {
+	session := logSetsSession(t)
+	var out LogSetsOut
+	decode(t, call(t, session, "log_sets", unknownRPEArgs("k")), &out)
+	unknown, measured := out.Sets[0], out.Sets[1]
+	if !unknown.RPEImputed || unknown.SI != 1 {
+		t.Fatalf("unknown set = %#v", unknown)
+	}
+	if measured.RPEImputed || measured.RPE != 9 || measured.SI != 1.2 {
+		t.Fatalf("measured set = %#v", measured)
+	}
+	if out.TotalSI != 2.2 {
+		t.Fatalf("total SI = %v", out.TotalSI)
+	}
+	var stored SessionOut
+	decode(t, call(t, session, "get_session", map[string]any{"session_id": out.Session.ID}), &stored)
+	if !stored.Session.Sets[0].RPEImputed || stored.Session.Sets[1].RPEImputed {
+		t.Fatalf("stored = %#v", stored.Session.Sets)
+	}
+	var history HistoryOut
+	decode(t, call(t, session, "exercise_history", map[string]any{"exercise": "remo"}), &history)
+	flags := map[int]bool{}
+	for _, set := range history.History.Sets {
+		flags[set.Reps] = set.RPEImputed
+	}
+	if !flags[10] || flags[8] {
+		t.Fatalf("history flags = %#v", flags)
+	}
+}
+
+func TestStatingTheRPELaterClearsTheMarkAndOtherEditsKeepIt(t *testing.T) {
+	session := logSetsSession(t)
+	var out LogSetsOut
+	decode(t, call(t, session, "log_sets", unknownRPEArgs("k")), &out)
+	id := out.Sets[0].ID
+	var edited SetOut
+	decode(t, call(t, session, "update_set", map[string]any{"set_id": id, "reps": 11}), &edited)
+	if !edited.Set.RPEImputed || edited.Set.SI != 1 {
+		t.Fatalf("editing reps changed the mark: %#v", edited.Set)
+	}
+	var stated SetOut
+	decode(t, call(t, session, "update_set", map[string]any{"set_id": id, "rpe": 8}), &stated)
+	if stated.Set.RPEImputed {
+		t.Fatalf("stating the RPE kept the mark: %#v", stated.Set)
+	}
+}
+
+func TestMeasuredSetsDoNotGainTheImputedField(t *testing.T) {
+	session := logSetsSession(t)
+	result := call(t, session, "log_sets", repsArgs("k", 12))
+	if strings.Contains(stringContent(result), "rpe_imputed") {
+		t.Fatalf("output = %s", stringContent(result))
+	}
+}
+
+func TestLogSetsStillRejectsAnOutOfRangeRPE(t *testing.T) {
+	session := logSetsSession(t)
+	args := unknownRPEArgs("k")
+	args["sets"].([]map[string]any)[0]["rpe"] = 0
+	if result := call(t, session, "log_sets", args); !result.IsError {
+		t.Fatal("accepted an explicit RPE of 0")
+	}
+}
+
+func TestSuggestLoadDoesNotJudgeEffortFromAnImputedRPE(t *testing.T) {
+	session := logSetsSession(t)
+	var plan PlanOut
+	decode(t, call(t, session, "create_plan", map[string]any{"name": "A", "items": []map[string]any{
+		{"exercise": "remo", "target_sets": 3, "rep_min": 8, "rep_max": 10, "target_rpe": 9.5},
+	}}), &plan)
+	call(t, session, "log_sets", map[string]any{"idempotency_key": "k", "exercise": "remo", "sets": []map[string]any{{"weight_kg": 70, "reps": 10}}})
+	var out LoadSuggestionOut
+	decode(t, call(t, session, "suggest_load", map[string]any{"exercise": "remo"}), &out)
+	s := out.Suggestion
+	if s.DeltaKG != 0 || s.LastRPE != 0 || !strings.Contains(s.Reason, "RPE") {
+		t.Fatalf("suggestion = %#v", s)
+	}
+}

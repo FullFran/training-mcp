@@ -520,6 +520,9 @@ func (s *Service) LogSets(ctx context.Context, in LogSetsInput) (LogSetsResult, 
 	sets := make([]LoggedSet, len(in.Sets))
 	for i, set := range in.Sets {
 		set.Technique = normalizeTechnique(set.Technique)
+		if set.RPE == 0 {
+			set.RPE, set.RPEImputed = ImputedRPE, true
+		}
 		if !validSetFields(exercise, set.WeightKG, set.Reps, set.RPE) || len(set.Technique) > maxTechniqueLen {
 			return LogSetsResult{}, ErrValidation
 		}
