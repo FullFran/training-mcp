@@ -85,11 +85,62 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 	if len(summaries.Sessions) != 1 || summaries.Sessions[0].SetCount != 1 || summaries.Sessions[0].TotalSI != 1.4 {
 		t.Fatalf("list=%#v", summaries)
 	}
-	if _, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "update_set", Arguments: map[string]any{"set_id": added2.Set.ID, "rpe": 99}}); err == nil {
+	// Invalid input comes back as a tool error the model can read and correct.
+	rejected := call(t, session, "update_set", map[string]any{"set_id": added2.Set.ID, "rpe": 99})
+	if !rejected.IsError {
 		t.Fatal("update_set accepted RPE outside its declared range")
 	}
-	if _, err := store.GetSession(context.Background(), started.Session.ID); err != nil {
+	stored, err := store.GetSession(context.Background(), started.Session.ID)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if stored.TotalSI != 1.4 {
+		t.Fatalf("rejected update changed the stored total SI: %v", stored.TotalSI)
+	}
+}
+
+func rawMCP(t *testing.T, url, method, host string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(method, url, strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"raw","version":"1"}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	if host != "" {
+		req.Host = host
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+	return resp
+}
+
+func TestStatelessServerIssuesNoSessions(t *testing.T) {
+	server := httptest.NewServer(New(training.NewService(testStore{}, nil)).Handler())
+	defer server.Close()
+	initialized := rawMCP(t, server.URL, http.MethodPost, "")
+	if initialized.StatusCode != http.StatusOK {
+		t.Fatalf("initialize status = %d", initialized.StatusCode)
+	}
+	if id := initialized.Header.Get("Mcp-Session-Id"); id != "" {
+		t.Fatalf("stateless server issued session id %q", id)
+	}
+	if got := rawMCP(t, server.URL, http.MethodDelete, "").StatusCode; got != http.StatusMethodNotAllowed {
+		t.Fatalf("DELETE status = %d, want 405", got)
+	}
+}
+
+func TestLoopbackConnectionRejectsAForeignHost(t *testing.T) {
+	server := httptest.NewServer(New(training.NewService(testStore{}, nil)).Handler())
+	defer server.Close()
+	if got := rawMCP(t, server.URL, http.MethodPost, "training.example.com").StatusCode; got != http.StatusForbidden {
+		t.Fatalf("foreign Host over loopback status = %d, want 403", got)
+	}
+	if got := rawMCP(t, server.URL, http.MethodPost, "localhost").StatusCode; got != http.StatusOK {
+		t.Fatalf("localhost Host over loopback status = %d, want 200", got)
 	}
 }
 

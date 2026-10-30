@@ -8,4 +8,6 @@
 
 The server does not implement a tunnel, TLS termination, OAuth, JWT, or connector provisioning. Use the official [MCP transport documentation](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports) and your selected tunnel provider's current documentation. Never expose the bypass mode on a public address.
 
+A connection that reaches the server over a loopback address must carry a loopback `Host`, or `/mcp` answers `403 Forbidden: invalid Host header`. This is the MCP SDK's DNS rebinding protection. A tunnel agent or proxy on the same machine must therefore rewrite `Host` to `localhost`. A reverse proxy reaching the server over a container network is not affected.
+
 Health is `GET /health`; the MCP Streamable HTTP endpoint is `/mcp`. There are no REST or GraphQL routes.
