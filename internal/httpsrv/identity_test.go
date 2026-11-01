@@ -237,3 +237,32 @@ func TestRequestWithoutAnIdentitySeesNobodysData(t *testing.T) {
 		t.Fatalf("a request with no identity read %d plans", len(plans))
 	}
 }
+
+// Subjects are compared byte for byte: a near match must never reach someone else's
+// data, least of all the owner's.
+func TestSubjectsMatchExactly(t *testing.T) {
+	f := newIdentityFixture(t, true)
+	createPlan(t, f.handler, f.tokenFor(testSubject), "Owner plan")
+	for _, near := range []string{" " + testSubject, testSubject + " ", strings.ToUpper(testSubject)} {
+		if got := listPlans(t, f.handler, f.tokenFor(near)); strings.Contains(got, "Owner plan") {
+			t.Fatalf("%q reads the owner's plans: %s", near, got)
+		}
+	}
+	createPlan(t, f.handler, f.tokenFor("user_guest"), "Guest plan")
+	if got := listPlans(t, f.handler, f.tokenFor("USER_GUEST")); strings.Contains(got, "Guest plan") {
+		t.Fatalf("a case variant reads the guest's plans: %s", got)
+	}
+}
+
+// Moving the owner to a subject that already has an account must still give them
+// their own data.
+func TestConfiguredOwnerWinsOverAStoredAccount(t *testing.T) {
+	f := newIdentityFixture(t, true)
+	createPlan(t, f.handler, staticToken, "Owner plan")
+	if _, err := f.store.ProvisionUser(context.Background(), testSubject); err != nil {
+		t.Fatal(err)
+	}
+	if got := listPlans(t, f.handler, f.tokenFor(testSubject)); !strings.Contains(got, "Owner plan") {
+		t.Fatalf("owner's plans = %s", got)
+	}
+}
