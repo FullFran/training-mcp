@@ -2,7 +2,17 @@ package training
 
 import "context"
 
+// Store is the persistence port. Everything that belongs to a person is reached
+// through ForUser, so a data method cannot be called without saying whose data it is.
 type Store interface {
+	ForUser(userID int64) UserStore
+	// Snapshot copies the whole database, every user's data included.
+	Snapshot(context.Context, string) error
+}
+
+// UserStore is the data of one user. Another user's id behaves exactly as a missing
+// id does: the same error, so its existence cannot be inferred.
+type UserStore interface {
 	Start(context.Context, Session) (Session, error)
 	AddSet(context.Context, AddSetInput) (Set, float64, error)
 	LogSets(context.Context, LogSetsRecord) (LogSetsResult, error)
@@ -36,7 +46,6 @@ type Store interface {
 	SetExerciseGroup(context.Context, ExerciseGroup) error
 	ExerciseGroups(context.Context) ([]ExerciseGroup, error)
 	VolumeByGroup(context.Context, ListFilter) ([]GroupVolume, error)
-	Snapshot(context.Context, string) error
 	SetExerciseNote(context.Context, ExerciseNote) error
 	ExerciseNotes(context.Context) ([]ExerciseNote, error)
 	SupersetFor(context.Context, int64, string) (string, error)

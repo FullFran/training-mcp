@@ -19,6 +19,9 @@ import (
 	"github.com/fullfran/training-mcp/internal/websrv"
 )
 
+// ownerUserID is the one user every request acts as until requests carry an identity.
+const ownerUserID = 1
+
 func address(args []string) string {
 	fs := flag.NewFlagSet("training-mcp", flag.ContinueOnError)
 	v := fs.String("addr", ":8080", "")
@@ -55,14 +58,16 @@ func runWithContext(ctx context.Context, args []string) error {
 		return err
 	}
 	defer store.Close()
-	service := training.NewService(store, time.Now)
-	mcpServer := mcpsrv.New(service)
+	services := training.NewServices(store, time.Now)
+	owner := services.ForUser(ownerUserID)
+	serviceFor := func(context.Context) *training.Service { return owner }
+	mcpServer := mcpsrv.New(serviceFor)
 	logger := log.Default()
 	httpsrv.WarningIfDisabled(cfg.AuthDisabled, logger)
 
 	var web *httpsrv.WebUI
 	if cfg.WebBasePath != "" {
-		webServer, err := websrv.New(service, time.Now, cfg.WebBasePath)
+		webServer, err := websrv.New(serviceFor, services.Snapshot, time.Now, cfg.WebBasePath)
 		if err != nil {
 			return err
 		}

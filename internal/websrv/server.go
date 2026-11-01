@@ -34,10 +34,11 @@ var staticFS embed.FS
 const recentExerciseLimit = 8
 
 type Server struct {
-	service *training.Service
-	clock   training.Clock
-	base    string
-	tpl     *template.Template
+	service  training.ServiceFor
+	snapshot func(context.Context, string) error
+	clock    training.Clock
+	base     string
+	tpl      *template.Template
 	// txt renders the manifest and the service worker. They are JSON and
 	// JavaScript documents, so html/template's contextual escaping would be
 	// wrong for them.
@@ -111,7 +112,7 @@ func (b ExerciseBlock) IsRecord(s training.Set) bool {
 	return b.BestE1RM > 0 && math.Abs(training.Epley1RM(s.WeightKG, s.Reps)-b.BestE1RM) < 0.05
 }
 
-func New(service *training.Service, clock training.Clock, basePath string) (*Server, error) {
+func New(service training.ServiceFor, snapshot func(context.Context, string) error, clock training.Clock, basePath string) (*Server, error) {
 	funcs := map[string]any{
 		"num":         formatNumber,
 		"rpeScale":    rpeScale,
@@ -172,7 +173,7 @@ func New(service *training.Service, clock training.Clock, basePath string) (*Ser
 		return nil, err
 	}
 	s := &Server{
-		service: service, clock: clock, base: strings.TrimSuffix(basePath, "/"),
+		service: service, snapshot: snapshot, clock: clock, base: strings.TrimSuffix(basePath, "/"),
 		tpl: tpl, txt: txt, mux: http.NewServeMux(),
 	}
 	s.routes()
@@ -258,7 +259,7 @@ func (s *Server) addSet(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, err)
 			return
 		}
-		_, _, err = s.service.AddSet(r.Context(), training.AddSetInput{
+		_, _, err = s.service(r.Context()).AddSet(r.Context(), training.AddSetInput{
 			SessionID: session.ID, Exercise: exercise, WeightKG: weight,
 			Reps: reps, RPE: rpe, Technique: technique,
 		})
@@ -314,7 +315,7 @@ func (s *Server) updateSet(w http.ResponseWriter, r *http.Request) {
 		patch.Technique = &v
 	}
 	if message == "" {
-		switch _, _, err := s.service.UpdateSet(r.Context(), id, patch); {
+		switch _, _, err := s.service(r.Context()).UpdateSet(r.Context(), id, patch); {
 		case errors.Is(err, training.ErrNotFound):
 			message = "Esa serie ya no existe."
 		case errors.Is(err, training.ErrValidation):
@@ -334,7 +335,7 @@ func (s *Server) deleteSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	message := ""
-	switch _, _, _, err := s.service.DeleteSet(r.Context(), id); {
+	switch _, _, _, err := s.service(r.Context()).DeleteSet(r.Context(), id); {
 	case errors.Is(err, training.ErrNotFound):
 		message = "Esa serie ya no existe."
 	case errors.Is(err, training.ErrValidation):
@@ -376,19 +377,19 @@ func (s *Server) plansPage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) plansData(ctx context.Context, message string) (pageData, error) {
 	data := pageData{Base: s.base, Today: s.todayDate(), Error: message}
-	summaries, err := s.service.ListPlans(ctx)
+	summaries, err := s.service(ctx).ListPlans(ctx)
 	if err != nil {
 		return data, err
 	}
 	// ListPlans returns totals only; the page needs each plan's exercises.
 	for _, summary := range summaries {
-		plan, err := s.service.GetPlan(ctx, summary.ID)
+		plan, err := s.service(ctx).GetPlan(ctx, summary.ID)
 		if err != nil {
 			return data, err
 		}
 		data.Plans = append(data.Plans, plan)
 	}
-	groups, err := s.service.ExerciseGroups(ctx)
+	groups, err := s.service(ctx).ExerciseGroups(ctx)
 	if err != nil {
 		return data, err
 	}
@@ -416,30 +417,30 @@ func (s *Server) planAction(w http.ResponseWriter, r *http.Request) {
 	switch strings.TrimSuffix(r.URL.Path, "/") {
 	case s.base + "/plans/create":
 		// A routine starts empty; exercises are added from the page itself.
-		_, err = s.service.CreatePlan(r.Context(), training.Plan{
+		_, err = s.service(r.Context()).CreatePlan(r.Context(), training.Plan{
 			Name:  r.PostFormValue("name"),
 			Items: []training.PlanItem{{Exercise: "por definir", TargetSets: 1}},
 		})
 	case s.base + "/plans/update":
 		name, notes := r.PostFormValue("name"), r.PostFormValue("notes")
-		err = s.service.UpdatePlan(r.Context(), planID, training.PlanPatch{Name: &name, Notes: &notes})
+		err = s.service(r.Context()).UpdatePlan(r.Context(), planID, training.PlanPatch{Name: &name, Notes: &notes})
 	case s.base + "/plans/delete":
-		err = s.service.DeletePlan(r.Context(), planID)
+		err = s.service(r.Context()).DeletePlan(r.Context(), planID)
 	case s.base + "/plans/item":
 		rpe, _ := strconv.ParseFloat(strings.TrimSpace(r.PostFormValue("target_rpe")), 64)
-		err = s.service.SetPlanItem(r.Context(), planID, training.PlanItem{
+		err = s.service(r.Context()).SetPlanItem(r.Context(), planID, training.PlanItem{
 			Exercise: exercise, TargetSets: atoi("target_sets"),
 			RepMin: atoi("rep_min"), RepMax: atoi("rep_max"), TargetRPE: rpe,
 			Superset: r.PostFormValue("superset"), Notes: r.PostFormValue("notes"),
 		})
 	case s.base + "/plans/item/remove":
-		err = s.service.RemovePlanItem(r.Context(), planID, exercise)
+		err = s.service(r.Context()).RemovePlanItem(r.Context(), planID, exercise)
 	case s.base + "/plans/move":
 		delta := 1
 		if r.PostFormValue("direction") == "up" {
 			delta = -1
 		}
-		err = s.service.MovePlanItem(r.Context(), planID, exercise, delta)
+		err = s.service(r.Context()).MovePlanItem(r.Context(), planID, exercise, delta)
 	}
 
 	message := ""
@@ -475,7 +476,7 @@ func (s *Server) export(w http.ResponseWriter, r *http.Request) {
 	}
 	defer os.RemoveAll(dir)
 	path := filepath.Join(dir, "training.db")
-	if err := s.service.Snapshot(r.Context(), path); err != nil {
+	if err := s.snapshot(r.Context(), path); err != nil {
 		s.fail(w, err)
 		return
 	}
@@ -498,17 +499,17 @@ func (s *Server) export(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) history(w http.ResponseWriter, r *http.Request) {
-	sessions, err := s.service.ListSessions(r.Context(), training.ListFilter{Limit: 60})
+	sessions, err := s.service(r.Context()).ListSessions(r.Context(), training.ListFilter{Limit: 60})
 	if err != nil {
 		s.fail(w, err)
 		return
 	}
-	volume, err := s.service.VolumeByGroup(r.Context(), training.ListFilter{})
+	volume, err := s.service(r.Context()).VolumeByGroup(r.Context(), training.ListFilter{})
 	if err != nil {
 		s.fail(w, err)
 		return
 	}
-	recommend, err := s.service.VolumeRecommendation(r.Context())
+	recommend, err := s.service(r.Context()).VolumeRecommendation(r.Context())
 	if err != nil {
 		s.fail(w, err)
 		return
@@ -525,7 +526,7 @@ func (s *Server) session(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	session, err := s.service.GetSession(r.Context(), id)
+	session, err := s.service(r.Context()).GetSession(r.Context(), id)
 	if errors.Is(err, training.ErrNotFound) || errors.Is(err, training.ErrValidation) {
 		http.NotFound(w, r)
 		return
@@ -535,7 +536,7 @@ func (s *Server) session(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := pageData{Base: s.base, Today: session.Date, Session: session, ReadOnly: true}
-	if data.Progress, err = s.service.SessionProgress(r.Context(), session.ID); err != nil {
+	if data.Progress, err = s.service(r.Context()).SessionProgress(r.Context(), session.ID); err != nil {
 		s.fail(w, err)
 		return
 	}
@@ -563,27 +564,27 @@ func (s *Server) todayData(ctx context.Context, message string) (pageData, error
 	today := s.todayDate()
 	data := pageData{Base: s.base, Today: today, Error: message}
 
-	sessions, err := s.service.ListSessions(ctx, training.ListFilter{From: today, To: today, Limit: 1})
+	sessions, err := s.service(ctx).ListSessions(ctx, training.ListFilter{From: today, To: today, Limit: 1})
 	if err != nil {
 		return data, err
 	}
 	if len(sessions) > 0 {
-		if data.Session, err = s.service.GetSession(ctx, sessions[0].ID); err != nil {
+		if data.Session, err = s.service(ctx).GetSession(ctx, sessions[0].ID); err != nil {
 			return data, err
 		}
 	}
-	if data.Recent, err = s.service.RecentExercises(ctx, recentExerciseLimit); err != nil {
+	if data.Recent, err = s.service(ctx).RecentExercises(ctx, recentExerciseLimit); err != nil {
 		return data, err
 	}
-	if data.Plans, err = s.service.ListPlans(ctx); err != nil {
+	if data.Plans, err = s.service(ctx).ListPlans(ctx); err != nil {
 		return data, err
 	}
 	if data.Session.ID > 0 && data.Session.PlanID > 0 {
-		if data.Progress, err = s.service.SessionProgress(ctx, data.Session.ID); err != nil {
+		if data.Progress, err = s.service(ctx).SessionProgress(ctx, data.Session.ID); err != nil {
 			return data, err
 		}
 		// The routine's own notes, shown above its exercises.
-		if plan, err := s.service.GetPlan(ctx, data.Session.PlanID); err == nil {
+		if plan, err := s.service(ctx).GetPlan(ctx, data.Session.PlanID); err == nil {
 			data.PlanNotes = plan.Notes
 		}
 	}
@@ -598,7 +599,7 @@ func (s *Server) todayData(ctx context.Context, message string) (pageData, error
 				data.TrainedGroups = append(data.TrainedGroups, b.MuscleGroup)
 			}
 		}
-		given, err := s.service.SessionFeedback(ctx, data.Session.ID)
+		given, err := s.service(ctx).SessionFeedback(ctx, data.Session.ID)
 		if err != nil {
 			return data, err
 		}
@@ -636,7 +637,7 @@ func (s *Server) saveNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	message := ""
-	switch err := s.service.SetExerciseNote(r.Context(), r.PostFormValue("exercise"), r.PostFormValue("note")); {
+	switch err := s.service(r.Context()).SetExerciseNote(r.Context(), r.PostFormValue("exercise"), r.PostFormValue("note")); {
 	case errors.Is(err, training.ErrValidation):
 		message = "Nota inválida: elige un ejercicio y usa 280 caracteres como mucho."
 	case err != nil:
@@ -662,7 +663,7 @@ func (s *Server) recordFeedback(w http.ResponseWriter, r *http.Request) {
 		return v
 	}
 	message := ""
-	err = s.service.RecordFeedback(r.Context(), session.ID, training.Feedback{
+	err = s.service(r.Context()).RecordFeedback(r.Context(), session.ID, training.Feedback{
 		MuscleGroup: r.PostFormValue("muscle_group"),
 		Fatigue:     rating("fatigue"), Pump: rating("pump"), Recovery: rating("recovery"),
 	})
@@ -689,8 +690,15 @@ func (s *Server) choosePlan(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, s.base+"/", http.StatusSeeOther)
 		return
 	}
+	// Before anything else: a plan that cannot be started must not cost the day's
+	// empty session.
+	plan, err := s.service(r.Context()).GetPlan(r.Context(), planID)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
 	today := s.todayDate()
-	sessions, err := s.service.ListSessions(r.Context(), training.ListFilter{From: today, To: today, Limit: 1})
+	sessions, err := s.service(r.Context()).ListSessions(r.Context(), training.ListFilter{From: today, To: today, Limit: 1})
 	if err != nil {
 		s.fail(w, err)
 		return
@@ -698,7 +706,7 @@ func (s *Server) choosePlan(w http.ResponseWriter, r *http.Request) {
 	if len(sessions) > 0 {
 		if sessions[0].SetCount == 0 {
 			// Nothing logged yet: replace the empty session outright.
-			if _, err := s.service.DeleteSession(r.Context(), sessions[0].ID); err != nil {
+			if _, err := s.service(r.Context()).DeleteSession(r.Context(), sessions[0].ID); err != nil {
 				s.fail(w, err)
 				return
 			}
@@ -707,13 +715,8 @@ func (s *Server) choosePlan(w http.ResponseWriter, r *http.Request) {
 			// are never touched, so adopting another plan mid-session is safe:
 			// its exercises are added and anything already done that the new
 			// plan does not include simply shows as off-plan.
-			plan, err := s.service.GetPlan(r.Context(), planID)
-			if err != nil {
-				s.fail(w, err)
-				return
-			}
 			for _, it := range plan.Items {
-				if err := s.service.SetSessionItem(r.Context(), sessions[0].ID, it); err != nil {
+				if err := s.service(r.Context()).SetSessionItem(r.Context(), sessions[0].ID, it); err != nil {
 					s.fail(w, err)
 					return
 				}
@@ -722,7 +725,7 @@ func (s *Server) choosePlan(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if _, err := s.service.StartPlannedSession(r.Context(), today, planID); err != nil {
+	if _, err := s.service(r.Context()).StartPlannedSession(r.Context(), today, planID); err != nil {
 		s.fail(w, err)
 		return
 	}
@@ -754,12 +757,12 @@ func (s *Server) adjustItem(w http.ResponseWriter, r *http.Request) {
 			message = "No se puede bajar de una serie."
 			break
 		}
-		err = s.service.AdjustSessionItem(r.Context(), session.ID, exercise, training.SessionItemPatch{TargetSets: &next})
+		err = s.service(r.Context()).AdjustSessionItem(r.Context(), session.ID, exercise, training.SessionItemPatch{TargetSets: &next})
 	case "skip", "unskip":
 		skipped := action == "skip"
-		err = s.service.AdjustSessionItem(r.Context(), session.ID, exercise, training.SessionItemPatch{Skipped: &skipped})
+		err = s.service(r.Context()).AdjustSessionItem(r.Context(), session.ID, exercise, training.SessionItemPatch{Skipped: &skipped})
 	case "swap":
-		err = s.service.SwapSessionItem(r.Context(), session.ID, exercise, r.PostFormValue("replacement"))
+		err = s.service(r.Context()).SwapSessionItem(r.Context(), session.ID, exercise, r.PostFormValue("replacement"))
 	case "adopt":
 		// An exercise done off-plan becomes part of today's plan at the volume
 		// already performed.
@@ -767,9 +770,9 @@ func (s *Server) adjustItem(w http.ResponseWriter, r *http.Request) {
 		if done < 1 {
 			done = 1
 		}
-		err = s.service.SetSessionItem(r.Context(), session.ID, training.PlanItem{Exercise: exercise, TargetSets: done})
+		err = s.service(r.Context()).SetSessionItem(r.Context(), session.ID, training.PlanItem{Exercise: exercise, TargetSets: done})
 	case "remove":
-		err = s.service.RemoveSessionItem(r.Context(), session.ID, exercise)
+		err = s.service(r.Context()).RemoveSessionItem(r.Context(), session.ID, exercise)
 	default:
 		message = "Acción desconocida."
 	}
@@ -804,7 +807,7 @@ func (s *Server) decorate(ctx context.Context, data *pageData) error {
 		}
 	}
 
-	groups, err := s.service.ExerciseGroups(ctx)
+	groups, err := s.service(ctx).ExerciseGroups(ctx)
 	if err != nil {
 		return err
 	}
@@ -815,7 +818,7 @@ func (s *Server) decorate(ctx context.Context, data *pageData) error {
 	for _, n := range names {
 		catalogue[n] = true
 	}
-	notes, err := s.service.ExerciseNotes(ctx)
+	notes, err := s.service(ctx).ExerciseNotes(ctx)
 	if err != nil {
 		return err
 	}
@@ -867,20 +870,20 @@ func (s *Server) decorate(ctx context.Context, data *pageData) error {
 // set means opening the app never leaves behind an empty session.
 func (s *Server) ensureToday(ctx context.Context) (training.Session, error) {
 	today := s.todayDate()
-	sessions, err := s.service.ListSessions(ctx, training.ListFilter{From: today, To: today, Limit: 1})
+	sessions, err := s.service(ctx).ListSessions(ctx, training.ListFilter{From: today, To: today, Limit: 1})
 	if err != nil {
 		return training.Session{}, err
 	}
 	if len(sessions) > 0 {
 		return training.Session{ID: sessions[0].ID, Date: sessions[0].Date}, nil
 	}
-	return s.service.StartSession(ctx, today)
+	return s.service(ctx).StartSession(ctx, today)
 }
 
 // infoFor gathers what the entry form shows about one exercise: last time's
 // set, the standing record, its muscle group and its setup note.
 func (s *Server) infoFor(ctx context.Context, name, today string) (ExerciseInfo, error) {
-	h, err := s.service.ExerciseHistory(ctx, name, 200)
+	h, err := s.service(ctx).ExerciseHistory(ctx, name, 200)
 	if err != nil {
 		return ExerciseInfo{}, err
 	}
@@ -895,7 +898,7 @@ func (s *Server) infoFor(ctx context.Context, name, today string) (ExerciseInfo,
 			break
 		}
 	}
-	notes, err := s.service.ExerciseNotes(ctx)
+	notes, err := s.service(ctx).ExerciseNotes(ctx)
 	if err != nil {
 		return entry, err
 	}
@@ -905,7 +908,7 @@ func (s *Server) infoFor(ctx context.Context, name, today string) (ExerciseInfo,
 			break
 		}
 	}
-	suggestion, err := s.service.SuggestLoad(ctx, name)
+	suggestion, err := s.service(ctx).SuggestLoad(ctx, name)
 	if err != nil {
 		return entry, err
 	}

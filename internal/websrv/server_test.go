@@ -25,12 +25,12 @@ func newServer(t *testing.T) (http.Handler, *training.Service) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { store.Close() })
-	service := training.NewService(store, func() time.Time {
+	clock := func() time.Time {
 		return time.Date(2026, 8, 7, 10, 0, 0, 0, time.UTC)
-	})
-	server, err := websrv.New(service, func() time.Time {
-		return time.Date(2026, 8, 7, 10, 0, 0, 0, time.UTC)
-	}, base)
+	}
+	services := training.NewServices(store, clock)
+	service := services.ForUser(1)
+	server, err := websrv.New(func(context.Context) *training.Service { return service }, services.Snapshot, clock, base)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -831,7 +831,7 @@ func TestExportStreamsARestorableDatabase(t *testing.T) {
 		t.Fatalf("restored copy does not open: %v", err)
 	}
 	defer restored.Close()
-	sessions, err := restored.ListSessions(t.Context(), training.ListFilter{Limit: 10})
+	sessions, err := restored.ForUser(1).ListSessions(t.Context(), training.ListFilter{Limit: 10})
 	if err != nil || len(sessions) != 1 || sessions[0].SetCount != 1 {
 		t.Fatalf("restored data = %#v, %v", sessions, err)
 	}

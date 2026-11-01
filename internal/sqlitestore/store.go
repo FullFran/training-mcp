@@ -119,22 +119,37 @@ func (s *Store) Snapshot(ctx context.Context, path string) error {
 	return err
 }
 
-func (s *Store) Start(ctx context.Context, session training.Session) (training.Session, error) {
+// ForUser returns the data methods bound to one user. Nothing else in this package
+// reaches user data, so every statement knows whose row it is touching.
+func (s *Store) ForUser(userID int64) training.UserStore {
+	return &userStore{db: s.db, failpoint: s.failpoint, userID: userID}
+}
+
+// userStore is the Store as seen by one user.
+type userStore struct {
+	db        *sql.DB
+	failpoint func(string) error
+	userID    int64
+}
+
+func (s *userStore) Start(ctx context.Context, session training.Session) (training.Session, error) {
 	// The plan name is snapshotted alongside the id so history stays readable
 	// even if the plan is later renamed or deleted.
-	if session.PlanID > 0 && session.PlanName == "" {
+	if session.PlanID > 0 {
 		p, err := s.GetPlan(ctx, session.PlanID)
 		if err != nil {
 			return training.Session{}, err
 		}
-		session.PlanName = p.Name
+		if session.PlanName == "" {
+			session.PlanName = p.Name
+		}
 	}
 	var planID any
 	if session.PlanID > 0 {
 		planID = session.PlanID
 	}
-	res, err := s.db.ExecContext(ctx, `INSERT INTO sessions(date, started_at, plan_id, plan_name) VALUES (?, CURRENT_TIMESTAMP, ?, ?)`,
-		session.Date, planID, session.PlanName)
+	res, err := s.db.ExecContext(ctx, `INSERT INTO sessions(user_id, date, started_at, plan_id, plan_name) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`,
+		s.userID, session.Date, planID, session.PlanName)
 	if err != nil {
 		return training.Session{}, err
 	}
@@ -146,20 +161,21 @@ func (s *Store) Start(ctx context.Context, session training.Session) (training.S
 		// template, and editing the template never rewrites this session.
 		if _, err = s.db.ExecContext(ctx, `
 INSERT INTO session_items (session_id,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset,notes)
-SELECT ?,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset,notes FROM plan_items WHERE plan_id=?`,
-			session.ID, session.PlanID); err != nil {
+SELECT ?,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset,notes FROM plan_items
+WHERE plan_id IN (SELECT id FROM plans WHERE id=? AND user_id=?)`,
+			session.ID, session.PlanID, s.userID); err != nil {
 			return training.Session{}, err
 		}
 	}
 	return session, nil
 }
-func (s *Store) AddSet(ctx context.Context, in training.AddSetInput) (training.Set, float64, error) {
+func (s *userStore) AddSet(ctx context.Context, in training.AddSetInput) (training.Set, float64, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return training.Set{}, 0, err
 	}
 	defer tx.Rollback()
-	set, total, err := insertSet(ctx, tx, in)
+	set, total, err := insertSet(ctx, tx, s.userID, in)
 	if err != nil {
 		return training.Set{}, 0, err
 	}
@@ -172,17 +188,17 @@ func (s *Store) AddSet(ctx context.Context, in training.AddSetInput) (training.S
 // insertSet appends one set to a session inside an open transaction, returning
 // it with the session's recalculated total. Every path that records a set goes
 // through here so position and SI cannot be computed two ways.
-func insertSet(ctx context.Context, tx *sql.Tx, in training.AddSetInput) (training.Set, float64, error) {
-	var pos int
-	err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(position),0)+1 FROM sets WHERE session_id=?`, in.SessionID).Scan(&pos)
+func insertSet(ctx context.Context, tx *sql.Tx, userID int64, in training.AddSetInput) (training.Set, float64, error) {
+	var exists int
+	err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions WHERE id=? AND user_id=?`, in.SessionID, userID).Scan(&exists)
 	if err != nil {
 		return training.Set{}, 0, err
 	}
-	var exists int
-	if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions WHERE id=?`, in.SessionID).Scan(&exists); err != nil || exists == 0 {
-		if exists == 0 {
-			return training.Set{}, 0, training.ErrNotFound
-		}
+	if exists == 0 {
+		return training.Set{}, 0, training.ErrNotFound
+	}
+	var pos int
+	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(position),0)+1 FROM sets WHERE session_id=?`, in.SessionID).Scan(&pos); err != nil {
 		return training.Set{}, 0, err
 	}
 	si := training.CalculateSI(in.RPE)
@@ -208,13 +224,13 @@ func insertSet(ctx context.Context, tx *sql.Tx, in training.AddSetInput) (traini
 // The first statement is a write on purpose: it takes SQLite's write lock before
 // anything is read, so concurrent calls queue on busy_timeout rather than failing
 // when a read transaction tries to upgrade, and each one sees the previous result.
-func (s *Store) LogSets(ctx context.Context, in training.LogSetsRecord) (training.LogSetsResult, error) {
+func (s *userStore) LogSets(ctx context.Context, in training.LogSetsRecord) (training.LogSetsResult, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return training.LogSetsResult{}, err
 	}
 	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `INSERT INTO idempotency_keys(key,fingerprint,response,created_at) VALUES (?,?,'',CURRENT_TIMESTAMP) ON CONFLICT(user_id,key) DO NOTHING`, in.Key, in.Fingerprint)
+	res, err := tx.ExecContext(ctx, `INSERT INTO idempotency_keys(user_id,key,fingerprint,response,created_at) VALUES (?,?,?,'',CURRENT_TIMESTAMP) ON CONFLICT(user_id,key) DO NOTHING`, s.userID, in.Key, in.Fingerprint)
 	if err != nil {
 		return training.LogSetsResult{}, err
 	}
@@ -224,7 +240,7 @@ func (s *Store) LogSets(ctx context.Context, in training.LogSetsRecord) (trainin
 	}
 	if inserted == 0 {
 		var fingerprint, response string
-		if err = tx.QueryRowContext(ctx, `SELECT fingerprint,response FROM idempotency_keys WHERE key=?`, in.Key).Scan(&fingerprint, &response); err != nil {
+		if err = tx.QueryRowContext(ctx, `SELECT fingerprint,response FROM idempotency_keys WHERE user_id=? AND key=?`, s.userID, in.Key).Scan(&fingerprint, &response); err != nil {
 			return training.LogSetsResult{}, err
 		}
 		if fingerprint != in.Fingerprint {
@@ -239,9 +255,9 @@ func (s *Store) LogSets(ctx context.Context, in training.LogSetsRecord) (trainin
 	}
 
 	out := training.LogSetsResult{}
-	err = tx.QueryRowContext(ctx, `SELECT id,date,plan_name FROM sessions WHERE date=? ORDER BY id DESC LIMIT 1`, in.Date).Scan(&out.Session.ID, &out.Session.Date, &out.Session.PlanName)
+	err = tx.QueryRowContext(ctx, `SELECT id,date,plan_name FROM sessions WHERE user_id=? AND date=? ORDER BY id DESC LIMIT 1`, s.userID, in.Date).Scan(&out.Session.ID, &out.Session.Date, &out.Session.PlanName)
 	if errors.Is(err, sql.ErrNoRows) {
-		created, err := tx.ExecContext(ctx, `INSERT INTO sessions(date, started_at, plan_id, plan_name) VALUES (?, CURRENT_TIMESTAMP, NULL, '')`, in.Date)
+		created, err := tx.ExecContext(ctx, `INSERT INTO sessions(user_id, date, started_at, plan_id, plan_name) VALUES (?, ?, CURRENT_TIMESTAMP, NULL, '')`, s.userID, in.Date)
 		if err != nil {
 			return training.LogSetsResult{}, err
 		}
@@ -260,7 +276,7 @@ func (s *Store) LogSets(ctx context.Context, in training.LogSetsRecord) (trainin
 		return training.LogSetsResult{}, err
 	}
 	for _, set := range in.Sets {
-		stored, total, err := insertSet(ctx, tx, training.AddSetInput{
+		stored, total, err := insertSet(ctx, tx, s.userID, training.AddSetInput{
 			SessionID: out.Session.ID, Exercise: in.Exercise, WeightKG: set.WeightKG,
 			Reps: set.Reps, RPE: set.RPE, RPEImputed: set.RPEImputed, Technique: set.Technique, Superset: superset,
 		})
@@ -279,7 +295,7 @@ func (s *Store) LogSets(ctx context.Context, in training.LogSetsRecord) (trainin
 	if err != nil {
 		return training.LogSetsResult{}, err
 	}
-	if _, err = tx.ExecContext(ctx, `UPDATE idempotency_keys SET response=? WHERE key=?`, string(response), in.Key); err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE idempotency_keys SET response=? WHERE user_id=? AND key=?`, string(response), s.userID, in.Key); err != nil {
 		return training.LogSetsResult{}, err
 	}
 	if _, err = tx.ExecContext(ctx, `DELETE FROM idempotency_keys WHERE created_at < datetime('now','-30 days')`); err != nil {
@@ -290,14 +306,14 @@ func (s *Store) LogSets(ctx context.Context, in training.LogSetsRecord) (trainin
 	}
 	return out, nil
 }
-func (s *Store) UpdateSet(ctx context.Context, id int64, p training.SetPatch) (training.Set, float64, error) {
+func (s *userStore) UpdateSet(ctx context.Context, id int64, p training.SetPatch) (training.Set, float64, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return training.Set{}, 0, err
 	}
 	defer tx.Rollback()
 	var set training.Set
-	err = tx.QueryRowContext(ctx, `SELECT id,session_id,position,exercise,weight_kg,reps,rpe,rpe_imputed,si,technique FROM sets WHERE id=?`, id).Scan(&set.ID, &set.SessionID, &set.Position, &set.Exercise, &set.WeightKG, &set.Reps, &set.RPE, &set.RPEImputed, &set.SI, &set.Technique)
+	err = tx.QueryRowContext(ctx, `SELECT st.id,st.session_id,st.position,st.exercise,st.weight_kg,st.reps,st.rpe,st.rpe_imputed,st.si,st.technique FROM sets st JOIN sessions se ON se.id=st.session_id WHERE st.id=? AND se.user_id=?`, id, s.userID).Scan(&set.ID, &set.SessionID, &set.Position, &set.Exercise, &set.WeightKG, &set.Reps, &set.RPE, &set.RPEImputed, &set.SI, &set.Technique)
 	if errors.Is(err, sql.ErrNoRows) {
 		return training.Set{}, 0, training.ErrNotFound
 	}
@@ -321,7 +337,7 @@ func (s *Store) UpdateSet(ctx context.Context, id int64, p training.SetPatch) (t
 		set.Technique = *p.Technique
 	}
 	set.SI = training.CalculateSI(set.RPE)
-	_, err = tx.ExecContext(ctx, `UPDATE sets SET exercise=?,weight_kg=?,reps=?,rpe=?,rpe_imputed=?,si=?,technique=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`, set.Exercise, set.WeightKG, set.Reps, set.RPE, set.RPEImputed, set.SI, set.Technique, id)
+	_, err = tx.ExecContext(ctx, `UPDATE sets SET exercise=?,weight_kg=?,reps=?,rpe=?,rpe_imputed=?,si=?,technique=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND session_id=?`, set.Exercise, set.WeightKG, set.Reps, set.RPE, set.RPEImputed, set.SI, set.Technique, id, set.SessionID)
 	if err != nil {
 		return training.Set{}, 0, err
 	}
@@ -331,20 +347,20 @@ func (s *Store) UpdateSet(ctx context.Context, id int64, p training.SetPatch) (t
 	total, err := s.total(ctx, set.SessionID)
 	return set, total, err
 }
-func (s *Store) DeleteSet(ctx context.Context, id int64) (int64, float64, int, error) {
+func (s *userStore) DeleteSet(ctx context.Context, id int64) (int64, float64, int, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, 0, 0, err
 	}
 	defer tx.Rollback()
 	var sessionID int64
-	if err = tx.QueryRowContext(ctx, `SELECT session_id FROM sets WHERE id=?`, id).Scan(&sessionID); errors.Is(err, sql.ErrNoRows) {
+	if err = tx.QueryRowContext(ctx, `SELECT st.session_id FROM sets st JOIN sessions se ON se.id=st.session_id WHERE st.id=? AND se.user_id=?`, id, s.userID).Scan(&sessionID); errors.Is(err, sql.ErrNoRows) {
 		return 0, 0, 0, training.ErrNotFound
 	}
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	if _, err = tx.ExecContext(ctx, `DELETE FROM sets WHERE id=?`, id); err != nil {
+	if _, err = tx.ExecContext(ctx, `DELETE FROM sets WHERE id=? AND session_id=?`, id, sessionID); err != nil {
 		return 0, 0, 0, err
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT id FROM sets WHERE session_id=? ORDER BY position,id`, sessionID)
@@ -384,10 +400,10 @@ func (s *Store) DeleteSet(ctx context.Context, id int64) (int64, float64, int, e
 	total, err := s.total(ctx, sessionID)
 	return sessionID, total, len(ids), err
 }
-func (s *Store) GetSession(ctx context.Context, id int64) (training.Session, error) {
+func (s *userStore) GetSession(ctx context.Context, id int64) (training.Session, error) {
 	var out training.Session
 	var planID sql.NullInt64
-	err := s.db.QueryRowContext(ctx, `SELECT id,date,plan_id,plan_name FROM sessions WHERE id=?`, id).
+	err := s.db.QueryRowContext(ctx, `SELECT id,date,plan_id,plan_name FROM sessions WHERE id=? AND user_id=?`, id, s.userID).
 		Scan(&out.ID, &out.Date, &planID, &out.PlanName)
 	out.PlanID = planID.Int64
 	if errors.Is(err, sql.ErrNoRows) {
@@ -416,9 +432,9 @@ func (s *Store) GetSession(ctx context.Context, id int64) (training.Session, err
 	out.TotalSI = training.NormalizeSI(out.TotalSI)
 	return out, nil
 }
-func (s *Store) ListSessions(ctx context.Context, f training.ListFilter) ([]training.SessionSummary, error) {
-	q := `SELECT s.id,s.date,COUNT(st.id),COALESCE(SUM(st.si),0),s.plan_name FROM sessions s LEFT JOIN sets st ON st.session_id=s.id WHERE 1=1`
-	args := []any{}
+func (s *userStore) ListSessions(ctx context.Context, f training.ListFilter) ([]training.SessionSummary, error) {
+	q := `SELECT s.id,s.date,COUNT(st.id),COALESCE(SUM(st.si),0),s.plan_name FROM sessions s LEFT JOIN sets st ON st.session_id=s.id WHERE s.user_id=?`
+	args := []any{s.userID}
 	if f.From != "" {
 		q += ` AND s.date>=?`
 		args = append(args, f.From)
@@ -449,11 +465,11 @@ func (s *Store) ListSessions(ctx context.Context, f training.ListFilter) ([]trai
 // RecentExercises returns the newest set of each distinct exercise, most
 // recently used first. MAX(id) picks the latest row per exercise because ids
 // are monotonic within a table lifetime.
-func (s *Store) RecentExercises(ctx context.Context, limit int) ([]training.ExerciseMemory, error) {
+func (s *userStore) RecentExercises(ctx context.Context, limit int) ([]training.ExerciseMemory, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT exercise,weight_kg,reps,rpe,rpe_imputed FROM sets
-WHERE id IN (SELECT MAX(id) FROM sets GROUP BY exercise)
-ORDER BY id DESC LIMIT ?`, limit)
+WHERE id IN (SELECT MAX(st.id) FROM sets st JOIN sessions se ON se.id=st.session_id WHERE se.user_id=? GROUP BY st.exercise)
+ORDER BY id DESC LIMIT ?`, s.userID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -469,13 +485,13 @@ ORDER BY id DESC LIMIT ?`, limit)
 	return out, rows.Err()
 }
 
-func (s *Store) CreatePlan(ctx context.Context, p training.Plan) (training.Plan, error) {
+func (s *userStore) CreatePlan(ctx context.Context, p training.Plan) (training.Plan, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return training.Plan{}, err
 	}
 	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `INSERT INTO plans(name,notes,created_at) VALUES (?,?,CURRENT_TIMESTAMP)`, p.Name, p.Notes)
+	res, err := tx.ExecContext(ctx, `INSERT INTO plans(user_id,name,notes,created_at) VALUES (?,?,?,CURRENT_TIMESTAMP)`, s.userID, p.Name, p.Notes)
 	if err != nil {
 		return training.Plan{}, err
 	}
@@ -494,11 +510,12 @@ func (s *Store) CreatePlan(ctx context.Context, p training.Plan) (training.Plan,
 	return p, tx.Commit()
 }
 
-func (s *Store) ListPlans(ctx context.Context) ([]training.Plan, error) {
+func (s *userStore) ListPlans(ctx context.Context) ([]training.Plan, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT p.id,p.name,p.notes,COALESCE(SUM(i.target_sets),0),COUNT(i.id)
 FROM plans p LEFT JOIN plan_items i ON i.plan_id=p.id
-GROUP BY p.id ORDER BY p.name`)
+WHERE p.user_id=?
+GROUP BY p.id ORDER BY p.name`, s.userID)
 	if err != nil {
 		return nil, err
 	}
@@ -517,9 +534,9 @@ GROUP BY p.id ORDER BY p.name`)
 	return out, rows.Err()
 }
 
-func (s *Store) GetPlan(ctx context.Context, id int64) (training.Plan, error) {
+func (s *userStore) GetPlan(ctx context.Context, id int64) (training.Plan, error) {
 	var p training.Plan
-	err := s.db.QueryRowContext(ctx, `SELECT id,name,notes FROM plans WHERE id=?`, id).Scan(&p.ID, &p.Name, &p.Notes)
+	err := s.db.QueryRowContext(ctx, `SELECT id,name,notes FROM plans WHERE id=? AND user_id=?`, id, s.userID).Scan(&p.ID, &p.Name, &p.Notes)
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, training.ErrNotFound
 	}
@@ -543,9 +560,9 @@ func (s *Store) GetPlan(ctx context.Context, id int64) (training.Plan, error) {
 }
 
 // UpdatePlan edits a plan's name and notes, leaving its exercises alone.
-func (s *Store) UpdatePlan(ctx context.Context, id int64, p training.PlanPatch) error {
+func (s *userStore) UpdatePlan(ctx context.Context, id int64, p training.PlanPatch) error {
 	var name, notes string
-	err := s.db.QueryRowContext(ctx, `SELECT name,notes FROM plans WHERE id=?`, id).Scan(&name, &notes)
+	err := s.db.QueryRowContext(ctx, `SELECT name,notes FROM plans WHERE id=? AND user_id=?`, id, s.userID).Scan(&name, &notes)
 	if errors.Is(err, sql.ErrNoRows) {
 		return training.ErrNotFound
 	}
@@ -558,21 +575,21 @@ func (s *Store) UpdatePlan(ctx context.Context, id int64, p training.PlanPatch) 
 	if p.Notes != nil {
 		notes = *p.Notes
 	}
-	_, err = s.db.ExecContext(ctx, `UPDATE plans SET name=?,notes=? WHERE id=?`, name, notes, id)
+	_, err = s.db.ExecContext(ctx, `UPDATE plans SET name=?,notes=? WHERE id=? AND user_id=?`, name, notes, id, s.userID)
 	return err
 }
 
 // SetPlanItem adds an exercise to a plan, or replaces its prescription if it is
 // already there. New items go last. Matched by exercise name in code rather
 // than by a unique constraint, so existing plans need no schema change.
-func (s *Store) SetPlanItem(ctx context.Context, planID int64, it training.PlanItem) error {
+func (s *userStore) SetPlanItem(ctx context.Context, planID int64, it training.PlanItem) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	var exists int
-	if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM plans WHERE id=?`, planID).Scan(&exists); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM plans WHERE id=? AND user_id=?`, planID, s.userID).Scan(&exists); err != nil {
 		return err
 	}
 	if exists == 0 {
@@ -600,13 +617,13 @@ func (s *Store) SetPlanItem(ctx context.Context, planID int64, it training.PlanI
 }
 
 // RemovePlanItem drops an exercise and closes the gap in the ordering.
-func (s *Store) RemovePlanItem(ctx context.Context, planID int64, exercise string) error {
+func (s *userStore) RemovePlanItem(ctx context.Context, planID int64, exercise string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `DELETE FROM plan_items WHERE plan_id=? AND exercise=?`, planID, exercise)
+	res, err := tx.ExecContext(ctx, `DELETE FROM plan_items WHERE plan_id IN (SELECT id FROM plans WHERE id=? AND user_id=?) AND exercise=?`, planID, s.userID, exercise)
 	if err != nil {
 		return err
 	}
@@ -625,14 +642,14 @@ func (s *Store) RemovePlanItem(ctx context.Context, planID int64, exercise strin
 
 // MovePlanItem shifts an exercise up or down by one place. Order matters: it is
 // the order the session is performed in.
-func (s *Store) MovePlanItem(ctx context.Context, planID int64, exercise string, delta int) error {
+func (s *userStore) MovePlanItem(ctx context.Context, planID int64, exercise string, delta int) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	var pos int
-	err = tx.QueryRowContext(ctx, `SELECT position FROM plan_items WHERE plan_id=? AND exercise=?`, planID, exercise).Scan(&pos)
+	err = tx.QueryRowContext(ctx, `SELECT i.position FROM plan_items i JOIN plans p ON p.id=i.plan_id WHERE i.plan_id=? AND i.exercise=? AND p.user_id=?`, planID, exercise, s.userID).Scan(&pos)
 	if errors.Is(err, sql.ErrNoRows) {
 		return training.ErrNotFound
 	}
@@ -701,8 +718,8 @@ func resequencePlan(ctx context.Context, tx *sql.Tx, planID int64) error {
 	return nil
 }
 
-func (s *Store) DeletePlan(ctx context.Context, id int64) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM plans WHERE id=?`, id)
+func (s *userStore) DeletePlan(ctx context.Context, id int64) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM plans WHERE id=? AND user_id=?`, id, s.userID)
 	if err != nil {
 		return err
 	}
@@ -718,9 +735,9 @@ func (s *Store) DeletePlan(ctx context.Context, id int64) error {
 
 // SessionProgress lists the session's planned exercises with how many sets are
 // done, then any exercise performed that the plan did not prescribe.
-func (s *Store) SessionProgress(ctx context.Context, sessionID int64) ([]training.PlanProgress, error) {
+func (s *userStore) SessionProgress(ctx context.Context, sessionID int64) ([]training.PlanProgress, error) {
 	var exists int
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions WHERE id=?`, sessionID).Scan(&exists); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions WHERE id=? AND user_id=?`, sessionID, s.userID).Scan(&exists); err != nil {
 		return nil, err
 	}
 	if exists == 0 {
@@ -730,8 +747,8 @@ func (s *Store) SessionProgress(ctx context.Context, sessionID int64) ([]trainin
 SELECT i.superset, i.notes, i.exercise, i.target_sets, i.rep_min, i.rep_max, i.target_rpe, i.skipped,
        (SELECT COUNT(*) FROM sets st WHERE st.session_id=i.session_id AND st.exercise=i.exercise),
        COALESCE(g.muscle_group,'')
-FROM session_items i LEFT JOIN exercise_groups g ON g.exercise=i.exercise
-WHERE i.session_id=? ORDER BY i.position`, sessionID)
+FROM session_items i LEFT JOIN exercise_groups g ON g.user_id=? AND g.exercise=i.exercise
+WHERE i.session_id=? ORDER BY i.position`, s.userID, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -752,8 +769,8 @@ WHERE i.session_id=? ORDER BY i.position`, sessionID)
 
 	extra, err := s.db.QueryContext(ctx, `
 SELECT st.exercise, COUNT(*), COALESCE(g.muscle_group,'')
-FROM sets st LEFT JOIN exercise_groups g ON g.exercise=st.exercise
-WHERE st.session_id=? GROUP BY st.exercise ORDER BY MIN(st.position)`, sessionID)
+FROM sets st LEFT JOIN exercise_groups g ON g.user_id=? AND g.exercise=st.exercise
+WHERE st.session_id=? GROUP BY st.exercise ORDER BY MIN(st.position)`, s.userID, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -772,9 +789,9 @@ WHERE st.session_id=? GROUP BY st.exercise ORDER BY MIN(st.position)`, sessionID
 
 // SetSessionItem adds an exercise to today's session plan, or replaces its
 // prescription if it is already there. New items go last.
-func (s *Store) SetSessionItem(ctx context.Context, sessionID int64, it training.PlanItem) error {
+func (s *userStore) SetSessionItem(ctx context.Context, sessionID int64, it training.PlanItem) error {
 	var exists int
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions WHERE id=?`, sessionID).Scan(&exists); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions WHERE id=? AND user_id=?`, sessionID, s.userID).Scan(&exists); err != nil {
 		return err
 	}
 	if exists == 0 {
@@ -797,11 +814,11 @@ ON CONFLICT(session_id,exercise) DO UPDATE SET
 
 // PatchSessionItem changes only the fields given, so bumping the set count does
 // not require restating the rep range.
-func (s *Store) PatchSessionItem(ctx context.Context, sessionID int64, exercise string, p training.SessionItemPatch) error {
+func (s *userStore) PatchSessionItem(ctx context.Context, sessionID int64, exercise string, p training.SessionItemPatch) error {
 	var it training.PlanItem
 	var skipped bool
-	err := s.db.QueryRowContext(ctx, `SELECT exercise,target_sets,rep_min,rep_max,target_rpe,skipped FROM session_items WHERE session_id=? AND exercise=?`,
-		sessionID, exercise).Scan(&it.Exercise, &it.TargetSets, &it.RepMin, &it.RepMax, &it.TargetRPE, &skipped)
+	err := s.db.QueryRowContext(ctx, `SELECT i.exercise,i.target_sets,i.rep_min,i.rep_max,i.target_rpe,i.skipped FROM session_items i JOIN sessions se ON se.id=i.session_id WHERE i.session_id=? AND i.exercise=? AND se.user_id=?`,
+		sessionID, exercise, s.userID).Scan(&it.Exercise, &it.TargetSets, &it.RepMin, &it.RepMax, &it.TargetRPE, &skipped)
 	if errors.Is(err, sql.ErrNoRows) {
 		return training.ErrNotFound
 	}
@@ -823,15 +840,15 @@ func (s *Store) PatchSessionItem(ctx context.Context, sessionID int64, exercise 
 	if p.Skipped != nil {
 		skipped = *p.Skipped
 	}
-	_, err = s.db.ExecContext(ctx, `UPDATE session_items SET target_sets=?,rep_min=?,rep_max=?,target_rpe=?,skipped=? WHERE session_id=? AND exercise=?`,
-		it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE, skipped, sessionID, exercise)
+	_, err = s.db.ExecContext(ctx, `UPDATE session_items SET target_sets=?,rep_min=?,rep_max=?,target_rpe=?,skipped=? WHERE session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?) AND exercise=?`,
+		it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE, skipped, sessionID, s.userID, exercise)
 	return err
 }
 
 // SwapSessionItem substitutes one exercise for another in place, keeping its
 // position and prescription. This is the occupied-machine case.
-func (s *Store) SwapSessionItem(ctx context.Context, sessionID int64, from, to string) error {
-	res, err := s.db.ExecContext(ctx, `UPDATE session_items SET exercise=? WHERE session_id=? AND exercise=?`, to, sessionID, from)
+func (s *userStore) SwapSessionItem(ctx context.Context, sessionID int64, from, to string) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE session_items SET exercise=? WHERE session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?) AND exercise=?`, to, sessionID, s.userID, from)
 	if err != nil {
 		return err
 	}
@@ -847,8 +864,8 @@ func (s *Store) SwapSessionItem(ctx context.Context, sessionID int64, from, to s
 
 // RemoveSessionItem drops an exercise from today's plan. Sets already logged
 // against it are untouched and resurface as off-plan work.
-func (s *Store) RemoveSessionItem(ctx context.Context, sessionID int64, exercise string) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM session_items WHERE session_id=? AND exercise=?`, sessionID, exercise)
+func (s *userStore) RemoveSessionItem(ctx context.Context, sessionID int64, exercise string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM session_items WHERE session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?) AND exercise=?`, sessionID, s.userID, exercise)
 	if err != nil {
 		return err
 	}
@@ -862,9 +879,9 @@ func (s *Store) RemoveSessionItem(ctx context.Context, sessionID int64, exercise
 	return nil
 }
 
-func (s *Store) SetFeedback(ctx context.Context, sessionID int64, f training.Feedback) error {
+func (s *userStore) SetFeedback(ctx context.Context, sessionID int64, f training.Feedback) error {
 	var exists int
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions WHERE id=?`, sessionID).Scan(&exists); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions WHERE id=? AND user_id=?`, sessionID, s.userID).Scan(&exists); err != nil {
 		return err
 	}
 	if exists == 0 {
@@ -879,8 +896,8 @@ ON CONFLICT(session_id,muscle_group) DO UPDATE SET
 	return err
 }
 
-func (s *Store) SessionFeedback(ctx context.Context, sessionID int64) ([]training.Feedback, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT muscle_group,fatigue,pump,recovery FROM session_feedback WHERE session_id=? ORDER BY muscle_group`, sessionID)
+func (s *userStore) SessionFeedback(ctx context.Context, sessionID int64) ([]training.Feedback, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT muscle_group,fatigue,pump,recovery FROM session_feedback WHERE session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?) ORDER BY muscle_group`, sessionID, s.userID)
 	if err != nil {
 		return nil, err
 	}
@@ -898,10 +915,10 @@ func (s *Store) SessionFeedback(ctx context.Context, sessionID int64) ([]trainin
 
 // LatestFeedback returns the most recent rating per muscle group, which is what
 // next week's volume should respond to.
-func (s *Store) LatestFeedback(ctx context.Context) (map[string]training.Feedback, error) {
+func (s *userStore) LatestFeedback(ctx context.Context) (map[string]training.Feedback, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT muscle_group,fatigue,pump,recovery FROM session_feedback
-WHERE id IN (SELECT MAX(id) FROM session_feedback GROUP BY muscle_group)`)
+WHERE id IN (SELECT MAX(f.id) FROM session_feedback f JOIN sessions se ON se.id=f.session_id WHERE se.user_id=? GROUP BY f.muscle_group)`, s.userID)
 	if err != nil {
 		return nil, err
 	}
@@ -917,20 +934,20 @@ WHERE id IN (SELECT MAX(id) FROM session_feedback GROUP BY muscle_group)`)
 	return out, rows.Err()
 }
 
-func (s *Store) SetExerciseNote(ctx context.Context, n training.ExerciseNote) error {
+func (s *userStore) SetExerciseNote(ctx context.Context, n training.ExerciseNote) error {
 	if strings.TrimSpace(n.Note) == "" {
-		_, err := s.db.ExecContext(ctx, `DELETE FROM exercise_notes WHERE exercise=?`, n.Exercise)
+		_, err := s.db.ExecContext(ctx, `DELETE FROM exercise_notes WHERE user_id=? AND exercise=?`, s.userID, n.Exercise)
 		return err
 	}
 	_, err := s.db.ExecContext(ctx, `
-INSERT INTO exercise_notes(exercise,note,updated_at) VALUES (?,?,CURRENT_TIMESTAMP)
+INSERT INTO exercise_notes(user_id,exercise,note,updated_at) VALUES (?,?,?,CURRENT_TIMESTAMP)
 ON CONFLICT(user_id,exercise) DO UPDATE SET note=excluded.note, updated_at=CURRENT_TIMESTAMP`,
-		n.Exercise, n.Note)
+		s.userID, n.Exercise, n.Note)
 	return err
 }
 
-func (s *Store) ExerciseNotes(ctx context.Context) ([]training.ExerciseNote, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT exercise,note FROM exercise_notes ORDER BY exercise`)
+func (s *userStore) ExerciseNotes(ctx context.Context) ([]training.ExerciseNote, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT exercise,note FROM exercise_notes WHERE user_id=? ORDER BY exercise`, s.userID)
 	if err != nil {
 		return nil, err
 	}
@@ -948,10 +965,10 @@ func (s *Store) ExerciseNotes(ctx context.Context) ([]training.ExerciseNote, err
 
 // SupersetFor reports the superset label an exercise carries in a session's
 // plan, so a logged set can be stamped without the caller stating it.
-func (s *Store) SupersetFor(ctx context.Context, sessionID int64, exercise string) (string, error) {
+func (s *userStore) SupersetFor(ctx context.Context, sessionID int64, exercise string) (string, error) {
 	var label string
-	err := s.db.QueryRowContext(ctx, `SELECT superset FROM session_items WHERE session_id=? AND exercise=?`,
-		sessionID, exercise).Scan(&label)
+	err := s.db.QueryRowContext(ctx, `SELECT i.superset FROM session_items i JOIN sessions se ON se.id=i.session_id WHERE i.session_id=? AND i.exercise=? AND se.user_id=?`,
+		sessionID, exercise, s.userID).Scan(&label)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
@@ -960,9 +977,10 @@ func (s *Store) SupersetFor(ctx context.Context, sessionID int64, exercise strin
 
 // RecentFeedback returns up to limit most recent ratings per muscle group,
 // newest first, so a recommendation can look at a trend rather than a moment.
-func (s *Store) RecentFeedback(ctx context.Context, limit int) (map[string][]training.Feedback, error) {
+func (s *userStore) RecentFeedback(ctx context.Context, limit int) (map[string][]training.Feedback, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT muscle_group,fatigue,pump,recovery FROM session_feedback ORDER BY muscle_group, id DESC`)
+SELECT f.muscle_group,f.fatigue,f.pump,f.recovery FROM session_feedback f JOIN sessions se ON se.id=f.session_id
+WHERE se.user_id=? ORDER BY f.muscle_group, f.id DESC`, s.userID)
 	if err != nil {
 		return nil, err
 	}
@@ -980,16 +998,16 @@ SELECT muscle_group,fatigue,pump,recovery FROM session_feedback ORDER BY muscle_
 	return out, rows.Err()
 }
 
-func (s *Store) SetLandmarks(ctx context.Context, l training.Landmarks) error {
+func (s *userStore) SetLandmarks(ctx context.Context, l training.Landmarks) error {
 	_, err := s.db.ExecContext(ctx, `
-INSERT INTO volume_landmarks(muscle_group,mev,mrv,updated_at) VALUES (?,?,?,CURRENT_TIMESTAMP)
+INSERT INTO volume_landmarks(user_id,muscle_group,mev,mrv,updated_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP)
 ON CONFLICT(user_id,muscle_group) DO UPDATE SET mev=excluded.mev, mrv=excluded.mrv, updated_at=CURRENT_TIMESTAMP`,
-		l.MuscleGroup, l.MEV, l.MRV)
+		s.userID, l.MuscleGroup, l.MEV, l.MRV)
 	return err
 }
 
-func (s *Store) AllLandmarks(ctx context.Context) (map[string]training.Landmarks, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT muscle_group,mev,mrv FROM volume_landmarks`)
+func (s *userStore) AllLandmarks(ctx context.Context) (map[string]training.Landmarks, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT muscle_group,mev,mrv FROM volume_landmarks WHERE user_id=?`, s.userID)
 	if err != nil {
 		return nil, err
 	}
@@ -1008,18 +1026,18 @@ func (s *Store) AllLandmarks(ctx context.Context) (map[string]training.Landmarks
 // DeleteSession removes a session and, by ON DELETE CASCADE, all of its sets.
 // It returns how many sets went with it so the caller can report the cost of an
 // irreversible delete.
-func (s *Store) DeleteSession(ctx context.Context, id int64) (int, error) {
+func (s *userStore) DeleteSession(ctx context.Context, id int64) (int, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
 	defer tx.Rollback()
 	var n int
-	err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM sets WHERE session_id=?`, id).Scan(&n)
+	err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM sets WHERE session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?)`, id, s.userID).Scan(&n)
 	if err != nil {
 		return 0, err
 	}
-	res, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE id=?`, id)
+	res, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE id=? AND user_id=?`, id, s.userID)
 	if err != nil {
 		return 0, err
 	}
@@ -1033,17 +1051,17 @@ func (s *Store) DeleteSession(ctx context.Context, id int64) (int, error) {
 	return n, tx.Commit()
 }
 
-func (s *Store) ExerciseHistory(ctx context.Context, exercise string, limit int) (training.ExerciseHistory, error) {
+func (s *userStore) ExerciseHistory(ctx context.Context, exercise string, limit int) (training.ExerciseHistory, error) {
 	out := training.ExerciseHistory{Exercise: exercise, Sets: []training.ExerciseSet{}}
-	err := s.db.QueryRowContext(ctx, `SELECT muscle_group FROM exercise_groups WHERE exercise=?`, exercise).Scan(&out.MuscleGroup)
+	err := s.db.QueryRowContext(ctx, `SELECT muscle_group FROM exercise_groups WHERE user_id=? AND exercise=?`, s.userID, exercise).Scan(&out.MuscleGroup)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return out, err
 	}
 	rows, err := s.db.QueryContext(ctx, `
 SELECT st.id,st.session_id,se.date,st.weight_kg,st.reps,st.rpe,st.rpe_imputed,st.si,st.technique,st.superset
 FROM sets st JOIN sessions se ON se.id=st.session_id
-WHERE st.exercise=?
-ORDER BY se.date DESC, st.position DESC LIMIT ?`, exercise, limit)
+WHERE se.user_id=? AND st.exercise=?
+ORDER BY se.date DESC, st.position DESC LIMIT ?`, s.userID, exercise, limit)
 	if err != nil {
 		return out, err
 	}
@@ -1065,8 +1083,8 @@ ORDER BY se.date DESC, st.position DESC LIMIT ?`, exercise, limit)
 	err = s.db.QueryRowContext(ctx, `
 SELECT st.id,st.session_id,se.date,st.weight_kg,st.reps,st.rpe,st.rpe_imputed,st.si,st.technique,st.superset
 FROM sets st JOIN sessions se ON se.id=st.session_id
-WHERE st.exercise=? AND st.technique=''
-ORDER BY st.weight_kg*(1+CAST(st.reps AS REAL)/30) DESC, se.date DESC LIMIT 1`, exercise).
+WHERE se.user_id=? AND st.exercise=? AND st.technique=''
+ORDER BY st.weight_kg*(1+CAST(st.reps AS REAL)/30) DESC, se.date DESC LIMIT 1`, s.userID, exercise).
 		Scan(&best.SetID, &best.SessionID, &best.Date, &best.WeightKG, &best.Reps, &best.RPE, &best.RPEImputed, &best.SI, &best.Technique, &best.Superset)
 	if errors.Is(err, sql.ErrNoRows) {
 		return out, nil
@@ -1082,14 +1100,14 @@ ORDER BY st.weight_kg*(1+CAST(st.reps AS REAL)/30) DESC, se.date DESC LIMIT 1`, 
 
 // WeeklyVolume buckets SI per muscle group by training week. The week start is
 // computed as the Monday on or before the session date.
-func (s *Store) WeeklyVolume(ctx context.Context, f training.ListFilter) ([]training.WeeklyVolume, error) {
+func (s *userStore) WeeklyVolume(ctx context.Context, f training.ListFilter) ([]training.WeeklyVolume, error) {
 	q := `SELECT date(se.date, '-' || ((CAST(strftime('%w', se.date) AS INTEGER) + 6) % 7) || ' days') AS wk,
 COALESCE(g.muscle_group,''),COALESCE(SUM(st.si),0),COUNT(st.id)
 FROM sets st
 JOIN sessions se ON se.id=st.session_id
-LEFT JOIN exercise_groups g ON g.exercise=st.exercise
-WHERE 1=1`
-	args := []any{}
+LEFT JOIN exercise_groups g ON g.user_id=se.user_id AND g.exercise=st.exercise
+WHERE se.user_id=?`
+	args := []any{s.userID}
 	if f.From != "" {
 		q += ` AND se.date>=?`
 		args = append(args, f.From)
@@ -1116,16 +1134,16 @@ WHERE 1=1`
 	return out, rows.Err()
 }
 
-func (s *Store) SetExerciseGroup(ctx context.Context, g training.ExerciseGroup) error {
+func (s *userStore) SetExerciseGroup(ctx context.Context, g training.ExerciseGroup) error {
 	_, err := s.db.ExecContext(ctx, `
-INSERT INTO exercise_groups(exercise,muscle_group,updated_at) VALUES (?,?,CURRENT_TIMESTAMP)
+INSERT INTO exercise_groups(user_id,exercise,muscle_group,updated_at) VALUES (?,?,?,CURRENT_TIMESTAMP)
 ON CONFLICT(user_id,exercise) DO UPDATE SET muscle_group=excluded.muscle_group, updated_at=CURRENT_TIMESTAMP`,
-		g.Exercise, g.MuscleGroup)
+		s.userID, g.Exercise, g.MuscleGroup)
 	return err
 }
 
-func (s *Store) ExerciseGroups(ctx context.Context) ([]training.ExerciseGroup, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT exercise,muscle_group FROM exercise_groups ORDER BY muscle_group,exercise`)
+func (s *userStore) ExerciseGroups(ctx context.Context) ([]training.ExerciseGroup, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT exercise,muscle_group FROM exercise_groups WHERE user_id=? ORDER BY muscle_group,exercise`, s.userID)
 	if err != nil {
 		return nil, err
 	}
@@ -1143,13 +1161,13 @@ func (s *Store) ExerciseGroups(ctx context.Context) ([]training.ExerciseGroup, e
 
 // VolumeByGroup left-joins the catalogue so sets whose exercise has no mapping
 // still appear, grouped under an empty muscle group.
-func (s *Store) VolumeByGroup(ctx context.Context, f training.ListFilter) ([]training.GroupVolume, error) {
+func (s *userStore) VolumeByGroup(ctx context.Context, f training.ListFilter) ([]training.GroupVolume, error) {
 	q := `SELECT COALESCE(g.muscle_group,''),COALESCE(SUM(st.si),0),COUNT(st.id)
 FROM sets st
 JOIN sessions se ON se.id=st.session_id
-LEFT JOIN exercise_groups g ON g.exercise=st.exercise
-WHERE 1=1`
-	args := []any{}
+LEFT JOIN exercise_groups g ON g.user_id=se.user_id AND g.exercise=st.exercise
+WHERE se.user_id=?`
+	args := []any{s.userID}
 	if f.From != "" {
 		q += ` AND se.date>=?`
 		args = append(args, f.From)
@@ -1176,8 +1194,8 @@ WHERE 1=1`
 	return out, rows.Err()
 }
 
-func (s *Store) total(ctx context.Context, id int64) (float64, error) {
+func (s *userStore) total(ctx context.Context, id int64) (float64, error) {
 	var total float64
-	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(si),0) FROM sets WHERE session_id=?`, id).Scan(&total)
+	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(si),0) FROM sets WHERE session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?)`, id, s.userID).Scan(&total)
 	return training.NormalizeSI(total), err
 }

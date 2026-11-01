@@ -24,7 +24,7 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	s := New(training.NewService(store, time.Now))
+	s := New(only(training.NewService(store.ForUser(1), time.Now)))
 	h := httptest.NewServer(httpsrv.Routes(s.Handler(), false, "secret", nil))
 	defer h.Close()
 	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "1.0.0"}, nil)
@@ -90,7 +90,7 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 	if !rejected.IsError {
 		t.Fatal("update_set accepted RPE outside its declared range")
 	}
-	stored, err := store.GetSession(context.Background(), started.Session.ID)
+	stored, err := store.ForUser(1).GetSession(context.Background(), started.Session.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 }
 
 func TestServerToolsDeclareHowTheyBehave(t *testing.T) {
-	session := mustConnect(t, New(training.NewService(testStore{}, nil)).Handler())
+	session := mustConnect(t, New(only(training.NewService(testStore{}, nil))).Handler())
 	result, err := session.ListTools(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -164,7 +164,7 @@ func rawMCP(t *testing.T, url, method, host string) *http.Response {
 }
 
 func TestStatelessServerIssuesNoSessions(t *testing.T) {
-	server := httptest.NewServer(New(training.NewService(testStore{}, nil)).Handler())
+	server := httptest.NewServer(New(only(training.NewService(testStore{}, nil))).Handler())
 	defer server.Close()
 	initialized := rawMCP(t, server.URL, http.MethodPost, "")
 	if initialized.StatusCode != http.StatusOK {
@@ -179,7 +179,7 @@ func TestStatelessServerIssuesNoSessions(t *testing.T) {
 }
 
 func TestLoopbackConnectionRejectsAForeignHost(t *testing.T) {
-	server := httptest.NewServer(New(training.NewService(testStore{}, nil)).Handler())
+	server := httptest.NewServer(New(only(training.NewService(testStore{}, nil))).Handler())
 	defer server.Close()
 	if got := rawMCP(t, server.URL, http.MethodPost, "training.example.com").StatusCode; got != http.StatusForbidden {
 		t.Fatalf("foreign Host over loopback status = %d, want 403", got)
@@ -190,7 +190,7 @@ func TestLoopbackConnectionRejectsAForeignHost(t *testing.T) {
 }
 
 func TestServerInstructionsLeadWithTheLoggingPath(t *testing.T) {
-	session := mustConnect(t, New(training.NewService(testStore{}, nil)).Handler())
+	session := mustConnect(t, New(only(training.NewService(testStore{}, nil))).Handler())
 	got := session.InitializeResult().Instructions
 	if !strings.Contains(got, "log_set") {
 		t.Fatalf("instructions do not name log_set: %q", got)
@@ -201,7 +201,7 @@ func TestServerInstructionsLeadWithTheLoggingPath(t *testing.T) {
 }
 
 func TestServerToolsDescribeTheirInputsAndValidationContract(t *testing.T) {
-	session := mustConnect(t, New(training.NewService(testStore{}, time.Now)).Handler())
+	session := mustConnect(t, New(only(training.NewService(testStore{}, time.Now))).Handler())
 	result, err := session.ListTools(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -313,7 +313,7 @@ func TestServerToolsDescribeTheirInputsAndValidationContract(t *testing.T) {
 }
 
 func TestListSessionsRejectsInvertedDateRangeThroughMCP(t *testing.T) {
-	session := mustConnect(t, New(training.NewService(testStore{}, time.Now)).Handler())
+	session := mustConnect(t, New(only(training.NewService(testStore{}, time.Now))).Handler())
 	result := call(t, session, "list_sessions", map[string]any{
 		"from": "2026-08-07",
 		"to":   "2026-08-06",
@@ -332,7 +332,7 @@ func TestListSessionsRejectsInvertedDateRangeThroughMCP(t *testing.T) {
 }
 
 func TestListSessionsSerializesEmptyResultsAsArray(t *testing.T) {
-	session := mustConnect(t, New(training.NewService(testStore{}, time.Now)).Handler())
+	session := mustConnect(t, New(only(training.NewService(testStore{}, time.Now))).Handler())
 	result := call(t, session, "list_sessions", map[string]any{})
 
 	data, err := json.Marshal(result.StructuredContent)
@@ -345,7 +345,7 @@ func TestListSessionsSerializesEmptyResultsAsArray(t *testing.T) {
 }
 
 func TestUnexpectedStartSessionErrorUsesGenericMCPError(t *testing.T) {
-	s := New(training.NewService(errorStore{}, time.Now))
+	s := New(only(training.NewService(errorStore{}, time.Now)))
 	result := call(t, mustConnect(t, s.Handler()), "start_session", map[string]any{"date": "2026-08-06"})
 	if !result.IsError || stringContent(result) != "internal tool error" {
 		t.Fatalf("result=%#v content=%q", result, stringContent(result))
@@ -358,7 +358,7 @@ func TestServerSerializesNormalizedSIValuesAndTotal(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	session := mustConnect(t, New(training.NewService(store, time.Now)).Handler())
+	session := mustConnect(t, New(only(training.NewService(store.ForUser(1), time.Now))).Handler())
 	startedResult := call(t, session, "start_session", map[string]any{"date": "2026-08-06"})
 	var started SessionOut
 	decode(t, startedResult, &started)
@@ -390,6 +390,11 @@ func TestServerSerializesNormalizedSIValuesAndTotal(t *testing.T) {
 	if !bytes.Contains(data, []byte(`"si":1.4`)) || !bytes.Contains(data, []byte(`"total_si":3.8`)) {
 		t.Fatalf("MCP output = %s, want SI 1.4 and total 3.8", data)
 	}
+}
+
+// only answers every request with one service.
+func only(service *training.Service) training.ServiceFor {
+	return func(context.Context) *training.Service { return service }
 }
 
 type testStore struct{}
@@ -556,8 +561,6 @@ func (testStore) SessionFeedback(context.Context, int64) ([]training.Feedback, e
 func (testStore) LatestFeedback(context.Context) (map[string]training.Feedback, error) {
 	return nil, nil
 }
-
-func (testStore) Snapshot(context.Context, string) error { return nil }
 
 func (testStore) SetExerciseNote(context.Context, training.ExerciseNote) error { return nil }
 func (testStore) ExerciseNotes(context.Context) ([]training.ExerciseNote, error) {

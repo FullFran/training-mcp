@@ -43,7 +43,11 @@ The domain declares what it needs and nothing more.
 
 ```go
 // internal/training/store.go
-type Store interface { /* 37 methods, all context-first */ }
+type Store interface {
+	ForUser(userID int64) UserStore
+	Snapshot(context.Context, string) error // the whole database, for backup
+}
+type UserStore interface { /* 36 methods, all context-first */ }
 
 // internal/training/model.go
 type Clock func() time.Time
@@ -51,8 +55,19 @@ type Clock func() time.Time
 
 `Clock` being a function type rather than an interface is deliberate: it has one
 method, and `time.Now` satisfies it with no adapter at all. Wiring in
-`main.go` reads `training.NewService(store, time.Now)`, and a test pins the date
+`main.go` reads `training.NewServices(store, time.Now)`, and a test pins the date
 by passing a closure. There is no mock framework anywhere in this repository.
+
+`Store` is split so a data method cannot be called, nor compile, without saying
+whose data it is. `UserStore` holds the user id itself, with no default user, and
+every statement filters by it. Child rows (`sets`, `plan_items`, `session_items`,
+`session_feedback`) are reached through a parent the user owns. Another user's id
+behaves exactly like a missing id, with the same error, so its existence cannot be
+inferred. A `training.Service` is built on one `UserStore`, so it serves one user.
+`mcpsrv` and `websrv` get theirs per request through a `training.ServiceFor`
+function; `main.go` wires the only one that exists today, which always answers the
+owner, user 1. `Snapshot` is the one exception: it copies every user's data, and it
+reaches `websrv` as a function of its own for `export.db`.
 
 ## Why the packages sit where they do
 
