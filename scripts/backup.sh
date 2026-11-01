@@ -62,7 +62,8 @@ fi
 if [ "$download" = true ]; then
   # Verify before replacing, so a bad download never costs the copy already here.
   tmp="$(mktemp "$dest/.incoming.XXXXXX")"
-  curl -fsS --max-time 300 -o "$tmp" "${WEB_URL%/}/export.db"
+  # The URL grants full access, so like the other secrets it stays out of argv.
+  printf 'url = "%s"\n' "${WEB_URL%/}/export.db" | curl -fsS --max-time 300 -o "$tmp" -K -
 
   # A download that is not a readable database is not a backup, so check.
   head -c 15 "$tmp" | grep -q 'SQLite format 3' || { echo "not a SQLite file" >&2; exit 1; }
