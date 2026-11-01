@@ -133,41 +133,55 @@ type userStore struct {
 }
 
 func (s *userStore) Start(ctx context.Context, session training.Session) (training.Session, error) {
-	// The plan name is snapshotted alongside the id so history stays readable
-	// even if the plan is later renamed or deleted.
-	if session.PlanID > 0 {
-		p, err := s.GetPlan(ctx, session.PlanID)
-		if err != nil {
-			return training.Session{}, err
-		}
-		if session.PlanName == "" {
-			session.PlanName = p.Name
-		}
-	}
-	var planID any
-	if session.PlanID > 0 {
-		planID = session.PlanID
-	}
-	res, err := s.db.ExecContext(ctx, `INSERT INTO sessions(user_id, date, started_at, plan_id, plan_name) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`,
-		s.userID, session.Date, planID, session.PlanName)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return training.Session{}, err
 	}
-	if session.ID, err = res.LastInsertId(); err != nil {
-		return training.Session{}, err
-	}
+	defer tx.Rollback()
 	if session.PlanID > 0 {
+		// The plan name is snapshotted alongside the id so history stays readable
+		// even if the plan is later renamed or deleted. The plan comes from the
+		// statement that stores it, so it cannot change owner in between.
+		res, err := tx.ExecContext(ctx, `
+INSERT INTO sessions(user_id, date, started_at, plan_id, plan_name)
+SELECT user_id, ?, CURRENT_TIMESTAMP, id, COALESCE(NULLIF(?,''),name) FROM plans WHERE id=? AND user_id=?`,
+			session.Date, session.PlanName, session.PlanID, s.userID)
+		if err != nil {
+			return training.Session{}, err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return training.Session{}, err
+		}
+		if n == 0 {
+			return training.Session{}, training.ErrNotFound
+		}
+		if session.ID, err = res.LastInsertId(); err != nil {
+			return training.Session{}, err
+		}
+		if err = tx.QueryRowContext(ctx, `SELECT plan_name FROM sessions WHERE id=?`, session.ID).Scan(&session.PlanName); err != nil {
+			return training.Session{}, err
+		}
 		// Copy the plan into the session so adjusting today never edits the
 		// template, and editing the template never rewrites this session.
-		if _, err = s.db.ExecContext(ctx, `
+		if _, err = tx.ExecContext(ctx, `
 INSERT INTO session_items (session_id,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset,notes)
 SELECT ?,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset,notes FROM plan_items
 WHERE plan_id IN (SELECT id FROM plans WHERE id=? AND user_id=?)`,
 			session.ID, session.PlanID, s.userID); err != nil {
 			return training.Session{}, err
 		}
+	} else {
+		res, err := tx.ExecContext(ctx, `INSERT INTO sessions(user_id, date, started_at, plan_id, plan_name) VALUES (?, ?, CURRENT_TIMESTAMP, NULL, ?)`,
+			s.userID, session.Date, session.PlanName)
+		if err != nil {
+			return training.Session{}, err
+		}
+		if session.ID, err = res.LastInsertId(); err != nil {
+			return training.Session{}, err
+		}
 	}
-	return session, nil
+	return session, tx.Commit()
 }
 func (s *userStore) AddSet(ctx context.Context, in training.AddSetInput) (training.Set, float64, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -412,7 +426,7 @@ func (s *userStore) GetSession(ctx context.Context, id int64) (training.Session,
 	if err != nil {
 		return out, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,session_id,position,exercise,weight_kg,reps,rpe,rpe_imputed,si,technique,superset FROM sets WHERE session_id=? ORDER BY position`, id)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,session_id,position,exercise,weight_kg,reps,rpe,rpe_imputed,si,technique,superset FROM sets WHERE session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?) ORDER BY position`, id, s.userID)
 	if err != nil {
 		return out, err
 	}
@@ -543,7 +557,7 @@ func (s *userStore) GetPlan(ctx context.Context, id int64) (training.Plan, error
 	if err != nil {
 		return p, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT position,exercise,target_sets,rep_min,rep_max,target_rpe,superset,notes FROM plan_items WHERE plan_id=? ORDER BY position`, id)
+	rows, err := s.db.QueryContext(ctx, `SELECT position,exercise,target_sets,rep_min,rep_max,target_rpe,superset,notes FROM plan_items WHERE plan_id IN (SELECT id FROM plans WHERE id=? AND user_id=?) ORDER BY position`, id, s.userID)
 	if err != nil {
 		return p, err
 	}
@@ -748,7 +762,7 @@ SELECT i.superset, i.notes, i.exercise, i.target_sets, i.rep_min, i.rep_max, i.t
        (SELECT COUNT(*) FROM sets st WHERE st.session_id=i.session_id AND st.exercise=i.exercise),
        COALESCE(g.muscle_group,'')
 FROM session_items i LEFT JOIN exercise_groups g ON g.user_id=? AND g.exercise=i.exercise
-WHERE i.session_id=? ORDER BY i.position`, s.userID, sessionID)
+WHERE i.session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?) ORDER BY i.position`, s.userID, sessionID, s.userID)
 	if err != nil {
 		return nil, err
 	}
@@ -770,7 +784,7 @@ WHERE i.session_id=? ORDER BY i.position`, s.userID, sessionID)
 	extra, err := s.db.QueryContext(ctx, `
 SELECT st.exercise, COUNT(*), COALESCE(g.muscle_group,'')
 FROM sets st LEFT JOIN exercise_groups g ON g.user_id=? AND g.exercise=st.exercise
-WHERE st.session_id=? GROUP BY st.exercise ORDER BY MIN(st.position)`, s.userID, sessionID)
+WHERE st.session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?) GROUP BY st.exercise ORDER BY MIN(st.position)`, s.userID, sessionID, s.userID)
 	if err != nil {
 		return nil, err
 	}
@@ -790,26 +804,19 @@ WHERE st.session_id=? GROUP BY st.exercise ORDER BY MIN(st.position)`, s.userID,
 // SetSessionItem adds an exercise to today's session plan, or replaces its
 // prescription if it is already there. New items go last.
 func (s *userStore) SetSessionItem(ctx context.Context, sessionID int64, it training.PlanItem) error {
-	var exists int
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions WHERE id=? AND user_id=?`, sessionID, s.userID).Scan(&exists); err != nil {
-		return err
-	}
-	if exists == 0 {
-		return training.ErrNotFound
-	}
-	var pos int
-	if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(MAX(position),0)+1 FROM session_items WHERE session_id=?`, sessionID).Scan(&pos); err != nil {
-		return err
-	}
-	_, err := s.db.ExecContext(ctx, `
+	res, err := s.db.ExecContext(ctx, `
 INSERT INTO session_items (session_id,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset,notes)
-VALUES (?,?,?,?,?,?,?,?,?)
+SELECT id,(SELECT COALESCE(MAX(position),0)+1 FROM session_items WHERE session_id=?),?,?,?,?,?,?,?
+FROM sessions WHERE id=? AND user_id=?
 ON CONFLICT(session_id,exercise) DO UPDATE SET
  target_sets=excluded.target_sets, rep_min=excluded.rep_min,
  rep_max=excluded.rep_max, target_rpe=excluded.target_rpe,
  superset=excluded.superset, notes=excluded.notes`,
-		sessionID, pos, it.Exercise, it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE, it.Superset, it.Notes)
-	return err
+		sessionID, it.Exercise, it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE, it.Superset, it.Notes, sessionID, s.userID)
+	if err != nil {
+		return err
+	}
+	return mustHaveAffected(res)
 }
 
 // PatchSessionItem changes only the fields given, so bumping the set count does
@@ -880,20 +887,29 @@ func (s *userStore) RemoveSessionItem(ctx context.Context, sessionID int64, exer
 }
 
 func (s *userStore) SetFeedback(ctx context.Context, sessionID int64, f training.Feedback) error {
-	var exists int
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions WHERE id=? AND user_id=?`, sessionID, s.userID).Scan(&exists); err != nil {
-		return err
-	}
-	if exists == 0 {
-		return training.ErrNotFound
-	}
-	_, err := s.db.ExecContext(ctx, `
+	res, err := s.db.ExecContext(ctx, `
 INSERT INTO session_feedback (session_id,muscle_group,fatigue,pump,recovery,created_at)
-VALUES (?,?,?,?,?,CURRENT_TIMESTAMP)
+SELECT id,?,?,?,?,CURRENT_TIMESTAMP FROM sessions WHERE id=? AND user_id=?
 ON CONFLICT(session_id,muscle_group) DO UPDATE SET
  fatigue=excluded.fatigue, pump=excluded.pump, recovery=excluded.recovery, created_at=CURRENT_TIMESTAMP`,
-		sessionID, f.MuscleGroup, f.Fatigue, f.Pump, f.Recovery)
-	return err
+		f.MuscleGroup, f.Fatigue, f.Pump, f.Recovery, sessionID, s.userID)
+	if err != nil {
+		return err
+	}
+	return mustHaveAffected(res)
+}
+
+// mustHaveAffected turns a statement scoped to the user that touched nothing into
+// the error a missing id gets.
+func mustHaveAffected(res sql.Result) error {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return training.ErrNotFound
+	}
+	return nil
 }
 
 func (s *userStore) SessionFeedback(ctx context.Context, sessionID int64) ([]training.Feedback, error) {

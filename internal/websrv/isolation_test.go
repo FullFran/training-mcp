@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -115,68 +116,125 @@ func dumpDatabase(t *testing.T, db *sql.DB) string {
 	return out.String()
 }
 
-func postID(path func(string) string, form func(string) url.Values) func(*testing.T, http.Handler, string) (int, string) {
-	return func(t *testing.T, h http.Handler, id string) (int, string) {
-		w := post(t, h, base+path(id), form(id), true)
-		return w.Code, w.Body.String()
+// webRoutes says how each registered route keeps users apart. A route added later
+// with no entry fails TestEveryWebRouteHasAnIsolationCase.
+var webRoutes = map[string]func(*testing.T){
+	"POST /sets/{id}/delete": idRoute(func(w webWorld) string { return w.set }, func(id string) (string, url.Values) {
+		return "/sets/" + id + "/delete", url.Values{}
+	}),
+	"POST /sets/{id}/update": idRoute(func(w webWorld) string { return w.set }, func(id string) (string, url.Values) {
+		return "/sets/" + id + "/update", url.Values{"reps": {"1"}}
+	}),
+	"POST /plans/update":      planRoute("/plans/update", url.Values{"name": {"robada"}, "notes": {"x"}}),
+	"POST /plans/delete":      planRoute("/plans/delete", nil),
+	"POST /plans/item":        planRoute("/plans/item", url.Values{"exercise": {secretExercise}, "target_sets": {"9"}}),
+	"POST /plans/item/remove": planRoute("/plans/item/remove", url.Values{"exercise": {secretExercise}}),
+	"POST /plans/move":        planRoute("/plans/move", url.Values{"exercise": {secretExercise}, "direction": {"down"}}),
+	"POST /plan":              testChoosingAnotherUsersPlanKeepsTheDaysEmptySession,
+	"GET /s/{id}":             testWebSessionPageTreatsAnotherUsersIDAsMissing,
+
+	"GET /{$}":           pageRoute("/", secretExercise),
+	"GET /history":       pageRoute("/history", ""),
+	"GET /plans":         pageRoute("/plans", secretPlan),
+	"GET /exercise-info": pageRoute("/exercise-info?name="+url.QueryEscape(secretExercise), secretNote),
+
+	"POST /sets": writeRoute("/sets", setForm(secretExercise, "50", "5", "8"),
+		`sets st JOIN sessions se ON se.id=st.session_id WHERE se.user_id=2 AND st.exercise='`+secretExercise+`'`),
+	"POST /note": writeRoute("/note", url.Values{"exercise": {secretExercise}, "note": {"suya"}},
+		`exercise_notes WHERE user_id=2 AND note='suya'`),
+	"POST /feedback": writeRoute("/feedback", url.Values{"muscle_group": {"pecho"}, "fatigue": {"1"}, "pump": {"1"}, "recovery": {"1"}},
+		`session_feedback f JOIN sessions se ON se.id=f.session_id WHERE se.user_id=2 AND f.muscle_group='pecho'`),
+	"POST /plans/create": writeRoute("/plans/create", url.Values{"name": {secretPlan}},
+		`plans WHERE user_id=2 AND name='`+secretPlan+`'`),
+	"POST /plan/item": writeRoute("/plan/item", url.Values{"action": {"adopt"}, "exercise": {secretExercise}, "done": {"1"}},
+		`session_items i JOIN sessions se ON se.id=i.session_id WHERE se.user_id=2 AND i.exercise='`+secretExercise+`'`),
+
+	"GET /manifest.webmanifest": sharedRoute("the same document for everyone"),
+	"GET /sw.js":                sharedRoute("the same document for everyone"),
+	"GET /static/":              sharedRoute("embedded assets, the same for everyone"),
+	"GET":                       sharedRoute("a redirect to the app root"),
+	"GET /export.db":            sharedRoute("copies every user's data; it leaves the web before a second user reaches it"),
+}
+
+func TestEveryWebRouteIsIsolated(t *testing.T) {
+	for route, check := range webRoutes {
+		t.Run(route, check)
 	}
 }
 
-func planRoute(path string, fields url.Values) func(*testing.T, http.Handler, string) (int, string) {
-	return postID(func(string) string { return path }, func(id string) url.Values {
+func TestEveryWebRouteHasAnIsolationCase(t *testing.T) {
+	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	services := training.NewServices(store, webClock)
+	server, err := websrv.New(func(context.Context) *training.Service { return services.ForUser(1) }, services.Snapshot, webClock, base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registered := []string{}
+	for _, pattern := range server.Routes() {
+		registered = append(registered, strings.TrimSpace(strings.Replace(pattern, base, "", 1)))
+	}
+	sort.Strings(registered)
+	covered := []string{}
+	for route := range webRoutes {
+		covered = append(covered, route)
+	}
+	sort.Strings(covered)
+	if got, want := strings.Join(covered, "\n"), strings.Join(registered, "\n"); got != want {
+		t.Fatalf("isolation cases:\n%s\nregistered routes:\n%s", got, want)
+	}
+}
+
+func sharedRoute(string) func(*testing.T) { return func(*testing.T) {} }
+
+func planRoute(path string, fields url.Values) func(*testing.T) {
+	return idRoute(func(w webWorld) string { return w.plan }, func(id string) (string, url.Values) {
 		form := url.Values{"plan_id": {id}}
 		for k, v := range fields {
 			form[k] = v
 		}
-		return form
+		return path, form
 	})
 }
 
-func TestWebRoutesTreatAnotherUsersIDAsMissing(t *testing.T) {
-	noForm := func(string) url.Values { return url.Values{} }
-	exercise := url.Values{"exercise": {secretExercise}}
-	routes := []struct {
-		name string
-		call func(*testing.T, http.Handler, string) (int, string)
-		pick func(webWorld) string
-	}{
-		{"delete set", postID(func(id string) string { return "/sets/" + id + "/delete" }, noForm), func(w webWorld) string { return w.set }},
-		{"update set", postID(func(id string) string { return "/sets/" + id + "/update" }, func(string) url.Values { return url.Values{"reps": {"1"}} }), func(w webWorld) string { return w.set }},
-		{"plan update", planRoute("/plans/update", url.Values{"name": {"robada"}, "notes": {"x"}}), func(w webWorld) string { return w.plan }},
-		{"plan delete", planRoute("/plans/delete", nil), func(w webWorld) string { return w.plan }},
-		{"plan item", planRoute("/plans/item", url.Values{"exercise": {secretExercise}, "target_sets": {"9"}}), func(w webWorld) string { return w.plan }},
-		{"plan item remove", planRoute("/plans/item/remove", exercise), func(w webWorld) string { return w.plan }},
-		{"plan move", planRoute("/plans/move", url.Values{"exercise": {secretExercise}, "direction": {"down"}}), func(w webWorld) string { return w.plan }},
-	}
-	for _, route := range routes {
-		t.Run(route.name, func(t *testing.T) {
-			world := newWebWorld(t)
-			before := dumpDatabase(t, world.db)
+// idRoute requires another user's id to get what a missing id gets, with the owner's
+// own call succeeding so the refusal is known to be about the user.
+func idRoute(pick func(webWorld) string, request func(id string) (string, url.Values)) func(*testing.T) {
+	return func(t *testing.T) {
+		world := newWebWorld(t)
+		send := func(h http.Handler, id string) (int, string) {
+			path, form := request(id)
+			w := post(t, h, base+path, form, true)
+			return w.Code, w.Body.String()
+		}
+		before := dumpDatabase(t, world.db)
 
-			foreignCode, foreignBody := route.call(t, world.second, route.pick(world))
-			missingCode, missingBody := route.call(t, world.second, missingWebID)
+		foreignCode, foreignBody := send(world.second, pick(world))
+		missingCode, missingBody := send(world.second, missingWebID)
 
-			if foreignCode != missingCode || foreignBody != missingBody {
-				t.Fatalf("foreign id: %d\n%s\nmissing id: %d\n%s", foreignCode, foreignBody, missingCode, missingBody)
-			}
-			if strings.Contains(foreignBody, secretExercise) || strings.Contains(foreignBody, secretPlan) {
-				t.Fatalf("response carries the owner's data:\n%s", foreignBody)
-			}
-			if after := dumpDatabase(t, world.db); after != before {
-				t.Fatalf("rows changed:\nbefore\n%s\nafter\n%s", before, after)
-			}
+		if foreignCode != missingCode || foreignBody != missingBody {
+			t.Fatalf("foreign id: %d\n%s\nmissing id: %d\n%s", foreignCode, foreignBody, missingCode, missingBody)
+		}
+		if strings.Contains(foreignBody, secretExercise) || strings.Contains(foreignBody, secretPlan) {
+			t.Fatalf("response carries the owner's data:\n%s", foreignBody)
+		}
+		if after := dumpDatabase(t, world.db); after != before {
+			t.Fatalf("rows changed:\nbefore\n%s\nafter\n%s", before, after)
+		}
 
-			if code, _ := route.call(t, world.owner, route.pick(world)); code != http.StatusOK {
-				t.Fatalf("owner status = %d", code)
-			}
-			if after := dumpDatabase(t, world.db); after == before {
-				t.Fatal("the owner's call changed nothing, so the refusal above proves nothing")
-			}
-		})
+		if code, _ := send(world.owner, pick(world)); code != http.StatusOK {
+			t.Fatalf("owner status = %d", code)
+		}
+		if after := dumpDatabase(t, world.db); after == before {
+			t.Fatal("the owner's call changed nothing, so the refusal above proves nothing")
+		}
 	}
 }
 
-func TestWebSessionPageTreatsAnotherUsersIDAsMissing(t *testing.T) {
+func testWebSessionPageTreatsAnotherUsersIDAsMissing(t *testing.T) {
 	world := newWebWorld(t)
 	foreign := get(t, world.second, base+"/s/"+world.session)
 	missing := get(t, world.second, base+"/s/"+missingWebID)
@@ -191,7 +249,7 @@ func TestWebSessionPageTreatsAnotherUsersIDAsMissing(t *testing.T) {
 
 // Choosing a plan replaces the day's empty session, so a plan that is not the user's
 // to start must be refused before that session is touched.
-func TestChoosingAnotherUsersPlanKeepsTheDaysEmptySession(t *testing.T) {
+func testChoosingAnotherUsersPlanKeepsTheDaysEmptySession(t *testing.T) {
 	world := newWebWorld(t)
 	ownSession, err := world.db.Exec(`INSERT INTO sessions(user_id,date,started_at,plan_name) VALUES (2,'2026-08-07',CURRENT_TIMESTAMP,'')`)
 	if err != nil {
@@ -245,74 +303,51 @@ func TestChoosingAnotherUsersPlanKeepsTheDaysEmptySession(t *testing.T) {
 	}
 }
 
-func TestWebPagesShowNothingOfAnotherUser(t *testing.T) {
-	world := newWebWorld(t)
-	store, err := sqlitestore.Open(t.TempDir() + "/empty.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer store.Close()
-	empty := webHandler(t, training.NewServices(store, webClock), 1)
-	for _, tc := range []struct{ path, marker string }{
-		{"/", secretExercise},
-		{"/history", ""},
-		{"/plans", secretPlan},
-		{"/exercise-info?name=" + url.QueryEscape(secretExercise), secretNote},
-	} {
-		t.Run(tc.path, func(t *testing.T) {
-			got := get(t, world.second, base+tc.path)
-			want := get(t, empty, base+tc.path)
-			if got.Code != want.Code || got.Body.String() != want.Body.String() {
-				t.Fatalf("beside the owner: %d\n%s\non an empty database: %d\n%s", got.Code, got.Body, want.Code, want.Body)
-			}
-			owner := get(t, world.owner, base+tc.path).Body.String()
-			if owner == got.Body.String() {
-				t.Fatalf("the owner sees the same as a user with no data, so this proves nothing:\n%s", owner)
-			}
-			if tc.marker != "" && !strings.Contains(owner, tc.marker) {
-				t.Fatalf("the owner's page lacks %q:\n%s", tc.marker, owner)
-			}
-		})
+// pageRoute requires a user beside the owner to get what an empty database shows.
+func pageRoute(path, marker string) func(*testing.T) {
+	return func(t *testing.T) {
+		world := newWebWorld(t)
+		store, err := sqlitestore.Open(t.TempDir() + "/empty.db")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer store.Close()
+		empty := webHandler(t, training.NewServices(store, webClock), 1)
+		got := get(t, world.second, base+path)
+		want := get(t, empty, base+path)
+		if got.Code != want.Code || got.Body.String() != want.Body.String() {
+			t.Fatalf("beside the owner: %d\n%s\non an empty database: %d\n%s", got.Code, got.Body, want.Code, want.Body)
+		}
+		owner := get(t, world.owner, base+path).Body.String()
+		if owner == got.Body.String() {
+			t.Fatalf("the owner sees the same as a user with no data, so this proves nothing:\n%s", owner)
+		}
+		if marker != "" && !strings.Contains(owner, marker) {
+			t.Fatalf("the owner's page lacks %q:\n%s", marker, owner)
+		}
 	}
 }
 
-func TestWebWritesBelongToTheUserWhoMadeThem(t *testing.T) {
-	cases := []struct {
-		name, path string
-		form       url.Values
-		count      string
-	}{
-		{"set", "/sets", setForm(secretExercise, "50", "5", "8"),
-			`sets st JOIN sessions se ON se.id=st.session_id WHERE se.user_id=2 AND st.exercise='` + secretExercise + `'`},
-		{"note", "/note", url.Values{"exercise": {secretExercise}, "note": {"suya"}},
-			`exercise_notes WHERE user_id=2 AND note='suya'`},
-		{"feedback", "/feedback", url.Values{"muscle_group": {"pecho"}, "fatigue": {"1"}, "pump": {"1"}, "recovery": {"1"}},
-			`session_feedback f JOIN sessions se ON se.id=f.session_id WHERE se.user_id=2 AND f.muscle_group='pecho'`},
-		{"plan", "/plans/create", url.Values{"name": {secretPlan}},
-			`plans WHERE user_id=2 AND name='` + secretPlan + `'`},
-		{"session item", "/plan/item", url.Values{"action": {"adopt"}, "exercise": {secretExercise}, "done": {"1"}},
-			`session_items i JOIN sessions se ON se.id=i.session_id WHERE se.user_id=2 AND i.exercise='` + secretExercise + `'`},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			world := newWebWorld(t)
-			if w := post(t, world.second, base+tc.path, tc.form, true); w.Code != http.StatusOK {
-				t.Fatalf("status = %d: %s", w.Code, w.Body)
-			}
-			var n int
-			if err := world.db.QueryRow(`SELECT COUNT(*) FROM ` + tc.count).Scan(&n); err != nil {
-				t.Fatal(err)
-			}
-			if n != 1 {
-				t.Fatalf("%s found %d rows", tc.count, n)
-			}
-			var touched int
-			if err := world.db.QueryRow(`SELECT COUNT(*) FROM sessions WHERE user_id=1`).Scan(&touched); err != nil {
-				t.Fatal(err)
-			}
-			if touched != 1 {
-				t.Fatalf("user 1 now has %d sessions", touched)
-			}
-		})
+// writeRoute requires the write to land under user 2 and leave user 1's sessions alone.
+func writeRoute(path string, form url.Values, count string) func(*testing.T) {
+	return func(t *testing.T) {
+		world := newWebWorld(t)
+		if w := post(t, world.second, base+path, form, true); w.Code != http.StatusOK {
+			t.Fatalf("status = %d: %s", w.Code, w.Body)
+		}
+		var n int
+		if err := world.db.QueryRow(`SELECT COUNT(*) FROM ` + count).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n != 1 {
+			t.Fatalf("%s found %d rows", count, n)
+		}
+		var touched int
+		if err := world.db.QueryRow(`SELECT COUNT(*) FROM sessions WHERE user_id=1`).Scan(&touched); err != nil {
+			t.Fatal(err)
+		}
+		if touched != 1 {
+			t.Fatalf("user 1 now has %d sessions", touched)
+		}
 	}
 }
