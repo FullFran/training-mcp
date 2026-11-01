@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fullfran/training-mcp/internal/training"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
@@ -27,13 +28,12 @@ const (
 	maxLoggedClaim   = 120
 )
 
-// OAuthConfig describes the provider this server trusts and the one account it
-// serves. This is a single-user service: a valid token for anyone else, even from
-// the same provider, is refused.
+// OAuthConfig describes the provider this server trusts and how a verified subject
+// becomes a user. A valid token whose subject Resolve does not recognize is refused.
 type OAuthConfig struct {
 	Issuer   string
 	Resource string
-	Subject  string
+	Resolve  training.UserResolver
 	// JWKSURL defaults to the provider's standard location under Issuer.
 	JWKSURL string
 	Logger  *log.Logger
@@ -91,15 +91,13 @@ func metadataURLFor(resource string) string {
 	return u.String()
 }
 
-func (o *OAuth) verify(raw string) error {
+// verify returns the subject of a valid token.
+func (o *OAuth) verify(raw string) (string, error) {
 	var claims jwt.RegisteredClaims
 	if _, err := o.parser.ParseWithClaims(raw, &claims, o.keyFor); err != nil {
-		return fmt.Errorf("%w (aud=%q iss=%q)", err, clip(strings.Join(claims.Audience, ",")), clip(claims.Issuer))
+		return "", fmt.Errorf("%w (aud=%q iss=%q)", err, clip(strings.Join(claims.Audience, ",")), clip(claims.Issuer))
 	}
-	if claims.Subject != o.cfg.Subject {
-		return fmt.Errorf("subject %q is not the owner", clip(claims.Subject))
-	}
-	return nil
+	return claims.Subject, nil
 }
 
 // clip bounds a claim before logging: until the signature checks out, these
@@ -181,20 +179,32 @@ func (o *OAuth) fetchKeys() (map[string]*rsa.PublicKey, error) {
 	return keys, nil
 }
 
-// guard admits the static bearer token or a valid access token. Failures point
-// the client at the metadata document, which is how it discovers where to log in.
+// guard admits the static bearer token, as the owner, or a valid access token of
+// someone with an account, as that user. Failures point the client at the metadata
+// document, which is how it discovers where to log in.
 func (o *OAuth) guard(token string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if staticTokenMatches(r, token) {
-			next.ServeHTTP(w, r)
+			asOwner(next).ServeHTTP(w, r)
 			return
 		}
 		challenge := fmt.Sprintf(`Bearer resource_metadata=%q`, o.metadataURL)
 		if raw, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
-			err := o.verify(strings.TrimSpace(raw))
+			subject, err := o.verify(strings.TrimSpace(raw))
 			if err == nil {
-				next.ServeHTTP(w, r)
-				return
+				userID, known, resolveErr := o.cfg.Resolve(r.Context(), subject)
+				if resolveErr != nil {
+					// This says nothing about the token, so it must not send the client
+					// to log in again.
+					o.cfg.Logger.Printf("resolving a user failed: %v", resolveErr)
+					http.Error(w, "temporarily unavailable", http.StatusServiceUnavailable)
+					return
+				}
+				if known {
+					next.ServeHTTP(w, r.WithContext(training.WithUser(r.Context(), userID)))
+					return
+				}
+				err = fmt.Errorf("subject %q has no account", clip(subject))
 			}
 			o.cfg.Logger.Printf("oauth token rejected: %v", err)
 			challenge += `, error="invalid_token"`

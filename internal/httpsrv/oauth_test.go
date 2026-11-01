@@ -2,6 +2,7 @@ package httpsrv
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
@@ -72,8 +73,11 @@ func newOAuthFixture(t *testing.T) *oauthFixture {
 	}))
 	t.Cleanup(f.jwks.Close)
 	oauth := NewOAuth(OAuthConfig{
-		Issuer: testIssuer, Resource: testResource, Subject: testSubject,
+		Issuer: testIssuer, Resource: testResource,
 		JWKSURL: f.jwks.URL, Logger: log.New(f.logs, "", 0),
+		Resolve: func(_ context.Context, subject string) (int64, bool, error) {
+			return 1, subject == testSubject, nil
+		},
 	})
 	mcp := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		f.reached.Store(true)

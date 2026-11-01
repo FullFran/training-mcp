@@ -17,6 +17,9 @@ type Config struct {
 	WebBasePath string
 	// OAuth settings are all set or all empty; empty leaves OAuth off.
 	OAuthIssuer, OAuthResource, OAuthSubject string
+	// OAuthProvision gives any subject the provider vouches for an account of its
+	// own. Off, only the owner and existing accounts get in.
+	OAuthProvision bool
 }
 
 func Load(addr string) (Config, error) {
@@ -43,6 +46,14 @@ func Load(addr string) (Config, error) {
 	issuer := strings.TrimSpace(os.Getenv("MCP_OAUTH_ISSUER"))
 	resource := strings.TrimSpace(os.Getenv("MCP_OAUTH_RESOURCE"))
 	subject := strings.TrimSpace(os.Getenv("MCP_OAUTH_SUBJECT"))
+	provision := os.Getenv("MCP_OAUTH_PROVISION")
+	// Who may hold an account must never depend on how a value was misspelled.
+	if provision != "" && provision != "1" {
+		return Config{}, errors.New("MCP_OAUTH_PROVISION must be 1 or empty")
+	}
+	if provision != "" && issuer == "" {
+		return Config{}, errors.New("MCP_OAUTH_PROVISION needs the MCP_OAUTH_* settings")
+	}
 	if issuer != "" || resource != "" || subject != "" {
 		if disabled {
 			// The bypass would leave /mcp open while the operator believes tokens
@@ -65,7 +76,7 @@ func Load(addr string) (Config, error) {
 	}
 	return Config{
 		Addr: addr, DBPath: db, Token: token, AuthDisabled: disabled, WebBasePath: webBase,
-		OAuthIssuer: issuer, OAuthResource: resource, OAuthSubject: subject,
+		OAuthIssuer: issuer, OAuthResource: resource, OAuthSubject: subject, OAuthProvision: provision == "1",
 	}, nil
 }
 
