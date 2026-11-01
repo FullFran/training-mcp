@@ -147,6 +147,15 @@ as `NAME=value` lines taken literally, with no quotes.
 Keep the passphrase somewhere other than this machine: without it the copies
 cannot be read. Expire old objects with a lifecycle rule on the bucket.
 
+The off-site run lives on the VPS, in `~/training-mcp-backup`: `scripts/backup.sh`,
+`scripts/r2-env.sh` and `scripts/restore-check.sh`, plus `.credentials/r2.env` and
+a `.credentials/dokploy.env` holding only `WEB_URL`. It needs `curl`, `gpg` and
+`sqlite3`, and cron runs it with `/bin/bash` hourly with `--daily`. On the VPS a
+failure only reaches `~/.local/state/training-mcp/backup.log`, as there is no
+desktop to notify. Do not add `r2.env` on the laptop, whose cron keeps plain local
+copies: it could not reach the R2 endpoint when last tried. There is no Go on the
+VPS, so run `restore-check.sh --no-boot` there.
+
 `scripts/restore-check.sh` proves a copy is restorable without touching
 production: it fetches the newest object, decrypts and verifies it, boots the
 server on it in a temp dir, and reads it back through MCP. Run it after setting
