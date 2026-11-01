@@ -1,0 +1,36 @@
+name: Off-site backup check
+
+# A failed run emails the repository owner, which is the alert. Forks get no
+# secrets, and there is deliberately no pull_request trigger.
+on:
+  schedule:
+    - cron: "47 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write the read-only bucket credentials
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_WATCH_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_WATCH_SECRET_ACCESS_KEY }}
+        run: |
+          umask 077
+          mkdir -p .credentials
+          {
+            printf 'R2_ENDPOINT=%s\n' "$R2_ENDPOINT"
+            printf 'R2_BUCKET=%s\n' "$R2_BUCKET"
+            printf 'R2_ACCESS_KEY_ID=%s\n' "$R2_ACCESS_KEY_ID"
+            printf 'R2_SECRET_ACCESS_KEY=%s\n' "$R2_SECRET_ACCESS_KEY"
+          } > .credentials/r2-watch.env
+
+      - name: Check the newest copy
+        run: bash scripts/check-offsite.sh
