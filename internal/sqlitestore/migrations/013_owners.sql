@@ -1,7 +1,7 @@
 -- Every person's data gets an owner. Identity is an internal id rather than the
 -- provider's subject, so changing identity provider or instance only rewrites
 -- users.clerk_subject. User 1 is the original owner: every existing row is theirs,
--- and their subject is bound when the server first starts with one configured.
+-- and their subject stays empty until a later change binds it.
 CREATE TABLE users (
  id INTEGER PRIMARY KEY,
  clerk_subject TEXT UNIQUE,
