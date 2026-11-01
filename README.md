@@ -152,9 +152,10 @@ The off-site run lives on the VPS, in `~/training-mcp-backup`: `scripts/backup.s
 a `.credentials/dokploy.env` holding only `WEB_URL`. It needs `curl`, `gpg` and
 `sqlite3`, and cron runs it with `/bin/bash` hourly with `--daily`. On the VPS a
 failure only reaches `~/.local/state/training-mcp/backup.log`, as there is no
-desktop to notify. Do not add `r2.env` on the laptop, whose cron keeps plain local
-copies: it could not reach the R2 endpoint when last tried. There is no Go on the
-VPS, so run `restore-check.sh --no-boot` there.
+desktop to notify. The laptop's cron keeps plain local copies and has no `r2.env`,
+so the VPS is the only uploader. The bucket expires objects after 90 days by age
+alone, so a long silent failure would empty it. There is no Go on the VPS, so run
+`restore-check.sh --no-boot` there.
 
 `scripts/restore-check.sh` proves a copy is restorable without touching
 production: it fetches the newest object, decrypts and verifies it, boots the
