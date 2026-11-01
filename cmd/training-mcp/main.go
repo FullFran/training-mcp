@@ -75,7 +75,10 @@ func runWithContext(ctx context.Context, args []string) error {
 		oauth = httpsrv.NewOAuth(httpsrv.OAuthConfig{
 			Issuer: cfg.OAuthIssuer, Resource: cfg.OAuthResource, Resolve: services.ResolveUser(cfg.OAuthSubject, cfg.OAuthProvision), Logger: logger,
 		})
-		logger.Printf("oauth enabled for resource %s, new accounts: %t", cfg.OAuthResource, cfg.OAuthProvision)
+		logger.Printf("oauth enabled for resource %s", cfg.OAuthResource)
+		if cfg.OAuthProvision {
+			logger.Printf("oauth gives every subject the provider vouches for an account")
+		}
 	}
 	handler := httpsrv.RoutesWithOAuth(mcpServer.Handler(), cfg.AuthDisabled, cfg.Token, web, oauth)
 	httpServer := &http.Server{Addr: cfg.Addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}

@@ -7,7 +7,8 @@ import "context"
 // so moving to another identity instance only changes that setting.
 const OwnerUserID int64 = 1
 
-// noUser owns nothing and never will, as ids start at 1.
+// noUser is no account, as ids start at 1. Every route sets an identity, so nothing
+// should reach it; if one did, its writes would land here, apart from everyone's data.
 const noUser int64 = 0
 
 type userKey struct{}
@@ -24,8 +25,8 @@ func UserFrom(ctx context.Context) (int64, bool) {
 }
 
 // ForRequest returns the service for whoever the request acts as. A request with no
-// identity sees nobody's data, so a route that forgets to authenticate fails empty
-// rather than exposing the owner's.
+// identity never touches a real user's data, so a route that forgets to authenticate
+// fails apart rather than exposing the owner's.
 func (s *Services) ForRequest(ctx context.Context) *Service {
 	userID, ok := UserFrom(ctx)
 	if !ok {
