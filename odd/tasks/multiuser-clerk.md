@@ -18,8 +18,8 @@ Assumptions from the proposal, not stated by the user: all personal data is per 
 
 ## Tasks
 
-- [~] T1 (S7) inline: alert when the newest off-site copy is stale, from GitHub Actions. Risk: item 5. Pending: a real run once the workflow is on main.
-- [ ] T2 (S1, S5, S6) inline: migration adding owners, user-bound store, identity from token to tools, two-user tests. Risk: item 1, item 2.
+- [x] T1 (S7) inline: alert when the newest off-site copy is stale, from GitHub Actions. Risk: item 5. PR #14. The failure email itself is unobserved.
+- [~] T2 (S1, S5, S6) inline: migration adding owners (this slice), then user-bound store, then identity from token to tools, two-user tests. Risk: item 1, item 2.
 - [ ] T3 (S2, S8) inline: Clerk production instance, invite-only, reconnect ChatGPT. Risk: item 2, item 5.
 - [ ] T4 (S1, S3, S5) inline: web login, cookie session, CSRF, per-user offline cache, root mount. Risk: item 2.
 - [ ] T5 (S7) inline: backup credential for the snapshot, independent of the web path. Risk: item 2, item 5.
@@ -39,3 +39,6 @@ Route: inline; the units depend on each other, so no writer trigger holds.
 - L8 (2026-11-01, user, verbatim): "no me dejes automatizaciones en le ordenador mio vale? y si, stacked to main"
 - L9: Removed both training entries from the laptop crontab, the backup and the watchdog; it now has 0 lines, and the existing local copies stay. So L7's install is undone and the laptop no longer makes copies; the VPS and R2 hold the running backups. The watchdog moved to a scheduled GitHub workflow using `scripts/check-offsite.sh` with a read-only token; its failure email is the alert. Writing repository secrets was refused by the permission system, so the owner runs the setup script. `go test ./scripts`: 32 passed. The workflow cannot run until it is on main.
 - L10 (2026-11-01): Setup script run at the owner's request. Token `training-mcp-backups-watch`: signed list 200, signed write 403. The four repository secrets are set, per `gh secret list`.
+- L11 (2026-11-01, user, verbatim): "y si! sube rama y pr abierta y mergeada sigue asi con todas"
+- L12: PR #14 merged by rebase. The workflow ran on main against the real bucket: success, `newest copy: training-2026-11-01.db.gpg`. Discovery: Dokploy has `autoDeploy` on `main`, and that merge started a production deployment, so merging a migration applies it to real data at once.
+- L13: Migration 013 rehearsed on a fresh production snapshot in scratch: sessions 104, sets 2142, SI 2348.4, session items 3, plans 4, plan items 20, notes 1, groups 72, landmarks 1, keys 10, identical before and after; server booted and served list_sessions; 1 user, 0 rows owned by anyone else; integrity ok, foreign key check empty. Rollback note: an older binary fails on the rebuilt keys, since its `ON CONFLICT` targets no longer match, so rolling back means restoring a pre-migration backup or fixing forward.

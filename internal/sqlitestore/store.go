@@ -214,7 +214,7 @@ func (s *Store) LogSets(ctx context.Context, in training.LogSetsRecord) (trainin
 		return training.LogSetsResult{}, err
 	}
 	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `INSERT INTO idempotency_keys(key,fingerprint,response,created_at) VALUES (?,?,'',CURRENT_TIMESTAMP) ON CONFLICT(key) DO NOTHING`, in.Key, in.Fingerprint)
+	res, err := tx.ExecContext(ctx, `INSERT INTO idempotency_keys(key,fingerprint,response,created_at) VALUES (?,?,'',CURRENT_TIMESTAMP) ON CONFLICT(user_id,key) DO NOTHING`, in.Key, in.Fingerprint)
 	if err != nil {
 		return training.LogSetsResult{}, err
 	}
@@ -924,7 +924,7 @@ func (s *Store) SetExerciseNote(ctx context.Context, n training.ExerciseNote) er
 	}
 	_, err := s.db.ExecContext(ctx, `
 INSERT INTO exercise_notes(exercise,note,updated_at) VALUES (?,?,CURRENT_TIMESTAMP)
-ON CONFLICT(exercise) DO UPDATE SET note=excluded.note, updated_at=CURRENT_TIMESTAMP`,
+ON CONFLICT(user_id,exercise) DO UPDATE SET note=excluded.note, updated_at=CURRENT_TIMESTAMP`,
 		n.Exercise, n.Note)
 	return err
 }
@@ -983,7 +983,7 @@ SELECT muscle_group,fatigue,pump,recovery FROM session_feedback ORDER BY muscle_
 func (s *Store) SetLandmarks(ctx context.Context, l training.Landmarks) error {
 	_, err := s.db.ExecContext(ctx, `
 INSERT INTO volume_landmarks(muscle_group,mev,mrv,updated_at) VALUES (?,?,?,CURRENT_TIMESTAMP)
-ON CONFLICT(muscle_group) DO UPDATE SET mev=excluded.mev, mrv=excluded.mrv, updated_at=CURRENT_TIMESTAMP`,
+ON CONFLICT(user_id,muscle_group) DO UPDATE SET mev=excluded.mev, mrv=excluded.mrv, updated_at=CURRENT_TIMESTAMP`,
 		l.MuscleGroup, l.MEV, l.MRV)
 	return err
 }
@@ -1119,7 +1119,7 @@ WHERE 1=1`
 func (s *Store) SetExerciseGroup(ctx context.Context, g training.ExerciseGroup) error {
 	_, err := s.db.ExecContext(ctx, `
 INSERT INTO exercise_groups(exercise,muscle_group,updated_at) VALUES (?,?,CURRENT_TIMESTAMP)
-ON CONFLICT(exercise) DO UPDATE SET muscle_group=excluded.muscle_group, updated_at=CURRENT_TIMESTAMP`,
+ON CONFLICT(user_id,exercise) DO UPDATE SET muscle_group=excluded.muscle_group, updated_at=CURRENT_TIMESTAMP`,
 		g.Exercise, g.MuscleGroup)
 	return err
 }
