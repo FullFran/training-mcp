@@ -1011,3 +1011,47 @@ func TestSetLandmarksValidation(t *testing.T) {
 		}
 	}
 }
+
+type perUserStore struct {
+	memoryStore
+	users []int64
+}
+
+func (p *perUserStore) ForUser(userID int64) UserStore {
+	p.users = append(p.users, userID)
+	return newMemoryStore()
+}
+
+func TestServicesBindsEachServiceToItsUser(t *testing.T) {
+	ctx := context.Background()
+	store := &perUserStore{}
+	services := NewServices(store, time.Now)
+	one, two := services.ForUser(1), services.ForUser(2)
+	if !reflect.DeepEqual(store.users, []int64{1, 2}) {
+		t.Fatalf("users = %v", store.users)
+	}
+	if _, err := two.StartSession(ctx, "2026-08-07"); err != nil {
+		t.Fatal(err)
+	}
+	sessions, err := one.ListSessions(ctx, ListFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sessions) != 0 {
+		t.Fatalf("user 1 sees user 2's sessions: %#v", sessions)
+	}
+}
+
+func TestServicesSnapshotRejectsAnEmptyPath(t *testing.T) {
+	store := &perUserStore{}
+	services := NewServices(store, time.Now)
+	if err := services.Snapshot(context.Background(), "  "); !errors.Is(err, ErrValidation) {
+		t.Fatalf("Snapshot = %v, want validation", err)
+	}
+	if err := services.Snapshot(context.Background(), "/copy.db"); err != nil {
+		t.Fatal(err)
+	}
+	if store.snapshotPath != "/copy.db" {
+		t.Fatalf("snapshot path = %q", store.snapshotPath)
+	}
+}

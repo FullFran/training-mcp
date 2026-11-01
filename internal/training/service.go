@@ -23,12 +23,30 @@ func CalculateSI(rpe float64) float64 {
 	return NormalizeSI(v)
 }
 
+// Service holds the rules for one user's data; it is bound to that user by the
+// UserStore it is built on.
 type Service struct {
+	store UserStore
+	clock Clock
+}
+
+func NewService(store UserStore, clock Clock) *Service { return &Service{store: store, clock: clock} }
+
+// ServiceFor returns the service for whoever made a request. Driving adapters get
+// their service through it, never holding one of their own.
+type ServiceFor func(context.Context) *Service
+
+// Services hands out a Service per user and owns what is not any one user's.
+type Services struct {
 	store Store
 	clock Clock
 }
 
-func NewService(store Store, clock Clock) *Service { return &Service{store: store, clock: clock} }
+func NewServices(store Store, clock Clock) *Services { return &Services{store: store, clock: clock} }
+
+func (s *Services) ForUser(userID int64) *Service {
+	return NewService(s.store.ForUser(userID), s.clock)
+}
 
 func (s *Service) StartSession(ctx context.Context, date string) (Session, error) {
 	return s.StartPlannedSession(ctx, date, 0)
@@ -387,8 +405,9 @@ func clampAdvice(current, delta, mev, mrv int) string {
 	}
 }
 
-// Snapshot writes a consistent copy of the database to path, for backup.
-func (s *Service) Snapshot(ctx context.Context, path string) error {
+// Snapshot writes a consistent copy of the whole database, every user's data
+// included, to path, for backup.
+func (s *Services) Snapshot(ctx context.Context, path string) error {
 	if strings.TrimSpace(path) == "" {
 		return ErrValidation
 	}

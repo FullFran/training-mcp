@@ -17,7 +17,7 @@ func logSetsSession(t *testing.T) *mcp.ClientSession {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { store.Close() })
-	return mustConnect(t, New(training.NewService(store, time.Now)).Handler())
+	return mustConnect(t, New(only(training.NewService(store.ForUser(1), time.Now))).Handler())
 }
 
 func repsArgs(key string, reps ...int) map[string]any {

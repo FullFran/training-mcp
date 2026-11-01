@@ -39,7 +39,7 @@ func TestLogSetsRollsBackEntirelyOnFailure(t *testing.T) {
 		}
 		return nil
 	}
-	if _, err := store.LogSets(context.Background(), logSetsRecord("k", 12, 10)); !errors.Is(err, boom) {
+	if _, err := store.ForUser(1).LogSets(context.Background(), logSetsRecord("k", 12, 10)); !errors.Is(err, boom) {
 		t.Fatalf("err = %v", err)
 	}
 	store.failpoint = nil
@@ -51,7 +51,7 @@ func TestLogSetsRollsBackEntirelyOnFailure(t *testing.T) {
 		t.Fatalf("left sets=%d sessions=%d keys=%d behind", got, sessions, keys)
 	}
 	// A retry after the failure must actually record, not replay an empty result.
-	out, err := store.LogSets(context.Background(), logSetsRecord("k", 12, 10))
+	out, err := store.ForUser(1).LogSets(context.Background(), logSetsRecord("k", 12, 10))
 	if err != nil || out.Replayed || len(out.Sets) != 2 {
 		t.Fatalf("retry = %#v, %v", out, err)
 	}
@@ -70,7 +70,7 @@ func TestLogSetsSameKeyConcurrentlyRecordsOnce(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			results[i], errs[i] = store.LogSets(context.Background(), logSetsRecord("same", 12, 10))
+			results[i], errs[i] = store.ForUser(1).LogSets(context.Background(), logSetsRecord("same", 12, 10))
 		}()
 	}
 	wg.Wait()
@@ -107,7 +107,7 @@ func TestLogSetsDifferentKeysConcurrentlyShareOneSession(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, errs[i] = store.LogSets(context.Background(), logSetsRecord(key, 12, 10))
+			_, errs[i] = store.ForUser(1).LogSets(context.Background(), logSetsRecord(key, 12, 10))
 		}()
 	}
 	wg.Wait()
@@ -131,7 +131,7 @@ func TestLogSetsReplaySurvivesARestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	first, err := store.LogSets(context.Background(), logSetsRecord("k", 12))
+	first, err := store.ForUser(1).LogSets(context.Background(), logSetsRecord("k", 12))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestLogSetsReplaySurvivesARestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	again, err := store.LogSets(context.Background(), logSetsRecord("k", 12))
+	again, err := store.ForUser(1).LogSets(context.Background(), logSetsRecord("k", 12))
 	if err != nil || !again.Replayed || again.Sets[0].ID != first.Sets[0].ID {
 		t.Fatalf("replay = %#v, %v", again, err)
 	}
@@ -157,14 +157,14 @@ func TestLogSetsStampsTheSupersetFromTheSessionPlan(t *testing.T) {
 	}
 	defer store.Close()
 	ctx := context.Background()
-	plan, err := store.CreatePlan(ctx, training.Plan{Name: "A", Items: []training.PlanItem{{Exercise: "remo", TargetSets: 3, Superset: "A"}}})
+	plan, err := store.ForUser(1).CreatePlan(ctx, training.Plan{Name: "A", Items: []training.PlanItem{{Exercise: "remo", TargetSets: 3, Superset: "A"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.Start(ctx, training.Session{Date: "2026-10-30", PlanID: plan.ID}); err != nil {
+	if _, err = store.ForUser(1).Start(ctx, training.Session{Date: "2026-10-30", PlanID: plan.ID}); err != nil {
 		t.Fatal(err)
 	}
-	out, err := store.LogSets(ctx, logSetsRecord("k", 12))
+	out, err := store.ForUser(1).LogSets(ctx, logSetsRecord("k", 12))
 	if err != nil {
 		t.Fatal(err)
 	}

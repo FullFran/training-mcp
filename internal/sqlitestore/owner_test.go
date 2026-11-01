@@ -158,13 +158,13 @@ func TestPersonalKeysAreUniquePerUserAndUpsertsLeaveOthersAlone(t *testing.T) {
 
 	// Twice, as the second write is the one that takes the conflict path.
 	for range 2 {
-		if err := store.SetExerciseNote(ctx, training.ExerciseNote{Exercise: "Press", Note: "Mine"}); err != nil {
+		if err := store.ForUser(1).SetExerciseNote(ctx, training.ExerciseNote{Exercise: "Press", Note: "Mine"}); err != nil {
 			t.Fatal(err)
 		}
-		if err := store.SetExerciseGroup(ctx, training.ExerciseGroup{Exercise: "Press", MuscleGroup: "Chest"}); err != nil {
+		if err := store.ForUser(1).SetExerciseGroup(ctx, training.ExerciseGroup{Exercise: "Press", MuscleGroup: "Chest"}); err != nil {
 			t.Fatal(err)
 		}
-		if err := store.SetLandmarks(ctx, training.Landmarks{MuscleGroup: "Chest", MEV: 10, MRV: 20}); err != nil {
+		if err := store.ForUser(1).SetLandmarks(ctx, training.Landmarks{MuscleGroup: "Chest", MEV: 10, MRV: 20}); err != nil {
 			t.Fatal(err)
 		}
 	}
