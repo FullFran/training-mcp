@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,6 +45,8 @@ type Server struct {
 	// wrong for them.
 	txt *texttemplate.Template
 	mux *http.ServeMux
+	// patterns lists what is registered on mux, which cannot list itself.
+	patterns []string
 }
 
 // ExerciseBlock groups a session's sets by exercise, the way a workout is
@@ -191,43 +194,51 @@ func (s *Server) Handler() http.Handler { return s.mux }
 // BasePath is the public prefix the PWA is served from.
 func (s *Server) BasePath() string { return s.base }
 
+// Routes lists every registered pattern, so a test can require a case for each.
+func (s *Server) Routes() []string { return slices.Clone(s.patterns) }
+
 func (s *Server) routes() {
 	b := s.base
-	s.mux.HandleFunc("GET "+b+"/{$}", s.today)
-	s.mux.HandleFunc("POST "+b+"/sets", s.addSet)
-	s.mux.HandleFunc("POST "+b+"/sets/{id}/delete", s.deleteSet)
-	s.mux.HandleFunc("POST "+b+"/sets/{id}/update", s.updateSet)
-	s.mux.HandleFunc("GET "+b+"/history", s.history)
-	s.mux.HandleFunc("GET "+b+"/export.db", s.export)
-	s.mux.HandleFunc("GET "+b+"/plans", s.plansPage)
-	s.mux.HandleFunc("POST "+b+"/plans/create", s.planAction)
-	s.mux.HandleFunc("POST "+b+"/plans/update", s.planAction)
-	s.mux.HandleFunc("POST "+b+"/plans/delete", s.planAction)
-	s.mux.HandleFunc("POST "+b+"/plans/item", s.planAction)
-	s.mux.HandleFunc("POST "+b+"/plans/item/remove", s.planAction)
-	s.mux.HandleFunc("POST "+b+"/plans/move", s.planAction)
-	s.mux.HandleFunc("POST "+b+"/plan", s.choosePlan)
-	s.mux.HandleFunc("POST "+b+"/plan/item", s.adjustItem)
-	s.mux.HandleFunc("POST "+b+"/feedback", s.recordFeedback)
-	s.mux.HandleFunc("POST "+b+"/note", s.saveNote)
-	s.mux.HandleFunc("GET "+b+"/exercise-info", s.exerciseInfo)
-	s.mux.HandleFunc("GET "+b+"/s/{id}", s.session)
-	s.mux.HandleFunc("GET "+b+"/manifest.webmanifest", s.manifest)
-	s.mux.HandleFunc("GET "+b+"/sw.js", s.serviceWorker)
+	s.handle("GET "+b+"/{$}", s.today)
+	s.handle("POST "+b+"/sets", s.addSet)
+	s.handle("POST "+b+"/sets/{id}/delete", s.deleteSet)
+	s.handle("POST "+b+"/sets/{id}/update", s.updateSet)
+	s.handle("GET "+b+"/history", s.history)
+	s.handle("GET "+b+"/export.db", s.export)
+	s.handle("GET "+b+"/plans", s.plansPage)
+	s.handle("POST "+b+"/plans/create", s.planAction)
+	s.handle("POST "+b+"/plans/update", s.planAction)
+	s.handle("POST "+b+"/plans/delete", s.planAction)
+	s.handle("POST "+b+"/plans/item", s.planAction)
+	s.handle("POST "+b+"/plans/item/remove", s.planAction)
+	s.handle("POST "+b+"/plans/move", s.planAction)
+	s.handle("POST "+b+"/plan", s.choosePlan)
+	s.handle("POST "+b+"/plan/item", s.adjustItem)
+	s.handle("POST "+b+"/feedback", s.recordFeedback)
+	s.handle("POST "+b+"/note", s.saveNote)
+	s.handle("GET "+b+"/exercise-info", s.exerciseInfo)
+	s.handle("GET "+b+"/s/{id}", s.session)
+	s.handle("GET "+b+"/manifest.webmanifest", s.manifest)
+	s.handle("GET "+b+"/sw.js", s.serviceWorker)
 
 	sub, err := fs.Sub(staticFS, "static")
 	if err != nil {
 		panic(err)
 	}
-	s.mux.Handle("GET "+b+"/static/", http.StripPrefix(b+"/static/", cacheStatic(http.FileServerFS(sub))))
+	s.handle("GET "+b+"/static/", http.StripPrefix(b+"/static/", cacheStatic(http.FileServerFS(sub))).ServeHTTP)
 
 	// Bare prefix with no trailing slash: send it to the app root so a typed or
 	// shared URL still lands somewhere useful.
 	if b != "" {
-		s.mux.HandleFunc("GET "+b, func(w http.ResponseWriter, r *http.Request) {
+		s.handle("GET "+b, func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, b+"/", http.StatusMovedPermanently)
 		})
 	}
+}
+
+func (s *Server) handle(pattern string, handler http.HandlerFunc) {
+	s.patterns = append(s.patterns, pattern)
+	s.mux.HandleFunc(pattern, handler)
 }
 
 func (s *Server) today(w http.ResponseWriter, r *http.Request) {
