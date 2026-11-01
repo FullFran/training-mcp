@@ -157,6 +157,13 @@ so the VPS is the only uploader. The bucket expires objects after 90 days by age
 alone, so a long silent failure would empty it. There is no Go on the VPS, so run
 `restore-check.sh --no-boot` there.
 
+`scripts/check-offsite.sh` covers that silence from the laptop: hourly, it raises a
+desktop notification if the newest object is older than yesterday or the bucket
+cannot be read, which also catches a dead VPS or a revoked token. It stays silent
+otherwise. It reads `.credentials/r2-watch.env`, with the same `R2_*` values, and
+that file also holds the laptop's copy of `BACKUP_PASSPHRASE`.
+`scripts/install-backup-cron.sh` schedules it alongside the local copy.
+
 `scripts/restore-check.sh` proves a copy is restorable without touching
 production: it fetches the newest object, decrypts and verifies it, boots the
 server on it in a temp dir, and reads it back through MCP. Run it after setting
