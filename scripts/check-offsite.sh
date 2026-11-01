@@ -1,25 +1,16 @@
 #!/usr/bin/env bash
-# Raises a desktop notification when the newest copy in R2 is older than
-# yesterday, or when the bucket cannot be read. The off-site backup runs on a VPS
-# where a failure only reaches a log nobody reads, and a dead VPS would not report
-# anything at all, so this checks the result from another machine.
+# Fails when the newest copy in R2 is older than yesterday, or when the bucket
+# cannot be read. The off-site backup runs on a VPS where a failure only reaches a
+# log nobody reads, and a dead VPS would report nothing at all, so a scheduled
+# GitHub workflow runs this from elsewhere and its failure email is the alert.
 #
-# Reads .credentials/r2-watch.env, not r2.env: on this machine r2.env would make
-# backup.sh upload too.
+# Reads .credentials/r2-watch.env, not r2.env, as the workflow's token is read-only.
 set -euo pipefail
-
-# Cron's PATH has neither of the locations curl is installed in.
-PATH="$HOME/.nix-profile/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"
 
 reason="the check itself failed"
 on_exit() {
   local status=$?
-  if [ "$status" -ne 0 ]; then
-    echo "$(date '+%F %T') off-site check failed (exit $status): $reason" >&2
-    # Best effort, as in backup.sh.
-    DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=/run/user/$(id -u)/bus}" \
-      notify-send -u critical "Training off-site backup" "$reason" 2>/dev/null || true
-  fi
+  [ "$status" -eq 0 ] || echo "off-site check failed (exit $status): $reason" >&2
 }
 trap on_exit EXIT
 
@@ -45,8 +36,9 @@ fi
 
 date="${newest#training-}"
 date="${date%%.*}"
-# Yesterday still counts, as the day's copy only appears after midnight's first run.
+# Yesterday still counts: the day's copy only appears after the day's first run.
 if [[ "$date" < "$(date -d yesterday +%F)" ]]; then
   reason="newest copy is from $date"
   exit 1
 fi
+echo "newest copy: $newest"
