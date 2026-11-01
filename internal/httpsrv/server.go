@@ -6,6 +6,8 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/fullfran/training-mcp/internal/training"
 )
 
 func Bearer(token string, disabled bool, next http.Handler) http.Handler {
@@ -44,6 +46,14 @@ func staticTokenMatches(r *http.Request, token string) bool {
 	expected := []byte(token)
 	return len(provided) == len(expected) && subtle.ConstantTimeCompare(provided, expected) == 1
 }
+
+// asOwner marks a request as the owner's. The static token and the auth bypass
+// identify nobody else, so everything behind them acts as the owner.
+func asOwner(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(training.WithUser(r.Context(), training.OwnerUserID)))
+	})
+}
 func unauthorized(w http.ResponseWriter) {
 	w.Header().Set("WWW-Authenticate", "Bearer")
 	http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -76,13 +86,13 @@ func RoutesWithOAuth(mcp http.Handler, authDisabled bool, token string, web *Web
 		mux.Handle("/.well-known/oauth-protected-resource", metadata)
 		mux.Handle("/.well-known/oauth-protected-resource/mcp", metadata)
 	} else {
-		mux.Handle("/mcp", MaxBody(Bearer(token, authDisabled, mcp)))
+		mux.Handle("/mcp", MaxBody(Bearer(token, authDisabled, asOwner(mcp))))
 	}
 	if web != nil && web.Handler != nil && web.BasePath != "" {
 		// The secret path is the outer gate, but the same bearer still guards
 		// these routes so the app is never reachable from inside the network
 		// without it. The reverse proxy supplies the header.
-		guarded := MaxBody(Bearer(token, authDisabled, web.Handler))
+		guarded := MaxBody(Bearer(token, authDisabled, asOwner(web.Handler)))
 		mux.Handle(web.BasePath, guarded)
 		mux.Handle(web.BasePath+"/", guarded)
 	}

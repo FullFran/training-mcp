@@ -6,6 +6,11 @@ import "context"
 // through ForUser, so a data method cannot be called without saying whose data it is.
 type Store interface {
 	ForUser(userID int64) UserStore
+	// UserBySubject finds the account of an identity provider's subject.
+	UserBySubject(ctx context.Context, subject string) (userID int64, found bool, err error)
+	// ProvisionUser returns the subject's account, creating it if needed. Concurrent
+	// calls for one subject get one account.
+	ProvisionUser(ctx context.Context, subject string) (int64, error)
 	// Snapshot copies the whole database, every user's data included.
 	Snapshot(context.Context, string) error
 }

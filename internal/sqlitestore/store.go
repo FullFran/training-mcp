@@ -125,6 +125,23 @@ func (s *Store) ForUser(userID int64) training.UserStore {
 	return &userStore{db: s.db, failpoint: s.failpoint, userID: userID}
 }
 
+func (s *Store) UserBySubject(ctx context.Context, subject string) (int64, bool, error) {
+	var userID int64
+	err := s.db.QueryRowContext(ctx, `SELECT id FROM users WHERE clerk_subject=?`, subject).Scan(&userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, false, nil
+	}
+	return userID, err == nil, err
+}
+
+// ProvisionUser is one statement, as a client's first calls arrive together.
+func (s *Store) ProvisionUser(ctx context.Context, subject string) (int64, error) {
+	var userID int64
+	err := s.db.QueryRowContext(ctx, `INSERT INTO users(clerk_subject,created_at) VALUES (?,CURRENT_TIMESTAMP)
+		ON CONFLICT(clerk_subject) DO UPDATE SET clerk_subject=excluded.clerk_subject RETURNING id`, subject).Scan(&userID)
+	return userID, err
+}
+
 // userStore is the Store as seen by one user.
 type userStore struct {
 	db        *sql.DB

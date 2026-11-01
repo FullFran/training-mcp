@@ -19,9 +19,6 @@ import (
 	"github.com/fullfran/training-mcp/internal/websrv"
 )
 
-// ownerUserID is the one user every request acts as until requests carry an identity.
-const ownerUserID = 1
-
 func address(args []string) string {
 	fs := flag.NewFlagSet("training-mcp", flag.ContinueOnError)
 	v := fs.String("addr", ":8080", "")
@@ -59,15 +56,13 @@ func runWithContext(ctx context.Context, args []string) error {
 	}
 	defer store.Close()
 	services := training.NewServices(store, time.Now)
-	owner := services.ForUser(ownerUserID)
-	serviceFor := func(context.Context) *training.Service { return owner }
-	mcpServer := mcpsrv.New(serviceFor)
+	mcpServer := mcpsrv.New(services.ForRequest)
 	logger := log.Default()
 	httpsrv.WarningIfDisabled(cfg.AuthDisabled, logger)
 
 	var web *httpsrv.WebUI
 	if cfg.WebBasePath != "" {
-		webServer, err := websrv.New(serviceFor, services.Snapshot, time.Now, cfg.WebBasePath)
+		webServer, err := websrv.New(services.ForRequest, services.Snapshot, time.Now, cfg.WebBasePath)
 		if err != nil {
 			return err
 		}
@@ -78,9 +73,9 @@ func runWithContext(ctx context.Context, args []string) error {
 	var oauth *httpsrv.OAuth
 	if cfg.OAuthIssuer != "" {
 		oauth = httpsrv.NewOAuth(httpsrv.OAuthConfig{
-			Issuer: cfg.OAuthIssuer, Resource: cfg.OAuthResource, Subject: cfg.OAuthSubject, Logger: logger,
+			Issuer: cfg.OAuthIssuer, Resource: cfg.OAuthResource, Resolve: services.ResolveUser(cfg.OAuthSubject, cfg.OAuthProvision), Logger: logger,
 		})
-		logger.Printf("oauth enabled for resource %s", cfg.OAuthResource)
+		logger.Printf("oauth enabled for resource %s, new accounts: %t", cfg.OAuthResource, cfg.OAuthProvision)
 	}
 	handler := httpsrv.RoutesWithOAuth(mcpServer.Handler(), cfg.AuthDisabled, cfg.Token, web, oauth)
 	httpServer := &http.Server{Addr: cfg.Addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}

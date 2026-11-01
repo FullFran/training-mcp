@@ -134,3 +134,34 @@ func TestLoadTrimsOAuthValues(t *testing.T) {
 		t.Fatalf("cfg = %+v", cfg)
 	}
 }
+
+func TestLoadReadsProvisioning(t *testing.T) {
+	t.Setenv("MCP_BEARER_TOKEN", "x")
+	t.Setenv("MCP_AUTH_DISABLED", "")
+	set := func(provision string) {
+		t.Setenv("MCP_OAUTH_ISSUER", "https://auth.example.test")
+		t.Setenv("MCP_OAUTH_RESOURCE", "https://training.example.test/mcp")
+		t.Setenv("MCP_OAUTH_SUBJECT", "user_owner")
+		t.Setenv("MCP_OAUTH_PROVISION", provision)
+	}
+	set("")
+	if cfg, err := Load(""); err != nil || cfg.OAuthProvision {
+		t.Fatalf("default: provision = %v, err = %v", cfg.OAuthProvision, err)
+	}
+	set("1")
+	if cfg, err := Load(""); err != nil || !cfg.OAuthProvision {
+		t.Fatalf("on: provision = %v, err = %v", cfg.OAuthProvision, err)
+	}
+	// Who may hold an account must never depend on how a value was misspelled.
+	set("true")
+	if _, err := Load(""); err == nil {
+		t.Fatal("accepted a provisioning value that is neither empty nor 1")
+	}
+	set("1")
+	t.Setenv("MCP_OAUTH_ISSUER", "")
+	t.Setenv("MCP_OAUTH_RESOURCE", "")
+	t.Setenv("MCP_OAUTH_SUBJECT", "")
+	if _, err := Load(""); err == nil {
+		t.Fatal("accepted provisioning with OAuth off")
+	}
+}

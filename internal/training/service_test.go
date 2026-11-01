@@ -1022,6 +1022,11 @@ func (p *perUserStore) ForUser(userID int64) UserStore {
 	return newMemoryStore()
 }
 
+func (p *perUserStore) UserBySubject(context.Context, string) (int64, bool, error) {
+	return 0, false, nil
+}
+func (p *perUserStore) ProvisionUser(context.Context, string) (int64, error) { return 0, nil }
+
 func TestServicesBindsEachServiceToItsUser(t *testing.T) {
 	ctx := context.Background()
 	store := &perUserStore{}
