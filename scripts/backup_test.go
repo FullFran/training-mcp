@@ -219,3 +219,53 @@ func TestInstallerReplacesItsOwnEntriesAndNoOtherProjects(t *testing.T) {
 		t.Fatalf("crontab = \n%s", got)
 	}
 }
+
+// volumeSandbox reads the database from a Docker volume on the same host, with
+// no web URL configured at all.
+func volumeSandbox(t *testing.T) *sandbox {
+	s := newSandbox(t)
+	if err := os.Remove(filepath.Join(s.root, ".credentials", "dokploy.env")); err != nil {
+		t.Fatal(err)
+	}
+	s.write(filepath.Join(s.root, ".credentials", "volume.env"), "DB_VOLUME=training-mcp-data\n", 0o600)
+	s.tool("docker", `echo "$@" >>"$HOME/docker-calls"; printf 'SQLite format 3 volume'`)
+	return s
+}
+
+func TestBackupSnapshotsTheVolumeWithoutTheWeb(t *testing.T) {
+	s := volumeSandbox(t)
+	out, err := s.run("backup.sh")
+	if err != nil {
+		t.Fatalf("backup failed: %v\n%s", err, out)
+	}
+	if got := s.read(s.today()); got != "SQLite format 3 volume" {
+		t.Fatalf("today's copy = %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(s.home, "curl-calls")); err == nil {
+		t.Fatal("volume mode downloaded over the web")
+	}
+	calls := s.read(filepath.Join(s.home, "docker-calls"))
+	for _, want := range []string{"--network none", "training-mcp-data:/data"} {
+		if !strings.Contains(calls, want) {
+			t.Fatalf("docker call lacks %q: %s", want, calls)
+		}
+	}
+	if info, err := os.Stat(s.today()); err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("copy not private: %v %v", info, err)
+	}
+}
+
+func TestFailedVolumeSnapshotKeepsThePreviousCopy(t *testing.T) {
+	s := volumeSandbox(t)
+	s.write(s.today(), "good copy", 0o644)
+	s.tool("docker", `exit 1`)
+	if out, err := s.run("backup.sh"); err == nil {
+		t.Fatalf("backup reported success:\n%s", out)
+	}
+	if got := s.read(s.today()); got != "good copy" {
+		t.Fatalf("failure overwrote today's copy with %q", got)
+	}
+	if !strings.Contains(s.read(filepath.Join(s.home, "notified")), "Training backup failed") {
+		t.Fatal("failure sent no notification")
+	}
+}

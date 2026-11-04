@@ -150,8 +150,13 @@ cannot be read. Expire old objects with a lifecycle rule on the bucket.
 
 The off-site run lives on the VPS, in `~/training-mcp-backup`: `scripts/backup.sh`,
 `scripts/r2-env.sh` and `scripts/restore-check.sh`, plus `.credentials/r2.env` and
-a `.credentials/dokploy.env` holding only `WEB_URL`. It needs `curl`, `gpg` and
-`sqlite3`, and cron runs it with `/bin/bash` hourly with `--daily`. On the VPS a
+a `.credentials/volume.env` holding `DB_VOLUME=training-mcp-data`. With that file
+the snapshot comes straight from the Docker volume on the same host (the same
+`VACUUM INTO`, in a throwaway container with no network, as the file's owner), so it
+needs no web route; optional `DB_FILE` (default `training.db`) and `SNAPSHOT_IMAGE`
+(default a pinned `python:3.13-alpine`). Without it, `.credentials/dokploy.env`
+with `WEB_URL` downloads `/export.db` as before. It needs `curl`, `gpg`, `sqlite3`
+and `docker`, and cron runs it with `/bin/bash` hourly with `--daily`. On the VPS a
 failure only reaches `~/.local/state/training-mcp/backup.log`, as there is no
 desktop to notify. The VPS is the only uploader. The bucket expires objects after 90 days by age
 alone, so a long silent failure would empty it. There is no Go on the VPS, so run
