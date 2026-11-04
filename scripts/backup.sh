@@ -34,8 +34,19 @@ if [ "${1:-}" = "--daily" ]; then
 fi
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# shellcheck disable=SC1091
-source "$root/.credentials/dokploy.env"
+# Source of the snapshot: .credentials/volume.env (DB_VOLUME, on the host that runs
+# the server) takes precedence over .credentials/dokploy.env (WEB_URL, over the web).
+if [ -f "$root/.credentials/volume.env" ]; then
+  # shellcheck disable=SC1091
+  source "$root/.credentials/volume.env"
+  : "${DB_VOLUME:?missing in volume.env}"
+  DB_FILE="${DB_FILE:-training.db}"
+  # Has python3 with sqlite3; pinned so an hourly run never pulls a moving tag.
+  SNAPSHOT_IMAGE="${SNAPSHOT_IMAGE:-python:3.13.18-alpine3.24}"
+else
+  # shellcheck disable=SC1091
+  source "$root/.credentials/dokploy.env"
+fi
 
 offsite=false
 if [ -f "$root/.credentials/r2.env" ]; then
@@ -62,8 +73,24 @@ fi
 if [ "$download" = true ]; then
   # Verify before replacing, so a bad download never costs the copy already here.
   tmp="$(mktemp "$dest/.incoming.XXXXXX")"
-  # The URL grants full access, so like the other secrets it stays out of argv.
-  printf 'url = "%s"\n' "${WEB_URL%/}/export.db" | curl -fsS --max-time 300 -o "$tmp" -K -
+  if [ -n "${DB_VOLUME:-}" ]; then
+    # Same VACUUM INTO the server's /export.db uses, run in a throwaway container
+    # with no network. It starts as root only to read the file owner, then drops
+    # to that owner, so no WAL or shm file in the volume ever becomes root's.
+    docker run --rm --network none -v "$DB_VOLUME:/data" --entrypoint python3 "$SNAPSHOT_IMAGE" -c '
+import os, sqlite3, sys
+db = "/data/" + sys.argv[1]
+st = os.stat(db)
+os.setgid(st.st_gid)
+os.setuid(st.st_uid)
+sqlite3.connect(db).execute("VACUUM INTO ?", ("/tmp/snapshot.db",))
+with open("/tmp/snapshot.db", "rb") as f:
+    sys.stdout.buffer.write(f.read())
+' "$DB_FILE" >"$tmp"
+  else
+    # The URL grants full access, so like the other secrets it stays out of argv.
+    printf 'url = "%s"\n' "${WEB_URL%/}/export.db" | curl -fsS --max-time 300 -o "$tmp" -K -
+  fi
 
   # A download that is not a readable database is not a backup, so check.
   head -c 15 "$tmp" | grep -q 'SQLite format 3' || { echo "not a SQLite file" >&2; exit 1; }
