@@ -4,15 +4,58 @@
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Log your training by talking to it.** A single-user Go service that replaces a
-workout spreadsheet with 35 conversational MCP tools over Streamable HTTP,
-plus an installable PWA for the gym floor. SQLite for storage, no framework,
-no mock library.
+**Your training log, connected to your AI assistant.** Training MCP is a
+self-hosted workout tracker built with Go and SQLite. Record sets in conversation
+through MCP, or use the optional installable web app between sets at the gym.
 
+```text
+You: "Tres series de ocho en press banca a 80 kg, RPE 8"
+Assistant: logs the sets in today's training session
 ```
-you:  "tres por ocho en press banca a 80, RPE 8"
-→ log_set  → today's session, created if needed, SI recalculated
+
+[Get started](#quick-start) · [ChatGPT setup](docs/chatgpt-setup.md) ·
+[Connection and authentication](docs/connection-paths.md) ·
+[Tool reference](docs/tools.md) · [Architecture](docs/architecture.md)
+
+## What you can do
+
+- **Log naturally:** record sets, weight, reps and RPE with an MCP client.
+- **Train from your phone:** use the optional PWA for plans, set logging and a rest timer.
+- **See your progress:** review training history, estimated records and volume.
+- **Keep your data:** the service stores workouts in SQLite; export and backup
+  options are described below.
+
+The MCP server uses Streamable HTTP. A compatible client needs network access
+and appropriate authentication; ChatGPT setup requires a public HTTPS endpoint.
+The PWA is disabled by default. **Its current authentication relies on a secret
+URL and a reverse proxy:** anyone who gets that URL has full access. Read
+[connection paths](docs/connection-paths.md) and [Web UI](#web-ui-pwa) before
+making the service accessible to others.
+
+## Quick start
+
+Requires Go 1.26 or newer and a terminal with `openssl` and `curl`.
+
+```sh
+git clone https://github.com/FullFran/training-mcp.git
+cd training-mcp
+export MCP_BEARER_TOKEN="$(openssl rand -hex 32)"
+go run ./cmd/training-mcp --addr 127.0.0.1:8080
 ```
+
+In another terminal, check that the local service is running:
+
+```sh
+curl http://127.0.0.1:8080/health
+# {"status":"ok"}
+```
+
+This checks the server, not an MCP client connection. Keep the token private;
+a new random token is generated each time you run the export command. For
+persistent configuration, set a stable token outside source control.
+To connect an MCP client or ChatGPT, follow
+[connection paths](docs/connection-paths.md) and
+[ChatGPT setup](docs/chatgpt-setup.md). Public access requires HTTPS.
 
 ## Why it is built this way
 
@@ -46,14 +89,10 @@ Full write-up: **[docs/architecture.md](docs/architecture.md)**.
 | **Advisory, never automatic** | `suggest_load` and `volume_recommendation` explain themselves and decline when they lack evidence. Neither ever edits a plan. |
 | **Config absence removes surface** | Unset `WEB_BASE_PATH` means the PWA is not mounted at all, rather than served on a default path. |
 
-## Quick path
+## Development checks
 
-1. Install Go 1.26 or newer.
-2. Set `MCP_BEARER_TOKEN` and run `go run ./cmd/training-mcp` (default `:8080`).
-3. Expose `/mcp` through HTTPS for a public ChatGPT connector; local tunnel-only development is documented in `docs/connection-paths.md`.
-4. Verify with `go test ./...` and `go vet ./...`. CI runs the same checks on
-   every push, plus `-race`, `gofmt`, a Docker build, and a 70% statement
-   coverage floor on `internal/sqlitestore` — the layer that touches the data.
+Run `go test ./...` and `go vet ./...`. CI also checks formatting, the race
+detector, the Docker build and a coverage floor for the SQLite store.
 
 ## Configuration
 
@@ -184,19 +223,17 @@ this up and periodically afterwards. To really restore: decrypt with
 the bearer token, so anyone holding the URL has full access. This is tracked
 debt, not a design: see the open issues.
 
-## Scope boundary
+## Scope and limitations
 
-This MVP excludes recommendations, multi-user identity/RBAC, REST/GraphQL,
-OAuth/JWT/token rotation, audit history, cloud sync, concurrent-writer
-controls, and formula changes.
-
-Three exclusions were deliberately lifted as the tool proved useful:
-frontend/mobile clients (the PWA), analytics (per-muscle volume and exercise
-progression), and planned workouts (plans). Everything else still stands.
-
-Plans record prescriptions you decide. The volume-landmark feedback loop is
-implemented as an advisory: it reports a set-count change per muscle group, but
-never edits a plan on its own.
+- MCP supports a static bearer token and optional OAuth token verification.
+  OAuth issuance is handled by an external provider. See
+  [connection paths](docs/connection-paths.md) for account provisioning and
+  its security implications.
+- The optional PWA currently uses a secret URL and a reverse proxy that injects
+  the bearer token. Treat the URL as a credential.
+- Recommendations are advisory: they do not change a plan automatically.
+- PWA offline caching is for reading; recording sets requires a network connection.
+- This project does not provide a general REST/GraphQL API or an audit history.
 
 ## Documentation
 
