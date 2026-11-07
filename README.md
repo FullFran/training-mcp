@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.svg" alt="training-mcp logo" width="120" height="120"></p>
+
 # Training MCP
 
 [![CI](https://github.com/FullFran/training-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/FullFran/training-mcp/actions/workflows/ci.yml)
