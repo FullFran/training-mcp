@@ -92,7 +92,9 @@ Full write-up: **[docs/architecture.md](docs/architecture.md)**.
 ## Development checks
 
 Run `go test ./...` and `go vet ./...`. CI also checks formatting, the race
-detector, the Docker build and a coverage floor for the SQLite store.
+detector and a coverage floor for the SQLite store, and builds and boots the
+Docker image the way the server does. Merging to `main` deploys; see
+[deployment](docs/deployment.md).
 
 ## Configuration
 
@@ -193,8 +195,9 @@ a `.credentials/volume.env` holding `DB_VOLUME=training-mcp-data`. With that fil
 the snapshot comes straight from the Docker volume on the same host (the same
 `VACUUM INTO`, in a throwaway container with no network, as the file's owner), so it
 needs no web route; optional `DB_FILE` (default `training.db`) and `SNAPSHOT_IMAGE`
-(default a pinned `python:3.13-alpine`). Without it, `.credentials/dokploy.env`
-with `WEB_URL` downloads `/export.db` as before. It needs `curl`, `gpg`, `sqlite3`
+(default a pinned `python:3.13-alpine`). Without it, the script reads `WEB_URL`
+from `.credentials/dokploy.env` (the file keeps its historical name; no Dokploy is
+involved) and downloads `/export.db` over the web. It needs `curl`, `gpg`, `sqlite3`
 and `docker`, and cron runs it with `/bin/bash` hourly with `--daily`. On the VPS a
 failure only reaches `~/.local/state/training-mcp/backup.log`, as there is no
 desktop to notify. The VPS is the only uploader. The bucket expires objects after 90 days by age
@@ -242,5 +245,6 @@ debt, not a design: see the open issues.
 - [ChatGPT setup](docs/chatgpt-setup.md)
 - [Connection paths and tunnel safety](docs/connection-paths.md)
 - [SI formula](docs/si-formula.md)
+- [Deployment](docs/deployment.md) — how `main` reaches production, CI gate, rollback
 
 The external Secure MCP Tunnel smoke flow is **unverified in this repository**. Use the official provider documentation rather than invented commands.
