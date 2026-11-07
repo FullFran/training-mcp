@@ -8,13 +8,22 @@ on:
 permissions:
   contents: read
 
+# One run per ref. A newer push to a pull request supersedes the older run;
+# runs on main are never cancelled, so every commit that reaches the server
+# keeps its own result.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
           cache: true
@@ -53,11 +62,74 @@ jobs:
           }
           echo "ok"
 
-  build:
+  # The image is what actually ships, so it must build and boot here, not for
+  # the first time on the server. See docs/deployment.md.
+  image:
     runs-on: ubuntu-latest
+    env:
+      IMAGE: training-mcp:ci
+      CONTAINER: training-mcp-smoke
     steps:
-      - uses: actions/checkout@v4
-      # The image is what actually ships, so a broken Dockerfile must fail here
-      # and not at deploy time.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The server's deploy agent checks the repository out with umask 0077,
+      # so every file in the build context is readable by its owner only, and
+      # COPY keeps those modes. The runner's checkout is world-readable, which
+      # would hide an image whose files the non-root user cannot read.
+      - name: strip group and other permissions like the server checkout
+        run: chmod -R go-rwx .
+
       - name: docker build
-        run: docker build -t training-mcp:ci .
+        run: docker build -t "$IMAGE" .
+
+      # The runtime image is distroless (no shell, no curl), so the probe runs
+      # from the runner. No volume is mounted: the image's own /data must be
+      # writable by the non-root user, as it is when production mounts its
+      # named volume there for the first time. The token is a throwaway value
+      # for this container only, not a secret.
+      - name: boot the image and probe /health
+        run: |
+          set -euo pipefail
+          docker run -d --name "$CONTAINER" -p 127.0.0.1:8080:8080 \
+            -e MCP_BEARER_TOKEN=ci-smoke-token "$IMAGE"
+
+          body=""
+          for _ in $(seq 1 30); do
+            if body="$(curl -fsS --max-time 2 http://127.0.0.1:8080/health)"; then
+              break
+            fi
+            body=""
+            if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER")" != "true" ]; then
+              echo "the container exited before answering /health" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ -z "$body" ]; then
+            echo "/health did not answer within 30s" >&2
+            exit 1
+          fi
+          echo "/health: $body"
+          jq -e '.status == "ok"' <<<"$body" >/dev/null
+
+          # Auth is on: /mcp without the token must be refused.
+          code="$(curl -sS -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8080/mcp)"
+          echo "/mcp without a token: $code"
+          test "$code" = "401"
+
+          # The server applied its migrations before listening, so the database
+          # file must exist under /data and be a real SQLite file.
+          docker cp "$CONTAINER:/data/training.db" "$RUNNER_TEMP/training.db"
+          header="$(head -c 15 "$RUNNER_TEMP/training.db")"
+          echo "/data/training.db header: $header"
+          test "$header" = "SQLite format 3"
+
+      - name: container logs
+        if: failure()
+        run: docker logs "$CONTAINER" || true
+
+      - name: remove the container
+        if: always()
+        run: docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
