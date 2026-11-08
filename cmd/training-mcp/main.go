@@ -80,7 +80,7 @@ func runWithContext(ctx context.Context, args []string) error {
 			logger.Printf("oauth gives every subject the provider vouches for an account")
 		}
 	}
-	handler := httpsrv.RoutesWithOAuth(mcpServer.Handler(), cfg.AuthDisabled, cfg.Token, web, oauth)
+	handler := httpsrv.LogProtocol(logger, httpsrv.RoutesWithOAuth(mcpServer.Handler(), cfg.AuthDisabled, cfg.Token, web, oauth))
 	httpServer := &http.Server{Addr: cfg.Addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
 	errCh := make(chan error, 1)
 	go func() { errCh <- httpServer.ListenAndServe() }()
