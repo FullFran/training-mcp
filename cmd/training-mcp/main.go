@@ -3,11 +3,15 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
+	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -25,11 +29,46 @@ func address(args []string) string {
 	_ = fs.Parse(args)
 	return *v
 }
+
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(healthcheck(address(os.Args[2:])))
+	}
 	if err := run(os.Args[1:]); err != nil {
 		log.Print(err)
 		os.Exit(1)
 	}
+}
+
+// healthcheck lets a distroless container check itself without a shell.
+func healthcheck(listen string) int {
+	return healthcheckWithOutput(listen, os.Stderr)
+}
+
+func healthcheckWithOutput(listen string, stderr io.Writer) int {
+	if !strings.Contains(listen, ":") {
+		listen = ":" + listen
+	}
+	host, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		fmt.Fprintln(stderr, "healthcheck: invalid listen address")
+		return 1
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "127.0.0.1"
+	}
+	c := &http.Client{Timeout: 3 * time.Second}
+	resp, err := c.Get("http://" + net.JoinHostPort(host, port) + "/health")
+	if err != nil {
+		fmt.Fprintln(stderr, "healthcheck:", err)
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintln(stderr, "healthcheck: status", resp.StatusCode)
+		return 1
+	}
+	return 0
 }
 func run(args []string) error {
 	return runWithSignals(args, os.Interrupt, syscall.SIGTERM)
