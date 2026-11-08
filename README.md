@@ -50,6 +50,8 @@ In another terminal, check that the local service is running:
 ```sh
 curl http://127.0.0.1:8080/health
 # {"status":"ok"}
+# or using the healthcheck subcommand (exit 0 if healthy, 1 on failure):
+go run ./cmd/training-mcp healthcheck --addr 127.0.0.1:8080
 ```
 
 This checks the server, not an MCP client connection. Keep the token private;
@@ -110,7 +112,7 @@ Docker image the way the server does. Merging to `main` deploys; see
 | `MCP_OAUTH_PROVISION` | off | `1` gives any subject the OAuth provider vouches for an account of its own; off, only the owner and existing accounts get in |
 | `WEB_BASE_PATH` | empty (web UI disabled) | Secret prefix the PWA is served from, e.g. `/a1b2c3…` |
 
-The unauthenticated `GET /health` endpoint returns `{"status":"ok"}`. MCP is only available at `/mcp` for GET, POST, and DELETE. Public ChatGPT access requires HTTPS at the TLS termination boundary.
+The unauthenticated `GET /health` endpoint returns `{"status":"ok"}`. Alternatively, `training-mcp healthcheck` sends `GET /health` to the local listener (defaulting to port 8080 or derived from `--addr`) and exits 0 on HTTP 200 or 1 on failure, designed for distroless container healthchecks without a shell, `curl`, or `wget`. MCP is only available at `/mcp` for GET, POST, and DELETE. Public ChatGPT access requires HTTPS at the TLS termination boundary.
 
 ## Tools
 
