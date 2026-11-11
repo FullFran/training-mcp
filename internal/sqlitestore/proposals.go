@@ -65,7 +65,7 @@ func (s *userStore) GetProposal(ctx context.Context, id int64) (training.Proposa
 // ListProposals returns pending proposals oldest first, the order they were
 // asked in, or answered ones newest first.
 func (s *userStore) ListProposals(ctx context.Context, f training.ProposalFilter) ([]training.Proposal, error) {
-	query := `SELECT ` + proposalColumns + ` FROM proposals WHERE user_id=? AND status NOT IN ('pending','applying') ORDER BY id DESC LIMIT ?`
+	query := `SELECT ` + proposalColumns + ` FROM proposals WHERE user_id=? AND status<>'pending' ORDER BY id DESC LIMIT ?`
 	if f.Pending {
 		query = `SELECT ` + proposalColumns + ` FROM proposals WHERE user_id=? AND status='pending' ORDER BY id LIMIT ?`
 	}

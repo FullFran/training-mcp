@@ -56,8 +56,8 @@ and are not proposals.
 
 A proposal is claimed before it is applied, so two answers cannot apply it
 twice. If the process stops between applying and recording the outcome, the
-proposal stays `applying` and is shown in neither list; check the data before
-proposing it again.
+proposal stays `applying` and shows in the history as such; check the data
+before proposing it again.
 
 Client handling (manual check, pending): ChatGPT and Claude must relay
 `pending` as "waiting for your approval in the app". Record the result of that

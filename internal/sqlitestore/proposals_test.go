@@ -201,3 +201,19 @@ func TestProposalsAreIsolatedBetweenUsers(t *testing.T) {
 		t.Fatal("accept-all leaked to another account")
 	}
 }
+
+// A proposal left applying (the process stopped mid-apply) stays visible in the
+// history, so the person can check whether it landed.
+func TestApplyingProposalShowsInHistory(t *testing.T) {
+	store := openTwoUsers(t)
+	ctx := context.Background()
+	user := store.ForUser(1)
+	p, _ := user.CreateProposal(ctx, proposal("delete_set"))
+	if err := user.ClaimProposal(ctx, p.ID); err != nil {
+		t.Fatal(err)
+	}
+	history, err := user.ListProposals(ctx, training.ProposalFilter{Limit: 10})
+	if err != nil || len(history) != 1 || history[0].Status != training.ProposalApplying {
+		t.Fatalf("history = %+v, %v", history, err)
+	}
+}
