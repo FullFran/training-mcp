@@ -37,6 +37,8 @@ type webWorld struct {
 	// proposal is the owner's pending proposal to create a plan named secretPlan+" 2".
 	proposal string
 	memory   string
+	// rule is the owner's stored grant.
+	rule string
 }
 
 func webHandler(t *testing.T, services *training.Services, userID int64) http.Handler {
@@ -98,12 +100,19 @@ func newWebWorld(t *testing.T) webWorld {
 		t.Fatal(err)
 	}
 	payload := []byte(`{"name":"` + secretPlan + ` 2","items":[{"exercise":"` + secretExercise + `","target_sets":1}]}`)
-	proposal, err := owner.Propose(ctx, training.ProposalInput{Tool: "create_plan", ActionType: "plan.create", Payload: payload},
+	proposal, err := owner.Propose(training.WithAgentSession(ctx, training.ExternalSession), training.ProposalInput{Tool: "create_plan", ActionType: "plan.create", Payload: payload},
 		func(context.Context) (json.RawMessage, error) { return nil, errors.New("not applied while pending") })
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = store.ForUser(1).SetRule(ctx, training.ApprovalRule{ActionType: "set.log", Remember: training.RememberAlways}); err != nil {
+	origin, err := store.ForUser(1).RecordDecision(ctx, training.DecisionRecord{Time: time.Unix(0, 0), Permission: "set.log", Outcome: training.OutcomeAllow,
+		DeciderKind: training.DeciderSubject, DeciderID: training.AccountHolder, Channel: training.ChannelWeb})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rule, err := store.ForUser(1).AddRule(ctx, training.AnswerRule{ActionType: "set.log", Effect: training.EffectAllow, Session: training.ExternalSession,
+		ExpiresAt: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC), Origin: origin})
+	if err != nil {
 		t.Fatal(err)
 	}
 	memory, err := owner.SaveMemory(ctx, training.MemoryInput{TopicKey: "lesion/hombro", Type: "limitation", Title: secretMemory, Body: "duele en " + secretExercise})
@@ -112,7 +121,7 @@ func newWebWorld(t *testing.T) webWorld {
 	}
 	return webWorld{
 		db: db, owner: webHandler(t, services, 1), second: webHandler(t, services, 2),
-		set: itoa(set.ID), session: itoa(session.ID), plan: itoa(plan.ID), proposal: itoa(proposal.ID), memory: itoa(memory.ID),
+		set: itoa(set.ID), session: itoa(session.ID), plan: itoa(plan.ID), proposal: itoa(proposal.ID), rule: itoa(rule), memory: itoa(memory.ID),
 	}
 }
 
@@ -121,7 +130,7 @@ func dumpDatabase(t *testing.T, db *sql.DB) string {
 	var out strings.Builder
 	for _, table := range []string{"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
 		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys",
-		"proposals", "approval_rules", "agent_permissions", "coach_memory"} {
+		"proposals", "answer_rules", "decision_records", "agent_permissions", "coach_memory"} {
 		rows, err := db.Query(`SELECT * FROM ` + table + ` ORDER BY rowid`)
 		if err != nil {
 			t.Fatal(err)
@@ -182,10 +191,10 @@ var webRoutes = map[string]func(*testing.T){
 	"POST /rest":  testRestTargetBelongsToWhoSetsIt,
 	"GET /review": pageRoute("/review", secretPlan+" 2"),
 	"POST /review/{id}/accept": idRoute(func(w webWorld) string { return w.proposal }, func(id string) (string, url.Values) {
-		return "/review/" + id + "/accept", url.Values{"remember": {"always"}}
+		return "/review/" + id + "/accept", url.Values{"answer": {"allow_always"}}
 	}),
 	"POST /review/{id}/reject": idRoute(func(w webWorld) string { return w.proposal }, func(id string) (string, url.Values) {
-		return "/review/" + id + "/reject", url.Values{}
+		return "/review/" + id + "/reject", url.Values{"answer": {"reject_always"}}
 	}),
 	"POST /review/accept-all": writeRoute("/review/accept-all", url.Values{"on": {"0"}},
 		`agent_permissions WHERE user_id=2 AND accept_all=0`),
@@ -241,17 +250,17 @@ func TestEveryWebRouteHasAnIsolationCase(t *testing.T) {
 func testForgettingTouchesOnlyTheUsersOwnRules(t *testing.T) {
 	world := newWebWorld(t)
 	before := dumpDatabase(t, world.db)
-	if w := post(t, world.second, base+"/review/forget", url.Values{"action_type": {"set.log"}}, true); w.Code != http.StatusOK {
+	if w := post(t, world.second, base+"/review/forget", url.Values{"rule_id": {world.rule}}, true); w.Code != http.StatusOK {
 		t.Fatalf("status %d", w.Code)
 	}
 	if after := dumpDatabase(t, world.db); after != before {
 		t.Fatalf("rows changed:\nbefore\n%s\nafter\n%s", before, after)
 	}
-	if w := post(t, world.owner, base+"/review/forget", url.Values{"action_type": {"set.log"}}, true); w.Code != http.StatusOK {
+	if w := post(t, world.owner, base+"/review/forget", url.Values{"rule_id": {world.rule}}, true); w.Code != http.StatusOK {
 		t.Fatalf("owner status %d", w.Code)
 	}
 	var n int
-	if err := world.db.QueryRow(`SELECT COUNT(*) FROM approval_rules WHERE user_id=1`).Scan(&n); err != nil || n != 0 {
+	if err := world.db.QueryRow(`SELECT COUNT(*) FROM answer_rules WHERE user_id=1`).Scan(&n); err != nil || n != 0 {
 		t.Fatalf("owner's rules = %d, %v", n, err)
 	}
 }

@@ -55,10 +55,33 @@ var statusLabels = map[string]string{
 }
 
 var decidedByLabels = map[string]string{
-	training.DecidedByPerson:    "tú",
-	training.DecidedBySession:   "recordado 12 h",
-	training.DecidedByAlways:    "recordado siempre",
-	training.DecidedByAcceptAll: "aceptar todo",
+	training.DecidedByPerson:       "tú",
+	training.DecidedBySessionGrant: "aceptado siempre en esa sesión",
+	training.DecidedByDenial:       "rechazado siempre en esa sesión",
+	training.DecidedByAcceptAll:    "aceptar todo",
+	// Proposals decided before answers became session-limited.
+	training.DecidedBySession: "recordado 12 h",
+	training.DecidedByAlways:  "recordado siempre",
+}
+
+// The answers a person can give a pending proposal, in the app's language.
+// The always ones only last for the session the proposal was asked in.
+var answerLabels = map[string]string{
+	training.AnswerAllowOnce:    "Aceptar una vez",
+	training.AnswerRejectOnce:   "Rechazar",
+	training.AnswerAllowAlways:  "Aceptar siempre en esta sesión",
+	training.AnswerRejectAlways: "Rechazar siempre en esta sesión",
+}
+
+// sessionLabel names the agent session a stored answer is limited to.
+func sessionLabel(session string) string {
+	if strings.HasPrefix(session, training.CoachSessionPrefix) {
+		return "esta conversación con el coach"
+	}
+	if session == training.ExternalSession {
+		return "clientes MCP externos"
+	}
+	return session
 }
 
 // ProposalField is one value of what a proposal would change.
@@ -77,13 +100,16 @@ type ProposalView struct {
 	DecidedBy string
 	When      string
 	Error     string
+	// InSession says the proposal was asked inside an agent session, so the
+	// always answers, which last for that session, can be offered.
+	InSession bool
 }
 
-// RuleView is a remembered answer as the review page shows it.
+// RuleView is a stored always answer as the review page shows it.
 type RuleView struct {
-	ActionType string
-	Label      string
-	Remember   string
+	ID       int64
+	Label    string
+	Remember string
 }
 
 // ReviewData is what the review page shows.
@@ -92,6 +118,7 @@ type ReviewData struct {
 	Answered  []ProposalView
 	AcceptAll bool
 	Rules     []RuleView
+	Answers   map[string]string
 }
 
 // proposalFields lists the payload's values, nested ones as compact JSON, so the
@@ -132,7 +159,7 @@ func (s *Server) proposalView(p training.Proposal) ProposalView {
 		ID: p.ID, ActionType: p.ActionType, Label: actionLabel(p.ActionType), Summary: proposalSummary(p.Tool, p.Payload),
 		Fields: proposalFields(p.Payload),
 		Status: statusLabels[p.Status], DecidedBy: decidedByLabels[p.DecidedBy],
-		When: when.In(s.clock().Location()).Format("02/01 15:04"), Error: p.Error,
+		When: when.In(s.clock().Location()).Format("02/01 15:04"), Error: p.Error, InSession: p.Session != "",
 	}
 }
 
@@ -151,7 +178,7 @@ func (s *Server) reviewData(r *http.Request) (ReviewData, error) {
 	if err != nil {
 		return ReviewData{}, err
 	}
-	data := ReviewData{AcceptAll: perms.AcceptAll}
+	data := ReviewData{AcceptAll: perms.AcceptAll, Answers: answerLabels}
 	for _, p := range pending {
 		data.Pending = append(data.Pending, s.proposalView(p))
 	}
@@ -159,11 +186,12 @@ func (s *Server) reviewData(r *http.Request) (ReviewData, error) {
 		data.Answered = append(data.Answered, s.proposalView(p))
 	}
 	for _, rule := range perms.Rules {
-		remember := "siempre"
-		if rule.Remember == training.RememberSession {
-			remember = "hasta las " + rule.ExpiresAt.In(s.clock().Location()).Format("15:04 del 02/01")
+		verb := "aceptar"
+		if rule.Effect == training.EffectDeny {
+			verb = "rechazar"
 		}
-		data.Rules = append(data.Rules, RuleView{ActionType: rule.ActionType, Label: actionLabel(rule.ActionType), Remember: remember})
+		remember := verb + " en " + sessionLabel(rule.Session) + " hasta las " + rule.ExpiresAt.In(s.clock().Location()).Format("15:04 del 02/01")
+		data.Rules = append(data.Rules, RuleView{ID: rule.ID, Label: actionLabel(rule.ActionType), Remember: remember})
 	}
 	return data, nil
 }
@@ -205,7 +233,7 @@ func (s *Server) reviewFailed(w http.ResponseWriter, r *http.Request, err error)
 	case errors.Is(err, training.ErrNotPending):
 		s.renderReview(w, r, http.StatusConflict, "Esa propuesta ya estaba respondida.")
 	case errors.Is(err, training.ErrValidation):
-		s.renderReview(w, r, http.StatusBadRequest, "No se pudo aplicar: los datos de la propuesta no son válidos.")
+		s.renderReview(w, r, http.StatusBadRequest, "No se pudo responder: los datos de la propuesta no son válidos o no tiene una sesión que recordar.")
 	case errors.Is(err, training.ErrIdempotencyConflict):
 		s.renderReview(w, r, http.StatusConflict, "No se pudo aplicar: esas series ya se registraron con otros datos.")
 	default:
@@ -227,18 +255,23 @@ func (s *Server) acceptProposal(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	remember := r.PostFormValue("remember")
-	switch remember {
-	case "", training.RememberOnce, training.RememberSession, training.RememberAlways:
+	answer := r.PostFormValue("answer")
+	// A page cached before the four answers posts the old field; refuse it
+	// rather than read "always" as once.
+	if old := r.PostFormValue("remember"); old != "" && old != "once" {
+		answer = "remember:" + old
+	}
+	switch answer {
+	case "", training.AnswerAllowOnce, training.AnswerAllowAlways:
 	default:
-		s.renderReview(w, r, http.StatusBadRequest, "Elige una vez, 12 horas o siempre.")
+		s.renderReview(w, r, http.StatusBadRequest, "Elige aceptar una vez o siempre en esta sesión.")
 		return
 	}
 	if s.opts.Apply == nil {
 		s.renderReview(w, r, http.StatusServiceUnavailable, "Aquí no se pueden aplicar propuestas.")
 		return
 	}
-	if _, err := s.service(r.Context()).AcceptProposal(r.Context(), id, remember, s.opts.Apply); err != nil {
+	if _, err := s.service(r.Context()).AcceptProposal(r.Context(), id, answer, s.opts.Apply); err != nil {
 		s.reviewFailed(w, r, err)
 		return
 	}
@@ -250,7 +283,14 @@ func (s *Server) rejectProposal(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, err := s.service(r.Context()).RejectProposal(r.Context(), id); err != nil {
+	answer := r.PostFormValue("answer")
+	switch answer {
+	case "", training.AnswerRejectOnce, training.AnswerRejectAlways:
+	default:
+		s.renderReview(w, r, http.StatusBadRequest, "Elige rechazar una vez o siempre en esta sesión.")
+		return
+	}
+	if _, err := s.service(r.Context()).RejectProposal(r.Context(), id, answer); err != nil {
 		s.reviewFailed(w, r, err)
 		return
 	}
@@ -275,9 +315,14 @@ func (s *Server) setAcceptAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) forgetRule(w http.ResponseWriter, r *http.Request) {
-	if err := s.service(r.Context()).ForgetRule(r.Context(), r.PostFormValue("action_type")); err != nil {
-		if errors.Is(err, training.ErrValidation) {
-			s.renderReview(w, r, http.StatusBadRequest, "Falta el tipo de acción.")
+	id, err := strconv.ParseInt(r.PostFormValue("rule_id"), 10, 64)
+	if err != nil || id <= 0 {
+		s.renderReview(w, r, http.StatusBadRequest, "No se pudo identificar la respuesta recordada.")
+		return
+	}
+	if err := s.service(r.Context()).ForgetRule(r.Context(), id); err != nil {
+		if errors.Is(err, training.ErrNotFound) {
+			s.renderReview(w, r, http.StatusOK, "Esa respuesta recordada ya no existe.")
 			return
 		}
 		s.fail(w, err)

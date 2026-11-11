@@ -21,7 +21,7 @@ const (
 var userTables = []string{
 	"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
 	"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys",
-	"proposals", "approval_rules", "agent_permissions", "coach_memory",
+	"proposals", "answer_rules", "decision_records", "agent_permissions", "coach_memory",
 }
 
 // ownedRows selects one user's rows from each table, children through their parent.
@@ -37,7 +37,8 @@ var ownedRows = map[string]string{
 	"volume_landmarks":  `SELECT * FROM volume_landmarks WHERE user_id=? ORDER BY rowid`,
 	"idempotency_keys":  `SELECT * FROM idempotency_keys WHERE user_id=? ORDER BY rowid`,
 	"proposals":         `SELECT * FROM proposals WHERE user_id=? ORDER BY rowid`,
-	"approval_rules":    `SELECT * FROM approval_rules WHERE user_id=? ORDER BY rowid`,
+	"answer_rules":      `SELECT * FROM answer_rules WHERE user_id=? ORDER BY rowid`,
+	"decision_records":  `SELECT * FROM decision_records WHERE user_id=? ORDER BY rowid`,
 	"agent_permissions": `SELECT * FROM agent_permissions WHERE user_id=? ORDER BY rowid`,
 	"coach_memory":      `SELECT * FROM coach_memory WHERE user_id=? ORDER BY rowid`,
 }
@@ -106,9 +107,9 @@ func dumpAll(t *testing.T, store *Store) string {
 
 type seeded struct {
 	session, set, plan int64
-	// proposal is pending; claimed is being applied.
-	proposal, claimed int64
-	memory            int64
+	// proposal is pending; claimed is being applied; rule is a stored grant.
+	proposal, claimed, rule int64
+	memory                  int64
 }
 
 // seedUser gives a user a row of every kind, using the same names for whoever calls it.
@@ -165,7 +166,13 @@ func seedUser(t *testing.T, user training.UserStore, group string) seeded {
 	if err = user.ClaimProposal(ctx, claimed.ID); err != nil {
 		t.Fatal(err)
 	}
-	if err = user.SetRule(ctx, training.ApprovalRule{ActionType: "set.log", Remember: training.RememberAlways}); err != nil {
+	origin, err := user.RecordDecision(ctx, training.DecisionRecord{Time: time.Unix(0, 0), Permission: "set.log", Outcome: training.OutcomeAllow,
+		DeciderKind: training.DeciderSubject, DeciderID: training.AccountHolder, Channel: training.ChannelWeb})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rule, err := user.AddRule(ctx, training.AnswerRule{ActionType: "set.log", Effect: training.EffectAllow, Session: "coach:a", ExpiresAt: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC), Origin: origin})
+	if err != nil {
 		t.Fatal(err)
 	}
 	if err = user.SetAcceptAll(ctx, true); err != nil {
@@ -176,7 +183,7 @@ func seedUser(t *testing.T, user training.UserStore, group string) seeded {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return seeded{session: session.ID, set: set.ID, plan: plan.ID, proposal: pending.ID, claimed: claimed.ID, memory: memory.ID}
+	return seeded{session: session.ID, set: set.ID, plan: plan.ID, proposal: pending.ID, claimed: claimed.ID, rule: rule, memory: memory.ID}
 }
 
 // idCases are the data methods addressed by an id. Each runs with an id that may
@@ -259,15 +266,13 @@ var idCases = map[string]func(context.Context, training.UserStore, seeded) (any,
 		return nil, u.ClaimProposal(c, id.proposal)
 	},
 	"RejectProposal": func(c context.Context, u training.UserStore, id seeded) (any, error) {
-		return u.RejectProposal(c, id.proposal, time.Unix(0, 0))
+		return u.RejectProposal(c, id.proposal, training.DecidedByPerson, time.Unix(0, 0))
 	},
 	"FinishProposal": func(c context.Context, u training.UserStore, id seeded) (any, error) {
 		return u.FinishProposal(c, id.claimed, training.ProposalOutcome{Status: training.ProposalAccepted, At: time.Unix(0, 0)})
 	},
-	// Keyed by action type rather than an id: forgetting someone else's rule
-	// must change nothing, as forgetting a rule nobody has does.
-	"ForgetRule": func(c context.Context, u training.UserStore, _ seeded) (any, error) {
-		return nil, u.ForgetRule(c, "set.log")
+	"ForgetRule": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return u.ForgetRule(c, id.rule)
 	},
 	// An account created after migration 14 has no setting of its own, unlike the
 	// owner of an empty database, so this is compared with a missing id instead.
@@ -287,7 +292,7 @@ var idCases = map[string]func(context.Context, training.UserStore, seeded) (any,
 }
 
 func TestAnotherUsersIDBehavesExactlyLikeAMissingOne(t *testing.T) {
-	missing := seeded{session: missingID, set: missingID, plan: missingID, proposal: missingID, claimed: missingID, memory: missingID}
+	missing := seeded{session: missingID, set: missingID, plan: missingID, proposal: missingID, claimed: missingID, rule: missingID, memory: missingID}
 	for name, run := range idCases {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
@@ -338,6 +343,7 @@ var readCases = map[string]func(context.Context, training.UserStore) (any, error
 	},
 	"ExerciseNotes": func(c context.Context, u training.UserStore) (any, error) { return u.ExerciseNotes(c) },
 	"RestTarget":    func(c context.Context, u training.UserStore) (any, error) { return u.RestTarget(c) },
+	"Decisions":     func(c context.Context, u training.UserStore) (any, error) { return u.Decisions(c, 50) },
 	"ListMemory": func(c context.Context, u training.UserStore) (any, error) {
 		listed, err := u.ListMemory(c, training.MemoryQuery{Limit: 50})
 		if err != nil {
@@ -423,11 +429,26 @@ var writeCases = map[string]struct {
 		},
 		`SELECT COUNT(*) FROM proposals WHERE user_id=2 AND tool='add_set'`,
 	},
-	"SetRule": {
+	"AddRule": {
 		func(c context.Context, u training.UserStore) error {
-			return u.SetRule(c, training.ApprovalRule{ActionType: "plan.delete", Remember: training.RememberAlways})
+			origin, err := u.RecordDecision(c, training.DecisionRecord{Time: time.Unix(0, 0), Permission: "plan.delete", Outcome: training.OutcomeDeny,
+				DeciderKind: training.DeciderSubject, DeciderID: training.AccountHolder, Channel: training.ChannelWeb})
+			if err != nil {
+				return err
+			}
+			_, err = u.AddRule(c, training.AnswerRule{ActionType: "plan.delete", Effect: training.EffectDeny, Session: "coach:b",
+				ExpiresAt: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC), Origin: origin})
+			return err
 		},
-		`SELECT COUNT(*) FROM approval_rules WHERE user_id=2 AND action_type='plan.delete'`,
+		`SELECT COUNT(*) FROM answer_rules WHERE user_id=2 AND action_type='plan.delete'`,
+	},
+	"RecordDecision": {
+		func(c context.Context, u training.UserStore) error {
+			_, err := u.RecordDecision(c, training.DecisionRecord{Time: time.Unix(0, 0), Permission: "plan.delete", Outcome: training.OutcomeDeny,
+				DeciderKind: training.DeciderSubject, DeciderID: training.AccountHolder, Channel: training.ChannelWeb})
+			return err
+		},
+		`SELECT COUNT(*) FROM decision_records WHERE user_id=2 AND permission='plan.delete'`,
 	},
 	"SetAcceptAll": {
 		func(c context.Context, u training.UserStore) error { return u.SetAcceptAll(c, true) },

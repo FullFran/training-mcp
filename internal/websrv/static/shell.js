@@ -22,6 +22,13 @@
   // --- refresh from the server --------------------------------------------
   // After a change made in a panel, the workout panel, the server's cards and
   // the review count are taken from a fresh home page; the conversation stays.
+  // verdictText says on a chat card what the person's answer did.
+  function verdictText(accepted, answer) {
+    if (answer === 'allow_always') return 'Aceptada, y aceptadas siempre en esta sesión.';
+    if (answer === 'reject_always') return 'Rechazada, y rechazadas siempre en esta sesión.';
+    return accepted ? 'Aceptada.' : 'Rechazada.';
+  }
+
   function apply(html) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const fresh = doc.getElementById('panel');
@@ -233,10 +240,13 @@
     const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
     if (csrf) headers['X-CSRF-Token'] = csrf;
     if (proposal) headers['HX-Request'] = 'true';
+    // The answer is the pressed button's value, so the body is read before the
+    // buttons are disabled (a disabled submitter is left out of the form data).
+    const body = new URLSearchParams(new FormData(form, event.submitter)).toString();
     form.querySelectorAll('button').forEach((b) => { b.disabled = true; });
     fetch(form.action, {
       method: 'POST', credentials: 'same-origin', headers,
-      body: new URLSearchParams(new FormData(form)).toString(),
+      body,
     })
       .then((res) => res.text())
       .then((html) => {
@@ -246,7 +256,7 @@
         const verdict = document.createElement('p');
         verdict.className = alert ? 'coach-note coach-error' : 'coach-note';
         verdict.textContent = alert ? alert.textContent
-          : (form.action.endsWith('/accept') ? 'Aceptada.' : 'Rechazada.');
+          : verdictText(form.action.endsWith('/accept'), event.submitter && event.submitter.value);
         proposal.querySelector('.card-actions').replaceWith(verdict);
         proposal.removeAttribute('data-proposal');
         setReview(doc.querySelectorAll('article.proposal').length);

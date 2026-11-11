@@ -76,11 +76,19 @@ type ProposalStore interface {
 	ClaimProposal(context.Context, int64) error
 	// FinishProposal records how applying a claimed proposal ended.
 	FinishProposal(context.Context, int64, ProposalOutcome) (Proposal, error)
-	// RejectProposal answers a pending proposal with no; ErrNotPending if it is not pending.
-	RejectProposal(context.Context, int64, time.Time) (Proposal, error)
+	// RejectProposal answers a pending proposal with no, decided by decidedBy;
+	// ErrNotPending if it is not pending.
+	RejectProposal(ctx context.Context, id int64, decidedBy string, at time.Time) (Proposal, error)
 	// Permissions are the standing answers. An account without a stored setting asks for everything.
 	Permissions(context.Context) (Permissions, error)
 	SetAcceptAll(context.Context, bool) error
-	SetRule(context.Context, ApprovalRule) error
-	ForgetRule(context.Context, string) error
+	// AddRule stores a session-limited grant or denial and returns its id.
+	AddRule(context.Context, AnswerRule) (int64, error)
+	// ForgetRule removes a grant or denial and returns it; ErrNotFound if this
+	// account has none with that id.
+	ForgetRule(context.Context, int64) (AnswerRule, error)
+	// RecordDecision writes a decision record and returns its id.
+	RecordDecision(context.Context, DecisionRecord) (int64, error)
+	// Decisions lists decision records newest first.
+	Decisions(ctx context.Context, limit int) ([]DecisionRecord, error)
 }

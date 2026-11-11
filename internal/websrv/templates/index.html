@@ -75,12 +75,13 @@
         <div class="card-actions">
           <form method="post" action="{{$.Base}}/review/{{.ID}}/accept">{{if $.CSRF}}
             <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
-            <input type="hidden" name="remember" value="once">
-            <button type="submit" class="primary">Aceptar</button>
+            <button type="submit" name="answer" value="allow_once" class="primary">{{index $.Review.Answers "allow_once"}}</button>
+            {{if .InSession}}<button type="submit" name="answer" value="allow_always" class="ghost">{{index $.Review.Answers "allow_always"}}</button>{{end}}
           </form>
           <form method="post" action="{{$.Base}}/review/{{.ID}}/reject">{{if $.CSRF}}
             <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
-            <button type="submit" class="ghost">Rechazar</button>
+            <button type="submit" name="answer" value="reject_once" class="ghost">{{index $.Review.Answers "reject_once"}}</button>
+            {{if .InSession}}<button type="submit" name="answer" value="reject_always" class="ghost">{{index $.Review.Answers "reject_always"}}</button>{{end}}
           </form>
         </div>
       </article>

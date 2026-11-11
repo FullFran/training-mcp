@@ -3,9 +3,12 @@ package mcpsrv
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/fullfran/training-mcp/internal/training"
@@ -116,7 +119,7 @@ func TestEveryWriteToolProposesAndAcceptingAppliesTheSameChange(t *testing.T) {
 				t.Fatalf("proposal = %+v, %v; want %s pending", p, err, action)
 			}
 
-			accepted, err := world.ownerService.AcceptProposal(ctx, id, training.RememberOnce, world.ownerServer.Apply)
+			accepted, err := world.ownerService.AcceptProposal(ctx, id, training.AnswerAllowOnce, world.ownerServer.Apply)
 			if err != nil || accepted.Status != training.ProposalAccepted {
 				t.Fatalf("accept = %+v, %v", accepted, err)
 			}
@@ -142,7 +145,7 @@ func TestRejectedProposalChangesNothing(t *testing.T) {
 	}
 	before := dumpTables(t, world.db, nil)
 	pending := structured(t, call(t, world.owner, "delete_session", map[string]any{"session_id": world.ids.session}))
-	if _, err := world.ownerService.RejectProposal(ctx, int64(pending["proposal_id"].(float64))); err != nil {
+	if _, err := world.ownerService.RejectProposal(ctx, int64(pending["proposal_id"].(float64)), training.AnswerRejectOnce); err != nil {
 		t.Fatal(err)
 	}
 	if after := dumpTables(t, world.db, nil); after != before {
@@ -174,7 +177,7 @@ func TestPendingProposalsAreIsolatedBetweenUsers(t *testing.T) {
 
 	second := world.services.ForUser(2)
 	_ = second.SetAcceptAll(ctx, false)
-	if _, err := second.AcceptProposal(ctx, id, training.RememberAlways, world.ownerServer.Apply); err == nil || err.Error() != training.ErrNotFound.Error() {
+	if _, err := second.AcceptProposal(ctx, id, training.AnswerAllowAlways, world.ownerServer.Apply); err == nil || err.Error() != training.ErrNotFound.Error() {
 		t.Fatalf("second user accepting = %v", err)
 	}
 	if list, _ := second.ListProposals(ctx, training.ProposalFilter{Pending: true}); len(list) != 0 {
@@ -223,8 +226,88 @@ func TestWriteToolsDeclareTheProposalContract(t *testing.T) {
 		if !slices.Contains(required, "status") || !slices.Contains(required, "proposal_id") {
 			t.Errorf("%s output requires %v", tool.Name, required)
 		}
-		if !regexp.MustCompile(`'pending'.*not applied yet`).MatchString(tool.Description) {
-			t.Errorf("%s description does not explain pending: %q", tool.Name, tool.Description)
+		if !regexp.MustCompile(`'pending'.*'rejected'.*not applied`).MatchString(tool.Description) {
+			t.Errorf("%s description does not explain pending and rejected: %q", tool.Name, tool.Description)
+		}
+		status, _ := schemaMap(t, schema["properties"])["status"].(map[string]any)
+		if desc, _ := status["description"].(string); !strings.Contains(desc, "'rejected'") {
+			t.Errorf("%s status does not explain rejected: %q", tool.Name, desc)
+		}
+	}
+}
+
+// engineBearer sends every request with one bearer, as the coach's engine does.
+type engineBearer struct{ token string }
+
+func (b engineBearer) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	r.Header.Set("Authorization", "Bearer "+b.token)
+	return http.DefaultTransport.RoundTrip(r)
+}
+
+func connectWithBearer(t *testing.T, handler http.Handler, token string) *mcp.ClientSession {
+	t.Helper()
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+	client := mcp.NewClient(&mcp.Implementation{Name: "coach", Version: "1.0.0"}, nil)
+	session, err := client.Connect(context.Background(), &mcp.StreamableClientTransport{Endpoint: server.URL, HTTPClient: &http.Client{Transport: engineBearer{token}}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { session.Close() })
+	return session
+}
+
+// A coach conversation is its own session, keyed by its engine bearer; every
+// external client shares the external session; a reject_always in one
+// conversation rejects there and nowhere else, and the agent is told so.
+func TestProposalsCarryTheirChannelsSession(t *testing.T) {
+	ctx := context.Background()
+	world := newIsolationWorld(t)
+	_ = world.ownerService.SetAcceptAll(ctx, false)
+	coach := connectWithBearer(t, world.ownerServer.Handler(), "tme_conversation-one")
+	otherCoach := connectWithBearer(t, world.ownerServer.Handler(), "tme_conversation-two")
+	args := map[string]any{"exercise": isolationExercise, "note": "codos dentro"}
+
+	proposed := func(session *mcp.ClientSession) (map[string]any, training.Proposal) {
+		t.Helper()
+		out := structured(t, call(t, session, "set_exercise_note", args))
+		p, err := world.ownerService.GetProposal(ctx, int64(out["proposal_id"].(float64)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out, p
+	}
+	_, first := proposed(coach)
+	_, second := proposed(otherCoach)
+	_, external := proposed(world.owner)
+	if !strings.HasPrefix(first.Session, training.CoachSessionPrefix) || first.Session == second.Session ||
+		strings.Contains(first.Session, "conversation-one") || external.Session != training.ExternalSession {
+		t.Fatalf("sessions: coach %q, other coach %q, external %q", first.Session, second.Session, external.Session)
+	}
+
+	if _, err := world.ownerService.RejectProposal(ctx, first.ID, training.AnswerRejectAlways); err != nil {
+		t.Fatal(err)
+	}
+	before := dumpTables(t, world.db, nil)
+	out, denied := proposed(coach)
+	if out["status"] != "rejected" || denied.Status != training.ProposalRejected || denied.DecidedBy != training.DecidedByDenial {
+		t.Fatalf("same conversation = %v, %+v", out, denied)
+	}
+	if after := dumpTables(t, world.db, nil); after != before {
+		t.Fatalf("a denied proposal changed data:\nbefore\n%s\nafter\n%s", before, after)
+	}
+	for _, session := range []*mcp.ClientSession{otherCoach, world.owner} {
+		if out, _ := proposed(session); out["status"] != "pending" {
+			t.Fatalf("denial reached another session: %v", out)
+		}
+	}
+}
+
+func TestACallNotMadeOverHTTPHasNoSession(t *testing.T) {
+	for _, req := range []*mcp.CallToolRequest{nil, {}, {Extra: &mcp.RequestExtra{}}} {
+		if got := agentSession(req); got != "" {
+			t.Fatalf("agentSession(%+v) = %q", req, got)
 		}
 	}
 }

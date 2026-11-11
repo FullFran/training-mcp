@@ -66,7 +66,7 @@ func TestMemorySaveIsAProposalOfItsOwnTypeUntilAccepted(t *testing.T) {
 	}
 
 	// Accepting it with "always" stores it and lets later saves through.
-	if _, err = svc.AcceptProposal(ctx, p.ID, training.RememberAlways, world.server.Apply); err != nil {
+	if _, err = svc.AcceptProposal(ctx, p.ID, training.AnswerAllowAlways, world.server.Apply); err != nil {
 		t.Fatal(err)
 	}
 	if world.count(t, "user_id=1 AND topic_key='lesion/hombro' AND body='Duele en press militar'") != 1 {
@@ -101,7 +101,7 @@ func TestMemoryForgetIsAProposalAndDeletesOnlyWhenAccepted(t *testing.T) {
 	if err != nil || p.ActionType != "memory.forget" {
 		t.Fatalf("proposal = %#v, %v", p, err)
 	}
-	if _, err = svc.AcceptProposal(ctx, p.ID, training.RememberOnce, world.server.Apply); err != nil {
+	if _, err = svc.AcceptProposal(ctx, p.ID, training.AnswerAllowOnce, world.server.Apply); err != nil {
 		t.Fatal(err)
 	}
 	if world.count(t, "1") != 0 {
@@ -194,7 +194,7 @@ func TestAlwaysOnSavingDoesNotCoverForgetting(t *testing.T) {
 	session := mustConnect(t, world.server.Handler())
 
 	saved := structured(t, call(t, session, "memory_save", map[string]any{"title": "Rodilla", "body": "dolor"}))
-	if _, err := svc.AcceptProposal(ctx, int64(saved["proposal_id"].(float64)), training.RememberAlways, world.server.Apply); err != nil {
+	if _, err := svc.AcceptProposal(ctx, int64(saved["proposal_id"].(float64)), training.AnswerAllowAlways, world.server.Apply); err != nil {
 		t.Fatal(err)
 	}
 	m, err := svc.SearchMemory(ctx, training.MemoryQuery{Text: "rodilla"})

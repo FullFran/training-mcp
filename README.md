@@ -128,10 +128,12 @@ drift, followed by the design notes explaining why the surface looks like this.
 
 A few shapes worth knowing before reading it:
 
-- Every write tool is a proposal. Its result says `status: accepted` (applied)
-  or `pending` (waiting on the `/review` page), plus a `proposal_id`. Answers
-  are remembered once, for 12 hours, or always per action type, and an
-  accept-all switch per account skips the questions. Accounts that existed
+- Every write tool is a proposal. Its result says `status: accepted` (applied),
+  `pending` (waiting on the `/review` page or the coach chat) or `rejected`,
+  plus a `proposal_id`. Answers follow HCS-0005: allow or reject once, or
+  always for that action type in this session only (one coach conversation,
+  or 12 hours for external MCP clients), and an accept-all switch per account
+  skips the questions. Accounts that existed
   before migration 014 keep accept-all on; new accounts ask for everything.
   See [Every write is a proposal](docs/tools.md#every-write-is-a-proposal).
 
@@ -167,7 +169,7 @@ shared with the MCP tools and cannot drift apart.
   reject) and logged sets appear as cards rendered by the server.
 - `/review` lists the agent's pending proposals with what each would change
   (one sentence per write tool, the exact payload one tap away),
-  accepts (once, 12 hours, always) or rejects them, shows the answer history
+  accepts or rejects them (once, or always in that session), shows the answer history
   and holds the accept-all switch. The person's own changes in the app apply
   directly.
 - A plan can be started for the day; its exercises become a checklist showing

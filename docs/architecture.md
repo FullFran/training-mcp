@@ -105,7 +105,7 @@ is how they end up implemented twice, slightly differently:
 ## Persistence
 
 SQLite, single file, forward-only numbered migrations under
-`internal/sqlitestore/migrations/`. Each numbered file is a step, additive except for 013, which rebuilds four tables to key them per user,
+`internal/sqlitestore/migrations/`. Each numbered file is a step, additive except for 013, which rebuilds four tables to key them per user, and 018, which drops the answers stored before they became session-limited (each recorded as revoked),
 (`001_init`, `002_exercise_groups`, … `008_plan_item_notes`), which is what lets
 the schema grow without the single user ever having to reset their history.
 
@@ -164,11 +164,15 @@ files (`/sw.js`, `/manifest.webmanifest`, `/static/`) are public.
 
 Authenticating a client is not the same as letting its agent change data.
 Every MCP write tool goes through `training.Service.Propose`, which records a
-proposal in the caller's own rows and applies it only when the account's
-accept-all switch, or a remembered answer for that action type, covers it.
-Otherwise the change waits for the person on `/review`. Accepting replays the
+proposal in the caller's own rows, in the agent session `mcpsrv` derives from
+the request's channel (one coach conversation, the external-client window, or
+none), and decides it as HCS-0005 does: a session-limited denial rejects it,
+the account's accept-all grant or a session-limited grant applies it, and
+otherwise it waits for the person on `/review` or in the coach chat. Each
+decision writes a decision record first; see
+[Every write is a proposal](tools.md#every-write-is-a-proposal). Accepting replays the
 stored payload through `mcpsrv.Server.Apply`, the same function the tool runs,
 so there is one write path whether a change is applied at once or later. The
-PWA's own forms are the person acting and write directly. Proposals, rules and
-the switch are reached only through the user-bound store, so another user's
+PWA's own forms are the person acting and write directly. Proposals, grants,
+denials, decision records and the switch are reached only through the user-bound store, so another user's
 proposal id answers exactly as a missing one.
