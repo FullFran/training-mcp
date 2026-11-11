@@ -20,13 +20,17 @@
   <button type="button" id="menu-open" class="icon-btn" aria-label="Menú" aria-controls="drawer" aria-expanded="false">☰</button>
   {{if .CoachOn}}<button type="button" id="model-open" class="chat-title model-open" aria-haspopup="dialog" aria-controls="model-sheet"><strong>Coach</strong> <span id="model-name" class="muted">{{.Today}}</span> <span aria-hidden="true">▾</span></button>
   {{else}}<div class="chat-title"><strong>Coach</strong> <span class="muted">{{.Today}}</span></div>{{end}}
-  <a id="review-badge" class="icon-btn review-badge" href="{{.Base}}/review" data-panel aria-label="Revisar"{{if not .PendingCount}} hidden{{end}}>✅<span>{{.PendingCount}}</span></a>
+  <div class="bar-end">
+    <a id="review-badge" class="icon-btn review-badge" href="{{.Base}}/review" data-panel aria-label="Revisar"{{if not .PendingCount}} hidden{{end}}>✅<span>{{.PendingCount}}</span></a>
+    {{if .CoachOn}}<button type="button" id="chat-new" class="icon-btn" aria-label="Nueva conversación">✎</button>{{end}}
+  </div>
 </header>
 
 <!-- The menu: panels open over the chat and come back to it; without
      JavaScript they are plain pages with a link home. -->
 <div id="drawer-scrim" class="scrim" hidden></div>
 <aside id="drawer" class="drawer" aria-label="Menú" hidden>
+  {{if .CoachOn}}<button type="button" id="drawer-new" class="drawer-new">✎ Nueva conversación</button>{{end}}
   <nav class="panel-links" aria-label="Paneles">
     <a href="{{.Base}}/history" data-panel>📅 Historial</a>
     <a href="{{.Base}}/plans" data-panel>📋 Rutinas</a>
@@ -34,10 +38,14 @@
     <a href="{{.Base}}/history#progreso" data-panel>📈 Progreso</a>
     {{if .ConnectorsOn}}<a href="{{.Base}}/coach/connectors">🔌 Conectores</a>{{end}}
   </nav>
+  {{if .CoachOn}}<!-- The person's conversations, filled from /coach/conversations; kept 90 days after the last message. -->
+  <nav id="conversations" class="conversations" aria-label="Conversaciones"></nav>{{end}}
   <section class="account" aria-label="Cuenta">
     {{if .CoachOn}}<p id="coach-state" class="muted"></p>
     <label id="coach-autosend-wrap" class="autosend" hidden><input type="checkbox" id="coach-autosend"> Enviar al acabar de dictar</label>
     <button type="button" id="coach-disconnect" class="ghost wide" hidden>Desconectar ChatGPT</button>
+    <button type="button" id="conv-delete-all" class="ghost wide danger-text" hidden>Borrar todas las conversaciones</button>
+    <p class="muted small">Las conversaciones se borran solas 90 días después del último mensaje.</p>
     {{else}}<p class="muted">El coach no está activado aquí.</p>{{end}}
   </section>
 </aside>

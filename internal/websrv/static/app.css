@@ -702,7 +702,7 @@ main { padding-bottom: 140px; }
   position: static;
   flex: none;
   display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  grid-template-columns: 88px 1fr 88px;
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
@@ -1094,3 +1094,27 @@ main { padding-bottom: 140px; }
 .coach-think > summary::after { content: "›"; }
 .coach-think[open] > summary::after { content: "⌄"; }
 .coach-think p { margin: 4px 0 8px; padding-left: 10px; border-left: 2px solid var(--line); white-space: pre-wrap; }
+
+/* Conversations in the drawer, like ChatGPT's history. */
+.bar-end { display: flex; justify-content: flex-end; }
+.drawer-new {
+  min-height: 48px; padding: 0 12px;
+  display: flex; align-items: center; gap: 8px;
+  border: 0; border-radius: 12px;
+  background: none; color: var(--text); font-size: 16px; font-weight: 700; text-align: left;
+}
+.drawer-new:active { background: var(--card); }
+.conversations { display: grid; gap: 2px; overflow-y: auto; min-height: 0; }
+.conversations h3 { margin: 12px 8px 4px; color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.conv-row { display: flex; align-items: center; border-radius: 10px; }
+.conv-row.on { background: var(--card); }
+.conv-open {
+  flex: 1; min-width: 0; min-height: 44px; padding: 0 10px;
+  border: 0; background: none; color: var(--text); font-size: 15px; text-align: left;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.conv-more { width: 40px; min-height: 40px; border: 0; background: none; color: var(--muted); font-size: 18px; }
+.conv-actions { display: flex; gap: 6px; padding: 0 8px 8px; }
+.conv-actions button { flex: 1; min-height: 40px; }
+.danger-text { color: var(--danger); }
+.small { font-size: 12px; margin: 0; }
