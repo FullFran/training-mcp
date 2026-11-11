@@ -1191,3 +1191,24 @@ func TestPlannedItemCarriesTodaysWeightForOneTapLog(t *testing.T) {
 		t.Fatal("fillPlanned does not prefer today's weight")
 	}
 }
+
+// The progress bars must not reuse the sticky top bar's class: they inherited
+// its sticky position, padding and border and covered the page when scrolled.
+func TestProgressBarsDoNotInheritTheTopBar(t *testing.T) {
+	h, service := newServer(t)
+	post(t, h, base+"/sets", setForm("banca", "80", "5", "8"), true)
+	if err := service.SetExerciseGroup(t.Context(), "banca", "pecho"); err != nil {
+		t.Fatal(err)
+	}
+	body := get(t, h, base+"/history").Body.String()
+	if strings.Contains(body, `<span class="bar">`) || !strings.Contains(body, `class="vbar" role="img" aria-label="pecho: `) {
+		t.Fatalf("volume bar markup:\n%s", body)
+	}
+	css, err := os.ReadFile("static/app.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(css), ".volume .bar") || !strings.Contains(string(css), ".volume .vbar") {
+		t.Fatal("volume bars still styled through the top bar's class")
+	}
+}

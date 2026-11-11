@@ -420,8 +420,11 @@ button { font: inherit; cursor: pointer; }
   font-size: 14px;
 }
 .volume .name { color: var(--muted); text-transform: capitalize; }
-.volume .bar { height: 8px; border-radius: 999px; background: #10131a; overflow: hidden; }
-.volume .bar span { display: block; height: 100%; background: var(--accent); }
+/* Not .bar: that is the sticky top bar, whose position, padding and border
+   made these bars cover the page when scrolled. The track uses the theme's
+   line colour so it shows on both the dark and the light card. */
+.volume .vbar { display: block; min-width: 0; height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.volume .vbar span { display: block; height: 100%; min-width: 2px; border-radius: inherit; background: var(--accent); }
 .volume .val { font-variant-numeric: tabular-nums; color: var(--text); }
 
 /* --- plan --------------------------------------------------------------- */

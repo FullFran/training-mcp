@@ -52,7 +52,7 @@
     {{range .Volume}}
     <div class="row-v">
       <span class="name">{{if .MuscleGroup}}{{.MuscleGroup}}{{else}}sin grupo{{end}}</span>
-      <span class="bar"><span style="width:{{pct .TotalSI $max}}%"></span></span>
+      <span class="vbar" role="img" aria-label="{{if .MuscleGroup}}{{.MuscleGroup}}{{else}}sin grupo{{end}}: {{num .TotalSI}}"><span style="width:{{pct .TotalSI $max}}%"></span></span>
       <span class="val">{{num .TotalSI}}</span>
     </div>
     {{end}}
