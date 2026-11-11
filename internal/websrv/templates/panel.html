@@ -17,7 +17,8 @@
       <li class="{{if .Skipped}}skipped{{else if .Done}}ok{{end}}{{if eq .TargetSets 0}} extra{{end}}{{if .Superset}} in-ss{{end}}"
           data-exercise="{{.Exercise}}"
           data-superset="{{.Superset}}"
-          data-reps="{{targetReps .}}"
+          data-reps="{{targetReps .}}"{{with todayWeight $.Session .Exercise}}
+          data-today-weight="{{.}}"{{end}}
           data-rpe="{{num .TargetRPE}}">
         <span class="chk">{{if .Skipped}}—{{else if .Done}}✓{{else}}○{{end}}</span>
         <span class="what">

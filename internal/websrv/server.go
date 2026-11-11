@@ -199,6 +199,23 @@ func NewWithOptions(service training.ServiceFor, snapshot func(context.Context, 
 			}
 			return n
 		},
+		// todayWeight is the weight of today's latest set of an exercise, which
+		// the one-tap log offers next: "last time" skips today on purpose, so
+		// without it the form would offer an older session's weight after heavy
+		// sets. Empty when the exercise has no set today.
+		"todayWeight": func(session training.Session, exercise string) string {
+			var last *training.Set
+			for i := range session.Sets {
+				set := &session.Sets[i]
+				if set.Exercise == exercise && (last == nil || set.ID > last.ID) {
+					last = set
+				}
+			}
+			if last == nil {
+				return ""
+			}
+			return formatNumber(last.WeightKG)
+		},
 		// targetReps prefills the middle of the prescribed range, the sensible
 		// first attempt when the plan says "10 to 12".
 		"targetReps": func(p training.PlanProgress) int {

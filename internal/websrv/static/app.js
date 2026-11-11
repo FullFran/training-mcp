@@ -36,14 +36,15 @@
   }
 
   // Loads a planned exercise's prescription: the exercise, the middle of the
-  // target rep range and the target RPE, plus last time's weight, which the
-  // plan deliberately does not prescribe.
+  // target rep range and the target RPE, plus a weight, which the plan
+  // deliberately does not prescribe: today's latest set of it when there is
+  // one, else last time's ("last time" skips today).
   function fillPlanned(item) {
     const name = item.dataset.exercise;
     const known = info[name] || {};
     fill({
       exercise: name,
-      weight: known.last ? known.last.weight_kg : null,
+      weight: item.dataset.todayWeight || (known.last ? known.last.weight_kg : null),
       reps: item.dataset.reps !== '0' ? item.dataset.reps : null,
       rpe: item.dataset.rpe !== '0' ? item.dataset.rpe : null
     });

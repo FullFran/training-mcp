@@ -1160,3 +1160,34 @@ func TestChipsStillCarryAMeasuredRPE(t *testing.T) {
 		t.Fatalf("a measured RPE is no longer prefilled:\n%s", body)
 	}
 }
+
+// One-tap log after heavy sets must offer today's weight, not the last
+// session's: "last time" skips today on purpose, so the planned item carries
+// the weight of today's latest set of that exercise.
+func TestPlannedItemCarriesTodaysWeightForOneTapLog(t *testing.T) {
+	h, service := newServer(t)
+	plan, err := service.CreatePlan(t.Context(), training.Plan{Name: "Empuje", Items: []training.PlanItem{
+		{Exercise: "banca", TargetSets: 4, RepMin: 6, RepMax: 8},
+		{Exercise: "remo", TargetSets: 3, RepMin: 6, RepMax: 8},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	post(t, h, base+"/plan", url.Values{"plan_id": {itoa(plan.ID)}}, false)
+	post(t, h, base+"/sets", setForm("banca", "77.5", "7", "8"), true)
+	post(t, h, base+"/sets", setForm("banca", "80", "7", "8"), true)
+	body := get(t, h, base+"/").Body.String()
+	if !strings.Contains(body, `data-exercise="banca"`) || !strings.Contains(body, `data-today-weight="80"`) {
+		t.Fatalf("planned banca lacks today's weight:\n%s", body)
+	}
+	if strings.Count(body, `data-today-weight="`) != 1 {
+		t.Fatal("an exercise with no set today carries a weight")
+	}
+	script, err := os.ReadFile("static/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(script), "item.dataset.todayWeight || (known.last ? known.last.weight_kg : null)") {
+		t.Fatal("fillPlanned does not prefer today's weight")
+	}
+}
