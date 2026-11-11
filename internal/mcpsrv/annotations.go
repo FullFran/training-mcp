@@ -50,6 +50,7 @@ var toolBehaviors = map[string]toolBehavior{
 	"weekly_volume":         read("Get weekly volume"),
 	"list_exercise_groups":  read("List exercise groups"),
 	"volume_by_muscle":      read("Get volume by muscle"),
+	"live_workout":          read("Get live workout"),
 
 	"start_session":        additive("Start session"),
 	"add_set":              additive("Add set"),
@@ -74,6 +75,7 @@ var toolBehaviors = map[string]toolBehavior{
 	"record_feedback":         overwriting("Record feedback"),
 	"set_volume_landmarks":    overwriting("Set volume landmarks"),
 	"set_exercise_group":      overwriting("Set exercise group"),
+	"set_rest_target":         overwriting("Set rest target"),
 }
 
 // addTool registers a tool with its declared behavior. A tool missing from

@@ -45,12 +45,18 @@ Starting a session from a plan **copies** it. From then on the session owns its 
 
 | Tool | What it does |
 |---|---|
+| `live_workout` | What is happening in today's workout right now: the session with its sets, planned versus done per exercise, the exercise planned next, the last set and when it was logged, and the rest since it against the person's target. Needs no session id. |
+| `set_rest_target` | Set the person's target rest between sets, 30 to 900 seconds (120 until set). The phone's rest timer uses the same value. |
 | `session_progress` | For a session following a plan: planned versus completed sets per exercise, with the prescribed rep range and RPE. Exercises done off-plan are listed with target_sets 0. |
 | `add_session_exercise` | Add an exercise to today's session plan, or replace its prescription. Adjusting a session never edits the plan it was started from. |
 | `adjust_session_exercise` | Change one exercise of today's session: its set count, rep range, RPE, or whether it is skipped. Omitted fields stay as they are. Use when the session does not go as planned. |
 | `swap_session_exercise` | Substitute one exercise for another in today's session, keeping the same prescription. Use when the planned machine is taken or the movement does not feel right. |
 | `remove_session_exercise` | Drop an exercise from today's session plan. Sets already logged against it are kept and reappear as off-plan work. |
 | `save_session_as_plan` | Turn a session — including any in-session adjustments and off-plan work — into a new reusable plan. Skipped exercises are left out. |
+
+### Live workout and rest
+
+`live_workout` is what a coach watching the session would see. Rest is derived from the timestamp of the most recently logged set, never stored: `rest.state` is `none` (no set yet today), `resting` (with `remaining_seconds`), `ready` (target reached, with `over_by_seconds`), `superset` (the next exercise of the same round follows without rest) or `idle` (more than 20 minutes since the last set, so not a rest). `next` is the exercise to do next: the next unfinished one of a superset round, else the exercise just worked while it has sets to go, else the first unfinished one in plan order. The target is one value per person, shared with the phone's ±30 s buttons.
 
 ## Progression and analysis
 

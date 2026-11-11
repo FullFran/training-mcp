@@ -96,6 +96,7 @@ var isolationCases = map[string]isolationCase{
 	"volume_recommendation": {args: noArgs},
 	"weekly_volume":         {args: noArgs},
 	"volume_by_muscle":      {args: noArgs},
+	"live_workout":          {args: noArgs},
 	"exercise_history": {args: func(toolIDs) map[string]any {
 		return map[string]any{"exercise": isolationExercise}
 	}},
@@ -117,6 +118,9 @@ var isolationCases = map[string]isolationCase{
 	}},
 	"set_exercise_note": {count: `exercise_notes WHERE user_id=2 AND exercise='` + isolationExercise + `' AND note='suya'`, args: func(toolIDs) map[string]any {
 		return map[string]any{"exercise": isolationExercise, "note": "suya"}
+	}},
+	"set_rest_target": {count: `users WHERE id=2 AND rest_seconds=75`, args: func(toolIDs) map[string]any {
+		return map[string]any{"rest_seconds": 75}
 	}},
 	"set_volume_landmarks": {count: `volume_landmarks WHERE user_id=2 AND muscle_group='pecho' AND mev=1`, args: func(toolIDs) map[string]any {
 		return map[string]any{"muscle_group": "pecho", "mev": 1, "mrv": 2}
