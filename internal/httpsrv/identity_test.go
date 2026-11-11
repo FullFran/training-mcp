@@ -37,7 +37,7 @@ func newIdentityFixture(t *testing.T, provision bool) *identityFixture {
 	t.Cleanup(func() { store.Close() })
 	services := training.NewServices(store, time.Now)
 	mcp := mcpsrv.New(services.ForRequest).Handler()
-	f.handler = RoutesWithOAuth(mcp, false, staticToken, nil, NewOAuth(OAuthConfig{
+	f.handler = RoutesWithOAuth(mcp, false, staticToken, NewOAuth(OAuthConfig{
 		Issuer: testIssuer, Resource: testResource, JWKSURL: f.jwks.URL, Logger: log.New(f.logs, "", 0),
 		Resolve: services.ResolveUser(testSubject, provision),
 	}))
@@ -136,8 +136,8 @@ func TestRoutesWithoutOAuthActAsTheOwner(t *testing.T) {
 	f := newIdentityFixture(t, false)
 	createPlan(t, f.handler, staticToken, "Owner plan")
 	for name, handler := range map[string]http.Handler{
-		"static token":  Routes(f.mcp, false, staticToken, nil),
-		"auth disabled": Routes(f.mcp, true, "", nil),
+		"static token":  Routes(f.mcp, false, staticToken),
+		"auth disabled": Routes(f.mcp, true, ""),
 	} {
 		t.Run(name, func(t *testing.T) {
 			token := ""
@@ -148,18 +148,6 @@ func TestRoutesWithoutOAuthActAsTheOwner(t *testing.T) {
 				t.Fatalf("plans = %s", got)
 			}
 		})
-	}
-}
-
-func TestWebUIActsAsTheOwner(t *testing.T) {
-	seen := int64(0)
-	web := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { seen, _ = training.UserFrom(r.Context()) })
-	handler := Routes(http.NotFoundHandler(), false, staticToken, &WebUI{Handler: web, BasePath: "/app"})
-	r := httptest.NewRequest(http.MethodGet, "/app/", nil)
-	r.Header.Set("Authorization", "Bearer "+staticToken)
-	handler.ServeHTTP(httptest.NewRecorder(), r)
-	if seen != training.OwnerUserID {
-		t.Fatalf("web acts as user %d", seen)
 	}
 }
 
@@ -209,7 +197,7 @@ func TestTokenWithoutASubjectNeverGetsAnAccount(t *testing.T) {
 // the client to log in again.
 func TestFailureResolvingTheUserIsNotAnAuthFailure(t *testing.T) {
 	f := newOAuthFixture(t)
-	f.handler = RoutesWithOAuth(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { f.reached.Store(true) }), false, staticToken, nil, NewOAuth(OAuthConfig{
+	f.handler = RoutesWithOAuth(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { f.reached.Store(true) }), false, staticToken, NewOAuth(OAuthConfig{
 		Issuer: testIssuer, Resource: testResource, JWKSURL: f.jwks.URL, Logger: log.New(f.logs, "", 0),
 		Resolve: func(context.Context, string) (int64, bool, error) { return 0, false, errors.New("database locked") },
 	}))

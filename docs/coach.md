@@ -53,7 +53,7 @@ The host speaks RE;write's engine protocol (one JSON object per line over the en
    openssl rand -base64 32
    ```
 
-3. Set the environment. The web app must be on (`WEB_BASE_PATH` or `WEB_OAUTH_CLIENT_ID`).
+3. Set the environment. The web app must be on (`WEB_OAUTH_CLIENT_ID`).
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -140,7 +140,7 @@ No official remote server yet, or none one tap can use (checked 2026-11-12 in th
 - **Google Calendar and Google Maps.** No official remote server for Calendar. Google's Maps server (`https://mapstools.googleapis.com/mcp`, registry `com.googleapis.mapstools/mcp`) uses Google accounts with no dynamic registration, or an API key in its own header, which the proxy does not send.
 - **GitHub** and **Asana**: official, but no dynamic registration; they work through the free URL field with a static token.
 
-OAuth needs the app at the root (`WEB_OAUTH_CLIENT_ID` and `MCP_OAUTH_RESOURCE`): the redirect URI is `<origin of MCP_OAUTH_RESOURCE>/coach/connectors/callback`. On the secret mount alone, only servers with a static token or none can be connected (`oauth_unavailable`).
+OAuth uses the app at the root (`WEB_OAUTH_CLIENT_ID` and `MCP_OAUTH_RESOURCE`, which the coach already needs): the redirect URI is `<origin of MCP_OAUTH_RESOURCE>/coach/connectors/callback`.
 
 ### Every call asks first
 
@@ -227,7 +227,7 @@ Divergences, recorded rather than worked around:
 
 ## Routes
 
-Under the app's base path, behind its existing login: the bearer of the secret mount, or the web login session at the root (which also checks its CSRF token on writes). Every write also needs the header `X-Coach: 1`, which a cross-site form cannot send. A request with no identity is refused with 403.
+At the root, behind the web login session, which also checks its CSRF token on writes. Every write also needs the header `X-Coach: 1`, which a cross-site form cannot send. A request with no identity is refused with 403.
 
 | Route | Answer |
 | --- | --- |

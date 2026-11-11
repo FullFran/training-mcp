@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -253,7 +253,6 @@ func TestHealthcheckCLIInvocation(t *testing.T) {
 // TestWebLoginSettingsServeTheAppAtTheRoot boots the real composition with the
 // web login configured and checks the root asks for a login at the provider.
 func TestWebLoginSettingsServeTheAppAtTheRoot(t *testing.T) {
-	t.Setenv("WEB_BASE_PATH", "")
 	t.Setenv("MCP_OAUTH_PROVISION", "")
 	t.Setenv("TRAINING_DB_PATH", t.TempDir()+"/training.db")
 	t.Setenv("MCP_OAUTH_ISSUER", "https://auth.example.test")
@@ -283,35 +282,16 @@ func TestWebLoginSettingsServeTheAppAtTheRoot(t *testing.T) {
 	}
 }
 
-// TestSecretMountAcceptsAgentProposals boots the real composition and walks one
-// agent write from pending to applied through the review page.
-func TestSecretMountAcceptsAgentProposals(t *testing.T) {
-	t.Setenv("WEB_BASE_PATH", "/s3cr3t-path-for-tests")
-	t.Setenv("MCP_OAUTH_ISSUER", "")
-	t.Setenv("WEB_OAUTH_CLIENT_ID", "")
-	t.Setenv("TRAINING_DB_PATH", t.TempDir()+"/training.db")
-	root, token := startServer(t)
-	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	send := func(method, path, contentType, body string) (int, string) {
-		t.Helper()
-		req, _ := http.NewRequest(method, root+path, strings.NewReader(body))
-		req.Header.Set("Authorization", "Bearer "+token)
-		req.Header.Set("Content-Type", contentType)
-		req.Header.Set("Accept", "application/json, text/event-stream")
-		resp, err := client.Do(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer resp.Body.Close()
-		data, _ := io.ReadAll(resp.Body)
-		return resp.StatusCode, string(data)
-	}
+// TestRootAcceptsAgentProposals boots the real composition and walks one agent
+// write from pending to applied through the review page, signed in at the root.
+func TestRootAcceptsAgentProposals(t *testing.T) {
+	srv := startRootServer(t, nil)
+	owner := srv.login()
 	form := "application/x-www-form-urlencoded"
-	if code, _ := send("POST", "/s3cr3t-path-for-tests/review/accept-all", form, "on=0"); code != http.StatusSeeOther {
+	if code, _ := owner.do("POST", "/review/accept-all", form, "on=0"); code != http.StatusSeeOther {
 		t.Fatalf("turning accept-all off: %d", code)
 	}
-	call := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_plan","arguments":{"name":"empuje","items":[{"exercise":"banca","target_sets":3}]}}}`
-	code, body := send("POST", "/mcp", "application/json", call)
+	code, body := srv.mcp(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_plan","arguments":{"name":"empuje","items":[{"exercise":"banca","target_sets":3}]}}}`)
 	if code != http.StatusOK || !strings.Contains(body, `\"status\":\"pending\"`) {
 		t.Fatalf("create_plan: %d %s", code, body)
 	}
@@ -319,11 +299,72 @@ func TestSecretMountAcceptsAgentProposals(t *testing.T) {
 	if match == nil {
 		t.Fatalf("no proposal id in %s", body)
 	}
-	if code, body := send("POST", "/s3cr3t-path-for-tests/review/"+match[1]+"/accept", form, "remember=once"); code != http.StatusSeeOther {
+	if code, body := owner.do("POST", "/review/"+match[1]+"/accept", form, "remember=once"); code != http.StatusSeeOther {
 		t.Fatalf("accept: %d %s", code, body)
 	}
-	_, body = send("POST", "/mcp", "application/json", `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_plans","arguments":{}}}`)
+	_, body = srv.mcp(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_plans","arguments":{}}}`)
 	if !strings.Contains(body, "empuje") {
 		t.Fatalf("the accepted plan is missing: %s", body)
+	}
+}
+
+const formerSecretPrefix = "/s3cr3t-path-for-tests"
+
+// A leftover WEB_BASE_PATH starts the server, says it is ignored without
+// quoting it, and mounts nothing: its prefix is a missing path, bearer or not.
+func TestWebBasePathIsIgnored(t *testing.T) {
+	logs := &lockedBuffer{}
+	log.SetOutput(logs)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	t.Setenv("WEB_BASE_PATH", formerSecretPrefix)
+	t.Setenv("MCP_OAUTH_ISSUER", "")
+	t.Setenv("MCP_OAUTH_RESOURCE", "")
+	t.Setenv("MCP_OAUTH_SUBJECT", "")
+	t.Setenv("MCP_OAUTH_PROVISION", "")
+	t.Setenv("WEB_OAUTH_CLIENT_ID", "")
+	t.Setenv("WEB_OAUTH_CLIENT_SECRET", "")
+	t.Setenv("TRAINING_COACH", "")
+	t.Setenv("TRAINING_DB_PATH", t.TempDir()+"/training.db")
+	base, token := startServer(t)
+	for _, path := range []string{formerSecretPrefix, formerSecretPrefix + "/", formerSecretPrefix + "/export.db", formerSecretPrefix + "/history", "/"} {
+		req, _ := http.NewRequest(http.MethodGet, base+path, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != http.StatusNotFound {
+			t.Errorf("GET %s with the bearer: status %d", path, res.StatusCode)
+		}
+	}
+	got := logs.String()
+	if !strings.Contains(got, "WEB_BASE_PATH is set but ignored") || strings.Contains(got, formerSecretPrefix[1:]) {
+		t.Fatalf("startup log:\n%s", got)
+	}
+}
+
+// With the login on, the former prefix is one more unknown path at the root:
+// the static bearer is sent to sign in, and a signed-in owner finds nothing.
+func TestWebBasePathIsIgnoredBesideTheLogin(t *testing.T) {
+	srv := startRootServer(t, map[string]string{"WEB_BASE_PATH": formerSecretPrefix})
+	owner := srv.login()
+	for _, path := range []string{formerSecretPrefix + "/", formerSecretPrefix + "/export.db", "/export.db"} {
+		req, _ := http.NewRequest(http.MethodGet, srv.base+path, nil)
+		req.Header.Set("Authorization", "Bearer "+srv.token)
+		res, err := noRedirects().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/login" {
+			t.Errorf("GET %s with the bearer: status %d, location %q", path, res.StatusCode, res.Header.Get("Location"))
+		}
+		if code, _ := owner.do(http.MethodGet, path, "", ""); code != http.StatusNotFound {
+			t.Errorf("GET %s signed in: status %d", path, code)
+		}
+	}
+	if !strings.Contains(srv.logs.String(), "WEB_BASE_PATH is set but ignored") {
+		t.Fatalf("startup log:\n%s", srv.logs.String())
 	}
 }

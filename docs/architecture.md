@@ -65,9 +65,10 @@ every statement filters by it. Child rows (`sets`, `plan_items`, `session_items`
 behaves exactly like a missing id, with the same error, so its existence cannot be
 inferred. A `training.Service` is built on one `UserStore`, so it serves one user.
 `mcpsrv` and `websrv` get theirs per request through a `training.ServiceFor`
-function; `main.go` wires the only one that exists today, which always answers the
-owner, user 1. `Snapshot` is the one exception: it copies every user's data, and it
-reaches `websrv` as a function of its own for `export.db`.
+function, which answers the user the request was authenticated as. `Snapshot` is
+the one exception: it copies every user's data, and it reaches `websrv` as a
+function of its own for `export.db`, which no production mount serves since the
+secret web mount was retired; backups snapshot the data volume instead.
 
 ## Why the packages sit where they do
 
@@ -108,7 +109,7 @@ is how they end up implemented twice, slightly differently:
 SQLite, single file, forward-only numbered migrations under
 `internal/sqlitestore/migrations/`. Each numbered file is a step, additive except for 013, which rebuilds four tables to key them per user, and 018, which drops the answers stored before they became session-limited (each recorded as revoked),
 (`001_init`, `002_exercise_groups`, … `008_plan_item_notes`), which is what lets
-the schema grow without the single user ever having to reset their history.
+the schema grow without anyone ever having to reset their history.
 
 Migration 017 adds `coach_memory` (one row per fact, unique per user and
 topic key) and `coach_memory_fts`, an FTS5 index with external content kept in
@@ -150,16 +151,21 @@ enforces the coverage floor on `sqlitestore`.
 
 ## Security boundary
 
-Authentication is a static bearer token checked at `httpsrv`, before any
-adapter sees the request. `GET /health` is the only unauthenticated route.
+Authentication is checked at `httpsrv`, before any adapter sees the request.
+`/mcp` takes the static bearer token, which acts as the owner for non-web
+clients, and, with the `MCP_OAUTH_*` settings, the provider's access tokens, each
+as its own user. Apart from `GET /health`, only the web login's own routes and
+the app's shell files answer without credentials.
 
 `MCP_AUTH_DISABLED=1` exists for tunnel-only local development and is named to
-be uncomfortable to type. `WEB_BASE_PATH` gates the PWA behind a secret prefix
-and, left unset, means the web adapter is not mounted at all — a missing
+be uncomfortable to type. The web app has a single entrance, the login below;
+without `WEB_OAUTH_CLIENT_ID` the web adapter is not mounted at all, so a missing
 configuration value removes the surface rather than exposing it with a default.
+`WEB_BASE_PATH`, which used to mount the PWA under a secret prefix behind the
+static token, is ignored, with a startup notice that never quotes its value.
 
 With `WEB_OAUTH_CLIENT_ID` and `WEB_OAUTH_CLIENT_SECRET`, `httpsrv.WebLogin`
-also serves the PWA at the root. `/login` starts an authorization code flow with
+serves the PWA at the root. `/login` starts an authorization code flow with
 PKCE at the same provider as `/mcp`; the callback checks state, the issuer, and
 an RS256 ID token whose audience is the client and whose nonce is this login's,
 then resolves the subject exactly as `/mcp` does. The session lives in server

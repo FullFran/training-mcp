@@ -189,10 +189,11 @@ func (b ExerciseBlock) Top() *training.Set {
 	return top
 }
 
-// Options are what differs between the two places the app is mounted.
+// Options are what differs between the ways the app can be served.
 type Options struct {
 	// Export serves /export.db, a copy of the whole database with every user's
-	// data, so only the owner-only secret mount may set it.
+	// data. The root never sets it; no production mount does since the secret
+	// mount was retired, and backups snapshot the data volume instead.
 	Export bool
 	// CSRFToken returns the token a request's session must send back with every
 	// write. Nil means the mount has no sessions and the pages carry no token.
@@ -208,8 +209,7 @@ type Options struct {
 	Connectors Connectors
 }
 
-// New serves the app under the secret base path, as the owner's backup route
-// always has.
+// New serves the app under basePath with the database export on.
 func New(service training.ServiceFor, snapshot func(context.Context, string) error, clock training.Clock, basePath string) (*Server, error) {
 	return NewWithOptions(service, snapshot, clock, basePath, Options{Export: true})
 }
@@ -329,9 +329,6 @@ func rpeScale() []string {
 }
 
 func (s *Server) Handler() http.Handler { return s.mux }
-
-// BasePath is the public prefix the PWA is served from.
-func (s *Server) BasePath() string { return s.base }
 
 // Routes lists every registered pattern, so a test can require a case for each.
 func (s *Server) Routes() []string { return slices.Clone(s.patterns) }

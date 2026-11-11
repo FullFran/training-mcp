@@ -18,35 +18,28 @@ func TestLoadDefaultsAndRequiresToken(t *testing.T) {
 	}
 }
 
-func TestLoadNormalizesWebBasePath(t *testing.T) {
+// The secret web mount is gone. A leftover WEB_BASE_PATH, however malformed,
+// must neither stop the server nor mount anything; it is only reported.
+func TestLoadIgnoresWebBasePath(t *testing.T) {
 	for _, tt := range []struct {
-		name, env, want string
-		wantErr         bool
+		name, env   string
+		wantIgnored bool
 	}{
-		{name: "unset disables the web UI", env: "", want: ""},
-		{name: "bare slashes disable it too", env: "/", want: ""},
-		{name: "adds the leading slash", env: "app", want: "/app"},
-		{name: "strips the trailing slash", env: "/app/", want: "/app"},
-		{name: "keeps a normalized value", env: "/a1b2c3", want: "/a1b2c3"},
-		{name: "rejects a query separator", env: "/app?x", wantErr: true},
-		{name: "rejects a fragment separator", env: "/app#x", wantErr: true},
-		{name: "rejects spaces", env: "/my app", wantErr: true},
+		{name: "unset", env: "", wantIgnored: false},
+		{name: "blank", env: "  ", wantIgnored: false},
+		{name: "a former secret prefix", env: "/a1b2c3", wantIgnored: true},
+		{name: "a value the old parser refused", env: "/app?x", wantIgnored: true},
+		{name: "a bare slash", env: "/", wantIgnored: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("MCP_BEARER_TOKEN", "secret")
 			t.Setenv("WEB_BASE_PATH", tt.env)
 			cfg, err := Load(":8080")
-			if tt.wantErr {
-				if err == nil {
-					t.Fatalf("Load() error = nil, want an error for %q", tt.env)
-				}
-				return
-			}
 			if err != nil {
 				t.Fatalf("Load() error = %v", err)
 			}
-			if cfg.WebBasePath != tt.want {
-				t.Fatalf("WebBasePath = %q, want %q", cfg.WebBasePath, tt.want)
+			if cfg.WebBasePathIgnored != tt.wantIgnored {
+				t.Fatalf("WebBasePathIgnored = %v, want %v", cfg.WebBasePathIgnored, tt.wantIgnored)
 			}
 		})
 	}
@@ -234,8 +227,7 @@ func TestLoadNeverPrintsTheWebClientSecret(t *testing.T) {
 const testCoachKey = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA="
 
 func TestLoadLeavesTheCoachOffByDefault(t *testing.T) {
-	t.Setenv("MCP_BEARER_TOKEN", "secret")
-	t.Setenv("WEB_BASE_PATH", "app")
+	setWebLoginEnv(t, "client", "secret")
 	t.Setenv("TRAINING_COACH", "")
 	t.Setenv("TRAINING_COACH_KEY", testCoachKey)
 	cfg, err := Load("")
@@ -245,8 +237,7 @@ func TestLoadLeavesTheCoachOffByDefault(t *testing.T) {
 }
 
 func TestLoadReadsTheCoach(t *testing.T) {
-	t.Setenv("MCP_BEARER_TOKEN", "secret")
-	t.Setenv("WEB_BASE_PATH", "app")
+	setWebLoginEnv(t, "client", "secret")
 	t.Setenv("TRAINING_DB_PATH", "/data/training.db")
 	t.Setenv("TRAINING_COACH", "1")
 	t.Setenv("TRAINING_COACH_KEY", testCoachKey)
@@ -275,16 +266,17 @@ func TestLoadReadsTheCoach(t *testing.T) {
 
 func TestLoadRefusesABrokenCoachConfiguration(t *testing.T) {
 	for name, env := range map[string]map[string]string{
-		"misspelled switch": {"TRAINING_COACH": "yes"},
-		"no key":            {"TRAINING_COACH_KEY": ""},
-		"short key":         {"TRAINING_COACH_KEY": "c2hvcnQ="},
-		"no web app":        {"WEB_BASE_PATH": ""},
-		"zero processes":    {"TRAINING_COACH_MAX_PROCESSES": "0"},
-		"bad idle":          {"TRAINING_COACH_IDLE_SECONDS": "soon"},
+		"misspelled switch":  {"TRAINING_COACH": "yes"},
+		"no key":             {"TRAINING_COACH_KEY": ""},
+		"short key":          {"TRAINING_COACH_KEY": "c2hvcnQ="},
+		"no web app":         {"WEB_OAUTH_CLIENT_ID": "", "WEB_OAUTH_CLIENT_SECRET": ""},
+		"only the old mount": {"WEB_OAUTH_CLIENT_ID": "", "WEB_OAUTH_CLIENT_SECRET": "", "WEB_BASE_PATH": "app"},
+		"zero processes":     {"TRAINING_COACH_MAX_PROCESSES": "0"},
+		"bad idle":           {"TRAINING_COACH_IDLE_SECONDS": "soon"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			t.Setenv("MCP_BEARER_TOKEN", "secret")
-			t.Setenv("WEB_BASE_PATH", "app")
+			setWebLoginEnv(t, "client", "secret")
+			t.Setenv("WEB_BASE_PATH", "")
 			t.Setenv("TRAINING_COACH", "1")
 			t.Setenv("TRAINING_COACH_KEY", testCoachKey)
 			t.Setenv("TRAINING_COACH_MAX_PROCESSES", "")

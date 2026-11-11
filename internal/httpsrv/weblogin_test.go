@@ -37,7 +37,7 @@ const (
 
 type issuedCode struct{ subject, nonce, challenge string }
 
-// loginFixture runs the real routes, both web mounts, the MCP handler and the
+// loginFixture runs the real routes, the web app at the root, the MCP handler and the
 // database against a fake provider that behaves like Clerk's authorization server.
 type loginFixture struct {
 	t        *testing.T
@@ -80,16 +80,11 @@ func newLoginFixture(t *testing.T, provision bool) *loginFixture {
 		AuthorizeURL: f.provider.URL + "/oauth/authorize", TokenURL: f.provider.URL + "/oauth/token",
 		Keys: oauth, Resolve: f.services.ResolveUser(testSubject, provision), Now: f.clock, Logger: logger,
 	})
-	secret, err := websrv.New(f.services.ForRequest, f.services.Snapshot, time.Now, "/app")
-	if err != nil {
-		t.Fatal(err)
-	}
 	root, err := websrv.NewWithOptions(f.services.ForRequest, f.services.Snapshot, time.Now, "", websrv.Options{CSRFToken: login.CSRFToken})
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.handler = RoutesWithLogin(mcpsrv.New(f.services.ForRequest).Handler(), false, staticToken,
-		&WebUI{Handler: secret.Handler(), BasePath: secret.BasePath()}, oauth,
+	f.handler = RoutesWithLogin(mcpsrv.New(f.services.ForRequest).Handler(), false, staticToken, oauth,
 		&RootWeb{Handler: root.Handler(), Login: login})
 	return f
 }
@@ -623,7 +618,6 @@ func TestPublicAppFilesNeedNoSession(t *testing.T) {
 func TestExistingRoutesBehaveAsBeforeAlongsideTheLogin(t *testing.T) {
 	f := newLoginFixture(t, false)
 	session := f.login(testSubject)
-	bearer := map[string]string{"Authorization": "Bearer " + staticToken}
 
 	if w := f.do(http.MethodGet, "/health", nil, nil, nil); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"ok"`) {
 		t.Errorf("/health: status %d", w.Code)
@@ -635,28 +629,38 @@ func TestExistingRoutesBehaveAsBeforeAlongsideTheLogin(t *testing.T) {
 	if w.Code != http.StatusUnauthorized || !strings.Contains(w.Header().Get("WWW-Authenticate"), "resource_metadata") {
 		t.Errorf("anonymous /mcp: status %d", w.Code)
 	}
-	// A browser session is not an MCP credential, nor the secret route's.
+	// A browser session is not an MCP credential.
 	if w := f.do(http.MethodPost, "/mcp", nil, []*http.Cookie{session}, nil); w.Code != http.StatusUnauthorized {
 		t.Errorf("/mcp with a session cookie: status %d", w.Code)
-	}
-	if w := f.do(http.MethodGet, "/app/", nil, []*http.Cookie{session}, nil); w.Code != http.StatusUnauthorized {
-		t.Errorf("secret route with a session cookie: status %d", w.Code)
 	}
 	if got := listPlans(t, f.handler, staticToken); !strings.Contains(got, "structuredContent") {
 		t.Errorf("static token on /mcp: %s", got)
 	}
-	// The secret route keeps working as the owner, with its backup and no CSRF.
-	if w := f.do(http.MethodGet, "/app/", nil, nil, bearer); w.Code != http.StatusOK || strings.Contains(w.Body.String(), "csrf") {
-		t.Errorf("secret route: status %d", w.Code)
+}
+
+// The secret mount is gone: its prefix is an ordinary unknown path at the root,
+// and the static token opens no part of the web app.
+func TestTheFormerSecretPrefixServesNothing(t *testing.T) {
+	f := newLoginFixture(t, false)
+	session := f.login(testSubject)
+	csrf := f.csrf(session)
+	bearer := map[string]string{"Authorization": "Bearer " + staticToken}
+	for _, path := range []string{"/app/", "/app/export.db", "/app/history"} {
+		if w := f.do(http.MethodGet, path, nil, nil, bearer); w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/login" {
+			t.Errorf("%s with the static token: status %d, location %q", path, w.Code, w.Header().Get("Location"))
+		}
+		if w := f.do(http.MethodGet, path, nil, []*http.Cookie{session}, nil); w.Code != http.StatusNotFound {
+			t.Errorf("%s signed in: status %d", path, w.Code)
+		}
 	}
-	if w := f.do(http.MethodPost, "/app/sets", setFormValues(), nil, mergeHeaders(bearer, map[string]string{"HX-Request": "true"})); w.Code != http.StatusOK {
-		t.Errorf("secret route write: status %d", w.Code)
+	if w := f.do(http.MethodPost, "/app/sets", setFormValues(), nil, mergeHeaders(bearer, map[string]string{"HX-Request": "true"})); w.Code != http.StatusUnauthorized {
+		t.Errorf("write under the prefix with the static token: status %d", w.Code)
 	}
-	if w := f.do(http.MethodGet, "/app/export.db", nil, nil, bearer); w.Code != http.StatusOK || w.Header().Get("Content-Type") != "application/vnd.sqlite3" {
-		t.Errorf("secret export: status %d", w.Code)
+	if w := f.do(http.MethodPost, "/app/sets", setFormValues(), []*http.Cookie{session}, map[string]string{"HX-Request": "true", "X-CSRF-Token": csrf}); w.Code != http.StatusNotFound {
+		t.Errorf("write under the prefix signed in: status %d", w.Code)
 	}
-	if n := f.ownerSetCount(); n != 1 {
-		t.Errorf("secret route write landed %d sets for the owner", n)
+	if n := f.ownerSetCount(); n != 0 {
+		t.Errorf("writes under the prefix landed %d sets for the owner", n)
 	}
 }
 
@@ -686,7 +690,7 @@ func TestDiscoveryPathsStayMissingBesideTheLogin(t *testing.T) {
 }
 
 func TestRoutesWithoutTheLoginKeepUnknownPathsMissing(t *testing.T) {
-	handler := Routes(http.NotFoundHandler(), false, staticToken, nil)
+	handler := Routes(http.NotFoundHandler(), false, staticToken)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
 	if w.Code != http.StatusNotFound {

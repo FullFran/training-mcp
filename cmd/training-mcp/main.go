@@ -116,14 +116,9 @@ func runWithContext(ctx context.Context, args []string) error {
 		}()
 	}
 
-	var web *httpsrv.WebUI
-	if cfg.WebBasePath != "" {
-		webServer, err := websrv.NewWithOptions(services.ForRequest, services.Snapshot, time.Now, cfg.WebBasePath, websrv.Options{Export: true, Apply: mcpServer.Apply, Coach: coachFor(coach), Connectors: connectorsFor(connectors)})
-		if err != nil {
-			return err
-		}
-		web = &httpsrv.WebUI{Handler: webServer.Handler(), BasePath: webServer.BasePath()}
-		logger.Printf("web UI mounted under a secret base path (%d chars)", len(cfg.WebBasePath))
+	if cfg.WebBasePathIgnored {
+		// The value was a credential once; it is never logged.
+		logger.Printf("WEB_BASE_PATH is set but ignored: the web app is only served at the root behind the login; remove it from the environment")
 	}
 
 	var oauth *httpsrv.OAuth
@@ -150,7 +145,7 @@ func runWithContext(ctx context.Context, args []string) error {
 		root = &httpsrv.RootWeb{Handler: app.Handler(), Login: login}
 		logger.Printf("web UI served at %s/ behind the provider's login", cfg.WebPublicURL)
 	}
-	handler := httpsrv.LogProtocol(logger, httpsrv.RoutesWithEngine(mcpServer.Handler(), cfg.AuthDisabled, cfg.Token, web, oauth, root, engineTokens))
+	handler := httpsrv.LogProtocol(logger, httpsrv.RoutesWithEngine(mcpServer.Handler(), cfg.AuthDisabled, cfg.Token, oauth, root, engineTokens))
 	if proxy != nil {
 		// The engines' door to people's connectors: engine tokens on loopback only.
 		outer := http.NewServeMux()

@@ -35,7 +35,7 @@ func newEngineFixture(t *testing.T, authDisabled bool) *engineFixture {
 	if authDisabled {
 		token = ""
 	}
-	return &engineFixture{tokens: tokens, store: store, services: services, handler: RoutesWithEngine(mcpsrv.New(services.ForRequest).Handler(), authDisabled, token, nil, nil, nil, tokens)}
+	return &engineFixture{tokens: tokens, store: store, services: services, handler: RoutesWithEngine(mcpsrv.New(services.ForRequest).Handler(), authDisabled, token, nil, nil, tokens)}
 }
 
 // engineCall is a tools/call as the engine sends it: straight to the loopback
@@ -130,14 +130,15 @@ func TestEngineTokenIsNotTheOwnerUnderTheAuthBypass(t *testing.T) {
 
 func TestEngineTokenDoesNotOpenTheWebApp(t *testing.T) {
 	tokens := engine.NewTokens(nil)
-	web := &WebUI{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusTeapot) }), BasePath: "/app"}
-	h := RoutesWithEngine(http.NotFoundHandler(), false, staticToken, web, nil, nil, tokens)
-	r := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8080/app/", nil)
+	app := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusTeapot) })
+	login := NewWebLogin(WebLoginConfig{Issuer: testIssuer, ClientID: testClientID, ClientSecret: testClientSecret, PublicURL: testPublicURL})
+	h := RoutesWithEngine(http.NotFoundHandler(), false, staticToken, nil, &RootWeb{Handler: app, Login: login}, tokens)
+	r := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8080/", nil)
 	r.RemoteAddr = "127.0.0.1:4000"
 	r.Header.Set("Authorization", "Bearer "+tokens.Mint(training.OwnerUserID, time.Hour))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
-	if w.Code != http.StatusUnauthorized {
+	if w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/login" {
 		t.Fatalf("web app with an engine token: %d", w.Code)
 	}
 }
