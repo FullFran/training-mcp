@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fullfran/training-mcp/internal/training"
 )
@@ -20,6 +21,7 @@ const (
 var userTables = []string{
 	"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
 	"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys",
+	"proposals", "approval_rules", "agent_permissions",
 }
 
 // ownedRows selects one user's rows from each table, children through their parent.
@@ -34,6 +36,9 @@ var ownedRows = map[string]string{
 	"exercise_groups":  `SELECT * FROM exercise_groups WHERE user_id=? ORDER BY rowid`,
 	"volume_landmarks": `SELECT * FROM volume_landmarks WHERE user_id=? ORDER BY rowid`,
 	"idempotency_keys": `SELECT * FROM idempotency_keys WHERE user_id=? ORDER BY rowid`,
+	"proposals":         `SELECT * FROM proposals WHERE user_id=? ORDER BY rowid`,
+	"approval_rules":    `SELECT * FROM approval_rules WHERE user_id=? ORDER BY rowid`,
+	"agent_permissions": `SELECT * FROM agent_permissions WHERE user_id=? ORDER BY rowid`,
 }
 
 func openTwoUsers(t *testing.T) *Store {
@@ -100,6 +105,8 @@ func dumpAll(t *testing.T, store *Store) string {
 
 type seeded struct {
 	session, set, plan int64
+	// proposal is pending; claimed is being applied.
+	proposal, claimed int64
 }
 
 // seedUser gives a user a row of every kind, using the same names for whoever calls it.
@@ -145,7 +152,24 @@ func seedUser(t *testing.T, user training.UserStore, group string) seeded {
 	if err = user.SetRestTarget(ctx, 90); err != nil {
 		t.Fatal(err)
 	}
-	return seeded{session: session.ID, set: set.ID, plan: plan.ID}
+	pending, err := user.CreateProposal(ctx, training.Proposal{Tool: "log_sets", ActionType: "set.log", Payload: []byte(`{"exercise":"banca"}`), CreatedAt: time.Unix(0, 0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	claimed, err := user.CreateProposal(ctx, training.Proposal{Tool: "delete_set", ActionType: "set.delete", Payload: []byte(`{"set_id":1}`), CreatedAt: time.Unix(0, 0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = user.ClaimProposal(ctx, claimed.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err = user.SetRule(ctx, training.ApprovalRule{ActionType: "set.log", Remember: training.RememberAlways}); err != nil {
+		t.Fatal(err)
+	}
+	if err = user.SetAcceptAll(ctx, true); err != nil {
+		t.Fatal(err)
+	}
+	return seeded{session: session.ID, set: set.ID, plan: plan.ID, proposal: pending.ID, claimed: claimed.ID}
 }
 
 // idCases are the data methods addressed by an id. Each runs with an id that may
@@ -221,10 +245,32 @@ var idCases = map[string]func(context.Context, training.UserStore, seeded) (any,
 		set, at, err := u.LastSetAt(c, id.session)
 		return []any{set, at}, err
 	},
+	"GetProposal": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return u.GetProposal(c, id.proposal)
+	},
+	"ClaimProposal": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return nil, u.ClaimProposal(c, id.proposal)
+	},
+	"RejectProposal": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return u.RejectProposal(c, id.proposal, time.Unix(0, 0))
+	},
+	"FinishProposal": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return u.FinishProposal(c, id.claimed, training.ProposalOutcome{Status: training.ProposalAccepted, At: time.Unix(0, 0)})
+	},
+	// Keyed by action type rather than an id: forgetting someone else's rule
+	// must change nothing, as forgetting a rule nobody has does.
+	"ForgetRule": func(c context.Context, u training.UserStore, _ seeded) (any, error) {
+		return nil, u.ForgetRule(c, "set.log")
+	},
+	// An account created after migration 14 has no setting of its own, unlike the
+	// owner of an empty database, so this is compared with a missing id instead.
+	"Permissions": func(c context.Context, u training.UserStore, _ seeded) (any, error) {
+		return u.Permissions(c)
+	},
 }
 
 func TestAnotherUsersIDBehavesExactlyLikeAMissingOne(t *testing.T) {
-	missing := seeded{session: missingID, set: missingID, plan: missingID}
+	missing := seeded{session: missingID, set: missingID, plan: missingID, proposal: missingID, claimed: missingID}
 	for name, run := range idCases {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
@@ -275,6 +321,14 @@ var readCases = map[string]func(context.Context, training.UserStore) (any, error
 	},
 	"ExerciseNotes": func(c context.Context, u training.UserStore) (any, error) { return u.ExerciseNotes(c) },
 	"RestTarget":    func(c context.Context, u training.UserStore) (any, error) { return u.RestTarget(c) },
+	"ListProposals": func(c context.Context, u training.UserStore) (any, error) {
+		pending, err := u.ListProposals(c, training.ProposalFilter{Pending: true, Limit: 50})
+		if err != nil {
+			return nil, err
+		}
+		answered, err := u.ListProposals(c, training.ProposalFilter{Limit: 50})
+		return []any{pending, answered}, err
+	},
 }
 
 func TestReadsSeeNothingOfAnotherUser(t *testing.T) {
@@ -336,6 +390,23 @@ var writeCases = map[string]struct {
 			return u.SetExerciseGroup(c, training.ExerciseGroup{Exercise: "sentadilla", MuscleGroup: "pierna"})
 		},
 		`SELECT COUNT(*) FROM exercise_groups WHERE user_id=2 AND exercise='sentadilla'`,
+	},
+	"CreateProposal": {
+		func(c context.Context, u training.UserStore) error {
+			_, err := u.CreateProposal(c, training.Proposal{Tool: "add_set", ActionType: "set.log", Payload: []byte(`{}`), CreatedAt: time.Unix(0, 0)})
+			return err
+		},
+		`SELECT COUNT(*) FROM proposals WHERE user_id=2 AND tool='add_set'`,
+	},
+	"SetRule": {
+		func(c context.Context, u training.UserStore) error {
+			return u.SetRule(c, training.ApprovalRule{ActionType: "plan.delete", Remember: training.RememberAlways})
+		},
+		`SELECT COUNT(*) FROM approval_rules WHERE user_id=2 AND action_type='plan.delete'`,
+	},
+	"SetAcceptAll": {
+		func(c context.Context, u training.UserStore) error { return u.SetAcceptAll(c, true) },
+		`SELECT COUNT(*) FROM agent_permissions WHERE user_id=2 AND accept_all=1`,
 	},
 	"SetExerciseNote": {
 		func(c context.Context, u training.UserStore) error {

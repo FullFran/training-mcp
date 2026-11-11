@@ -21,6 +21,7 @@ type Store interface {
 // UserStore is the data of one user. Another user's id behaves exactly as a missing
 // id does: the same error, so its existence cannot be inferred.
 type UserStore interface {
+	ProposalStore
 	Start(context.Context, Session) (Session, error)
 	AddSet(context.Context, AddSetInput) (Set, float64, error)
 	LogSets(context.Context, LogSetsRecord) (LogSetsResult, error)
@@ -63,4 +64,22 @@ type UserStore interface {
 	// RestTarget is the stored target rest in seconds; 0 when never set.
 	RestTarget(context.Context) (int, error)
 	SetRestTarget(context.Context, int) error
+}
+
+// ProposalStore keeps one user's agent proposals and standing answers.
+type ProposalStore interface {
+	CreateProposal(context.Context, Proposal) (Proposal, error)
+	GetProposal(context.Context, int64) (Proposal, error)
+	ListProposals(context.Context, ProposalFilter) ([]Proposal, error)
+	// ClaimProposal moves a pending proposal to applying; ErrNotPending if it is not pending.
+	ClaimProposal(context.Context, int64) error
+	// FinishProposal records how applying a claimed proposal ended.
+	FinishProposal(context.Context, int64, ProposalOutcome) (Proposal, error)
+	// RejectProposal answers a pending proposal with no; ErrNotPending if it is not pending.
+	RejectProposal(context.Context, int64, time.Time) (Proposal, error)
+	// Permissions are the standing answers. An account without a stored setting asks for everything.
+	Permissions(context.Context) (Permissions, error)
+	SetAcceptAll(context.Context, bool) error
+	SetRule(context.Context, ApprovalRule) error
+	ForgetRule(context.Context, string) error
 }

@@ -398,7 +398,8 @@ func only(service *training.Service) training.ServiceFor {
 	return func(context.Context) *training.Service { return service }
 }
 
-type testStore struct{}
+// testStore accepts every proposal at once and records nothing.
+type testStore struct{ acceptAllProposals }
 
 type errorStore struct{ testStore }
 
@@ -587,3 +588,30 @@ func (testStore) SetLandmarks(context.Context, training.Landmarks) error { retur
 func (testStore) AllLandmarks(context.Context) (map[string]training.Landmarks, error) {
 	return nil, nil
 }
+
+// acceptAllProposals is a ProposalStore with accept-all on and no memory.
+type acceptAllProposals struct{}
+
+func (acceptAllProposals) CreateProposal(_ context.Context, p training.Proposal) (training.Proposal, error) {
+	p.ID = 1
+	return p, nil
+}
+func (acceptAllProposals) GetProposal(context.Context, int64) (training.Proposal, error) {
+	return training.Proposal{}, training.ErrNotFound
+}
+func (acceptAllProposals) ListProposals(context.Context, training.ProposalFilter) ([]training.Proposal, error) {
+	return nil, nil
+}
+func (acceptAllProposals) ClaimProposal(context.Context, int64) error { return nil }
+func (acceptAllProposals) FinishProposal(_ context.Context, id int64, out training.ProposalOutcome) (training.Proposal, error) {
+	return training.Proposal{ID: id, Status: out.Status, DecidedBy: out.DecidedBy, Result: out.Result, Error: out.Error}, nil
+}
+func (acceptAllProposals) RejectProposal(context.Context, int64, time.Time) (training.Proposal, error) {
+	return training.Proposal{}, training.ErrNotFound
+}
+func (acceptAllProposals) Permissions(context.Context) (training.Permissions, error) {
+	return training.Permissions{AcceptAll: true}, nil
+}
+func (acceptAllProposals) SetAcceptAll(context.Context, bool) error                 { return nil }
+func (acceptAllProposals) SetRule(context.Context, training.ApprovalRule) error     { return nil }
+func (acceptAllProposals) ForgetRule(context.Context, string) error                 { return nil }
