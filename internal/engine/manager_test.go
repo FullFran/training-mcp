@@ -517,3 +517,24 @@ func TestARefusedLoginStartIsNotCounted(t *testing.T) {
 		t.Fatalf("a busy refusal used up the limit: %v", err)
 	}
 }
+
+func TestPendingWritesAreFlaggedForThePanel(t *testing.T) {
+	h := newHarness(t, "pending", nil)
+	h.connect(1)
+	ch, closeSub := h.m.Subscribe(1)
+	defer closeSub()
+	if err := h.m.Prompt(1, "apunta 3x8 a 80"); err != nil {
+		t.Fatal(err)
+	}
+	events, _ := collect(t, ch)
+	pending := map[any]any{}
+	for _, ev := range events {
+		if ev.Name == "tool" && ev.Data["phase"] == "end" {
+			pending[ev.Data["call"]] = ev.Data["pending"]
+		}
+	}
+	// A successful proposal is flagged; a failed call or a malformed flag is not.
+	if pending[2] != true || pending[3] != nil || pending[4] != nil || pending[1] != nil {
+		t.Fatalf("pending flags by call = %v", pending)
+	}
+}

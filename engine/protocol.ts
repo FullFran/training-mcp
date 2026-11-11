@@ -61,7 +61,7 @@ export type ChildMessage =
   | { type: 'token.get'; id: string }
   | { type: 'session'; tools: string[] }
   | { type: 'delta'; text: string }
-  | { type: 'tool'; name: string; phase: 'start' | 'end'; ok: boolean; call?: number }
+  | { type: 'tool'; name: string; phase: 'start' | 'end'; ok: boolean; call?: number; pending?: boolean }
   | { type: 'done'; aborted: boolean }
   | { type: 'error'; code: EngineErrorCode };
 

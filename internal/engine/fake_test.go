@@ -138,6 +138,11 @@ func runFakeEngine(mode string) {
 				}
 				send(map[string]any{"type": "tool", "phase": "start", "call": 1, "name": MCPToolPrefix + "get_session", "ok": true})
 				send(map[string]any{"type": "tool", "phase": "end", "call": 1, "name": MCPToolPrefix + "get_session", "ok": true})
+				if mode == "pending" {
+					send(map[string]any{"type": "tool", "phase": "end", "call": 2, "name": MCPToolPrefix + "log_sets", "ok": true, "pending": true})
+					send(map[string]any{"type": "tool", "phase": "end", "call": 3, "name": MCPToolPrefix + "log_sets", "ok": false, "pending": true})
+					send(map[string]any{"type": "tool", "phase": "end", "call": 4, "name": MCPToolPrefix + "log_sets", "ok": true, "pending": "yes"})
+				}
 				if mode == "flood" {
 					for range 50 {
 						send(map[string]any{"type": "delta", "text": strings.Repeat("x", 1000)})

@@ -62,6 +62,19 @@
     log.scrollTop = log.scrollHeight;
   }
 
+  // A write the coach asked for waits for the person's approval in /review.
+  function pendingNote() {
+    const p = document.createElement('p');
+    p.className = 'coach-note coach-pending';
+    p.append('Cambio propuesto, pendiente de tu aprobación. ');
+    const a = document.createElement('a');
+    a.href = base + '/review';
+    a.textContent = 'Revisar';
+    p.appendChild(a);
+    log.appendChild(p);
+    log.scrollTop = log.scrollHeight;
+  }
+
   function bubble(who, label) {
     const div = document.createElement('div');
     div.className = 'coach-msg coach-' + who;
@@ -133,7 +146,8 @@
     });
     stream.addEventListener('tool', (ev) => {
       const d = data(ev);
-      if (d.phase === 'end' && d.ok === false) note('Herramienta con error: ' + (d.name || ''), 'error');
+      if (d.phase === 'end' && d.pending === true) pendingNote();
+      else if (d.phase === 'end' && d.ok === false) note('Herramienta con error: ' + (d.name || ''), 'error');
       else if (d.phase === 'start') note('Consultando ' + (d.name || '').replace(/_/g, ' ') + '…', 'step');
     });
     stream.addEventListener('done', (ev) => {

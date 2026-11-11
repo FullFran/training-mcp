@@ -120,8 +120,10 @@ type childMessage struct {
 	Phase      string
 	OK         bool
 	Call       int
-	Aborted    bool
-	Code       ErrorCode
+	// Pending marks a write that became a proposal waiting for the person.
+	Pending bool
+	Aborted bool
+	Code    ErrorCode
 }
 
 var (
@@ -148,6 +150,7 @@ func parseChildMessage(line []byte) (childMessage, bool) {
 		Phase      string          `json:"phase"`
 		OK         bool            `json:"ok"`
 		Call       int             `json:"call"`
+		Pending    bool            `json:"pending"`
 		Aborted    bool            `json:"aborted"`
 		Code       string          `json:"code"`
 	}
@@ -209,6 +212,7 @@ func parseChildMessage(line []byte) (childMessage, bool) {
 			m.Phase = "start"
 		}
 		m.OK = m.Phase == "start" || raw.OK
+		m.Pending = m.Phase == "end" && m.OK && raw.Pending
 		if raw.Call > 0 && raw.Call <= maxCall {
 			m.Call = raw.Call
 		}

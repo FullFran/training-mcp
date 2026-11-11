@@ -759,3 +759,4 @@ main { padding-bottom: 140px; }
 }
 .coach-form #coach-stop { grid-column: 1 / -1; }
 .coach-foot { text-align: right; }
+.coach-pending { color: var(--accent); }

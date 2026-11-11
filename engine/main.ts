@@ -211,11 +211,27 @@ async function createSession(start: Extract<ParentMessage, { type: 'start' }>): 
     } else if (event.type === 'tool_execution_end') {
       const call = calls.get(event.toolCallId);
       calls.delete(event.toolCallId);
-      // Only the name and the outcome leave; never an argument or a result.
-      send({ type: 'tool', phase: 'end', name: event.toolName, ok: !event.isError, ...(call ? { call } : {}) });
+      // Only the name, the outcome and whether the write waits for the person's
+      // approval leave; never an argument or a result.
+      const pending = !event.isError && isPendingProposal(event.result);
+      send({ type: 'tool', phase: 'end', name: event.toolName, ok: !event.isError, ...(call ? { call } : {}), ...(pending ? { pending } : {}) });
     }
   });
   return created.session;
+}
+
+/**
+ * True when a write tool's structured result says the change is a proposal that
+ * waits for the person (`status: "pending"`). Pi hands the MCP result over with
+ * the structured content one or two levels down; nothing else is read.
+ */
+function isPendingProposal(result: unknown): boolean {
+  let value: unknown = result;
+  for (let depth = 0; depth < 3 && typeof value === 'object' && value !== null; depth++) {
+    if ((value as { status?: unknown }).status === 'pending') return true;
+    value = (value as { structuredContent?: unknown }).structuredContent;
+  }
+  return false;
 }
 
 /** The first visible model of the person's account, in the provider's own order. */

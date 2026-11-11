@@ -693,6 +693,9 @@ func (m *Manager) handle(p *person, pr *proc, msg childMessage) {
 		if msg.Phase == "end" {
 			data["ok"] = msg.OK
 		}
+		if msg.Pending {
+			data["pending"] = true
+		}
 		if msg.Call > 0 {
 			data["call"] = msg.Call
 		}

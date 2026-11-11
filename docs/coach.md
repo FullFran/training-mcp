@@ -69,7 +69,7 @@ Credentials are stored in `coach/credentials/` next to the database (`/data/coac
 
 1. The workout screen has a **Coach** button. It opens a bottom sheet over the workout; logging stays where it was.
 2. Not connected, the sheet asks them to connect ChatGPT, then shows a code and a link to `https://auth.openai.com/codex/device`. They sign in there and type the code. Nothing travels from their browser to the server in this step; the server polls OpenAI.
-3. Connected, they type and the answer streams in. Each tool call shows as a step (`Consultando list plans…`).
+3. Connected, they type and the answer streams in. Each tool call shows as a step (`Consultando list plans…`). The coach's writes go through the same proposals and permissions as any MCP client of that person: a write that waits for approval shows **Cambio propuesto, pendiente de tu aprobación** with a link to `/review`.
 4. Once the chat has been opened on that page, logging a set starts a short reaction from the coach (feedback on the set and what to do next); with the sheet closed, a dot on the button says there is something new. Without an open chat, the set waits and arrives with the next message.
 5. **Desconectar ChatGPT** deletes the stored credential, stops their engine process and revokes its token.
 
@@ -84,7 +84,7 @@ Under the app's base path, behind its existing login: the bearer of the secret m
 | `GET /coach/status` | `{state}`: `disconnected`, `pending` (with `user_code` and `verification_uri`), `connected` or `reconnect` |
 | `POST /coach/login` | Starts a device login: `{user_code, verification_uri, expires_in}`. One pending login per person; a new one cancels the previous. At most 3 starts per person in 15 minutes, then `rate_limited` |
 | `POST /coach/disconnect` | Disconnects |
-| `GET /coach/stream` | `text/event-stream`: `turn {origin: "user" or "reaction"}`, `delta {text}`, `tool {name, phase, ok?, call?}`, then `done {aborted}` or `error {code}` |
+| `GET /coach/stream` | `text/event-stream`: `turn {origin: "user" or "reaction"}`, `delta {text}`, `tool {name, phase, ok?, call?, pending?}`, then `done {aborted}` or `error {code}` |
 | `POST /coach/prompt` `{text}` | `202 {started}`; the answer arrives on the stream. Text is 1 to 4000 characters; any other field is 400 |
 | `POST /coach/abort` | `{aborted}`: stops the running turn |
 
@@ -94,7 +94,7 @@ The service worker never handles `/coach/*`, so nothing of the chat is cached.
 
 ### Live workout events
 
-Logging a set in the app (`POST /sets`, accepted) queues a `set_logged` event for that person: exercise, weight, reps, RPE, technique and the time, which is also when their rest starts. Events live in memory only, at most 20 per person, and are never written anywhere. At the start of each turn the host writes them, oldest first, as lines before the person's text:
+Logging a set in the app (`POST /sets`, accepted) queues a `set_logged` event for that person: exercise, weight, reps, RPE, technique and the time, which is also when their rest starts. Events live in memory only, at most 20 per person, are dropped after 3 hours, and are never written anywhere. At the start of each turn the host writes them, oldest first, as lines before the person's text:
 
 ```text
 [training-mcp context, set by the host] now=2026-11-11T18:02:10+01:00
@@ -112,7 +112,7 @@ Sets the coach itself logs through MCP are not echoed back as events.
 - **Not the owner.** The engine door is checked before every other one, so even `MCP_AUTH_DISABLED=1` never turns an engine into the owner.
 - **Short-lived.** A token lives as long as its process: until idle stop, disconnect, shutdown, or 60 minutes at most. A process whose token would expire during a turn is replaced first.
 - **Credentials.** One file per person, named by a hash of the person, AES-256-GCM with the person bound in as associated data (a file moved to another person's name does not decrypt), mode 0600 in a 0700 directory, written to a temporary file and renamed. Never logged, never sent to the browser, never on the engine's command line or in its environment: the engine asks for the access token over stdin when it needs one, and never gets the refresh token except inside a refresh request. Backups of the data volume contain them, encrypted with a key the backup does not hold.
-- **One refresher.** OpenAI's refresh token is single-use. The server is the only place that decides to refresh, one refresh at a time per person (concurrent token requests wait for the same refresh); the exchange runs in that person's engine through Pi. If it fails, the stored credential is kept and the person is asked to connect again. A process stopped while a refresh is out is kept up to 10 seconds so the new token can be stored; only a disconnect throws it away.
+- **One refresher.** OpenAI's refresh token is single-use. The server is the only place that decides to refresh, one refresh at a time per person (concurrent token requests wait for the same refresh); the exchange runs in that person's engine through Pi. If it fails, the stored credential is kept and the person is asked to connect again. A process stopped while a refresh is out is kept up to 10 seconds so the new token can be stored; only a disconnect throws it away, including from a process already stopped.
 - **Slots.** A process is a scarce slot. A pending login holds one without a credential, so it has a hard deadline (15 minutes), starts are rate-limited per person, a process left with no pending login and no credential is stopped at once, and a connected person's turn takes the slot of the oldest process that only waits for a code. A turn has a time limit (10 minutes) and a size limit (2 MiB of text); a process that does not settle after either is stopped.
 - **Shutdown.** Engine processes exit when their stdin closes, which covers a server that dies. On SIGTERM or SIGINT the server stops them before draining HTTP connections, which also ends open chat streams.
 - **Tools.** Pi has no sandbox, so its shell and file tools are off (`noTools: 'builtin'`) and its script tool is not activated (`direct` exposure). The engine reports its tool list when the session starts; the engine and the server each stop it if any tool is not `mcp__training__*`.
