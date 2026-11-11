@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestLoadDefaultsAndRequiresToken(t *testing.T) {
 	t.Setenv("MCP_BEARER_TOKEN", "secret")
@@ -163,5 +166,67 @@ func TestLoadReadsProvisioning(t *testing.T) {
 	t.Setenv("MCP_OAUTH_SUBJECT", "")
 	if _, err := Load(""); err == nil {
 		t.Fatal("accepted provisioning with OAuth off")
+	}
+}
+
+func setWebLoginEnv(t *testing.T, id, secret string) {
+	t.Helper()
+	t.Setenv("MCP_BEARER_TOKEN", "x")
+	t.Setenv("MCP_AUTH_DISABLED", "")
+	t.Setenv("MCP_OAUTH_PROVISION", "")
+	t.Setenv("MCP_OAUTH_ISSUER", "https://auth.example.test")
+	t.Setenv("MCP_OAUTH_RESOURCE", "https://training.example.test/mcp")
+	t.Setenv("MCP_OAUTH_SUBJECT", "user_owner")
+	t.Setenv("WEB_OAUTH_CLIENT_ID", id)
+	t.Setenv("WEB_OAUTH_CLIENT_SECRET", secret)
+}
+
+func TestLoadWebLoginDerivesItsURLFromTheResource(t *testing.T) {
+	setWebLoginEnv(t, " client ", "secret")
+	c, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.WebClientID != "client" || c.WebClientSecret != "secret" || c.WebPublicURL != "https://training.example.test" {
+		t.Fatalf("config = %+v", c)
+	}
+}
+
+func TestLoadWebLoginIsOffByDefault(t *testing.T) {
+	setWebLoginEnv(t, "", "")
+	c, err := Load("")
+	if err != nil || c.WebClientID != "" || c.WebPublicURL != "" {
+		t.Fatalf("config = %+v, err = %v", c, err)
+	}
+}
+
+func TestLoadRefusesHalfAWebLogin(t *testing.T) {
+	for name, env := range map[string][2]string{
+		"no secret": {"client", ""},
+		"no id":     {"", "secret"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			setWebLoginEnv(t, env[0], env[1])
+			if _, err := Load(""); err == nil || !strings.Contains(err.Error(), "WEB_OAUTH_CLIENT_ID and WEB_OAUTH_CLIENT_SECRET") {
+				t.Fatalf("err = %v", err)
+			}
+		})
+	}
+}
+
+func TestLoadWebLoginNeedsTheMCPOAuthSettings(t *testing.T) {
+	setWebLoginEnv(t, "client", "secret")
+	t.Setenv("MCP_OAUTH_ISSUER", "")
+	t.Setenv("MCP_OAUTH_RESOURCE", "")
+	t.Setenv("MCP_OAUTH_SUBJECT", "")
+	if _, err := Load(""); err == nil || !strings.Contains(err.Error(), "WEB_OAUTH_CLIENT_ID needs the MCP_OAUTH_* settings") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestLoadNeverPrintsTheWebClientSecret(t *testing.T) {
+	setWebLoginEnv(t, "", "do-not-print-me")
+	if _, err := Load(""); err == nil || strings.Contains(err.Error(), "do-not-print-me") {
+		t.Fatalf("err = %v", err)
 	}
 }

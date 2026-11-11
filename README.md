@@ -111,6 +111,7 @@ Docker image the way the server does. Merging to `main` deploys; see
 | `MCP_OAUTH_ISSUER`, `MCP_OAUTH_RESOURCE`, `MCP_OAUTH_SUBJECT` | off | Also accept OAuth access tokens on `/mcp`; set all three or none, see [connection paths](docs/connection-paths.md) |
 | `MCP_OAUTH_PROVISION` | off | `1` gives any subject the OAuth provider vouches for an account of its own; off, only the owner and existing accounts get in |
 | `WEB_BASE_PATH` | empty (web UI disabled) | Secret prefix the PWA is served from, e.g. `/a1b2c3…` |
+| `WEB_OAUTH_CLIENT_ID`, `WEB_OAUTH_CLIENT_SECRET` | off | The provider's OAuth application for the web login; set both, with the `MCP_OAUTH_*` settings, to serve the PWA at the root behind a login, see [connection paths](docs/connection-paths.md) |
 
 The unauthenticated `GET /health` endpoint returns `{"status":"ok"}`. Alternatively, `training-mcp healthcheck` sends `GET /health` to the local listener (defaulting to port 8080 or derived from `--addr`) and exits 0 on HTTP 200 or 1 on failure, designed for distroless container healthchecks without a shell, `curl`, or `wget`. MCP is only available at `/mcp` for GET, POST, and DELETE. Public ChatGPT access requires HTTPS at the TLS termination boundary.
 
@@ -146,7 +147,10 @@ without going through ChatGPT. It is a driving adapter over the same
 `training.Service`, so validation, exercise normalization and SI calculation are
 shared with the MCP tools and cannot drift apart.
 
-- Served only under the configured secret prefix; unset means not served at all.
+- Served under the configured secret prefix as the owner, and, with
+  `WEB_OAUTH_CLIENT_ID` and `WEB_OAUTH_CLIENT_SECRET`, at the root to whoever
+  signs in with the OAuth provider, each seeing only their own data. Neither
+  set means not served at all. The database export is only on the secret prefix.
 - A plan can be started for the day; its exercises become a checklist showing
   done/target sets, and tapping one loads its prescription into the form.
 - The day's plan is fully adjustable mid-session: add or drop an exercise,

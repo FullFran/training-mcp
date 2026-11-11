@@ -119,7 +119,21 @@ func runWithContext(ctx context.Context, args []string) error {
 			logger.Printf("oauth gives every subject the provider vouches for an account")
 		}
 	}
-	handler := httpsrv.LogProtocol(logger, httpsrv.RoutesWithOAuth(mcpServer.Handler(), cfg.AuthDisabled, cfg.Token, web, oauth))
+	var root *httpsrv.RootWeb
+	if cfg.WebClientID != "" {
+		login := httpsrv.NewWebLogin(httpsrv.WebLoginConfig{
+			Issuer: cfg.OAuthIssuer, ClientID: cfg.WebClientID, ClientSecret: cfg.WebClientSecret, PublicURL: cfg.WebPublicURL,
+			Keys: oauth, Resolve: services.ResolveUser(cfg.OAuthSubject, cfg.OAuthProvision), Logger: logger,
+		})
+		// The root never serves /export.db: it holds every user's data.
+		app, err := websrv.NewWithOptions(services.ForRequest, services.Snapshot, time.Now, "", websrv.Options{CSRFToken: login.CSRFToken})
+		if err != nil {
+			return err
+		}
+		root = &httpsrv.RootWeb{Handler: app.Handler(), Login: login}
+		logger.Printf("web UI served at %s/ behind the provider's login", cfg.WebPublicURL)
+	}
+	handler := httpsrv.LogProtocol(logger, httpsrv.RoutesWithLogin(mcpServer.Handler(), cfg.AuthDisabled, cfg.Token, web, oauth, root))
 	httpServer := &http.Server{Addr: cfg.Addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
 	errCh := make(chan error, 1)
 	go func() { errCh <- httpServer.ListenAndServe() }()

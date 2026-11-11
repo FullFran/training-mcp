@@ -39,6 +39,7 @@ type Server struct {
 	snapshot func(context.Context, string) error
 	clock    training.Clock
 	base     string
+	opts     Options
 	tpl      *template.Template
 	// txt renders the manifest and the service worker. They are JSON and
 	// JavaScript documents, so html/template's contextual escaping would be
@@ -99,6 +100,10 @@ type pageData struct {
 	// ReadOnly renders a past session without the editing controls.
 	ReadOnly bool
 	Error    string
+	// CSRF is the session's token, empty where the mount has no sessions.
+	CSRF string
+	// CanExport shows the backup link where /export.db is served.
+	CanExport bool
 }
 
 // LastSet returns the final set of the session, used to power "repeat last set".
@@ -115,7 +120,23 @@ func (b ExerciseBlock) IsRecord(s training.Set) bool {
 	return b.BestE1RM > 0 && math.Abs(training.Epley1RM(s.WeightKG, s.Reps)-b.BestE1RM) < 0.05
 }
 
+// Options are what differs between the two places the app is mounted.
+type Options struct {
+	// Export serves /export.db, a copy of the whole database with every user's
+	// data, so only the owner-only secret mount may set it.
+	Export bool
+	// CSRFToken returns the token a request's session must send back with every
+	// write. Nil means the mount has no sessions and the pages carry no token.
+	CSRFToken func(*http.Request) string
+}
+
+// New serves the app under the secret base path, as the owner's backup route
+// always has.
 func New(service training.ServiceFor, snapshot func(context.Context, string) error, clock training.Clock, basePath string) (*Server, error) {
+	return NewWithOptions(service, snapshot, clock, basePath, Options{Export: true})
+}
+
+func NewWithOptions(service training.ServiceFor, snapshot func(context.Context, string) error, clock training.Clock, basePath string, opts Options) (*Server, error) {
 	funcs := map[string]any{
 		"num":         formatNumber,
 		"rpeScale":    rpeScale,
@@ -176,7 +197,7 @@ func New(service training.ServiceFor, snapshot func(context.Context, string) err
 		return nil, err
 	}
 	s := &Server{
-		service: service, snapshot: snapshot, clock: clock, base: strings.TrimSuffix(basePath, "/"),
+		service: service, snapshot: snapshot, clock: clock, base: strings.TrimSuffix(basePath, "/"), opts: opts,
 		tpl: tpl, txt: txt, mux: http.NewServeMux(),
 	}
 	s.routes()
@@ -204,7 +225,9 @@ func (s *Server) routes() {
 	s.handle("POST "+b+"/sets/{id}/delete", s.deleteSet)
 	s.handle("POST "+b+"/sets/{id}/update", s.updateSet)
 	s.handle("GET "+b+"/history", s.history)
-	s.handle("GET "+b+"/export.db", s.export)
+	if s.opts.Export {
+		s.handle("GET "+b+"/export.db", s.export)
+	}
 	s.handle("GET "+b+"/plans", s.plansPage)
 	s.handle("POST "+b+"/plans/create", s.planAction)
 	s.handle("POST "+b+"/plans/update", s.planAction)
@@ -247,7 +270,7 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	s.render(w, "index.html", data)
+	s.render(w, r, "index.html", data)
 }
 
 func (s *Server) addSet(w http.ResponseWriter, r *http.Request) {
@@ -371,7 +394,7 @@ func (s *Server) renderPanel(w http.ResponseWriter, r *http.Request, message str
 		http.Redirect(w, r, s.base+"/", http.StatusSeeOther)
 		return
 	}
-	s.render(w, "panel.html", data)
+	s.render(w, r, "panel.html", data)
 }
 
 // plansPage lists every routine with its exercises, editable in place. Plan
@@ -383,7 +406,7 @@ func (s *Server) plansPage(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	s.render(w, "plans.html", data)
+	s.render(w, r, "plans.html", data)
 }
 
 func (s *Server) plansData(ctx context.Context, message string) (pageData, error) {
@@ -473,7 +496,7 @@ func (s *Server) planAction(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, dataErr)
 		return
 	}
-	s.render(w, "plans-main.html", data)
+	s.render(w, r, "plans-main.html", data)
 }
 
 // export streams a consistent copy of the whole database. It is the backup
@@ -525,7 +548,7 @@ func (s *Server) history(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	s.render(w, "history.html", pageData{
+	s.render(w, r, "history.html", pageData{
 		Base: s.base, Today: s.todayDate(), History: sessions,
 		Volume: volume, Recommend: recommend,
 	})
@@ -556,7 +579,7 @@ func (s *Server) session(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data.Today = s.todayDate()
-	s.render(w, "session.html", data)
+	s.render(w, r, "session.html", data)
 }
 
 func (s *Server) manifest(w http.ResponseWriter, r *http.Request) {
@@ -933,8 +956,12 @@ func (s *Server) infoFor(ctx context.Context, name, today string) (ExerciseInfo,
 
 func (s *Server) todayDate() string { return s.clock().Format("2006-01-02") }
 
-func (s *Server) render(w http.ResponseWriter, name string, data pageData) {
+func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data pageData) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if s.opts.CSRFToken != nil {
+		data.CSRF = s.opts.CSRFToken(r)
+	}
+	data.CanExport = s.opts.Export
 	s.renderTo(w, name, data)
 }
 

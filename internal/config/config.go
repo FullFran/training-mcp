@@ -20,6 +20,12 @@ type Config struct {
 	// OAuthProvision gives any subject the provider vouches for an account of its
 	// own. Off, only the owner and existing accounts get in.
 	OAuthProvision bool
+	// WebClientID and WebClientSecret are the provider's OAuth application for
+	// the web login. Set, the app is served at the root of WebPublicURL behind
+	// that login; empty, the root serves nothing.
+	WebClientID, WebClientSecret string
+	// WebPublicURL is the origin of MCP_OAUTH_RESOURCE, where the login returns.
+	WebPublicURL string
 }
 
 func Load(addr string) (Config, error) {
@@ -74,7 +80,24 @@ func Load(addr string) (Config, error) {
 			return Config{}, errors.New("MCP_OAUTH_RESOURCE must be this server's public /mcp URL")
 		}
 	}
+	clientID := strings.TrimSpace(os.Getenv("WEB_OAUTH_CLIENT_ID"))
+	clientSecret := strings.TrimSpace(os.Getenv("WEB_OAUTH_CLIENT_SECRET"))
+	var publicURL string
+	if clientID != "" || clientSecret != "" {
+		// Half a login would either never start or leave the client unable to prove
+		// who it is to the provider.
+		if clientID == "" || clientSecret == "" {
+			return Config{}, errors.New("WEB_OAUTH_CLIENT_ID and WEB_OAUTH_CLIENT_SECRET must be set together")
+		}
+		// The login trusts the same provider as /mcp and admits the same accounts.
+		if issuer == "" {
+			return Config{}, errors.New("WEB_OAUTH_CLIENT_ID needs the MCP_OAUTH_* settings")
+		}
+		u, _ := url.Parse(resource)
+		publicURL = u.Scheme + "://" + u.Host
+	}
 	return Config{
+		WebClientID: clientID, WebClientSecret: clientSecret, WebPublicURL: publicURL,
 		Addr: addr, DBPath: db, Token: token, AuthDisabled: disabled, WebBasePath: webBase,
 		OAuthIssuer: issuer, OAuthResource: resource, OAuthSubject: subject, OAuthProvision: provision == "1",
 	}, nil

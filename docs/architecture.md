@@ -139,3 +139,17 @@ adapter sees the request. `GET /health` is the only unauthenticated route.
 be uncomfortable to type. `WEB_BASE_PATH` gates the PWA behind a secret prefix
 and, left unset, means the web adapter is not mounted at all — a missing
 configuration value removes the surface rather than exposing it with a default.
+
+With `WEB_OAUTH_CLIENT_ID` and `WEB_OAUTH_CLIENT_SECRET`, `httpsrv.WebLogin`
+also serves the PWA at the root. `/login` starts an authorization code flow with
+PKCE at the same provider as `/mcp`; the callback checks state, the issuer, and
+an RS256 ID token whose audience is the client and whose nonce is this login's,
+then resolves the subject exactly as `/mcp` does. The session lives in server
+memory behind a `__Host-` cookie (HttpOnly, Secure, SameSite=Lax, seven days),
+so a restart signs everyone out. Every request that is not a GET or HEAD must
+send the session's CSRF token in `X-CSRF-Token` or the `csrf_token` field.
+Signed-in pages are `Cache-Control: no-store` and name their session's offline
+cache partition in `X-Cache-Partition`; the service worker reads only that
+partition offline, drops the others, and drops all of them on `/logged-out`.
+The root never serves `/export.db`, which holds every user's data. The shell
+files (`/sw.js`, `/manifest.webmanifest`, `/static/`) are public.

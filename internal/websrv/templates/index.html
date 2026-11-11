@@ -12,8 +12,9 @@
 <link rel="icon" href="{{.Base}}/static/icon-192.png">
 <link rel="apple-touch-icon" href="{{.Base}}/static/icon-192.png">
 <link rel="stylesheet" href="{{.Base}}/static/app.css">
-</head>
-<body data-base="{{.Base}}">
+{{if .CSRF}}<meta name="csrf-token" content="{{.CSRF}}">
+{{end}}</head>
+<body data-base="{{.Base}}"{{if .CSRF}} hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'{{end}}>
 
 <header class="bar">
   <div>
@@ -28,7 +29,8 @@
 
 <main>
   {{if not .Progress}}{{if .Plans}}
-  <form class="card plan-pick" method="post" action="{{.Base}}/plan">
+  <form class="card plan-pick" method="post" action="{{.Base}}/plan">{{if .CSRF}}
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
     <label class="field">
       <span>Entrenar con un plan</span>
       <select name="plan_id">

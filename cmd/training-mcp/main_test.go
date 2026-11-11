@@ -234,3 +234,58 @@ func TestHealthcheckCLIInvocation(t *testing.T) {
 		t.Fatalf("healthcheck returned error: %v, stderr: %s", err, stderrOk.String())
 	}
 }
+
+// TestWebLoginSettingsServeTheAppAtTheRoot boots the real composition with the
+// web login configured and checks the root asks for a login at the provider.
+func TestWebLoginSettingsServeTheAppAtTheRoot(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := l.Addr().String()
+	l.Close()
+	t.Setenv("MCP_BEARER_TOKEN", "test-token")
+	t.Setenv("MCP_AUTH_DISABLED", "")
+	t.Setenv("WEB_BASE_PATH", "")
+	t.Setenv("MCP_OAUTH_PROVISION", "")
+	t.Setenv("TRAINING_DB_PATH", t.TempDir()+"/training.db")
+	t.Setenv("MCP_OAUTH_ISSUER", "https://auth.example.test")
+	t.Setenv("MCP_OAUTH_RESOURCE", "https://training.example.test/mcp")
+	t.Setenv("MCP_OAUTH_SUBJECT", "user_owner")
+	t.Setenv("WEB_OAUTH_CLIENT_ID", "web-client")
+	t.Setenv("WEB_OAUTH_CLIENT_SECRET", "web-secret")
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- runWithContext(ctx, []string{"--addr", addr}) }()
+	defer func() {
+		cancel()
+		if err := <-done; err != nil {
+			t.Errorf("server: %v", err)
+		}
+	}()
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	var resp *http.Response
+	for i := 0; i < 100; i++ {
+		if resp, err = client.Get("http://" + addr + "/"); err == nil {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/login" {
+		t.Fatalf("GET /: status %d, location %q", resp.StatusCode, resp.Header.Get("Location"))
+	}
+	resp, err = client.Get("http://" + addr + "/login")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	to := resp.Header.Get("Location")
+	if !strings.HasPrefix(to, "https://auth.example.test/oauth/authorize?") ||
+		!strings.Contains(to, "redirect_uri=https%3A%2F%2Ftraining.example.test%2Fauth%2Fcallback") {
+		t.Fatalf("login goes to %q", to)
+	}
+}

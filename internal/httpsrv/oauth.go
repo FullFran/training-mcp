@@ -2,6 +2,7 @@ package httpsrv
 
 import (
 	"crypto/rsa"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -96,6 +97,35 @@ func (o *OAuth) verify(raw string) (string, error) {
 	var claims jwt.RegisteredClaims
 	if _, err := o.parser.ParseWithClaims(raw, &claims, o.keyFor); err != nil {
 		return "", fmt.Errorf("%w (aud=%q iss=%q)", err, clip(strings.Join(claims.Audience, ",")), clip(claims.Issuer))
+	}
+	return claims.Subject, nil
+}
+
+type idClaims struct {
+	jwt.RegisteredClaims
+	Nonce string `json:"nonce"`
+}
+
+// verifyIDToken returns the subject of an ID token the provider issued to the
+// web client for the login that sent nonce. It shares the provider's keys with
+// access tokens, but its audience is the client, never the MCP resource.
+func (o *OAuth) verifyIDToken(raw, clientID, nonce string) (string, error) {
+	parser := jwt.NewParser(
+		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()}),
+		jwt.WithIssuer(o.cfg.Issuer),
+		jwt.WithAudience(clientID),
+		jwt.WithExpirationRequired(),
+		jwt.WithLeeway(30*time.Second),
+	)
+	var claims idClaims
+	if _, err := parser.ParseWithClaims(raw, &claims, o.keyFor); err != nil {
+		return "", fmt.Errorf("%w (aud=%q iss=%q)", err, clip(strings.Join(claims.Audience, ",")), clip(claims.Issuer))
+	}
+	if nonce == "" || subtle.ConstantTimeCompare([]byte(claims.Nonce), []byte(nonce)) != 1 {
+		return "", errors.New("nonce does not match this login")
+	}
+	if claims.Subject == "" {
+		return "", errors.New("token has no subject")
 	}
 	return claims.Subject, nil
 }
