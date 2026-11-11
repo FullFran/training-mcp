@@ -54,6 +54,13 @@ type Settings struct {
 	// Preferences keeps each person's model and thinking choice. Without one,
 	// choices live in memory until the server stops.
 	Preferences PreferenceStore
+	// Connectors lists each person's connected remote MCP servers. Nil: none.
+	Connectors Connectors
+	// ConnectorURL is the loopback prefix of the host's connector proxy; a
+	// server's URL is ConnectorURL + name + "/mcp". Default: next to MCPURL.
+	ConnectorURL string
+	// ApprovalTimeout is how long a connector tool call waits for the person.
+	ApprovalTimeout time.Duration
 
 	Now    func() time.Time
 	Logger *log.Logger
@@ -111,6 +118,10 @@ func (s *Settings) defaults() {
 	set(&s.RefreshGrace, 10*time.Second)
 	if s.MaxPendingEvents <= 0 {
 		s.MaxPendingEvents = 20
+	}
+	set(&s.ApprovalTimeout, defaultApprovalTimeout)
+	if s.ConnectorURL == "" {
+		s.ConnectorURL = strings.TrimSuffix(s.MCPURL, "/mcp") + "/engine/connectors/"
 	}
 	if s.Now == nil {
 		s.Now = time.Now
@@ -190,6 +201,7 @@ type proc struct {
 	idle         *time.Timer
 	turn         *turnState
 	refreshes    map[string]chan *Credential
+	cs           connectorState
 	stopped      bool
 	discard      bool
 	exited       bool
@@ -212,6 +224,8 @@ type person struct {
 	models    *ModelList
 	modelWait chan struct{}
 	modelErr  ErrorCode
+	// loaded is which connector servers the last session loaded.
+	loaded map[string]bool
 }
 
 // Manager starts, feeds and stops engine processes: at most one per person,
@@ -376,6 +390,10 @@ func (m *Manager) Subscribe(userID int64) (<-chan Event, func()) {
 			delete(p.subs, id)
 			close(c)
 		}
+		if len(p.subs) == 0 && p.proc != nil {
+			// Nobody is left to answer: open questions are denied.
+			m.denyOpenApprovals(p, p.proc)
+		}
 		m.forget(p)
 	}
 }
@@ -532,7 +550,8 @@ func (m *Manager) startEngine(p *person) (*proc, error) {
 	}
 	if pr.token == "" {
 		pr.token = m.s.Tokens.Mint(p.id, m.s.MaxAge)
-		m.send(pr, parentMessage{Type: "start", MCPURL: m.s.MCPURL, MCPToken: pr.token, SystemPrompt: m.s.SystemPrompt})
+		pr.cs = m.newConnectorState(p.id)
+		m.send(pr, parentMessage{Type: "start", MCPURL: m.s.MCPURL, MCPToken: pr.token, SystemPrompt: m.s.SystemPrompt, Servers: m.engineServers(pr)})
 	}
 	return pr, nil
 }
@@ -726,7 +745,7 @@ func (m *Manager) ensureProc(p *person, forTurn bool) (*proc, error) {
 		m.log("start_failed", "spawn_error")
 		return nil, fail(CodeEngineUnavailable)
 	}
-	pr := &proc{cmd: cmd, userID: p.id, out: make(chan []byte, outBuffer), startedAt: m.s.Now(), refreshes: map[string]chan *Credential{}, done: make(chan struct{})}
+	pr := &proc{cmd: cmd, userID: p.id, out: make(chan []byte, outBuffer), startedAt: m.s.Now(), refreshes: map[string]chan *Credential{}, done: make(chan struct{}), cs: connectorState{servers: map[string]string{}, answers: map[string]sessionAnswer{}, approvals: map[string]*approval{}, tickets: map[string][]time.Time{}}}
 	p.proc = pr
 	// A stop just before (max age, eviction) may have forgotten this person; a
 	// process must always belong to a tracked person, or no cap, status,
@@ -847,12 +866,20 @@ func (m *Manager) handle(p *person, pr *proc, msg childMessage) {
 	case "token.get":
 		go m.answerToken(p, pr, msg.ID)
 	case "session":
-		// Fail closed: training-mcp's MCP tools and nothing else.
-		if !onlyTrainingTools(msg.Tools) {
+		// Fail closed: training-mcp's MCP tools and the tools of the servers
+		// the host gave this session, nothing else.
+		if !allowedTools(msg.Tools, pr.cs.servers) {
 			m.stop(p, "unexpected_tools", pr)
 			return
 		}
 		pr.toolsChecked = true
+		m.noteLoaded(p, pr, msg.Tools)
+	case "approval.request":
+		if !pr.toolsChecked {
+			m.send(pr, parentMessage{Type: "approval", ID: msg.ID, Decision: "deny"})
+			return
+		}
+		m.handleApproval(p, pr, msg)
 	case "delta", "thinking":
 		t := pr.turn
 		if t == nil || t.limited || !pr.toolsChecked {
@@ -1048,6 +1075,7 @@ func (m *Manager) endTurn(p *person, pr *proc, name string, data map[string]any)
 		return
 	}
 	pr.turn = nil
+	m.denyOpenApprovals(p, pr)
 	t.timeout.Stop()
 	if t.abortTimer != nil {
 		t.abortTimer.Stop()
@@ -1056,6 +1084,10 @@ func (m *Manager) endTurn(p *person, pr *proc, name string, data map[string]any)
 		m.broadcast(p, Event{Name: "error", Data: map[string]any{"code": string(CodeTurnLimit)}})
 	} else {
 		m.broadcast(p, Event{Name: name, Data: data})
+	}
+	if pr.cs.reload && p.proc == pr {
+		m.stop(p, "connectors_changed", pr)
+		return
 	}
 	m.touch(p, pr)
 }
