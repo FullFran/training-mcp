@@ -295,6 +295,9 @@ func (s *Server) routes() {
 	s.handle("GET "+b+"/memory", s.memoryPage)
 	s.handle("POST "+b+"/memory/{id}/update", s.updateMemory)
 	s.handle("POST "+b+"/memory/{id}/delete", s.deleteMemory)
+	s.handle("POST "+b+"/memory/{id}/confirm", s.confirmMemory)
+	s.handle("POST "+b+"/memory/conflicts/{id}/resolve", s.resolveConflict)
+	s.handle("POST "+b+"/memory/delete-all", s.deleteAllMemory)
 	s.handle("GET "+b+"/manifest.webmanifest", s.manifest)
 	s.handle("GET "+b+"/sw.js", s.serviceWorker)
 

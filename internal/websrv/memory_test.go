@@ -4,12 +4,25 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
 	"github.com/fullfran/training-mcp/internal/training"
+	"github.com/fullfran/training-mcp/internal/websrv"
 )
+
+// webHandlerAt serves one service with its own clock for the page.
+func webHandlerAt(t *testing.T, svc *training.Service, clock training.Clock) http.Handler {
+	t.Helper()
+	server, err := websrv.NewWithOptions(func(context.Context) *training.Service { return svc }, nil, clock, base, websrv.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return server.Handler()
+}
 
 func memoryWeb(t *testing.T) (http.Handler, *training.Service) {
 	t.Helper()
@@ -54,13 +67,15 @@ func TestMemoryPanelListsSearchesAndFilters(t *testing.T) {
 }
 
 // The person edits and deletes directly: these are not agent writes, so no proposal.
+// Deleting from the panel is for good, not a soft forget.
 func TestMemoryPanelEditsAndDeletesDirectly(t *testing.T) {
 	ctx := context.Background()
 	h, svc := memoryWeb(t)
-	m, err := svc.SaveMemory(ctx, training.MemoryInput{Title: "Agarre", Body: "Neutro"})
+	saved, err := svc.SaveMemory(ctx, training.MemoryInput{Title: "Agarre", Body: "Neutro"})
 	if err != nil {
 		t.Fatal(err)
 	}
+	m := saved.Memory
 	id := itoa(m.ID)
 	w := post(t, h, base+"/memory/"+id+"/update", url.Values{"title": {"Agarre en banca"}, "body": {"Prono, a 1,5 palmos"}, "type": {"preference"}, "pinned": {"1"}}, false)
 	if w.Code != http.StatusSeeOther || w.Header().Get("Location") != base+"/memory" {
@@ -97,5 +112,139 @@ func TestReviewPageLinksToMemory(t *testing.T) {
 	h, _ := memoryWeb(t)
 	if body := get(t, h, base+"/review").Body.String(); !strings.Contains(body, `href="`+base+`/memory"`) {
 		t.Fatalf("no memory link:\n%s", body)
+	}
+}
+
+func saveAll(t *testing.T, svc *training.Service, ins ...training.MemoryInput) []training.MemorySaved {
+	t.Helper()
+	var out []training.MemorySaved
+	for _, in := range ins {
+		saved, err := svc.SaveMemory(context.Background(), in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, saved)
+	}
+	return out
+}
+
+func TestMemoryPanelShowsEachView(t *testing.T) {
+	ctx := context.Background()
+	h, svc := memoryWeb(t)
+	saved := saveAll(t, svc,
+		training.MemoryInput{Type: "limitation", Title: "Hombro lesionado", Body: "nada de press"},
+		training.MemoryInput{Type: "limitation", Title: "Hombro recuperado", Body: "press ligero"},
+		training.MemoryInput{Type: "equipment", Title: "Mancuernas", Body: "hasta 30 kg"},
+		training.MemoryInput{Type: "note", Title: "Rodilla", Body: "sin problema"},
+	)
+	if _, err := svc.JudgeMemory(ctx, saved[1].Candidates[0].RelationID, training.RelationSupersedes, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.ForgetMemory(ctx, saved[3].Memory.ID); err != nil {
+		t.Fatal(err)
+	}
+	for view, want := range map[string][]string{
+		"":           {"Hombro recuperado", "Mancuernas"},
+		"superseded": {"Hombro lesionado"},
+		"forgotten":  {"Rodilla"},
+	} {
+		body := get(t, h, base+"/memory?view="+view).Body.String()
+		for _, title := range []string{"Hombro lesionado", "Hombro recuperado", "Mancuernas", "Rodilla"} {
+			if shown, wanted := strings.Contains(body, title), slices.Contains(want, title); shown != wanted {
+				t.Errorf("view %q shows %q = %v, want %v", view, title, shown, wanted)
+			}
+		}
+	}
+	if w := get(t, h, base+"/memory?view=secret"); w.Code != http.StatusBadRequest {
+		t.Fatalf("unknown view status = %d", w.Code)
+	}
+}
+
+func TestMemoryPanelListsDueFactsAndConfirmsThem(t *testing.T) {
+	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	now := webClock()
+	clock := func() time.Time { return now }
+	svc := training.NewServices(store, clock).ForUser(1)
+	h := webHandlerAt(t, svc, clock)
+	saved := saveAll(t, svc, training.MemoryInput{Type: "limitation", Title: "Hombro", Body: "molesta"})
+	if body := get(t, h, base+"/memory?view=due").Body.String(); strings.Contains(body, "Hombro") {
+		t.Fatalf("a fact saved today is due:\n%s", body)
+	}
+	now = now.AddDate(0, 0, 14)
+	body := get(t, h, base+"/memory?view=due").Body.String()
+	if !strings.Contains(body, "Hombro") || !strings.Contains(body, "Sigue vigente") {
+		t.Fatalf("a fact past its review date is not due:\n%s", body)
+	}
+	if w := post(t, h, base+"/memory/"+itoa(saved[0].Memory.ID)+"/confirm", nil, false); w.Code != http.StatusSeeOther {
+		t.Fatalf("confirm status = %d", w.Code)
+	}
+	if body = get(t, h, base+"/memory?view=due").Body.String(); strings.Contains(body, "Hombro") {
+		t.Fatalf("still due after confirming:\n%s", body)
+	}
+}
+
+func TestMemoryPanelResolvesConflicts(t *testing.T) {
+	ctx := context.Background()
+	h, svc := memoryWeb(t)
+	saved := saveAll(t, svc,
+		training.MemoryInput{Type: "preference", Title: "Prefiere tardes", Body: "a las 19"},
+		training.MemoryInput{Type: "preference", Title: "Prefiere mañanas", Body: "a las 7"},
+	)
+	relation := saved[1].Candidates[0].RelationID
+	if _, err := svc.JudgeMemory(ctx, relation, training.RelationConflictsWith, "horarios opuestos"); err != nil {
+		t.Fatal(err)
+	}
+	body := get(t, h, base+"/memory?view=conflicts").Body.String()
+	if !strings.Contains(body, "Prefiere tardes") || !strings.Contains(body, "Prefiere mañanas") || !strings.Contains(body, "horarios opuestos") {
+		t.Fatalf("conflicts:\n%s", body)
+	}
+	if w := post(t, h, base+"/memory/conflicts/"+itoa(relation)+"/resolve", url.Values{"keep": {"sideways"}}, true); w.Code != http.StatusBadRequest {
+		t.Fatalf("bad keep status = %d", w.Code)
+	}
+	if w := post(t, h, base+"/memory/conflicts/"+itoa(relation)+"/resolve", url.Values{"keep": {"new"}}, false); w.Code != http.StatusSeeOther {
+		t.Fatalf("resolve status = %d", w.Code)
+	}
+	active, err := svc.SearchMemory(ctx, training.MemoryQuery{})
+	if err != nil || len(active) != 1 || active[0].Title != "Prefiere mañanas" {
+		t.Fatalf("active = %v, %v", active, err)
+	}
+	if body = get(t, h, base+"/memory?view=conflicts").Body.String(); strings.Contains(body, "horarios opuestos") {
+		t.Fatalf("resolved conflict still listed:\n%s", body)
+	}
+}
+
+func TestMemoryPanelShowsHistory(t *testing.T) {
+	h, svc := memoryWeb(t)
+	saveAll(t, svc,
+		training.MemoryInput{TopicKey: "k", Title: "Hombro", Body: "texto antiguo"},
+		training.MemoryInput{TopicKey: "k", Title: "Hombro", Body: "texto nuevo"},
+	)
+	body := get(t, h, base+"/memory").Body.String()
+	if !strings.Contains(body, "texto antiguo") || !strings.Contains(body, "texto nuevo") {
+		t.Fatalf("history missing:\n%s", body)
+	}
+}
+
+func TestDeletingEverythingNeedsTheConfirmationWord(t *testing.T) {
+	ctx := context.Background()
+	h, svc := memoryWeb(t)
+	saveAll(t, svc, training.MemoryInput{Title: "Hombro", Body: "uno"}, training.MemoryInput{Title: "Rodilla", Body: "dos"})
+	if w := post(t, h, base+"/memory/delete-all", url.Values{"confirm": {"si"}}, true); w.Code != http.StatusBadRequest {
+		t.Fatalf("without the word: %d", w.Code)
+	}
+	if left, _ := svc.SearchMemory(ctx, training.MemoryQuery{}); len(left) != 2 {
+		t.Fatalf("deleted without confirming: %v", left)
+	}
+	if w := post(t, h, base+"/memory/delete-all", url.Values{"confirm": {" borrar "}}, false); w.Code != http.StatusSeeOther {
+		t.Fatalf("with the word: %d", w.Code)
+	}
+	for _, view := range training.MemoryViews {
+		if left, _ := svc.SearchMemory(ctx, training.MemoryQuery{View: view}); len(left) != 0 {
+			t.Fatalf("%s left: %v", view, left)
+		}
 	}
 }

@@ -22,9 +22,40 @@
 
 <main class="review memory">
   {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
-  <p class="muted">Lo que el entrenador recuerda de ti. Los chats se borran a los 90 días; esto se queda hasta que tú lo borres.</p>
+  <p class="muted">Lo que el entrenador recuerda de ti. Los chats se borran a los 90 días; esto se queda hasta que tú lo borres. Lo que el entrenador olvida o sustituye sigue aquí como historial.</p>
 
+  <nav class="bar-actions" aria-label="Vistas">{{range .Memory.Views}}
+    <a class="ghost{{if eq .Value $.Memory.View}} on{{end}}" href="{{$.Base}}/memory?view={{.Value}}"{{if eq .Value $.Memory.View}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}
+  </nav>
+
+  {{if eq .Memory.View "conflicts"}}
+  {{range .Memory.Conflicts}}
+  <article class="card proposal" id="conflict-{{.ID}}">
+    <header><strong>Se contradicen</strong>{{if .Reason}} <span class="muted">{{.Reason}}</span>{{end}}</header>
+    <p class="summary"><strong>Nuevo: {{.New.Title}}</strong> · {{.New.Body}}</p>
+    <p class="summary"><strong>Anterior: {{.Old.Title}}</strong> · {{.Old.Body}}</p>
+    <form method="post" action="{{$.Base}}/memory/conflicts/{{.ID}}/resolve">{{if $.CSRF}}
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+      <input type="hidden" name="keep" value="new">
+      <button type="submit" class="ghost wide">Quedarme con el nuevo</button>
+    </form>
+    <form method="post" action="{{$.Base}}/memory/conflicts/{{.ID}}/resolve">{{if $.CSRF}}
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+      <input type="hidden" name="keep" value="old">
+      <button type="submit" class="ghost wide">Quedarme con el anterior</button>
+    </form>
+    <form method="post" action="{{$.Base}}/memory/conflicts/{{.ID}}/resolve">{{if $.CSRF}}
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+      <input type="hidden" name="keep" value="both">
+      <button type="submit" class="ghost wide">Los dos son ciertos</button>
+    </form>
+  </article>
+  {{else}}
+  <p class="empty">No hay conflictos.</p>
+  {{end}}
+  {{else}}
   <form method="get" action="{{.Base}}/memory" class="card">
+    <input type="hidden" name="view" value="{{.Memory.View}}">
     <label>Buscar <input type="search" name="q" value="{{.Memory.Query}}"></label>
     <label>Tipo
       <select name="type">
@@ -37,8 +68,19 @@
 
   {{range .Memory.Items}}
   <article class="card proposal" id="memory-{{.ID}}">
-    <header><strong>{{.Title}}</strong> <span class="muted">{{.TypeLabel}}{{if .Pinned}} · fijado{{end}} · {{.When}}</span></header>
+    <header><strong>{{.Title}}</strong> <span class="muted">{{.TypeLabel}}{{if .Pinned}} · fijado{{end}}{{if .Status}} · {{.Status}}{{end}} · {{.When}}</span></header>
     <p class="summary">{{.Body}}</p>
+    {{if .History}}<details>
+      <summary>Versiones anteriores ({{len .History}})</summary>
+      <ol>{{range .History}}
+        <li><strong>{{.Title}}</strong> · {{.Body}}</li>{{end}}
+      </ol>
+    </details>{{end}}
+    {{if .Active}}
+    {{if .Due}}<form method="post" action="{{$.Base}}/memory/{{.ID}}/confirm">{{if $.CSRF}}
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+      <button type="submit" class="primary wide">Sigue vigente</button>
+    </form>{{end}}
     <details>
       <summary>Editar</summary>
       <form method="post" action="{{$.Base}}/memory/{{.ID}}/update">{{if $.CSRF}}
@@ -54,14 +96,25 @@
         <button type="submit" class="primary wide">Guardar</button>
       </form>
     </details>
+    {{end}}
     <form method="post" action="{{$.Base}}/memory/{{.ID}}/delete">{{if $.CSRF}}
       <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
-      <button type="submit" class="ghost wide risky">Borrar</button>
+      <button type="submit" class="ghost wide risky">Borrar para siempre</button>
     </form>
   </article>
   {{else}}
   <p class="empty">No hay nada{{if or .Memory.Query .Memory.Type}} con ese filtro{{else}} todavía{{end}}.</p>
   {{end}}
+  {{end}}
+
+  <details class="card">
+    <summary>Borrar todo</summary>
+    <form method="post" action="{{.Base}}/memory/delete-all">{{if .CSRF}}
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
+      <label>Escribe «borrar» para borrar para siempre todo lo que el entrenador recuerda, también lo olvidado. <input name="confirm" autocomplete="off" required></label>
+      <button type="submit" class="ghost wide risky">Borrar todo</button>
+    </form>
+  </details>
 </main>
 </body>
 </html>

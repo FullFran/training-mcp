@@ -38,6 +38,9 @@ var actionLabels = map[string]string{
 	"rest.set":                "Cambiar descanso objetivo",
 	"memory.save":             "Recordar",
 	"memory.forget":           "Olvidar recuerdo",
+	"memory.judge":            "Relacionar recuerdos",
+	"memory.confirm":          "Confirmar recuerdo",
+	"memory.consolidate":      "Fusionar recuerdos",
 }
 
 func actionLabel(actionType string) string {

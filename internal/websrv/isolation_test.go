@@ -39,6 +39,8 @@ type webWorld struct {
 	memory   string
 	// rule is the owner's stored grant.
 	rule string
+	// conflict is the owner's judged conflict between two facts.
+	conflict string
 }
 
 func webHandler(t *testing.T, services *training.Services, userID int64) http.Handler {
@@ -119,9 +121,21 @@ func newWebWorld(t *testing.T) webWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
+	rival, err := owner.SaveMemory(ctx, training.MemoryInput{TopicKey: "lesion/hombro-2", Type: "limitation", Title: secretMemory + " bis", Body: "no duele"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = owner.JudgeMemory(ctx, rival.Candidates[0].RelationID, training.RelationConflictsWith, "opuestos"); err != nil {
+		t.Fatal(err)
+	}
+	// With no review date, confirming visibly changes the fact.
+	if _, err = db.Exec(`UPDATE coach_memory SET review_after=''`); err != nil {
+		t.Fatal(err)
+	}
 	return webWorld{
 		db: db, owner: webHandler(t, services, 1), second: webHandler(t, services, 2),
-		set: itoa(set.ID), session: itoa(session.ID), plan: itoa(plan.ID), proposal: itoa(proposal.ID), rule: itoa(rule), memory: itoa(memory.ID),
+		set: itoa(set.ID), session: itoa(session.ID), plan: itoa(plan.ID), proposal: itoa(proposal.ID), rule: itoa(rule),
+		memory: itoa(memory.Memory.ID), conflict: itoa(rival.Candidates[0].RelationID),
 	}
 }
 
@@ -130,7 +144,7 @@ func dumpDatabase(t *testing.T, db *sql.DB) string {
 	var out strings.Builder
 	for _, table := range []string{"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
 		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys",
-		"proposals", "answer_rules", "decision_records", "agent_permissions", "coach_memory"} {
+		"proposals", "answer_rules", "decision_records", "agent_permissions", "coach_memory", "coach_memory_revisions", "coach_memory_relations"} {
 		rows, err := db.Query(`SELECT * FROM ` + table + ` ORDER BY rowid`)
 		if err != nil {
 			t.Fatal(err)
@@ -207,6 +221,13 @@ var webRoutes = map[string]func(*testing.T){
 	"POST /memory/{id}/delete": idRoute(func(w webWorld) string { return w.memory }, func(id string) (string, url.Values) {
 		return "/memory/" + id + "/delete", url.Values{}
 	}),
+	"POST /memory/{id}/confirm": idRoute(func(w webWorld) string { return w.memory }, func(id string) (string, url.Values) {
+		return "/memory/" + id + "/confirm", url.Values{}
+	}),
+	"POST /memory/conflicts/{id}/resolve": idRoute(func(w webWorld) string { return w.conflict }, func(id string) (string, url.Values) {
+		return "/memory/conflicts/" + id + "/resolve", url.Values{"keep": {"new"}}
+	}),
+	"POST /memory/delete-all": testDeletingAllMemoryTouchesOnlyTheUsersOwn,
 
 	"GET /manifest.webmanifest": sharedRoute("the same document for everyone"),
 	"GET /sw.js":                sharedRoute("the same document for everyone"),
@@ -262,6 +283,24 @@ func testForgettingTouchesOnlyTheUsersOwnRules(t *testing.T) {
 	var n int
 	if err := world.db.QueryRow(`SELECT COUNT(*) FROM answer_rules WHERE user_id=1`).Scan(&n); err != nil || n != 0 {
 		t.Fatalf("owner's rules = %d, %v", n, err)
+	}
+}
+
+func testDeletingAllMemoryTouchesOnlyTheUsersOwn(t *testing.T) {
+	world := newWebWorld(t)
+	before := dumpDatabase(t, world.db)
+	if w := post(t, world.second, base+"/memory/delete-all", url.Values{"confirm": {"borrar"}}, true); w.Code != http.StatusOK {
+		t.Fatalf("status %d", w.Code)
+	}
+	if after := dumpDatabase(t, world.db); after != before {
+		t.Fatalf("rows changed:\nbefore\n%s\nafter\n%s", before, after)
+	}
+	if w := post(t, world.owner, base+"/memory/delete-all", url.Values{"confirm": {"borrar"}}, true); w.Code != http.StatusOK {
+		t.Fatalf("owner status %d", w.Code)
+	}
+	var n int
+	if err := world.db.QueryRow(`SELECT COUNT(*) FROM coach_memory WHERE user_id=1`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("owner's memory = %d, %v", n, err)
 	}
 }
 
