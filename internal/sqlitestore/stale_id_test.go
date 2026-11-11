@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -291,10 +293,37 @@ func TestStaleIDReadCannotReturnAnotherUsersRows(t *testing.T) {
 			if statements <= tc.after {
 				t.Fatalf("the read ran %d statements, so the id never changed hands after statement %d", statements, tc.after)
 			}
-			text := fmt.Sprintf("%+v %v", out, err)
-			if strings.Contains(text, "secreto") || strings.Contains(text, "77") {
-				t.Fatalf("user 1's stale read returned user 2's rows: %s", text)
+			if leaked := userTwoMarkers(t, out, err); leaked != "" {
+				t.Fatalf("user 1's stale read returned user 2's rows (%s): %s", leaked, mustJSON(t, out))
 			}
 		})
 	}
+}
+
+// userTwoMarkerRE matches the values injected for user 2 as whole JSON numbers:
+// a 77.7 kg set, or an item with target_sets 77.
+var userTwoMarkerRE = regexp.MustCompile(`[:,\[]77\.7[,}\]]|"target_sets":77[,}]`)
+
+// userTwoMarkers reports which of user 2's injected markers a read returned.
+// It inspects the JSON encoding, so pointers are dereferenced and their
+// addresses (which can contain any digits) never reach the match.
+func userTwoMarkers(t *testing.T, out any, err error) string {
+	t.Helper()
+	text := mustJSON(t, out)
+	if err != nil {
+		text += " " + err.Error()
+	}
+	if strings.Contains(text, "secreto") {
+		return "secreto"
+	}
+	return userTwoMarkerRE.FindString(text)
+}
+
+func mustJSON(t *testing.T, v any) string {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("encode read result: %v", err)
+	}
+	return string(b)
 }
