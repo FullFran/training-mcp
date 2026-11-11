@@ -664,3 +664,20 @@ main { padding-bottom: 140px; }
 }
 .recommend .conf { display: block; margin-top: 2px; font-size: 12px; opacity: .8; }
 .recommend .conf-insuficiente { color: var(--danger); }
+
+/* --- review of agent proposals ----------------------------------------- */
+.review h2 { font-size: 16px; margin: 20px 0 8px; color: var(--muted); }
+.review .card { margin-bottom: 12px; }
+.proposal dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 10px 0; font-size: 15px; }
+.proposal dt { color: var(--muted); }
+.proposal dd { margin: 0; overflow-wrap: anywhere; }
+.proposal form { margin-top: 8px; }
+.remember { border: 0; padding: 0; margin: 0 0 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+.remember legend { color: var(--muted); font-size: 14px; margin-bottom: 6px; }
+.remember label { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; }
+.accept-all.on { border-color: var(--danger); background: #2a1618; }
+.accept-all p { margin: 0 0 10px; }
+.risky { border-color: var(--danger); color: var(--danger); }
+.attention { border-color: var(--accent); color: var(--accent); }
+.rules, .answered { list-style: none; padding: 0; margin: 0; }
+.rules li, .answered li { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--line); }

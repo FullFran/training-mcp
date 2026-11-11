@@ -1,0 +1,94 @@
+{{define "review.html"}}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Revisar</title>
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="{{.Base}}/manifest.webmanifest">
+<link rel="icon" href="{{.Base}}/static/icon-192.png">
+<link rel="stylesheet" href="{{.Base}}/static/app.css">
+{{if .CSRF}}<meta name="csrf-token" content="{{.CSRF}}">
+{{end}}</head>
+<body data-base="{{.Base}}">
+
+<header class="bar">
+  <div><strong>Revisar</strong></div>
+  <div class="bar-actions">
+    <a class="ghost" href="{{.Base}}/">Hoy</a>
+  </div>
+</header>
+
+<main class="review">
+  {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
+
+  <section class="card accept-all{{if .Review.AcceptAll}} on{{end}}" aria-label="Aceptar todo">
+    {{if .Review.AcceptAll}}
+    <p><strong>⚠ Aceptar todo está activado.</strong> El agente aplica cualquier cambio sin preguntarte, también los de tipos nuevos. Todo queda en el historial.</p>
+    {{else}}
+    <p><strong>Aceptar todo</strong> está desactivado: el agente te pregunta antes de cada cambio que no hayas recordado.</p>
+    {{end}}
+    <form method="post" action="{{.Base}}/review/accept-all">{{if .CSRF}}
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
+      <input type="hidden" name="on" value="{{if .Review.AcceptAll}}0{{else}}1{{end}}">
+      <button type="submit" class="ghost wide{{if not .Review.AcceptAll}} risky{{end}}">{{if .Review.AcceptAll}}Desactivar aceptar todo{{else}}Activar aceptar todo{{end}}</button>
+    </form>
+  </section>
+
+  <h2>Pendientes</h2>
+  {{range .Review.Pending}}
+  <article class="card proposal">
+    <header><strong>{{.Label}}</strong> <span class="muted">{{.When}}</span></header>
+    <dl>{{range .Fields}}
+      <dt>{{.Name}}</dt><dd>{{.Value}}</dd>{{end}}
+    </dl>
+    <form method="post" action="{{$.Base}}/review/{{.ID}}/accept">{{if $.CSRF}}
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+      <fieldset class="remember">
+        <legend>Recordar para «{{.Label}}»</legend>
+        <label><input type="radio" name="remember" value="once" checked> Solo esta vez</label>
+        <label><input type="radio" name="remember" value="session"> 12 horas</label>
+        <label><input type="radio" name="remember" value="always"> Siempre</label>
+      </fieldset>
+      <button type="submit" class="primary wide">Aceptar</button>
+    </form>
+    <form method="post" action="{{$.Base}}/review/{{.ID}}/reject">{{if $.CSRF}}
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+      <button type="submit" class="ghost wide">Rechazar</button>
+    </form>
+  </article>
+  {{else}}
+  <p class="empty">Nada pendiente.</p>
+  {{end}}
+
+  {{if .Review.Rules}}
+  <h2>Respuestas recordadas</h2>
+  <ul class="rules">
+    {{range .Review.Rules}}
+    <li>
+      <span><strong>{{.Label}}</strong> <span class="muted">{{.Remember}}</span></span>
+      <form method="post" action="{{$.Base}}/review/forget">{{if $.CSRF}}
+        <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+        <input type="hidden" name="action_type" value="{{.ActionType}}">
+        <button type="submit" class="ghost">Olvidar</button>
+      </form>
+    </li>
+    {{end}}
+  </ul>
+  {{end}}
+
+  {{if .Review.Answered}}
+  <h2>Historial</h2>
+  <ul class="answered">
+    {{range .Review.Answered}}
+    <li>
+      <span><strong>{{.Label}}</strong> · {{.Status}}{{if .DecidedBy}} <span class="muted">({{.DecidedBy}})</span>{{end}}</span>
+      <span class="muted">{{.When}}{{if .Error}} · {{.Error}}{{end}}</span>
+    </li>
+    {{end}}
+  </ul>
+  {{end}}
+</main>
+</body>
+</html>
+{{end}}

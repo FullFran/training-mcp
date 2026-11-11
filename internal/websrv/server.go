@@ -112,6 +112,10 @@ type pageData struct {
 	Rest       training.Rest
 	Next       *training.PlanProgress
 	LastSetID  int64
+	// Review is the review page: proposals waiting and answered, and the standing answers.
+	Review ReviewData
+	// PendingCount is how many agent proposals wait for an answer.
+	PendingCount int
 }
 
 // LastSet returns the final set of the session, used to power "repeat last set".
@@ -136,6 +140,9 @@ type Options struct {
 	// CSRFToken returns the token a request's session must send back with every
 	// write. Nil means the mount has no sessions and the pages carry no token.
 	CSRFToken func(*http.Request) string
+	// Apply applies an accepted proposal through its MCP tool's code. Nil means
+	// proposals can be listed and rejected here but not accepted.
+	Apply training.Applier
 }
 
 // New serves the app under the secret base path, as the owner's backup route
@@ -268,6 +275,11 @@ func (s *Server) routes() {
 	s.handle("POST "+b+"/rest", s.setRest)
 	s.handle("GET "+b+"/exercise-info", s.exerciseInfo)
 	s.handle("GET "+b+"/s/{id}", s.session)
+	s.handle("GET "+b+"/review", s.reviewPage)
+	s.handle("POST "+b+"/review/{id}/accept", s.acceptProposal)
+	s.handle("POST "+b+"/review/{id}/reject", s.rejectProposal)
+	s.handle("POST "+b+"/review/accept-all", s.setAcceptAll)
+	s.handle("POST "+b+"/review/forget", s.forgetRule)
 	s.handle("GET "+b+"/manifest.webmanifest", s.manifest)
 	s.handle("GET "+b+"/sw.js", s.serviceWorker)
 
@@ -297,6 +309,7 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
+	data.PendingCount = s.pendingCount(r)
 	s.render(w, r, "index.html", data)
 }
 

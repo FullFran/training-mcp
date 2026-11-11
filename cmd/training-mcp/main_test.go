@@ -3,12 +3,14 @@ package main
 import (
 	"bytes"
 	"context"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"testing"
@@ -287,5 +289,73 @@ func TestWebLoginSettingsServeTheAppAtTheRoot(t *testing.T) {
 	if !strings.HasPrefix(to, "https://auth.example.test/oauth/authorize?") ||
 		!strings.Contains(to, "redirect_uri=https%3A%2F%2Ftraining.example.test%2Fauth%2Fcallback") {
 		t.Fatalf("login goes to %q", to)
+	}
+}
+
+// TestSecretMountAcceptsAgentProposals boots the real composition and walks one
+// agent write from pending to applied through the review page.
+func TestSecretMountAcceptsAgentProposals(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := l.Addr().String()
+	l.Close()
+	t.Setenv("MCP_BEARER_TOKEN", "test-token")
+	t.Setenv("MCP_AUTH_DISABLED", "")
+	t.Setenv("WEB_BASE_PATH", "/s3cr3t-path-for-tests")
+	t.Setenv("MCP_OAUTH_ISSUER", "")
+	t.Setenv("WEB_OAUTH_CLIENT_ID", "")
+	t.Setenv("TRAINING_DB_PATH", t.TempDir()+"/training.db")
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- runWithContext(ctx, []string{"--addr", addr}) }()
+	defer func() {
+		cancel()
+		if err := <-done; err != nil {
+			t.Errorf("server: %v", err)
+		}
+	}()
+	root := "http://" + addr
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	send := func(method, path, contentType, body string) (int, string) {
+		t.Helper()
+		var resp *http.Response
+		for i := 0; i < 100; i++ {
+			req, _ := http.NewRequest(method, root+path, strings.NewReader(body))
+			req.Header.Set("Authorization", "Bearer test-token")
+			req.Header.Set("Content-Type", contentType)
+			req.Header.Set("Accept", "application/json, text/event-stream")
+			if resp, err = client.Do(req); err == nil {
+				break
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		data, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(data)
+	}
+	form := "application/x-www-form-urlencoded"
+	if code, _ := send("POST", "/s3cr3t-path-for-tests/review/accept-all", form, "on=0"); code != http.StatusSeeOther {
+		t.Fatalf("turning accept-all off: %d", code)
+	}
+	call := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_plan","arguments":{"name":"empuje","items":[{"exercise":"banca","target_sets":3}]}}}`
+	code, body := send("POST", "/mcp", "application/json", call)
+	if code != http.StatusOK || !strings.Contains(body, `\"status\":\"pending\"`) {
+		t.Fatalf("create_plan: %d %s", code, body)
+	}
+	match := regexp.MustCompile(`\\"proposal_id\\":(\d+)`).FindStringSubmatch(body)
+	if match == nil {
+		t.Fatalf("no proposal id in %s", body)
+	}
+	if code, body := send("POST", "/s3cr3t-path-for-tests/review/"+match[1]+"/accept", form, "remember=once"); code != http.StatusSeeOther {
+		t.Fatalf("accept: %d %s", code, body)
+	}
+	_, body = send("POST", "/mcp", "application/json", `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_plans","arguments":{}}}`)
+	if !strings.Contains(body, "empuje") {
+		t.Fatalf("the accepted plan is missing: %s", body)
 	}
 }
