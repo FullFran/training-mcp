@@ -495,7 +495,7 @@ func New(service training.ServiceFor) *Server {
 	setItemSchema := mustInputSchema[SessionItemInput]()
 	setPositiveID(setItemSchema.Properties["session_id"])
 	setItemSchema.Properties["exercise"].Pattern = `.*\S.*`
-	addWrite(w, &mcp.Tool{Name: "add_session_exercise", Description: "Add an exercise to today's session plan. If it is already there, target_sets is replaced and every optional field you omit (rep range, RPE, superset, notes) keeps its current value; sending either rep bound replaces the whole range. Adjusting a session never edits the plan it was started from.", InputSchema: setItemSchema}, "session.exercise.set", func(ctx context.Context, svc *training.Service, in SessionItemInput) (ItemOut, error) {
+	addWrite(w, &mcp.Tool{Name: "add_session_exercise", Description: "Add an exercise to today's session plan. If it is already there, target_sets is replaced and every optional field you omit (rep range, RPE, superset, notes) keeps its current value; sending either rep bound replaces the whole range. To clear a field, remove the exercise and add it again. Adjusting a session never edits the plan it was started from.", InputSchema: setItemSchema}, "session.exercise.set", func(ctx context.Context, svc *training.Service, in SessionItemInput) (ItemOut, error) {
 		err := svc.SetSessionItem(ctx, in.SessionID, training.PlanItem{
 			Exercise: in.Exercise, TargetSets: in.TargetSets,
 			RepMin: in.RepMin, RepMax: in.RepMax, TargetRPE: in.TargetRPE,
