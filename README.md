@@ -127,6 +127,13 @@ drift, followed by the design notes explaining why the surface looks like this.
 
 A few shapes worth knowing before reading it:
 
+- Every write tool is a proposal. Its result says `status: accepted` (applied)
+  or `pending` (waiting on the `/review` page), plus a `proposal_id`. Answers
+  are remembered once, for 12 hours, or always per action type, and an
+  accept-all switch per account skips the questions. Accounts that existed
+  before migration 014 keep accept-all on; new accounts ask for everything.
+  See [Every write is a proposal](docs/tools.md#every-write-is-a-proposal).
+
 - `log_set` needs no session id. It finds or creates today's session, so
   conversational logging is one call. The explicit `start_session` + `add_set`
   path remains for when you want control.
@@ -151,6 +158,10 @@ shared with the MCP tools and cannot drift apart.
   `WEB_OAUTH_CLIENT_ID` and `WEB_OAUTH_CLIENT_SECRET`, at the root to whoever
   signs in with the OAuth provider, each seeing only their own data. Neither
   set means not served at all. The database export is only on the secret prefix.
+- `/review` lists the agent's pending proposals with what each would change,
+  accepts (once, 12 hours, always) or rejects them, shows the answer history
+  and holds the accept-all switch. The person's own changes in the app apply
+  directly.
 - A plan can be started for the day; its exercises become a checklist showing
   done/target sets, and tapping one loads its prescription into the form.
 - The day's plan is fully adjustable mid-session: add or drop an exercise,

@@ -153,3 +153,16 @@ cache partition in `X-Cache-Partition`; the service worker reads only that
 partition offline, drops the others, and drops all of them on `/logged-out`.
 The root never serves `/export.db`, which holds every user's data. The shell
 files (`/sw.js`, `/manifest.webmanifest`, `/static/`) are public.
+
+### Agent writes are proposals
+
+Authenticating a client is not the same as letting its agent change data.
+Every MCP write tool goes through `training.Service.Propose`, which records a
+proposal in the caller's own rows and applies it only when the account's
+accept-all switch, or a remembered answer for that action type, covers it.
+Otherwise the change waits for the person on `/review`. Accepting replays the
+stored payload through `mcpsrv.Server.Apply`, the same function the tool runs,
+so there is one write path whether a change is applied at once or later. The
+PWA's own forms are the person acting and write directly. Proposals, rules and
+the switch are reached only through the user-bound store, so another user's
+proposal id answers exactly as a missing one.
