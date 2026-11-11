@@ -1182,7 +1182,7 @@ body:not([data-mode="train"]) .coach-sheet-head { display: none; }
   text-decoration: none;
 }
 .mode-card:active { transform: scale(.99); }
-.mode-card.train { border-color: var(--accent); }
+.mode-card.mode-train { border-color: var(--accent); }
 .mode-icon { grid-row: 1 / span 2; font-size: 40px; }
 .mode-card strong { font-size: 26px; align-self: end; }
 .mode-sub { color: var(--muted); font-size: 15px; align-self: start; }
@@ -1302,3 +1302,91 @@ body.coach-open .coach-sheet {
 .finish-list { margin: 0 0 12px; padding: 0; list-style: none; display: grid; gap: 6px; }
 .finish-list li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .finish .primary.wide { width: 100%; min-height: 52px; margin-top: 12px; font-size: 17px; }
+
+/* --- Entrenar: one card per exercise with its set table ---------------------
+   Columns Serie | Anterior | kg | Reps | RPE | check; rows 52px; a done row
+   turns green, the live row is the only one at full strength. */
+.train-plan { display: grid; gap: 10px; }
+.train-plan .planned { gap: 10px; }
+.train-plan .planned > li.ex-card { display: block; padding: 0; border-radius: 16px; background: var(--card); }
+.train-plan .planned > li.ex-card.extra { opacity: 1; }
+.train-plan .planned > li.in-ss { border-left: 4px solid #60a5fa; }
+.train-plan .planned > li.in-ss + li.in-ss { margin-top: -6px; border-top-left-radius: 4px; }
+.ex-head {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 60px;
+  padding: 8px 14px;
+  list-style: none;
+  cursor: pointer;
+}
+.ex-head::-webkit-details-marker { display: none; }
+.train-plan .ex { font-size: 17px; font-weight: 600; }
+.train-plan .count { font-size: 16px; }
+.ex-card .ss { background: #60a5fa; }
+.ex-body { padding: 0 8px 10px; display: grid; gap: 8px; }
+.train-plan .set-table { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.train-plan .set-table > li,
+.set-row .row-form {
+  display: grid;
+  grid-template-columns: 2.2rem minmax(4.4rem, 1fr) 4rem 3.2rem 3.2rem 3rem;
+  align-items: center;
+  gap: 4px;
+  min-height: 52px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+}
+.train-plan .set-table > li.pending,
+.train-plan .set-table > li.added { display: block; padding: 0; }
+.train-plan .set-table > li.head > span:nth-child(n+3) { text-align: center; }
+.train-plan .set-table > li.head { min-height: 24px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.set-row .set-n { text-align: center; font-weight: 700; color: var(--muted); }
+.set-row .prev { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.set-row input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+.set-row input::-webkit-outer-spin-button, .set-row input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.set-row .check {
+  width: 100%; min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 20px; font-weight: 800;
+}
+.set-row.live .check { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.set-row.pending:not(.live) .row-form { opacity: .7; }
+.train-plan .set-table > li.done { background: rgba(74, 222, 128, .14); }
+.set-row.done .v { grid-column: 3 / span 3; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+.set-row.done .set-n { color: var(--accent); }
+.set-row.done .edit { min-height: 44px; border: 0; background: none; color: var(--muted); font-size: 18px; }
+.set-row .row-tags { grid-column: 1 / -1; padding: 0 0 6px 2.6rem; font-size: 12px; }
+.set-row .edit-form { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 8px; }
+.set-row .edit-form input { flex: 1 1 4rem; }
+.set-row .edit-form .del { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--danger); background: none; color: var(--danger); }
+.ex-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ex-tools .add-row { flex: 1 1 100%; min-height: 44px; font-size: 15px; }
+.ex-tools .mini { min-height: 40px; }
+.ex-tools .item-actions { flex-basis: 100%; }
+/* The rows are the one-tap log here, so the dock only shows the rest while it
+   runs; the bar's quick log and its sheet would duplicate them. */
+body[data-mode="train"]:has(.ex-card) .wk-log,
+body[data-mode="train"]:has(.ex-card) .wk-now,
+body[data-mode="train"]:has(.ex-card) .wk-more,
+body[data-mode="train"]:has(.ex-card) .workout:has(> .rest[hidden]) { display: none; }
+.chat-bar .bar-start { display: flex; align-items: center; }

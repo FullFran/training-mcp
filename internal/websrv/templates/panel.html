@@ -21,7 +21,92 @@
   </section>
   {{end}}
 
-  {{if .Progress}}
+  {{if and (not .ReadOnly) .Cards}}
+  <section class="plan train-plan" aria-label="Entreno de hoy">
+    <header class="plan-head">
+      <strong>{{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Entreno libre{{end}}</strong>
+      <span class="muted">{{len .Session.Sets}} serie{{if ne (len .Session.Sets) 1}}s{{end}} · {{num .Session.TotalSI}} SI</span>
+    </header>
+    {{if .PlanNotes}}<p class="plan-note">{{.PlanNotes}}</p>{{end}}
+    <ol class="planned">
+      {{range $card := .Cards}}
+      <li class="ex-card{{if .Skipped}} skipped{{else if .Done}} ok{{end}}{{if not .Planned}} extra{{end}}{{if .Superset}} in-ss{{end}}"
+          data-exercise="{{.Exercise}}"
+          data-superset="{{.Superset}}"
+          data-reps="{{targetReps .PlanProgress}}"{{with todayWeight $.Session .Exercise}}
+          data-today-weight="{{.}}"{{end}}
+          data-rpe="{{num .TargetRPE}}">
+        <details name="ex-card"{{if .Open}} open{{end}}>
+          <summary class="ex-head">
+            <span class="chk">{{if .Skipped}}—{{else if .Done}}✓{{else}}○{{end}}</span>
+            <span class="what">
+              <span class="ex">{{if .Superset}}<span class="ss">{{.Superset}}</span>{{end}}{{.Exercise}}</span>
+              <span class="rx">
+                {{- if not .Planned}}fuera de plan
+                {{- else}}{{.RepMin}}{{if ne .RepMax .RepMin}}-{{.RepMax}}{{end}} reps{{if .TargetRPE}} @{{num .TargetRPE}}{{end}}{{end -}}
+              </span>
+              {{if .Notes}}<span class="item-note">{{.Notes}}</span>{{end}}
+            </span>
+            <span class="count">{{.DoneSets}}{{if .TargetSets}}/{{.TargetSets}}{{end}}</span>
+          </summary>
+          <div class="ex-body">
+            <ol class="set-table" aria-label="Series de {{.Exercise}}">
+              <li class="set-row head" aria-hidden="true"><span>Serie</span><span>Anterior</span><span>kg</span><span>Reps</span><span>RPE</span><span></span></li>
+              {{range $i, $set := .Sets}}
+              <li class="set-row done" data-set-id="{{$set.ID}}"
+                  data-weight="{{num $set.WeightKG}}" data-reps="{{$set.Reps}}" data-rpe="{{if not $set.RPEImputed}}{{num $set.RPE}}{{end}}"
+                  data-technique="{{$set.Technique}}">
+                <span class="set-n">{{add $i 1}}</span>
+                <span class="prev">{{index $card.Previous $i}}</span>
+                <span class="v">{{num $set.WeightKG}} kg × {{$set.Reps}} @{{if $set.RPEImputed}}?{{else}}{{num $set.RPE}}{{end}}</span>
+                <button class="edit" type="button" aria-label="Editar serie {{add $i 1}}">✎</button>
+                {{if or $set.Technique (index $.Records $set.ID)}}<span class="row-tags">{{if index $.Records $set.ID}}<span class="pr" title="Récord: mejor 1RM estimado">PR</span>{{end}}{{if $set.Technique}} <span class="tech-tag">{{$set.Technique}}</span>{{end}}</span>{{end}}
+              </li>
+              {{end}}
+              {{range $j, $row := .Pending}}
+              <li class="set-row pending{{if eq $j 0}} live{{end}}">{{template "set-row" (rowData $.Base $card.Exercise $row)}}</li>
+              {{end}}
+              <template class="row-tpl"><li class="set-row added">{{template "set-row" (rowData $.Base $card.Exercise .Extra)}}</li></template>
+            </ol>
+            <div class="ex-tools">
+              <button type="button" class="mini add-row">+ Añadir serie</button>
+              {{if .Planned}}
+              <button type="button" class="mini swap" data-exercise="{{.Exercise}}">Sustituir</button>
+              <button type="button" class="mini" hx-post="{{$.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML"
+                      hx-vals='{"action":"{{if .Skipped}}unskip{{else}}skip{{end}}","exercise":"{{.Exercise}}"}'>{{if .Skipped}}Retomar{{else}}Saltar{{end}}</button>
+              {{end}}
+              <button type="button" class="more" aria-label="Más opciones de {{.Exercise}}">⋯</button>
+              <div class="item-actions" hidden>
+                {{if .Planned}}
+                <button type="button" class="mini" hx-post="{{$.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML"
+                        hx-vals='{"action":"sets","delta":"-1","current":"{{.TargetSets}}","exercise":"{{.Exercise}}"}'>− serie</button>
+                <button type="button" class="mini" hx-post="{{$.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML"
+                        hx-vals='{"action":"sets","delta":"1","current":"{{.TargetSets}}","exercise":"{{.Exercise}}"}'>+ serie</button>
+                <form class="rx-edit" hx-post="{{$.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML">
+                  <input type="hidden" name="action" value="rx">
+                  <input type="hidden" name="exercise" value="{{.Exercise}}">
+                  <input name="rep_min" type="number" inputmode="numeric" min="0" step="1" placeholder="reps" value="{{if .RepMin}}{{.RepMin}}{{end}}" aria-label="Reps mínimas">
+                  <span class="muted">–</span>
+                  <input name="rep_max" type="number" inputmode="numeric" min="0" step="1" placeholder="máx" value="{{if .RepMax}}{{.RepMax}}{{end}}" aria-label="Reps máximas">
+                  <input name="target_rpe" type="number" inputmode="decimal" min="1" max="10" step="0.5" placeholder="RPE" value="{{if .TargetRPE}}{{num .TargetRPE}}{{end}}" aria-label="RPE objetivo">
+                  <button type="submit" class="mini">Guardar</button>
+                </form>
+                <button type="button" class="mini danger" hx-post="{{$.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML"
+                        hx-vals='{"action":"remove","exercise":"{{.Exercise}}"}'
+                        hx-confirm="¿Quitar del plan de hoy? Las series ya hechas se conservan.">Quitar</button>
+                {{else}}
+                <button type="button" class="mini" hx-post="{{$.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML"
+                        hx-vals='{"action":"adopt","done":"{{.DoneSets}}","exercise":"{{.Exercise}}"}'>Añadir al plan</button>
+                {{end}}
+              </div>
+            </div>
+          </div>
+        </details>
+      </li>
+      {{end}}
+    </ol>
+  </section>
+  {{else if .Progress}}
   <section class="plan card" aria-label="Plan de hoy">
     <header class="plan-head">
       <strong>{{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Plan de hoy{{end}}</strong>
@@ -105,7 +190,7 @@
     <strong>SI {{num .Session.TotalSI}}</strong>
   </div>
 
-  {{if .Blocks}}
+  {{if and .Blocks .ReadOnly}}
   <div class="blocks">
     {{range .Blocks}}
     <article class="block">
@@ -139,7 +224,7 @@
     </article>
     {{end}}
   </div>
-  {{else}}
+  {{else if not .Blocks}}
   <p class="empty">Sin series todavía. Añade la primera.</p>
   {{end}}
 
@@ -152,7 +237,7 @@
     <p class="finish-totals"><strong>{{len .Session.Sets}} serie{{if ne (len .Session.Sets) 1}}s{{end}}</strong> · {{len .Blocks}} ejercicio{{if ne (len .Blocks) 1}}s{{end}} · SI {{num .Session.TotalSI}}{{if .Progress}} · plan {{doneCount .Progress}}/{{len .Progress}}{{end}}</p>
     {{if .Blocks}}<ul class="finish-list">
       {{range .Blocks}}{{$block := .}}
-      <li><span>{{.Exercise}}</span> <span class="muted">{{len .Sets}} × · mejor {{with $block.Top}}{{num .WeightKG}} kg × {{.Reps}}{{end}}</span>{{range .Sets}}{{if $block.IsRecord .}} <span class="pr">PR</span>{{end}}{{end}}</li>
+      <li><span>{{.Exercise}}</span> <span class="muted">{{len .Sets}} serie{{if ne (len .Sets) 1}}s{{end}} · mejor {{with $block.Top}}{{num .WeightKG}} kg × {{.Reps}}{{end}}</span>{{range .Sets}}{{if $block.IsRecord .}} <span class="pr">PR</span>{{end}}{{end}}</li>
       {{end}}
     </ul>{{else}}<p class="muted">Todavía no hay series hoy.</p>{{end}}
     {{if and .TrainedGroups (not .ReadOnly)}}
@@ -188,3 +273,13 @@
   {{end}}
 </section>
 {{end}}
+
+{{define "set-row"}}<form class="row-form" hx-post="{{.Base}}/sets" hx-target="#panel" hx-swap="outerHTML" autocomplete="off">
+  <input type="hidden" name="exercise" value="{{.Exercise}}">
+  <span class="set-n">{{.Row.N}}</span>
+  <span class="prev">{{.Row.Previous}}</span>
+  <input name="weight_kg" type="number" inputmode="decimal" step="0.25" min="0.5" required value="{{.Row.Weight}}" aria-label="Peso, serie {{.Row.N}}">
+  <input name="reps" type="number" inputmode="numeric" step="1" min="1" required value="{{.Row.Reps}}" aria-label="Reps, serie {{.Row.N}}">
+  <input name="rpe" type="number" inputmode="decimal" step="0.5" min="1" max="10" required value="{{.Row.RPE}}" aria-label="RPE, serie {{.Row.N}}">
+  <button type="submit" class="check" aria-label="Registrar serie {{.Row.N}}">✓</button>
+</form>{{end}}

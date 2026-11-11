@@ -96,7 +96,7 @@ func TestEntrenarStartsFromAPlanOrAnEmptySession(t *testing.T) {
 	if strings.Contains(train, `id="train-start"`) {
 		t.Fatal("a started workout still offers to start one")
 	}
-	planned := section(t, train, `class="planned"`, "</ol>")
+	planned := section(t, train, `class="planned"`, "</section>")
 	for _, want := range []string{`data-exercise="banca"`, "1/3", "8-10 reps @9", `data-exercise="fondos"`, "0/2"} {
 		if !strings.Contains(planned, want) {
 			t.Fatalf("planned list lacks %s: %s", want, planned)
@@ -218,5 +218,62 @@ func TestWeightsAreShownRounded(t *testing.T) {
 	}
 	if strings.Contains(panel, "65.7708") {
 		t.Fatal("a raw weight is still rendered")
+	}
+}
+
+// Each exercise is a card with a set table: done rows, then rows still to log,
+// pre-filled from the plan and last session, each logged with one check.
+func TestEntrenarShowsASetTablePerExercise(t *testing.T) {
+	h, service := newServer(t)
+	earlier, err := service.StartSession(t.Context(), "2026-08-05")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []training.AddSetInput{
+		{SessionID: earlier.ID, Exercise: "banca", WeightKG: 75, Reps: 10, RPE: 8},
+		{SessionID: earlier.ID, Exercise: "banca", WeightKG: 77.5, Reps: 9, RPE: 9},
+	} {
+		if _, _, err := service.AddSet(t.Context(), s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	plan, err := service.CreatePlan(t.Context(), training.Plan{Name: "Empuje A", Items: []training.PlanItem{
+		{Exercise: "banca", TargetSets: 3, RepMin: 8, RepMax: 10, TargetRPE: 9},
+		{Exercise: "fondos", TargetSets: 2},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	post(t, h, base+"/plan", url.Values{"plan_id": {itoa(plan.ID)}}, false)
+	post(t, h, base+"/sets", setForm("banca", "80", "9", "9"), true)
+
+	train := section(t, get(t, h, base+"/?modo=entrenar").Body.String(), `id="train"`, "</main>")
+	banca := section(t, train, `data-exercise="banca"`, `data-exercise="fondos"`)
+	if !strings.Contains(banca, "<details") || !strings.Contains(banca, " open") {
+		t.Fatalf("the exercise in hand is not the open card: %s", banca)
+	}
+	// Done row: today's values beside last session's first set.
+	done := section(t, banca, `class="set-row done"`, "</li>")
+	for _, want := range []string{"75 × 10", "80 kg × 9 @9"} {
+		if !strings.Contains(done, want) {
+			t.Fatalf("done row lacks %s: %s", want, done)
+		}
+	}
+	// Rows to log: two left, the next pre-filled with today's weight, the plan's
+	// reps and RPE, and last session's second set as the reference.
+	if n := strings.Count(banca, `class="set-row pending`); n != 2 {
+		t.Fatalf("pending rows = %d, want 2: %s", n, banca)
+	}
+	live := section(t, banca, `class="set-row pending live"`, "</form>")
+	for _, want := range []string{
+		`hx-post="` + base + `/sets"`, `name="exercise" value="banca"`, "77.5 × 9",
+		`name="weight_kg"`, `value="80"`, `name="reps"`, `value="9"`, `name="rpe"`, `class="check"`,
+	} {
+		if !strings.Contains(live, want) {
+			t.Fatalf("live row lacks %s: %s", want, live)
+		}
+	}
+	if !strings.Contains(section(t, train, `data-exercise="fondos"`, "</details>"), "0/2") {
+		t.Fatal("fondos card lacks its count")
 	}
 }

@@ -21,12 +21,12 @@
 <section id="home" class="home" aria-label="Inicio">
   <header class="home-head"><strong>Entreno</strong> <span class="muted">{{.Today}}</span></header>
   <h1>¿Qué hacemos hoy?</h1>
-  <a id="go-train" class="mode-card train" href="{{.Base}}/?modo=entrenar" data-mode-go="train">
+  <a id="go-train" class="mode-card mode-train" href="{{.Base}}/?modo=entrenar" data-mode-go="train">
     <span class="mode-icon" aria-hidden="true">🏋️</span>
     <strong>Entrenar</strong>
     <span class="mode-sub">{{if .Progress}}{{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Plan de hoy{{end}} · {{doneCount .Progress}}/{{len .Progress}} ejercicios{{else if .Session.Sets}}{{len .Session.Sets}} serie{{if ne (len .Session.Sets) 1}}s{{end}} hoy{{else}}Elige un plan o entrena libre{{end}}</span>
   </a>
-  <a id="go-plan" class="mode-card plan" href="{{.Base}}/?modo=planificar" data-mode-go="plan">
+  <a id="go-plan" class="mode-card mode-plan" href="{{.Base}}/?modo=planificar" data-mode-go="plan">
     <span class="mode-icon" aria-hidden="true">🗂️</span>
     <strong>Planificar</strong>
     <span class="mode-sub">Rutinas, progreso, historial y el coach</span>

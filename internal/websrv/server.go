@@ -128,6 +128,11 @@ type pageData struct {
 	// (Entrenar) or "plan" (Planificar), from ?modo=. The page holds all three
 	// and switches between them in place.
 	Mode string
+	// Cards are today's exercises on the training screen, each with its set
+	// table pre-filled.
+	Cards []TrainCard
+	// Records are today's sets that match their exercise's best estimated 1RM.
+	Records map[int64]bool
 }
 
 // LastSet returns the session's final working set, used to power "repeat last
@@ -218,7 +223,11 @@ func NewWithOptions(service training.ServiceFor, snapshot func(context.Context, 
 				return f.Recovery
 			}
 		},
-		"add":     func(a, b int) int { return a + b },
+		"add": func(a, b int) int { return a + b },
+		// rowData hands one row still to log to the set-row template.
+		"rowData": func(base, exercise string, row PendingRow) setRowData {
+			return setRowData{Base: base, Exercise: exercise, Row: row}
+		},
 		"countOf": countOf,
 		"doneCount": func(items []training.PlanProgress) int {
 			n := 0
@@ -763,6 +772,17 @@ func (s *Server) todayData(ctx context.Context, message string) (pageData, error
 	}
 	if err = s.decorate(ctx, &data); err != nil {
 		return data, err
+	}
+	if data.Cards, err = s.trainCards(ctx, data); err != nil {
+		return data, err
+	}
+	data.Records = map[int64]bool{}
+	for _, b := range data.Blocks {
+		for _, set := range b.Sets {
+			if b.IsRecord(set) {
+				data.Records[set.ID] = true
+			}
+		}
 	}
 	if data.Session.ID > 0 {
 		seen := map[string]bool{}

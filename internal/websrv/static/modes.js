@@ -19,6 +19,7 @@
   const scrim = $('coach-scrim');
   const more = $('wk-more');
   const finish = () => $('finish');
+  let finishing = false;
 
   function show(mode, coach) {
     body.dataset.mode = mode;
@@ -98,12 +99,17 @@
   }
 
   // --- training screen -----------------------------------------------------
-  // Tapping an exercise loads it (app.js) and opens the entry form over the list.
-  document.addEventListener('click', (event) => {
-    if (body.dataset.mode !== 'train' || !more) return;
-    const item = event.target.closest('#train .planned li');
-    if (!item || event.target.closest('.more, .item-actions')) return;
-    more.open = true;
+  // After a set, the card of what comes next opens (the same one, the next of a
+  // superset, or the next exercise once this one is done).
+  document.addEventListener('workout:focus', (event) => {
+    const name = event.detail;
+    if (!name) return;
+    const card = Array.from(document.querySelectorAll('#train .planned > li'))
+      .find((li) => li.dataset.exercise === name);
+    const details = card && card.querySelector('details');
+    if (!details) return;
+    details.open = true;
+    if (body.dataset.mode === 'train') card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   });
 
   // An empty session starts by logging its first exercise.
@@ -121,7 +127,6 @@
   // --- finishing -----------------------------------------------------------
   // The summary is part of the workout panel, so it is always the server's
   // latest; it stays open across a swap (rating a muscle re-renders the panel).
-  let finishing = false;
   function setFinish(open) {
     finishing = open;
     const el = finish();
