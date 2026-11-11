@@ -131,3 +131,35 @@ func TestADeletedConversationIDIsNeverReused(t *testing.T) {
 		t.Fatalf("new conversation got id %d after deleting %d and %d", c, a, b)
 	}
 }
+
+// The purge and «borrar todo» delete conversations only: every training row
+// and the coach's memory stay as they were.
+func TestDeletingConversationsNeverTouchesTrainingDataOrMemory(t *testing.T) {
+	ctx := context.Background()
+	st := openTwoUsers(t)
+	seedUser(t, st.ForUser(1), "pecho")
+	seedUser(t, st.ForUser(2), "espalda")
+	now := time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)
+	cutoff := now.Add(-90 * 24 * time.Hour)
+	for _, user := range []int64{1, 2} {
+		old, _ := st.CreateCoachConversation(ctx, user, "vieja", cutoff.Add(-time.Hour))
+		st.AppendCoachMessage(ctx, user, old, engine.ConversationMessage{Role: "user", Text: "hola", Photos: 1, At: cutoff.Add(-time.Hour)})
+		st.CreateCoachConversation(ctx, user, "nueva", now)
+	}
+	before := dumpAll(t, st)
+	if n, err := st.PurgeCoachConversations(ctx, cutoff); err != nil || n != 2 {
+		t.Fatalf("purged %d, %v", n, err)
+	}
+	if err := st.DeleteCoachConversations(ctx, 1); err != nil {
+		t.Fatal(err)
+	}
+	if after := dumpAll(t, st); after != before {
+		t.Fatalf("deleting conversations changed other data:\nbefore\n%s\nafter\n%s", before, after)
+	}
+	if got := countRows(t, st, "SELECT COUNT(*) FROM coach_conversations"); got != 1 {
+		t.Fatalf("conversations left = %d, want person 2's new one", got)
+	}
+	if got := countRows(t, st, "SELECT COUNT(*) FROM coach_messages"); got != 0 {
+		t.Fatalf("messages of deleted conversations left = %d", got)
+	}
+}
