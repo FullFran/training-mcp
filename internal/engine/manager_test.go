@@ -311,7 +311,9 @@ func TestDisconnectDeletesCredentialAndStopsProcess(t *testing.T) {
 func TestSetLoggedIsQueuedWithoutAnOpenChat(t *testing.T) {
 	h := newHarness(t, "ok", nil)
 	h.connect(1)
-	h.m.Notify(1, SetLogged(time.Date(2026, 11, 11, 18, 0, 0, 0, time.UTC), "press banca", 80, 8, 8.5, ""))
+	// Relative to now: the host drops events older than eventTTL, so a fixed date fails later in the day.
+	at := time.Now().Add(-time.Minute).UTC().Truncate(time.Second)
+	h.m.Notify(1, SetLogged(at, "press banca", 80, 8, 8.5, ""))
 	if n := h.m.PendingEvents(1); n != 1 {
 		t.Fatalf("pending = %d", n)
 	}
@@ -321,7 +323,7 @@ func TestSetLoggedIsQueuedWithoutAnOpenChat(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, text := collect(t, ch)
-	want := ContextMarker + ` event=set_logged at=2026-11-11T18:00:00Z exercise="press banca" weight_kg=80 reps=8 rpe=8.5 (rest started at this time)`
+	want := ContextMarker + ` event=set_logged at=` + at.Format(time.RFC3339) + ` exercise="press banca" weight_kg=80 reps=8 rpe=8.5 (rest started at this time)`
 	if !strings.Contains(text, want) {
 		t.Fatalf("answer = %q, want the event line %q", text, want)
 	}
