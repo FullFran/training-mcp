@@ -60,6 +60,11 @@ func (f *fakeConnectors) Disconnect(_ context.Context, userID, id int64) error {
 	return nil
 }
 
+func (f *fakeConnectors) Descriptor(_ context.Context, userID, id int64) (connector.ServerJSON, error) {
+	f.rec("descriptor", userID)
+	return connector.ServerJSON{Name: "com.notion.mcp/notion"}, nil
+}
+
 func (f *fakeConnectors) Remove(_ context.Context, userID, id int64) error {
 	f.rec("remove", userID)
 	return nil
@@ -131,6 +136,9 @@ func TestEveryConnectorRouteActsAsTheRequestsPerson(t *testing.T) {
 		},
 		"GET /coach/connectors/{id}/tools": func() *httptest.ResponseRecorder {
 			return coachRequest(t, h, "GET", "/coach/connectors/5/tools", "", false)
+		},
+		"GET /coach/connectors/{id}/server.json": func() *httptest.ResponseRecorder {
+			return coachRequest(t, h, "GET", "/coach/connectors/5/server.json", "", false)
 		},
 		"POST /coach/connectors/{id}/disconnect": func() *httptest.ResponseRecorder {
 			return coachRequest(t, h, "POST", "/coach/connectors/5/disconnect", "{}", true)

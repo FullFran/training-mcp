@@ -22,6 +22,7 @@ type Connectors interface {
 	Tools(ctx context.Context, userID, id int64) ([]connector.Tool, error)
 	Disconnect(ctx context.Context, userID, id int64) error
 	Remove(ctx context.Context, userID, id int64) error
+	Descriptor(ctx context.Context, userID, id int64) (connector.ServerJSON, error)
 }
 
 // Approvals is the part of the coach that answers connector tool permission
@@ -63,6 +64,7 @@ func (s *Server) connectorRoutes() {
 	s.handle("GET "+b+"/coach/connectors/callback", s.coachUser(s.connectorCallback))
 	s.handle("POST "+b+"/coach/connectors/{id}/connect", s.coachWrite(s.connectorAction))
 	s.handle("GET "+b+"/coach/connectors/{id}/tools", s.coachUser(s.connectorAction))
+	s.handle("GET "+b+"/coach/connectors/{id}/server.json", s.coachUser(s.connectorAction))
 	s.handle("POST "+b+"/coach/connectors/{id}/disconnect", s.coachWrite(s.connectorAction))
 	s.handle("POST "+b+"/coach/connectors/{id}/remove", s.coachWrite(s.connectorAction))
 	s.handle("POST "+b+"/coach/connectors/{id}/revoke", s.coachWrite(s.connectorAction))
@@ -143,6 +145,13 @@ func (s *Server) connectorAction(w http.ResponseWriter, r *http.Request, userID 
 			return
 		}
 		writeCoachJSON(w, http.StatusOK, map[string]any{"tools": tools})
+	case "server.json":
+		d, err := c.Descriptor(ctx, userID, id)
+		if err != nil {
+			connectorError(w, err)
+			return
+		}
+		writeCoachJSON(w, http.StatusOK, d)
 	case "disconnect":
 		if err := c.Disconnect(ctx, userID, id); err != nil {
 			connectorError(w, err)
