@@ -32,6 +32,7 @@
     <a href="{{.Base}}/plans" data-panel>📋 Rutinas</a>
     <a id="review-link" class="{{if .PendingCount}}attention{{end}}" href="{{.Base}}/review" data-panel>✅ Revisar{{if .PendingCount}} ({{.PendingCount}}){{end}}</a>
     <a href="{{.Base}}/history#progreso" data-panel>📈 Progreso</a>
+    {{if .ConnectorsOn}}<a href="{{.Base}}/coach/connectors">🔌 Conectores</a>{{end}}
   </nav>
   <section class="account" aria-label="Cuenta">
     {{if .CoachOn}}<p id="coach-state" class="muted"></p>
@@ -242,6 +243,7 @@
 <script src="{{.Base}}/static/markdown.js" defer></script>
 <script src="{{.Base}}/static/coach-attach.js" defer></script>
 <script src="{{.Base}}/static/coach.js" defer></script>
+{{if .ConnectorsOn}}<script src="{{.Base}}/static/coach-approvals.js" defer></script>{{end}}
 {{end -}}
 
 {{if .CoachOn}}

@@ -71,25 +71,9 @@ type vaultFile struct {
 
 // Read returns nil, nil when the person has no stored credential.
 func (v *Vault) Read(userID int64) (*Credential, error) {
-	raw, err := os.ReadFile(v.path(userID))
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, ErrVaultUnreadable
-	}
-	var f vaultFile
-	if json.Unmarshal(raw, &f) != nil || f.V != 1 {
-		return nil, ErrVaultUnreadable
-	}
-	iv, errIV := base64.StdEncoding.DecodeString(f.IV)
-	data, errData := base64.StdEncoding.DecodeString(f.Data)
-	if errIV != nil || errData != nil || len(iv) != v.gcm.NonceSize() {
-		return nil, ErrVaultUnreadable
-	}
-	plain, err := v.gcm.Open(nil, iv, data, subject(userID))
-	if err != nil {
-		return nil, ErrVaultUnreadable
+	plain, found, err := v.open(v.path(userID), subject(userID))
+	if err != nil || !found {
+		return nil, err
 	}
 	var c Credential
 	if json.Unmarshal(plain, &c) != nil || !c.valid() {
@@ -101,13 +85,17 @@ func (v *Vault) Read(userID int64) (*Credential, error) {
 // Write stores a credential with mode 0600, through a temporary file and a
 // rename, so a crash leaves either the old file or the new one.
 func (v *Vault) Write(userID int64, c *Credential) error {
+	return v.seal(v.path(userID), subject(userID), c)
+}
+
+func (v *Vault) seal(target string, aad []byte, value any) error {
 	if err := os.MkdirAll(v.dir, 0o700); err != nil {
 		return err
 	}
 	if err := os.Chmod(v.dir, 0o700); err != nil {
 		return err
 	}
-	plain, err := json.Marshal(c)
+	plain, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
@@ -115,11 +103,10 @@ func (v *Vault) Write(userID int64, c *Credential) error {
 	if _, err := rand.Read(iv); err != nil {
 		return err
 	}
-	body, err := json.Marshal(vaultFile{V: 1, IV: base64.StdEncoding.EncodeToString(iv), Data: base64.StdEncoding.EncodeToString(v.gcm.Seal(nil, iv, plain, subject(userID)))})
+	body, err := json.Marshal(vaultFile{V: 1, IV: base64.StdEncoding.EncodeToString(iv), Data: base64.StdEncoding.EncodeToString(v.gcm.Seal(nil, iv, plain, aad))})
 	if err != nil {
 		return err
 	}
-	target := v.path(userID)
 	tmp, err := os.CreateTemp(v.dir, filepath.Base(target)+".*.tmp")
 	if err != nil {
 		return err
@@ -144,6 +131,69 @@ func (v *Vault) Write(userID int64, c *Credential) error {
 		return fmt.Errorf("storing credential: %w", err)
 	}
 	return nil
+}
+
+// open decrypts a file; found is false when there is none.
+func (v *Vault) open(target string, aad []byte) (plain []byte, found bool, err error) {
+	raw, err := os.ReadFile(target)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, true, ErrVaultUnreadable
+	}
+	var f vaultFile
+	if json.Unmarshal(raw, &f) != nil || f.V != 1 {
+		return nil, true, ErrVaultUnreadable
+	}
+	iv, errIV := base64.StdEncoding.DecodeString(f.IV)
+	data, errData := base64.StdEncoding.DecodeString(f.Data)
+	if errIV != nil || errData != nil || len(iv) != v.gcm.NonceSize() {
+		return nil, true, ErrVaultUnreadable
+	}
+	plain, err = v.gcm.Open(nil, iv, data, aad)
+	if err != nil {
+		return nil, true, ErrVaultUnreadable
+	}
+	return plain, true, nil
+}
+
+// secretSubject binds a named secret (for example "connector/7") to its person
+// and its name: a file moved to another person's or another name's place does
+// not decrypt.
+func secretSubject(userID int64, name string) []byte {
+	return append(subject(userID), []byte("/secret/"+name)...)
+}
+
+func (v *Vault) secretPath(userID int64, name string) string {
+	sum := sha256.Sum256(secretSubject(userID, name))
+	return filepath.Join(v.dir, "s-"+hex.EncodeToString(sum[:])+".json")
+}
+
+// ReadSecret decodes a person's named secret into value. False, nil when there
+// is none.
+func (v *Vault) ReadSecret(userID int64, name string, value any) (bool, error) {
+	plain, found, err := v.open(v.secretPath(userID, name), secretSubject(userID, name))
+	if err != nil || !found {
+		return false, err
+	}
+	if json.Unmarshal(plain, value) != nil {
+		return false, ErrVaultUnreadable
+	}
+	return true, nil
+}
+
+// WriteSecret stores a person's named secret like a credential.
+func (v *Vault) WriteSecret(userID int64, name string, value any) error {
+	return v.seal(v.secretPath(userID, name), secretSubject(userID, name), value)
+}
+
+func (v *Vault) DeleteSecret(userID int64, name string) error {
+	err := os.Remove(v.secretPath(userID, name))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	return err
 }
 
 func (v *Vault) Delete(userID int64) error {

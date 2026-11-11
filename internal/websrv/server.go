@@ -120,6 +120,8 @@ type pageData struct {
 	PendingCount int
 	// CoachOn shows the coach chat.
 	CoachOn bool
+	// ConnectorsOn links the connectors panel and shows connector approvals.
+	ConnectorsOn bool
 }
 
 // LastSet returns the final set of the session, used to power "repeat last set".
@@ -150,6 +152,9 @@ type Options struct {
 	// Coach is the in-app coach. Nil leaves the app exactly as it is without it:
 	// no chat, no coach routes.
 	Coach Coach
+	// Connectors are the person's own remote MCP servers. Used only with a
+	// Coach; nil serves no connector routes.
+	Connectors Connectors
 }
 
 // New serves the app under the secret base path, as the owner's backup route
@@ -1103,6 +1108,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 	}
 	data.CanExport = s.opts.Export
 	data.CoachOn = s.opts.Coach != nil
+	data.ConnectorsOn = s.opts.Coach != nil && s.opts.Connectors != nil
 	s.renderTo(w, name, data)
 }
 

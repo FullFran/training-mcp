@@ -17,7 +17,6 @@ package engine
 import (
 	"encoding/json"
 	"regexp"
-	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -116,6 +115,16 @@ type parentMessage struct {
 	// engine's default.
 	Model    string `json:"model,omitempty"`
 	Thinking string `json:"thinking,omitempty"`
+	// Servers are the person's connectors, reached through the host's proxy
+	// with the same engine token. No third-party credential is ever here.
+	Servers []engineServer `json:"servers,omitempty"`
+	// Decision answers an approval request: "allow" or "deny".
+	Decision string `json:"decision,omitempty"`
+}
+
+type engineServer struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
 }
 
 // ModelInfo is one model the person's ChatGPT login can use, as their engine
@@ -240,6 +249,9 @@ type childMessage struct {
 	Models   []ModelInfo
 	Model    string
 	Thinking string
+	// Args are a tool call's arguments as JSON text, cut short, shown to the
+	// person when they are asked; never logged.
+	Args string
 }
 
 var (
@@ -249,7 +261,10 @@ var (
 	reToolName = regexp.MustCompile(`^[A-Za-z0-9_]{1,128}$`)
 )
 
-const maxCall = 100000
+const (
+	maxCall  = 100000
+	maxTools = 1024
+)
 
 // parseChildMessage accepts only known messages with well-formed fields; it
 // returns false for anything else.
@@ -272,6 +287,7 @@ func parseChildMessage(line []byte) (childMessage, bool) {
 		Models     json.RawMessage `json:"models"`
 		Model      string          `json:"model"`
 		Thinking   string          `json:"thinking"`
+		Args       *string         `json:"args"`
 	}
 	if err := json.Unmarshal(line, &raw); err != nil {
 		return childMessage{}, false
@@ -307,7 +323,7 @@ func parseChildMessage(line []byte) (childMessage, bool) {
 		m.ID = raw.ID
 	case "session":
 		var tools []string
-		if err := json.Unmarshal(raw.Tools, &tools); err != nil || len(tools) > 256 {
+		if err := json.Unmarshal(raw.Tools, &tools); err != nil || len(tools) > maxTools {
 			return m, false
 		}
 		for _, t := range tools {
@@ -316,6 +332,17 @@ func parseChildMessage(line []byte) (childMessage, bool) {
 			}
 		}
 		m.Tools = tools
+	case "approval.request":
+		if !idOK || !reToolName.MatchString(raw.Name) {
+			return m, false
+		}
+		m.ID, m.Name = raw.ID, raw.Name
+		if raw.Args != nil {
+			if !utf8.ValidString(*raw.Args) || utf8.RuneCountInString(*raw.Args) > maxApprovalArgs {
+				return m, false
+			}
+			m.Args = *raw.Args
+		}
 	case "delta", "thinking":
 		if raw.Text == nil || utf8.RuneCountInString(*raw.Text) > maxDeltaChars || !utf8.ValidString(*raw.Text) {
 			return m, false
@@ -352,16 +379,5 @@ func parseChildMessage(line []byte) (childMessage, bool) {
 }
 
 // onlyTrainingTools reports whether a tool list is non-empty and holds this
-// server's MCP tools and nothing else. Anything more (a shell, a file tool, a
-// script tool) stops the engine.
-func onlyTrainingTools(tools []string) bool {
-	if len(tools) == 0 {
-		return false
-	}
-	for _, t := range tools {
-		if !strings.HasPrefix(t, MCPToolPrefix) || len(t) == len(MCPToolPrefix) {
-			return false
-		}
-	}
-	return true
-}
+// server's MCP tools and nothing else.
+func onlyTrainingTools(tools []string) bool { return allowedTools(tools, nil) }

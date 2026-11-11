@@ -17,6 +17,7 @@ import (
 
 	"github.com/fullfran/training-mcp/internal/config"
 	"github.com/fullfran/training-mcp/internal/engine"
+	"github.com/fullfran/training-mcp/internal/engine/connector"
 	"github.com/fullfran/training-mcp/internal/httpsrv"
 	"github.com/fullfran/training-mcp/internal/mcpsrv"
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
@@ -100,7 +101,7 @@ func runWithContext(ctx context.Context, args []string) error {
 	logger := log.Default()
 	httpsrv.WarningIfDisabled(cfg.AuthDisabled, logger)
 
-	coach, engineTokens, err := startCoach(cfg.Coach, store, logger)
+	coach, engineTokens, connectors, proxy, err := startCoach(cfg.Coach, cfg.WebPublicURL, store, logger)
 	if err != nil {
 		return err
 	}
@@ -115,7 +116,7 @@ func runWithContext(ctx context.Context, args []string) error {
 
 	var web *httpsrv.WebUI
 	if cfg.WebBasePath != "" {
-		webServer, err := websrv.NewWithOptions(services.ForRequest, services.Snapshot, time.Now, cfg.WebBasePath, websrv.Options{Export: true, Apply: mcpServer.Apply, Coach: coachFor(coach)})
+		webServer, err := websrv.NewWithOptions(services.ForRequest, services.Snapshot, time.Now, cfg.WebBasePath, websrv.Options{Export: true, Apply: mcpServer.Apply, Coach: coachFor(coach), Connectors: connectorsFor(connectors)})
 		if err != nil {
 			return err
 		}
@@ -140,7 +141,7 @@ func runWithContext(ctx context.Context, args []string) error {
 			Keys: oauth, Resolve: services.ResolveUser(cfg.OAuthSubject, cfg.OAuthProvision), Logger: logger,
 		})
 		// The root never serves /export.db: it holds every user's data.
-		app, err := websrv.NewWithOptions(services.ForRequest, services.Snapshot, time.Now, "", websrv.Options{CSRFToken: login.CSRFToken, Apply: mcpServer.Apply, Coach: coachFor(coach)})
+		app, err := websrv.NewWithOptions(services.ForRequest, services.Snapshot, time.Now, "", websrv.Options{CSRFToken: login.CSRFToken, Apply: mcpServer.Apply, Coach: coachFor(coach), Connectors: connectorsFor(connectors)})
 		if err != nil {
 			return err
 		}
@@ -148,6 +149,13 @@ func runWithContext(ctx context.Context, args []string) error {
 		logger.Printf("web UI served at %s/ behind the provider's login", cfg.WebPublicURL)
 	}
 	handler := httpsrv.LogProtocol(logger, httpsrv.RoutesWithEngine(mcpServer.Handler(), cfg.AuthDisabled, cfg.Token, web, oauth, root, engineTokens))
+	if proxy != nil {
+		// The engines' door to people's connectors: engine tokens on loopback only.
+		outer := http.NewServeMux()
+		outer.Handle(connector.ProxyPrefix, proxy)
+		outer.Handle("/", handler)
+		handler = outer
+	}
 	httpServer := &http.Server{Addr: cfg.Addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
 	errCh := make(chan error, 1)
 	go func() { errCh <- httpServer.ListenAndServe() }()
@@ -172,26 +180,45 @@ func runWithContext(ctx context.Context, args []string) error {
 }
 
 // startCoach builds the in-app coach when it is enabled. Disabled, it returns
-// nils and nothing of the coach exists.
-func startCoach(c config.Coach, prefs engine.PreferenceStore, logger *log.Logger) (*engine.Manager, httpsrv.EngineTokens, error) {
+// nils and nothing of the coach exists: no connectors and no proxy either.
+func startCoach(c config.Coach, publicURL string, store *sqlitestore.Store, logger *log.Logger) (*engine.Manager, httpsrv.EngineTokens, *connector.Service, http.Handler, error) {
 	if !c.Enabled {
-		return nil, nil, nil
+		return nil, nil, nil, nil, nil
 	}
 	vault, err := engine.NewVault(filepath.Join(c.DataDir, "credentials"), c.Key)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	tokens := engine.NewTokens(nil)
+	// The strict guard: public https servers only, checked at every dial.
+	guard := &connector.Guard{}
+	connectors := &connector.Service{Store: store, Secrets: vault, Guard: guard}
+	if publicURL != "" {
+		// Authorization servers send the person back to the app at the root.
+		connectors.OAuth = &connector.OAuthClient{Guard: guard, RedirectURL: strings.TrimSuffix(publicURL, "/") + "/coach/connectors/callback", ClientName: "training-mcp coach"}
+	}
 	manager, err := engine.NewManager(engine.Settings{
 		Vault: vault, Tokens: tokens, Command: engine.NodeCommand(c.Node, c.Engine),
-		MCPURL: c.MCPURL, SystemPrompt: engine.SystemPrompt, Preferences: prefs,
+		MCPURL: c.MCPURL, SystemPrompt: engine.SystemPrompt, Preferences: store,
 		MaxProcesses: c.MaxProcesses, Idle: time.Duration(c.IdleSeconds) * time.Second, Logger: logger,
+		Connectors: connectors,
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
+	connectors.Reload = manager.Reload
+	connectors.Loaded = manager.Loaded
+	proxy := &connector.Proxy{Service: connectors, Tokens: tokens, Authorize: manager.Authorize}
 	logger.Printf("coach enabled: up to %d engine processes", c.MaxProcesses)
-	return manager, tokens, nil
+	return manager, tokens, connectors, proxy, nil
+}
+
+// connectorsFor keeps a nil service a nil interface.
+func connectorsFor(s *connector.Service) websrv.Connectors {
+	if s == nil {
+		return nil
+	}
+	return s
 }
 
 // coachFor keeps a nil manager a nil interface, so the app sees no coach.

@@ -74,8 +74,56 @@ export function parseCredential(value: unknown): StoredCredential | null {
   return { access: c.access, refresh: c.refresh, expires: c.expires, accountId: c.accountId };
 }
 
+/** A person's connector, reached through the host's proxy with the engine token. */
+export interface ConnectorServer {
+  name: string;
+  url: string;
+}
+
+const SERVER_NAME = /^[a-z][a-z0-9]{0,23}$/;
+export const MAX_SERVERS = 16;
+
+/**
+ * The connectors of a start message, or null when anything is off. A server's
+ * URL must be the host's own proxy for that name, on the origin of the host's
+ * /mcp: the engine token goes nowhere else (HCS-0008-R012: the engine never
+ * holds a third-party credential; the host's proxy adds it).
+ */
+export function parseServers(value: unknown, mcpUrl: string): ConnectorServer[] | null {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > MAX_SERVERS) return null;
+  let origin: string;
+  try {
+    origin = new URL(mcpUrl).origin;
+  } catch {
+    return null;
+  }
+  const seen = new Set<string>();
+  const out: ConnectorServer[] = [];
+  for (const item of value) {
+    const server = item as { name?: unknown; url?: unknown } | null;
+    if (typeof server !== 'object' || server === null) return null;
+    const { name, url } = server;
+    if (typeof name !== 'string' || !SERVER_NAME.test(name) || name === MCP_SERVER_NAME || seen.has(name)) return null;
+    if (typeof url !== 'string' || url !== `${origin}/engine/connectors/${name}/mcp`) return null;
+    seen.add(name);
+    out.push({ name, url });
+  }
+  return out;
+}
+
+/** The connector a tool belongs to, or undefined (training's own tools included). */
+export function connectorOf(tool: string, names: ReadonlySet<string>): string | undefined {
+  const match = /^mcp__([a-z][a-z0-9]{0,23})__./.exec(tool);
+  return match && names.has(match[1]) ? match[1] : undefined;
+}
+
+/** The longest arguments text shown to the person with an approval request. */
+export const MAX_APPROVAL_ARGS = 2000;
+
 export type ParentMessage =
-  | { type: 'start'; mcpUrl: string; mcpToken: string; systemPrompt: string }
+  | { type: 'start'; mcpUrl: string; mcpToken: string; systemPrompt: string; servers?: ConnectorServer[] }
+  | { type: 'approval'; id: string; decision: 'allow' | 'deny' }
   | { type: 'login.start' }
   | { type: 'login.cancel' }
   | { type: 'refresh'; id: string; credential: StoredCredential }
@@ -98,6 +146,7 @@ export type ChildMessage =
   | { type: 'refresh.done'; id: string; credential: StoredCredential }
   | { type: 'refresh.failed'; id: string }
   | { type: 'token.get'; id: string }
+  | { type: 'approval.request'; id: string; name: string; args?: string }
   | { type: 'session'; tools: string[] }
   | { type: 'delta'; text: string }
   /** The model's reasoning text, apart from the answer. */
@@ -171,4 +220,65 @@ export class LineDecoder {
     }
     return out;
   }
+}
+
+// --- Connector tool approvals ----------------------------------------------------------
+//
+// The engine's half of connector tool approvals (HCS-0005). Before a tool of a
+// person's connector runs, the engine asks the host and waits; only an explicit
+// "allow" lets the call run. The host decides from its session grants or asks
+// the person; the engine never remembers an answer (HCS-0005-R009), and any
+// failure here blocks the call (R014). This lives in protocol.ts because the
+// image ships main.ts and protocol.ts only.
+
+export const DENIED_REASON = 'The person did not allow this call. Do not retry it unless they ask.';
+/** Longer than the host's own deadline, which answers first. */
+const ENGINE_WAIT_MS = 5 * 60_000;
+
+export interface ToolCall {
+  toolName: string;
+  input: unknown;
+}
+
+export interface ApprovalGate {
+  /** The tool_call hook: undefined lets a call run, a block result stops it. */
+  check(call: ToolCall): Promise<{ block: true; reason: string } | undefined>;
+  /** A decision from the host. */
+  resolve(id: string, decision: unknown): void;
+}
+
+export function createApprovalGate(send: (message: ChildMessage) => void, connectors: ReadonlySet<string>, waitMs = ENGINE_WAIT_MS): ApprovalGate {
+  const waiting = new Map<string, (allow: boolean) => void>();
+  let seq = 0;
+  const blocked = { block: true as const, reason: DENIED_REASON };
+
+  return {
+    async check(call) {
+      try {
+        if (call.toolName.startsWith(MCP_TOOL_PREFIX)) return undefined;
+        // Anything that is neither training's nor a connector's never runs.
+        if (connectorOf(call.toolName, connectors) === undefined) return blocked;
+        const id = `a-${++seq}`;
+        let args: string | undefined;
+        try {
+          args = JSON.stringify(call.input ?? {}).slice(0, MAX_APPROVAL_ARGS);
+        } catch {
+          args = undefined;
+        }
+        const allow = await new Promise<boolean>((resolve) => {
+          const timer = setTimeout(() => { waiting.delete(id); resolve(false); }, waitMs);
+          waiting.set(id, (value) => { clearTimeout(timer); resolve(value); });
+          send({ type: 'approval.request', id, name: call.toolName, ...(args === undefined ? {} : { args }) });
+        });
+        return allow ? undefined : blocked;
+      } catch {
+        return blocked;
+      }
+    },
+    resolve(id, decision) {
+      const done = waiting.get(id);
+      waiting.delete(id);
+      done?.(decision === 'allow');
+    },
+  };
 }

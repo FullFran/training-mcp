@@ -68,6 +68,7 @@ func (s *Server) coachRoutes() {
 	s.handle("POST "+b+"/coach/abort", s.coachWrite(s.coachAbort))
 	s.handle("GET "+b+"/coach/models", s.coachUser(s.coachModels))
 	s.handle("POST "+b+"/coach/settings", s.coachWrite(s.coachSettings))
+	s.connectorRoutes()
 }
 
 type coachHandler func(w http.ResponseWriter, r *http.Request, userID int64)

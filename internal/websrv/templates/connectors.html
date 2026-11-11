@@ -1,0 +1,54 @@
+{{define "connectors.html"}}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Conectores</title>
+<meta name="theme-color" content="#0f1115">
+<link rel="icon" href="{{.Base}}/static/icon-192.png">
+<link rel="stylesheet" href="{{.Base}}/static/app.css">
+<link rel="stylesheet" href="{{.Base}}/static/connectors.css">
+{{if .CSRF}}<meta name="csrf-token" content="{{.CSRF}}">
+{{end}}</head>
+<body data-base="{{.Base}}">
+
+<header class="bar">
+  <div><strong>Conectores</strong></div>
+  <div class="bar-actions">
+    <a class="ghost" href="{{.Base}}/">← Chat</a>
+  </div>
+</header>
+
+<main class="connectors">
+  <p class="muted">Conecta tus propios servidores MCP remotos (Notion u otros) y el coach podrá usar sus herramientas. Cada llamada a una herramienta de un conector te pide permiso antes de ejecutarse.</p>
+  <p id="cx-flash" class="alert" role="status" hidden></p>
+
+  <section class="card" aria-labelledby="cx-add-title">
+    <h2 id="cx-add-title">Añadir un servidor</h2>
+    <form id="cx-add" class="cx-form">
+      <label>URL (https)<input name="url" type="url" required placeholder="https://mcp.notion.com/mcp" inputmode="url" autocomplete="off"></label>
+      <label>Nombre<input name="label" maxlength="40" placeholder="Notion" autocomplete="off"></label>
+      <details>
+        <summary>Usar un token fijo en vez de iniciar sesión</summary>
+        <label>Token (opcional)<input name="token" type="password" autocomplete="off"></label>
+        <p class="muted">Solo si el servidor te da un token. Se guarda cifrado y nunca vuelve al navegador.</p>
+      </details>
+      <button type="submit" class="primary">Añadir</button>
+    </form>
+  </section>
+
+  <section aria-labelledby="cx-list-title">
+    <h2 id="cx-list-title">Tus conectores</h2>
+    <p id="cx-empty" class="muted" hidden>Aún no has añadido ninguno.</p>
+    <ul id="cx-list" class="cx-list"></ul>
+  </section>
+
+  <section aria-labelledby="cx-grants-title">
+    <h2 id="cx-grants-title">Permisos de esta sesión</h2>
+    <p class="muted">«En esta sesión» vale hasta que el coach se reinicia (inactividad, cambio de conectores o desconexión). Puedes retirarlos aquí.</p>
+    <ul id="cx-grants" class="cx-list"></ul>
+  </section>
+</main>
+<script src="{{.Base}}/static/connectors.js" defer></script>
+</body>
+</html>{{end}}

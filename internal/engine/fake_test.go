@@ -51,7 +51,16 @@ func runFakeEngine(mode string) {
 	}
 	tokenReplies := map[string]chan map[string]any{}
 	refreshes := 0
+	approvalReplies := map[string]chan string{}
 	var tmu sync.Mutex
+	askApproval := func(id, tool string) string {
+		ch := make(chan string, 1)
+		tmu.Lock()
+		approvalReplies[id] = ch
+		tmu.Unlock()
+		send(map[string]any{"type": "approval.request", "id": id, "name": tool, "args": `{"query":"secret-arg"}`})
+		return <-ch
+	}
 	askToken := func(id string) map[string]any {
 		ch := make(chan map[string]any, 1)
 		tmu.Lock()
@@ -74,6 +83,18 @@ func runFakeEngine(mode string) {
 			tools := []string{MCPToolPrefix + "get_session", MCPToolPrefix + "log_sets"}
 			if mode == "badtools" {
 				tools = append(tools, "bash")
+			}
+			if mode == "roguetools" {
+				tools = append(tools, "mcp__other__search")
+			}
+			// A connector server loads unless the host pointed it anywhere but its proxy.
+			servers, _ := m["servers"].([]any)
+			for _, raw := range servers {
+				srv, _ := raw.(map[string]any)
+				name := fmt.Sprint(srv["name"])
+				if strings.HasPrefix(fmt.Sprint(srv["url"]), "http://127.0.0.1:1/engine/connectors/"+name+"/mcp") && name != "broken" {
+					tools = append(tools, "mcp__"+name+"__search")
+				}
 			}
 			// The fake proves it got its token without echoing it.
 			if tok, _ := m["mcpToken"].(string); !strings.HasPrefix(tok, TokenPrefix) {
@@ -174,6 +195,14 @@ func runFakeEngine(mode string) {
 					send(map[string]any{"type": "tool", "phase": "end", "call": 3, "name": MCPToolPrefix + "log_sets", "ok": false, "pending": true})
 					send(map[string]any{"type": "tool", "phase": "end", "call": 4, "name": MCPToolPrefix + "log_sets", "ok": true, "pending": "yes"})
 				}
+				if mode == "approval" {
+					// Two calls of the same connector tool in one turn, one at a time.
+					var got []string
+					for i := range 2 {
+						got = append(got, askApproval(fmt.Sprintf("a-%d-%d", n, i), "mcp__notion__search"))
+					}
+					send(map[string]any{"type": "delta", "text": "approvals=" + strings.Join(got, ",") + "\n"})
+				}
 				if mode == "flood" {
 					for range 50 {
 						send(map[string]any{"type": "delta", "text": strings.Repeat("x", 1000)})
@@ -187,6 +216,13 @@ func runFakeEngine(mode string) {
 				send(map[string]any{"type": "delta", "text": "CONTEXT<" + ctx + ">TEXT<" + text + ">IMAGES" + photos + choice})
 				send(map[string]any{"type": "done", "aborted": false})
 			}()
+		case "approval":
+			tmu.Lock()
+			ch := approvalReplies[fmt.Sprint(m["id"])]
+			tmu.Unlock()
+			if ch != nil {
+				ch <- fmt.Sprint(m["decision"])
+			}
 		case "abort":
 			if mode != "deaf" {
 				send(map[string]any{"type": "done", "aborted": true})

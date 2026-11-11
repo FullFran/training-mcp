@@ -82,6 +82,101 @@ Credentials are stored in `coach/credentials/` next to the database (`/data/coac
 
 Without a choice, the model is the first one OpenAI lists for the account. Every model of the `openai-codex` provider in Pi 1.5.2 declares image input; Pi resizes a photo to the model's limits before the request. The conversation lives in the engine process only: it is lost when the process stops (idle, disconnect, restart) and is never written to disk.
 
+## Connectors: a person's own remote MCP servers
+
+Issue [#70](https://github.com/FullFran/training-mcp/issues/70). With the coach on, **🔌 Conectores** (in the menu, or `/coach/connectors`) lets each person add remote MCP servers, such as Notion's, to their own coach. Nobody else sees them, and nobody else's coach uses them.
+
+1. **Add** an `https` URL and a name. The name becomes the server's namespace for the model: tools of a server named `notion` are `mcp__notion__<tool>`. Lowercase letters and digits, up to 24, unique per person, never `training`. Up to 10 servers per person.
+2. **Connect**. The server is probed with an `initialize` and no credential:
+   - it answers: connected, with no credential;
+   - it asks for authorization (401): the host runs an OAuth client for this person and this server. It finds the authorization server from the server's protected resource metadata (RFC 9728, the `resource_metadata` of its `WWW-Authenticate`, else the well-known locations, else the server's own origin), reads the authorization server metadata (RFC 8414 or OpenID discovery, `issuer` must match, PKCE `S256` must be listed), registers a public client (RFC 7591, `token_endpoint_auth_method: none`, reused on later sign-ins), and sends the browser to the authorization endpoint with PKCE, a single-use `state` and the `resource` indicator (RFC 8707). The provider sends the person back to `/coach/connectors/callback`; only the person who started that sign-in can finish it, within 10 minutes;
+   - a **static token** (under «Usar un token fijo») is used instead when given: it goes to the vault and is sent as `Authorization: Bearer`.
+3. **Ver herramientas** lists the server's tools with the name the coach sees. A badge says whether the coach's current session loaded the server.
+4. **Desconectar** forgets the OAuth tokens (the OAuth client registration and a static token are kept, so **Conectar** works again); **Quitar** deletes the server and every secret of it. Either ends the person's coach session so the next turn starts with the current list (the conversation, which lives only in the engine process, starts over).
+
+OAuth needs the app at the root (`WEB_OAUTH_CLIENT_ID` and `MCP_OAUTH_RESOURCE`): the redirect URI is `<origin of MCP_OAUTH_RESOURCE>/coach/connectors/callback`. On the secret mount alone, only servers with a static token or none can be connected (`oauth_unavailable`).
+
+### Every call asks first
+
+A connector tool never runs on the model's word alone. Before each call the engine asks the host, and only an explicit allow lets it run:
+
+- With no standing answer, the chat shows **El coach quiere usar Notion**, the tool and its arguments (as text, cut at 2000 characters), with **Permitir una vez**, **Permitir en esta sesión**, **Rechazar** and **Rechazar en esta sesión** (ACP's `allow_once`, `allow_always`, `reject_once`, `reject_always`).
+- "En esta sesión" is held by the host, for the engine process it was given in. It ends with that process (idle stop, a connector change, disconnect, restart) and the panel's **Retirar permisos de la sesión** takes it back at once. Nothing is remembered in the database.
+- No answer within 2 minutes, a closed chat, an engine error, or an answer that is not one of the four: the call is denied.
+- The proxy enforces it too: each allow gives exactly one `tools/call` of that tool, through that engine's token, within 2 minutes. A call that was not allowed gets a JSON-RPC error `permission_denied` and never reaches the server. JSON-RPC batches are refused.
+- Training-data writes keep working as before: they are proposals the person answers on cards or on `/review`. Both use the same four answers and the same session: one coach conversation, `coach:` and a hash of its engine bearer, so an always answer for a connector tool and one for a proposal end together. They stay separate grants: a connector answer never decides a proposal, nor the other way round.
+
+### Routes
+
+Behind the same login, header and CSRF rules as the other coach routes.
+
+| Route | Answer |
+| --- | --- |
+| `GET /coach/connectors` | The panel |
+| `GET /coach/connectors/list` | `{connectors: [{id, name, label, url, auth, state, loaded?}], grants: [{tool, server, answer}]}`: no secret ever |
+| `POST /coach/connectors` `{url, label, token?}` | `201` with the connector |
+| `POST /coach/connectors/{id}/connect` | `{state: "connected"}` or `{state: "authorize", authorize_url}` |
+| `GET /coach/connectors/callback?state&code` | Redirect to the panel with `?connected=<id>` or `?error=<code>` |
+| `GET /coach/connectors/{id}/tools` | `{tools: [{name, model, description}]}` |
+| `GET /coach/connectors/{id}/server.json` | The connector as an MCP Registry `server.json` (below) |
+| `POST /coach/connectors/{id}/disconnect` | `{state: "disconnected"}` |
+| `POST /coach/connectors/{id}/remove` | `{removed: true}` |
+| `POST /coach/connectors/{id}/revoke` | `{revoked: true}`: ends this session's always answers for that server |
+| `POST /coach/approval` `{id, answer}` | `{answered: true}`; `404 no_approval`, `400 bad_answer` |
+
+The stream adds `approval {id, server, tool, args?}` and `approval_closed {id}`. Connector errors are a closed set: `bad_url`, `blocked_address`, `bad_label`, `bad_token`, `exists`, `too_many`, `not_found`, `oauth_unavailable`, `discovery_failed`, `registration_failed`, `token_failed`, `unauthorized`, `unreachable`, `state_invalid`, `vault`. Nothing a remote server or an authorization server wrote reaches a response or a log.
+
+### How the engine reaches them
+
+```mermaid
+flowchart LR
+  E[engine] -->|/engine/connectors/notion/mcp on loopback, engine token| P[host proxy]
+  P -->|the person's token for that server, guarded client| N[remote MCP server]
+  P -.->|tools/call only with a host allow| M[approvals in the manager]
+```
+
+The start message lists the person's connected servers as `{name, url}`, where `url` is always `http://127.0.0.1:<port>/engine/connectors/<name>/mcp` (the engine refuses any other). The engine registers them next to `training` with `direct` exposure and the same engine token. The proxy (`internal/engine/connector/proxy.go`):
+
+- admits only a live engine token on a direct loopback connection, like `/mcp`;
+- serves only that token's person's connected server of that name (another person's name is 404);
+- forwards only `Content-Type`, `Accept`, `Mcp-Session-Id`, `Mcp-Protocol-Version` and `Last-Event-ID`, and replaces `Authorization` with the person's credential from the vault: the engine token never leaves the machine, and the engine never holds a third-party credential;
+- refreshes an OAuth token that expires within a minute, or once after a 401, one refresh at a time per person and server; a failed refresh drops the tokens and the server shows disconnected;
+- answers a remote 401 or 403 as 502 without a challenge, so the engine never starts a sign-in of its own;
+- bounds requests to 4 MiB and responses to 32 MiB, streams server-sent events as they arrive, and gives a call 10 minutes.
+
+The engine waits up to 8 seconds for the connectors' tools after training-mcp's own, then reports its tool list. The engine and the host each stop it if any tool belongs to neither `training` nor a server the host gave; a server whose tools did not appear shows **no cargó en el coach** in the panel.
+
+### Connector security
+
+- **SSRF guard** (`internal/engine/connector/guard.go`) on every request for a connector: discovery, registration, tokens, tool listing and proxied MCP traffic. `https` only, no user info, no fragment, at most 2048 characters. Names such as `localhost`, single labels and `.local`, `.internal`, `.lan`, `.home.arpa`, `.corp`, `.intranet` are refused when added, and the name is resolved then too. The address is checked again **when each connection is made**, after DNS resolution, so a name that later resolves elsewhere (DNS rebinding) is still refused: loopback, `0.0.0.0/8`, private ranges, link-local (cloud metadata included), CGNAT `100.64.0.0/10`, unique-local `fc00::/7`, IPv4-mapped, NAT64 and 6to4 addresses, multicast, reserved and documentation ranges. Every redirect is checked like the first URL, at most 3. Proxy settings from the environment are ignored. Discovery and OAuth calls have 15 seconds and 256 KiB per response; headers have 30 seconds.
+- **Secrets** (static token, OAuth client, access and refresh tokens, and the discovered endpoints) live in the same vault as ChatGPT credentials, one file per person and connector, with the person and the connector bound in as associated data: a file moved to another person or connector does not decrypt. The `connectors` table (migration 021) holds the person, name, label, URL, kind of authorization and state, and no secret.
+- **Isolation.** Every store query, service call, route and proxy request names the person. Tests cover two people for each.
+- **Decision records.** Every permission decision is logged as one `{"event":"coach.decision", ...}` line in the HCS-0005 `decisionRecord` shape: `entry` (`connector.<name>`), `permission` (`tool.<tool>`), `outcome`, `operation` (the engine's request id), `session` (`coach:<hash>`, the same id proposals use), `decider` (a pseudonym `subject-<hash>` for the person, the grant or denial record, or the rule `HCS-0005-R001`/`R014`), `channel` (`web` for the person's answer, `grant-store` for a stored one, as for proposals) and `answer`. Never the call's arguments or result.
+
+### Against HCS
+
+The design follows [HCS](https://github.com/FullFran/hcs) (HCS-0005 authority, HCS-0008 host adapter):
+
+| Rule | Here |
+| --- | --- |
+| HCS-0008-R010 | Each connector is an MCP Registry `server.json` of schema 2025-12-11 with one `streamable-http` remote (`GET /coach/connectors/{id}/server.json`) |
+| HCS-0008-R011 | Its secret input, the `Authorization` header, has `isSecret: true` and never a `value` or `default` |
+| HCS-0008-R012, R030 | The secret comes only from that person's vault entry for that connector and is added by the host's proxy; it is never in what the engine receives, so no engine substitution can touch it |
+| HCS-0008-R014 | The engine reports its tools; the host derives which servers loaded and the panel shows a server that did not |
+| HCS-0008-R025 | The engine runs with a private home and agent directory and its MCP servers given in code; `engine/main.test.ts` starts the real engine with MCP servers, settings and a credential planted in the home and the workspace and checks that only the host's servers load and no planted server is contacted |
+| HCS-0005-R001, R005 | A connector call runs only with a host allow; `allow_once`/`reject_once` apply to that call only |
+| HCS-0005-R006, R007, R008 | `allow_always`/`reject_always` are host-held grants and denials limited to the engine session they were given in, with the record of the answer as origin; a denial wins |
+| HCS-0005-R003, R009 | Grants are checked when each call is dispatched (the engine asks, the proxy checks again) and can be revoked; Pi keeps no answer |
+| HCS-0005-R010 to R012, R014, R015 | Decision records as above; timeout, a lost stream and errors deny; the answer comes only from the person's authenticated `POST /coach/approval` |
+
+Divergences, recorded rather than worked around:
+
+- **Not a generation.** HCS-0008 describes packages in a signed generation chosen by an operator. Here a person adds a URL at run time; there is no package, catalog or signature, and the `server.json` document describes what was added rather than what a distribution shipped. `version` is `0.0.0`.
+- **Permission ids.** HCS 0.1 defines none (OQ-0005-1). Connector tools use `connector.<name>` as the entry and `tool.<tool>` as the permission, with a short hash when a tool name loses its case.
+- **Where decision records go.** They go to the server log only (OQ-0005-7); they are not sent as CloudEvents (R013 is a SHOULD).
+- **Pseudonymous decider.** `decider.id` for a person is a hash of their account (OQ-0005-6), not their subject id.
+- **Where records live.** Proposal decisions are stored in the database (#75); connector decisions are log lines, since the connector call itself leaves nothing in the database.
+
 ## Routes
 
 Under the app's base path, behind its existing login: the bearer of the secret mount, or the web login session at the root (which also checks its CSRF token on writes). Every write also needs the header `X-Coach: 1`, which a cross-site form cannot send. A request with no identity is refused with 403.
@@ -125,7 +220,7 @@ Sets the coach itself logs through MCP are not echoed back as events.
 - **Slots.** A process is a scarce slot. A pending login holds one without a credential, so it has a hard deadline (15 minutes), starts are rate-limited per person, a process left with no pending login and no credential is stopped at once, and a connected person's turn takes the slot of the oldest process that only waits for a code. A turn has a time limit (10 minutes) and a size limit (2 MiB of text); a process that does not settle after either is stopped.
 - **Photos.** training-mcp never stores a photo: it is checked (count, size, type against its bytes), written to that person's engine as part of the prompt line, and dropped. The engine checks it again and passes it to Pi's prompt. Like the rest of the conversation, it then stays in that engine's memory until the process stops, and the model sees it again on later turns. Photo bytes are never logged. A prompt line can carry up to about 8 MiB of base64, so the engine reads lines of up to 12 MiB from the server; what the engine sends back is still limited to 1 MiB per line.
 - **Shutdown.** Engine processes exit when their stdin closes, which covers a server that dies. On SIGTERM or SIGINT the server stops them before draining HTTP connections, which also ends open chat streams.
-- **Tools.** Pi has no sandbox, so its shell and file tools are off (`noTools: 'builtin'`) and its script tool is not activated (`direct` exposure). The engine reports its tool list when the session starts; the engine and the server each stop it if any tool is not `mcp__training__*`.
+- **Tools.** Pi has no sandbox, so its shell and file tools are off (`noTools: 'builtin'`) and its script tool is not activated (`direct` exposure). The engine reports its tool list when the session starts; the engine and the server each stop it if any tool is neither `mcp__training__*` nor a tool of a connector the host gave that session ([Connectors](#connectors-a-persons-own-remote-mcp-servers)).
 - **Model providers.** The engine process gets an environment with `PATH` only and a private temporary home, so no provider key of the operator reaches it. Before the first request it checks that every available model belongs to the person's OpenAI login.
 - **Model choice.** A person can only choose among the models their own engine listed from their login: the server refuses any other id before storing it, and the engine, given a stored id the account no longer lists, uses the account's first model instead. The choice is two columns of the person's row (`coach_model`, `coach_thinking`); reasoning text streams like the answer, under the same size limit, and is never stored.
 - **Isolation.** Every coach call names the person the request was authenticated as; events, streams, slots and credentials are kept per person. Tests cover two people for each route and for events.
@@ -145,7 +240,8 @@ Tests run against a fake engine process (the Go test binary speaking the protoco
 - which error texts a real 429, 503 or expired login produce, and so whether they map to `model_busy` and `reconnect`;
 - abort during a real model request;
 - that a real model answers about a photo (the photo path is tested up to the prompt line the engine reads, and Pi's own conversion to `input_image` was read in its source, not run);
-- memory and latency under real use.
+- memory and latency under real use;
+- **connectors with a real server.** No real Notion (or other) server was connected. OAuth discovery, registration, PKCE, refresh, the proxy and the approvals were tested against fake servers in Go; the real engine was tested loading a fake connector through the proxy path, not making an approved call through a real model. Notion's own metadata, its consent screen, whether it accepts dynamic registration from this redirect URI, and real tool calls remain open.
 
 ## Manual check with a real account
 
