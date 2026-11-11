@@ -292,6 +292,11 @@
     li.querySelectorAll('[aria-label]').forEach((el) => {
       el.setAttribute('aria-label', el.getAttribute('aria-label').replace(/\d+$/, String(n)));
     });
+    const kind = li.querySelector('.type-toggle');
+    if (kind) {
+      kind.dataset.n = String(n);
+      kind.setAttribute('aria-label', 'Serie ' + n + ': tocar para marcar calentamiento');
+    }
     const before = Array.from(table.querySelectorAll('.set-row.pending, .set-row.added')).pop();
     if (before) {
       ['weight_kg', 'reps', 'rpe'].forEach((name) => {
@@ -302,6 +307,25 @@
     }
     table.insertBefore(li, tpl);
     if (window.htmx) window.htmx.process(li);
+    buzz(8);
+  });
+
+  // Tapping a row's number marks it as a warm-up (W) and back; a warm-up is
+  // logged with category=warmup and never counts.
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest('.type-toggle');
+    if (!btn) return;
+    const row = btn.closest('.set-row');
+    const input = row && row.querySelector('input[name="category"]');
+    if (!input) return;
+    const warm = input.value !== 'warmup';
+    input.value = warm ? 'warmup' : '';
+    row.classList.toggle('warmup', warm);
+    btn.querySelector('.set-n').textContent = warm ? 'W' : btn.dataset.n;
+    btn.setAttribute('aria-pressed', String(warm));
+    btn.setAttribute('aria-label', warm
+      ? 'Calentamiento: tocar para serie normal'
+      : 'Serie ' + btn.dataset.n + ': tocar para marcar calentamiento');
     buzz(8);
   });
 

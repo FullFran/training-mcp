@@ -166,7 +166,8 @@ shared with the MCP tools and cannot drift apart.
 - The home offers two modes. **Entrenar** is a training logger: start a plan
   or an empty session, then each exercise is a card with its set table
   (Serie, Anterior, kg, Reps, RPE), pre-filled from the plan, the set before
-  and last session; one check logs a set and starts the rest timer, supersets
+  and last session; tapping a row's number marks it as a warm-up (an amber
+  **W** that never counts); one check logs a set and starts the rest timer, supersets
   keep their round rest, and **Terminar** shows the day's summary. A bar at
   the bottom opens the coach (when `TRAINING_COACH=1`, see
   [docs/coach.md](docs/coach.md)) as a sheet over the workout that closes back

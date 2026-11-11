@@ -163,11 +163,25 @@ func (b ExerciseBlock) IsRecord(s training.Set) bool {
 	return b.BestE1RM > 0 && math.Abs(training.Epley1RM(s.WeightKG, s.Reps)-b.BestE1RM) < 0.05
 }
 
-// Top is the block's best set by estimated 1RM, the line the finish summary
-// shows for each exercise. Nil for a block without sets.
+// WorkingCount is how many of the block's sets count; warm-ups do not.
+func (b ExerciseBlock) WorkingCount() int {
+	n := 0
+	for _, set := range b.Sets {
+		if set.Category != training.SetWarmup {
+			n++
+		}
+	}
+	return n
+}
+
+// Top is the block's best working set by estimated 1RM, the line the finish
+// summary shows for each exercise. Nil for a block with only warm-ups.
 func (b ExerciseBlock) Top() *training.Set {
 	var top *training.Set
 	for i := range b.Sets {
+		if b.Sets[i].Category == training.SetWarmup {
+			continue
+		}
 		if top == nil || training.Epley1RM(b.Sets[i].WeightKG, b.Sets[i].Reps) > training.Epley1RM(top.WeightKG, top.Reps) {
 			top = &b.Sets[i]
 		}

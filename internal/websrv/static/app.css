@@ -1390,3 +1390,10 @@ body[data-mode="train"]:has(.ex-card) .wk-now,
 body[data-mode="train"]:has(.ex-card) .wk-more,
 body[data-mode="train"]:has(.ex-card) .workout:has(> .rest[hidden]) { display: none; }
 .chat-bar .bar-start { display: flex; align-items: center; }
+/* Warm-ups in the set table: an amber W in the number column, dimmed values. */
+.type-toggle { min-height: 44px; padding: 0; border: 0; border-radius: 10px; background: none; color: inherit; font: inherit; }
+.set-row.warmup .set-n { color: #e0af68; }
+.set-row.pending.warmup .type-toggle { background: #3b2f12; }
+.set-row.done .warmup-tag { justify-self: center; min-width: 26px; min-height: 26px; font-size: 14px; }
+.train-plan .set-table > li.done.warmup { background: rgba(224, 175, 104, .12); }
+.train-plan .set-table > li.done.warmup .v { opacity: .7; }

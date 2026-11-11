@@ -15,10 +15,8 @@ const previousLimit = 40
 // done today and the rows still to log, each pre-filled.
 type TrainCard struct {
 	training.PlanProgress
-	// Sets are today's sets of the exercise, in the order logged.
-	Sets []training.Set
-	// Done rows show what last session did at the same position.
-	Previous []string
+	// Logged are today's sets of the exercise, in the order logged.
+	Logged []DoneRow
 	// Pending are the rows still to log; the first is the live one.
 	Pending []PendingRow
 	// Extra is the row «+ Añadir serie» adds beyond them.
@@ -27,6 +25,15 @@ type TrainCard struct {
 	Open bool
 	// Planned is false for an exercise done today outside any plan.
 	Planned bool
+}
+
+// DoneRow is a logged set. Warm-ups show a W and take no number, so working
+// sets are numbered 1, 2, 3 and compared with last session's working sets.
+type DoneRow struct {
+	training.Set
+	N        int
+	Warmup   bool
+	Previous string
 }
 
 // PendingRow is a set still to log, with the values the check would store.
@@ -52,22 +59,27 @@ func (s *Server) trainCards(ctx context.Context, data pageData) ([]TrainCard, er
 	for _, b := range data.Blocks {
 		if !seen[b.Exercise] {
 			seen[b.Exercise] = true
-			cards = append(cards, TrainCard{PlanProgress: training.PlanProgress{Exercise: b.Exercise, DoneSets: len(b.Sets)}})
+			cards = append(cards, TrainCard{PlanProgress: training.PlanProgress{Exercise: b.Exercise, DoneSets: workingCount(b.Sets)}})
 		}
 	}
 	for i := range cards {
 		c := &cards[i]
-		for _, set := range data.Session.Sets {
-			if set.Exercise == c.Exercise {
-				c.Sets = append(c.Sets, set)
-			}
-		}
 		last, err := s.lastSession(ctx, c.Exercise, data.Session.ID)
 		if err != nil {
 			return nil, err
 		}
-		for j := range c.Sets {
-			c.Previous = append(c.Previous, previousAt(last, j))
+		var working []training.Set
+		for _, set := range data.Session.Sets {
+			if set.Exercise != c.Exercise {
+				continue
+			}
+			row := DoneRow{Set: set, Warmup: set.Category == training.SetWarmup}
+			if !row.Warmup {
+				row.N = len(working) + 1
+				row.Previous = previousAt(last, len(working))
+				working = append(working, set)
+			}
+			c.Logged = append(c.Logged, row)
 		}
 		rows := 0
 		switch {
@@ -78,9 +90,9 @@ func (s *Server) trainCards(ctx context.Context, data pageData) ([]TrainCard, er
 			rows = 1
 		}
 		for j := 0; j < rows; j++ {
-			c.Pending = append(c.Pending, pendingRow(*c, last, len(c.Sets)+j))
+			c.Pending = append(c.Pending, pendingRow(*c, working, last, len(working)+j))
 		}
-		c.Extra = pendingRow(*c, last, len(c.Sets)+rows)
+		c.Extra = pendingRow(*c, working, last, len(working)+rows)
 	}
 	open := -1
 	for i, c := range cards {
@@ -103,8 +115,19 @@ func (s *Server) trainCards(ctx context.Context, data pageData) ([]TrainCard, er
 	return cards, nil
 }
 
-// lastSession returns an exercise's sets from its latest session before
-// today's, in the order they were done.
+// workingCount counts the sets that are not warm-ups.
+func workingCount(sets []training.Set) int {
+	n := 0
+	for _, set := range sets {
+		if set.Category != training.SetWarmup {
+			n++
+		}
+	}
+	return n
+}
+
+// lastSession returns an exercise's working sets from its latest session
+// before today's, in the order they were done; warm-ups are left out.
 func (s *Server) lastSession(ctx context.Context, exercise string, today int64) ([]training.ExerciseSet, error) {
 	history, err := s.service(ctx).ExerciseHistory(ctx, exercise, previousLimit)
 	if err != nil {
@@ -122,6 +145,9 @@ func (s *Server) lastSession(ctx context.Context, exercise string, today int64) 
 		if set.SessionID != session {
 			break
 		}
+		if set.Category == training.SetWarmup {
+			continue
+		}
 		out = append([]training.ExerciseSet{set}, out...)
 	}
 	return out, nil
@@ -134,11 +160,13 @@ func previousAt(last []training.ExerciseSet, i int) string {
 	return formatNumber(last[i].WeightKG) + " × " + strconv.Itoa(last[i].Reps)
 }
 
-func pendingRow(c TrainCard, last []training.ExerciseSet, i int) PendingRow {
+// pendingRow pre-fills the working set at position i; working are today's
+// working sets, so a warm-up never sets the next weight.
+func pendingRow(c TrainCard, working []training.Set, last []training.ExerciseSet, i int) PendingRow {
 	row := PendingRow{N: i + 1, Previous: previousAt(last, i), RPE: "8"}
 	var before *training.Set
-	if len(c.Sets) > 0 {
-		before = &c.Sets[len(c.Sets)-1]
+	if len(working) > 0 {
+		before = &working[len(working)-1]
 	}
 	var lastSame, lastEnd *training.ExerciseSet
 	if i < len(last) {

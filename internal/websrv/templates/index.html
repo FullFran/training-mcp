@@ -24,7 +24,7 @@
   <a id="go-train" class="mode-card mode-train" href="{{.Base}}/?modo=entrenar" data-mode-go="train">
     <span class="mode-icon" aria-hidden="true">🏋️</span>
     <strong>Entrenar</strong>
-    <span class="mode-sub">{{if .Progress}}{{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Plan de hoy{{end}} · {{doneCount .Progress}}/{{len .Progress}} ejercicios{{else if .Session.Sets}}{{len .Session.Sets}} serie{{if ne (len .Session.Sets) 1}}s{{end}} hoy{{else}}Elige un plan o entrena libre{{end}}</span>
+    <span class="mode-sub">{{if .Progress}}{{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Plan de hoy{{end}} · {{doneCount .Progress}}/{{len .Progress}} ejercicios{{else if .Session.Sets}}{{.WorkingSetCount}} serie{{if ne .WorkingSetCount 1}}s{{end}} hoy{{else}}Elige un plan o entrena libre{{end}}</span>
   </a>
   <a id="go-plan" class="mode-card mode-plan" href="{{.Base}}/?modo=planificar" data-mode-go="plan">
     <span class="mode-icon" aria-hidden="true">🗂️</span>

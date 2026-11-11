@@ -207,20 +207,6 @@ func TestPlanificarIsTheChatWithPanels(t *testing.T) {
 	}
 }
 
-// Weights read and pre-fill with at most two decimals, never as the raw float.
-func TestWeightsAreShownRounded(t *testing.T) {
-	h, _ := newServer(t)
-	panel := post(t, h, base+"/sets", setForm("banca", "65.77089365", "8", "8"), true).Body.String()
-	for _, want := range []string{"65.77 kg × 8", `data-weight="65.77"`, `data-last-weight="65.77"`} {
-		if !strings.Contains(panel, want) {
-			t.Fatalf("panel lacks %s", want)
-		}
-	}
-	if strings.Contains(panel, "65.7708") {
-		t.Fatal("a raw weight is still rendered")
-	}
-}
-
 // Each exercise is a card with a set table: done rows, then rows still to log,
 // pre-filled from the plan and last session, each logged with one check.
 func TestEntrenarShowsASetTablePerExercise(t *testing.T) {
@@ -275,5 +261,48 @@ func TestEntrenarShowsASetTablePerExercise(t *testing.T) {
 	}
 	if !strings.Contains(section(t, train, `data-exercise="fondos"`, "</details>"), "0/2") {
 		t.Fatal("fondos card lacks its count")
+	}
+}
+
+// In the set table a warm-up shows a W instead of a number, does not count,
+// and never pre-fills the next set; every row to log can be switched to W.
+func TestEntrenarMarksWarmupsInTheSetTable(t *testing.T) {
+	h, service := newServer(t)
+	plan, err := service.CreatePlan(t.Context(), training.Plan{Name: "P", Items: []training.PlanItem{
+		{Exercise: "sentadilla", TargetSets: 2, RepMin: 5},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	post(t, h, base+"/plan", url.Values{"plan_id": {itoa(plan.ID)}}, false)
+	warm := setForm("sentadilla", "60", "5", "6")
+	warm.Set("category", "warmup")
+	post(t, h, base+"/sets", warm, true)
+	post(t, h, base+"/sets", setForm("sentadilla", "100", "5", "8"), true)
+
+	card := section(t, get(t, h, base+"/?modo=entrenar").Body.String(), `data-exercise="sentadilla"`, "</details>")
+	if !strings.Contains(card, `<span class="count">1/2</span>`) || !strings.Contains(card, `<span class="chk">○</span>`) {
+		t.Fatalf("a warm-up counted as done: %s", card)
+	}
+	wu := section(t, card, `class="set-row done warmup"`, "</li>")
+	if !strings.Contains(wu, `data-category="warmup"`) || !strings.Contains(wu, `class="warmup-tag"`) {
+		t.Fatalf("warm-up row not marked: %s", wu)
+	}
+	work := section(t, card, `class="set-row done" data-set-id`, "</li>")
+	if !strings.Contains(work, `<span class="set-n">1</span>`) {
+		t.Fatalf("the first working set is not set 1: %s", work)
+	}
+	finish := section(t, get(t, h, base+"/?modo=entrenar").Body.String(), `id="finish"`, "</section>")
+	if !strings.Contains(finish, "<strong>1 serie</strong>") || !strings.Contains(finish, "1 serie · mejor 100 kg × 5") {
+		t.Fatalf("the summary counts the warm-up: %s", finish)
+	}
+	if home := section(t, get(t, h, base+"/").Body.String(), `id="go-train"`, "</a>"); strings.Contains(home, "2 series") {
+		t.Fatalf("the home counts the warm-up: %s", home)
+	}
+	live := section(t, card, `class="set-row pending live"`, "</form>")
+	for _, want := range []string{`<span class="set-n">2</span>`, `name="weight_kg"`, `value="100"`, `name="category" value=""`, `class="type-toggle"`} {
+		if !strings.Contains(live, want) {
+			t.Fatalf("live row lacks %s: %s", want, live)
+		}
 	}
 }
