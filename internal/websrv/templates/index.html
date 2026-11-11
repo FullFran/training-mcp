@@ -188,7 +188,7 @@
 <section id="coach" class="coach-dock" aria-label="Coach">
   <div class="chat-status">
     <span id="coach-state" class="muted"></span>
-    <button type="button" id="coach-speak" class="ghost mini" aria-pressed="false" hidden>🔈 Leer respuestas</button>
+    <label id="coach-autosend-wrap" class="autosend" hidden><input type="checkbox" id="coach-autosend"> Enviar al acabar de dictar</label>
     <button type="button" id="coach-disconnect" class="ghost mini" hidden>Desconectar</button>
   </div>
   <div id="coach-connect" class="coach-connect" hidden>
@@ -202,9 +202,11 @@
   </div>
   <form id="coach-form" class="coach-form" hidden>
     <div id="composer-extras" class="composer-extras"></div>
-    <button type="button" id="coach-mic" class="ghost mic" aria-label="Dictar" aria-pressed="false" hidden>🎤</button>
     <textarea id="coach-text" rows="1" maxlength="4000" placeholder="Pregunta a tu coach" aria-label="Mensaje para el coach"></textarea>
+    <!-- Dictation: tap to talk, it stops on silence or on a second tap. -->
+    <button type="button" id="coach-mic" class="mic" aria-label="Dictar" aria-pressed="false" hidden>🎤</button>
     <button type="submit" id="coach-send" class="primary">Enviar</button>
+    <p id="coach-listening" class="listening" role="status" hidden>Escuchando… habla y toca 🎤 para terminar</p>
     <button type="button" id="coach-stop" class="ghost" hidden>Detener</button>
   </form>
 </section>

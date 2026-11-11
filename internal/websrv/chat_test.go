@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
@@ -157,8 +158,18 @@ func TestComposerHasVoiceAndTheExtrasSlot(t *testing.T) {
 	if !strings.Contains(body, base+"/static/markdown.js") {
 		t.Fatal("the coach page does not load the reply renderer")
 	}
-	if !strings.Contains(body, `id="coach-speak"`) {
-		t.Fatal("no read-aloud switch")
+	// Dictation only: replies are not read aloud.
+	if !strings.Contains(body, `id="coach-autosend"`) || strings.Contains(body, `coach-speak`) {
+		t.Fatal("voice controls: want the dictation auto-send switch and no read-aloud")
+	}
+	for _, file := range []string{"static/coach.js", "static/shell.js", "static/app.js"} {
+		src, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(src), "speechSynthesis") || strings.Contains(string(src), "SpeechSynthesis") {
+			t.Fatalf("%s still reads replies aloud", file)
+		}
 	}
 	// The workout and the panels do not depend on the coach.
 	for _, want := range []string{`id="workout"`, `class="panel-links"`} {
@@ -172,7 +183,7 @@ func TestComposerHasVoiceAndTheExtrasSlot(t *testing.T) {
 func TestServiceWorkerCachesTheChatShell(t *testing.T) {
 	h, _ := newServer(t)
 	body := get(t, h, base+"/sw.js").Body.String()
-	for _, want := range []string{"const VERSION = 'v6';", "BASE + '/static/shell.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'"} {
+	for _, want := range []string{"const VERSION = 'v7';", "BASE + '/static/shell.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("service worker lacks %s", want)
 		}
