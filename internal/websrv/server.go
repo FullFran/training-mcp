@@ -114,6 +114,8 @@ type pageData struct {
 	LastSetID  int64
 	// Review is the review page: proposals waiting and answered, and the standing answers.
 	Review ReviewData
+	// Memory is the memory page: what the coach remembers about the person.
+	Memory MemoryData
 	// PendingCount is how many agent proposals wait for an answer.
 	PendingCount int
 	// CoachOn shows the coach chat.
@@ -285,6 +287,9 @@ func (s *Server) routes() {
 	s.handle("POST "+b+"/review/{id}/reject", s.rejectProposal)
 	s.handle("POST "+b+"/review/accept-all", s.setAcceptAll)
 	s.handle("POST "+b+"/review/forget", s.forgetRule)
+	s.handle("GET "+b+"/memory", s.memoryPage)
+	s.handle("POST "+b+"/memory/{id}/update", s.updateMemory)
+	s.handle("POST "+b+"/memory/{id}/delete", s.deleteMemory)
 	s.handle("GET "+b+"/manifest.webmanifest", s.manifest)
 	s.handle("GET "+b+"/sw.js", s.serviceWorker)
 

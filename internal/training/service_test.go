@@ -141,8 +141,9 @@ func TestServiceListSessionsResults(t *testing.T) {
 }
 
 type memoryStore struct {
-	// ProposalStore is left nil: these tests never reach proposals.
+	// ProposalStore and MemoryStore are left nil: these tests never reach them.
 	ProposalStore
+	MemoryStore
 	nextSession, nextSet int64
 	sessions             map[int64]Session
 	sets                 map[int64]Set

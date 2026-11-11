@@ -22,6 +22,7 @@ type Store interface {
 // id does: the same error, so its existence cannot be inferred.
 type UserStore interface {
 	ProposalStore
+	MemoryStore
 	Start(context.Context, Session) (Session, error)
 	AddSet(context.Context, AddSetInput) (Set, float64, error)
 	LogSets(context.Context, LogSetsRecord) (LogSetsResult, error)

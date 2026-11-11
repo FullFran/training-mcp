@@ -53,6 +53,7 @@ and are not proposals.
 | `feedback.record` | `record_feedback` |
 | `landmarks.set` | `set_volume_landmarks` |
 | `rest.set` | `set_rest_target` |
+| `memory.save` / `memory.forget` | `memory_save` / `memory_forget` |
 
 A proposal is claimed before it is applied, so two answers cannot apply it
 twice. If the process stops between applying and recording the outcome, the
@@ -151,6 +152,29 @@ Per-exercise metadata that persists across sessions.
 | `list_exercise_groups` | List every exercise that has a muscle group assigned, ordered by group. |
 | `set_exercise_note` | Store a persistent setup reminder for an exercise, such as seat height or grip width. It is shown every time that exercise is logged. An empty note removes it. |
 | `list_exercise_notes` | List every exercise that has a setup note. |
+
+## Coach memory
+
+Durable facts about the person that outlive chats. Chats are deleted after 90
+days; memory stays until the person deletes it in the app (`/memory`, linked
+from the review page). Each fact has a type (`preference`, `limitation`,
+`goal`, `equipment`, `worked`, `note`), a title, a body, dates and a **topic
+key** that names it: saving the same key again updates the fact instead of
+adding a duplicate. Storage and search are SQLite FTS5, deterministic and
+without a model. Saving and forgetting are separate action types
+(`memory.save`, `memory.forget`), so letting the coach remember without asking
+never lets it delete memory without asking.
+
+| Tool | What it does |
+|---|---|
+| `memory_save` | Save a fact, or update the one with the same `topic_key`. Without a key, one is derived from the type and title. `pinned` puts it first in `memory_context`; omitted, the stored value is kept. A proposal. |
+| `memory_forget` | Delete a fact by `memory_id`. A proposal. |
+| `memory_search` | Find facts by words (every word must match as a prefix, accents ignored), optionally of one type; with no words it lists them, pinned first then most recently updated. Bodies are whole. |
+| `memory_get` | One fact by `memory_id`, whole. |
+| `memory_context` | What to know at the start of a chat: up to 20 facts, pinned first then most recent, bodies cut to 280 characters. |
+
+No memory tool takes a user id: whose memory it is comes only from the
+authenticated request. A `user_id` sent as an argument is never read.
 
 ---
 

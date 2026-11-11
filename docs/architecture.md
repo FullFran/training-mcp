@@ -104,10 +104,16 @@ is how they end up implemented twice, slightly differently:
 
 ## Persistence
 
-SQLite, single file, thirteen forward-only migrations under
+SQLite, single file, forward-only numbered migrations under
 `internal/sqlitestore/migrations/`. Each numbered file is a step, additive except for 013, which rebuilds four tables to key them per user,
 (`001_init`, `002_exercise_groups`, … `008_plan_item_notes`), which is what lets
 the schema grow without the single user ever having to reset their history.
+
+Migration 017 adds `coach_memory` (one row per fact, unique per user and
+topic key) and `coach_memory_fts`, an FTS5 index with external content kept in
+step by triggers. The index holds no user id; every search joins back to
+`coach_memory` and filters by user there. Search text is reduced to quoted
+prefix words, so nothing a person or agent types is read as FTS syntax.
 
 `sqlitestore` carries the highest coverage floor in CI (70% statements) because
 it is the layer that touches the data: a bug in a driving adapter shows up as a

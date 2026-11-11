@@ -33,6 +33,9 @@ func TestProposalSummaryPerTool(t *testing.T) {
 		{"record_feedback", `{"session_id":5,"muscle_group":"pecho","fatigue":2,"pump":1,"recovery":3}`, "Valorar pecho: fatiga 2, bombeo 1, recuperación 3"},
 		{"set_volume_landmarks", `{"muscle_group":"pecho","mev":8,"mrv":20}`, "Fijar los límites de pecho: MEV 8, MRV 20 series por semana"},
 		{"set_rest_target", `{"rest_seconds":150}`, "Descanso objetivo: 2:30"},
+		{"memory_save", `{"type":"limitation","title":"Hombro","body":"Duele en press militar"}`, "Recordar (limitación) «Hombro»: Duele en press militar"},
+		{"memory_save", `{"title":"Agarre","body":"Prefiere agarre neutro"}`, "Recordar (nota) «Agarre»: Prefiere agarre neutro"},
+		{"memory_forget", `{"memory_id":4}`, "Olvidar el recuerdo 4"},
 	}
 	for _, c := range cases {
 		if got := proposalSummary(c.tool, []byte(c.payload)); got != c.want {

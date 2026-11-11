@@ -361,6 +361,25 @@ var summaries = map[string]func(json.RawMessage) string{
 		}
 		return fmt.Sprintf("Fijar los límites de %s: MEV %d, MRV %d series por semana", in.MuscleGroup, in.MEV, in.MRV)
 	}),
+	"memory_save": summary(func(in struct {
+		Type  string `json:"type"`
+		Title string `json:"title"`
+		Body  string `json:"body"`
+	}) string {
+		if in.Title == "" || in.Body == "" {
+			return ""
+		}
+		kind := in.Type
+		if kind == "" {
+			kind = "note"
+		}
+		return fmt.Sprintf("Recordar (%s) «%s»: %s", strings.ToLower(memoryTypeLabel(kind)), in.Title, in.Body)
+	}),
+	"memory_forget": summary(func(in struct {
+		MemoryID int64 `json:"memory_id"`
+	}) string {
+		return fmt.Sprintf("Olvidar el recuerdo %d", in.MemoryID)
+	}),
 	"set_rest_target": summary(func(in struct {
 		RestSeconds int `json:"rest_seconds"`
 	}) string {

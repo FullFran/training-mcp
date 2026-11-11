@@ -21,7 +21,7 @@ const (
 var userTables = []string{
 	"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
 	"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys",
-	"proposals", "approval_rules", "agent_permissions",
+	"proposals", "approval_rules", "agent_permissions", "coach_memory",
 }
 
 // ownedRows selects one user's rows from each table, children through their parent.
@@ -39,6 +39,7 @@ var ownedRows = map[string]string{
 	"proposals":         `SELECT * FROM proposals WHERE user_id=? ORDER BY rowid`,
 	"approval_rules":    `SELECT * FROM approval_rules WHERE user_id=? ORDER BY rowid`,
 	"agent_permissions": `SELECT * FROM agent_permissions WHERE user_id=? ORDER BY rowid`,
+	"coach_memory":      `SELECT * FROM coach_memory WHERE user_id=? ORDER BY rowid`,
 }
 
 func openTwoUsers(t *testing.T) *Store {
@@ -107,6 +108,7 @@ type seeded struct {
 	session, set, plan int64
 	// proposal is pending; claimed is being applied.
 	proposal, claimed int64
+	memory            int64
 }
 
 // seedUser gives a user a row of every kind, using the same names for whoever calls it.
@@ -169,7 +171,12 @@ func seedUser(t *testing.T, user training.UserStore, group string) seeded {
 	if err = user.SetAcceptAll(ctx, true); err != nil {
 		t.Fatal(err)
 	}
-	return seeded{session: session.ID, set: set.ID, plan: plan.ID, proposal: pending.ID, claimed: claimed.ID}
+	memory, err := user.SaveMemory(ctx, training.Memory{TopicKey: "lesion/hombro", Type: training.MemoryLimitation, Title: "hombro de " + group,
+		Body: "duele en press de " + group, SourceChatID: "chat-1", CreatedAt: time.Unix(0, 0), UpdatedAt: time.Unix(0, 0)}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return seeded{session: session.ID, set: set.ID, plan: plan.ID, proposal: pending.ID, claimed: claimed.ID, memory: memory.ID}
 }
 
 // idCases are the data methods addressed by an id. Each runs with an id that may
@@ -267,10 +274,20 @@ var idCases = map[string]func(context.Context, training.UserStore, seeded) (any,
 	"Permissions": func(c context.Context, u training.UserStore, _ seeded) (any, error) {
 		return u.Permissions(c)
 	},
+	"GetMemory": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return u.GetMemory(c, id.memory)
+	},
+	"UpdateMemory": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		body := "robado"
+		return u.UpdateMemory(c, id.memory, training.MemoryPatch{Body: &body, UpdatedAt: time.Unix(1, 0)})
+	},
+	"DeleteMemory": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return u.DeleteMemory(c, id.memory)
+	},
 }
 
 func TestAnotherUsersIDBehavesExactlyLikeAMissingOne(t *testing.T) {
-	missing := seeded{session: missingID, set: missingID, plan: missingID, proposal: missingID, claimed: missingID}
+	missing := seeded{session: missingID, set: missingID, plan: missingID, proposal: missingID, claimed: missingID, memory: missingID}
 	for name, run := range idCases {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
@@ -321,6 +338,14 @@ var readCases = map[string]func(context.Context, training.UserStore) (any, error
 	},
 	"ExerciseNotes": func(c context.Context, u training.UserStore) (any, error) { return u.ExerciseNotes(c) },
 	"RestTarget":    func(c context.Context, u training.UserStore) (any, error) { return u.RestTarget(c) },
+	"ListMemory": func(c context.Context, u training.UserStore) (any, error) {
+		listed, err := u.ListMemory(c, training.MemoryQuery{Limit: 50})
+		if err != nil {
+			return nil, err
+		}
+		found, err := u.ListMemory(c, training.MemoryQuery{Text: "hombro press", Limit: 50})
+		return []any{listed, found}, err
+	},
 	"ListProposals": func(c context.Context, u training.UserStore) (any, error) {
 		pending, err := u.ListProposals(c, training.ProposalFilter{Pending: true, Limit: 50})
 		if err != nil {
@@ -417,6 +442,15 @@ var writeCases = map[string]struct {
 	"SetRestTarget": {
 		func(c context.Context, u training.UserStore) error { return u.SetRestTarget(c, 75) },
 		`SELECT COUNT(*) FROM users WHERE id=2 AND rest_seconds=75`,
+	},
+	// The owner already has a fact under this topic key: user 2 gets their own.
+	"SaveMemory": {
+		func(c context.Context, u training.UserStore) error {
+			_, err := u.SaveMemory(c, training.Memory{TopicKey: "lesion/hombro", Type: training.MemoryNote, Title: "suya", Body: "suya",
+				CreatedAt: time.Unix(0, 0), UpdatedAt: time.Unix(0, 0)}, nil)
+			return err
+		},
+		`SELECT COUNT(*) FROM coach_memory WHERE user_id=2 AND topic_key='lesion/hombro' AND title='suya'`,
 	},
 }
 
