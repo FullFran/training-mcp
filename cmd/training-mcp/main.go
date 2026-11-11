@@ -199,7 +199,7 @@ func startCoach(c config.Coach, publicURL string, store *sqlitestore.Store, logg
 	}
 	manager, err := engine.NewManager(engine.Settings{
 		Vault: vault, Tokens: tokens, Command: engine.NodeCommand(c.Node, c.Engine),
-		MCPURL: c.MCPURL, SystemPrompt: engine.SystemPrompt, Preferences: store,
+		MCPURL: c.MCPURL, SystemPrompt: engine.SystemPrompt, Preferences: store, Conversations: store,
 		MaxProcesses: c.MaxProcesses, Idle: time.Duration(c.IdleSeconds) * time.Second, Logger: logger,
 		Connectors: connectors,
 	})

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -20,11 +21,17 @@ type Coach interface {
 	StartLogin(userID int64) (engine.LoginInfo, error)
 	Disconnect(userID int64) error
 	Subscribe(userID int64) (<-chan engine.Event, func())
-	Prompt(userID int64, text string, images ...engine.Image) error
+	Prompt(userID, conversation int64, text string, images ...engine.Image) (int64, error)
 	Abort(userID int64) bool
 	Notify(userID int64, ev engine.WorkoutEvent)
 	Models(userID int64) (engine.ModelList, error)
 	SetPreferences(userID int64, model, thinking string) error
+	Conversations(userID int64) ([]engine.Conversation, error)
+	Conversation(userID, conversation int64) (engine.Conversation, []engine.ConversationMessage, error)
+	OpenConversation(userID, conversation int64) error
+	RenameConversation(userID, conversation int64, title string) error
+	DeleteConversation(userID, conversation int64) error
+	DeleteConversations(userID int64) error
 }
 
 const (
@@ -53,6 +60,7 @@ var coachHTTPStatus = map[engine.ErrorCode]int{
 	engine.CodeLoginFailed:       http.StatusBadGateway,
 	engine.CodeTurnLimit:         http.StatusGatewayTimeout,
 	engine.CodeBadRequest:        http.StatusBadRequest,
+	engine.CodeNotFound:          http.StatusNotFound,
 }
 
 func (s *Server) coachRoutes() {
@@ -69,6 +77,12 @@ func (s *Server) coachRoutes() {
 	s.handle("GET "+b+"/coach/models", s.coachUser(s.coachModels))
 	s.handle("POST "+b+"/coach/settings", s.coachWrite(s.coachSettings))
 	s.connectorRoutes()
+	s.handle("POST "+b+"/coach/open", s.coachWrite(s.coachOpen))
+	s.handle("GET "+b+"/coach/conversations", s.coachUser(s.coachConversations))
+	s.handle("GET "+b+"/coach/conversations/{id}", s.coachUser(s.coachConversation))
+	s.handle("POST "+b+"/coach/conversations/{id}/rename", s.coachWrite(s.coachRename))
+	s.handle("POST "+b+"/coach/conversations/{id}/delete", s.coachWrite(s.coachDelete))
+	s.handle("POST "+b+"/coach/conversations/delete-all", s.coachWrite(s.coachDeleteAll))
 }
 
 type coachHandler func(w http.ResponseWriter, r *http.Request, userID int64)
@@ -178,8 +192,9 @@ func (s *Server) coachPrompt(w http.ResponseWriter, r *http.Request, userID int6
 	// to finish it. The recorder in tests has no deadline to set.
 	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(coachUploadTime))
 	var body struct {
-		Text   string `json:"text"`
-		Images []struct {
+		Text         string `json:"text"`
+		Conversation int64  `json:"conversation"`
+		Images       []struct {
 			Type string `json:"type"`
 			Data []byte `json:"data"` // base64 in the request
 		} `json:"images"`
@@ -213,11 +228,122 @@ func (s *Server) coachPrompt(w http.ResponseWriter, r *http.Request, userID int6
 		writeCoachJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_image"})
 		return
 	}
-	if err := s.opts.Coach.Prompt(userID, text, images...); err != nil {
+	if body.Conversation < 0 {
+		writeCoachJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_request"})
+		return
+	}
+	conv, err := s.opts.Coach.Prompt(userID, body.Conversation, text, images...)
+	if err != nil {
 		coachError(w, err)
 		return
 	}
-	writeCoachJSON(w, http.StatusAccepted, map[string]bool{"started": true})
+	writeCoachJSON(w, http.StatusAccepted, map[string]any{"started": true, "conversation": conv})
+}
+
+// --- conversations ------------------------------------------------------------
+
+// conversationID is the {id} of a conversation route: a positive number, or the
+// route answers 404 as for a conversation that is not the person's.
+func conversationID(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		writeCoachJSON(w, http.StatusNotFound, map[string]string{"error": string(engine.CodeNotFound)})
+		return 0, false
+	}
+	return id, true
+}
+
+// decodeCoachBody reads a small JSON body with no unknown fields.
+func decodeCoachBody(w http.ResponseWriter, r *http.Request, v any) bool {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		writeCoachJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_request"})
+		return false
+	}
+	return true
+}
+
+func (s *Server) coachConversations(w http.ResponseWriter, _ *http.Request, userID int64) {
+	list, err := s.opts.Coach.Conversations(userID)
+	if err != nil {
+		coachError(w, err)
+		return
+	}
+	writeCoachJSON(w, http.StatusOK, map[string]any{"conversations": list})
+}
+
+// coachConversation returns a conversation's messages as JSON text; the page
+// renders them as text, never as HTML.
+func (s *Server) coachConversation(w http.ResponseWriter, r *http.Request, userID int64) {
+	id, ok := conversationID(w, r)
+	if !ok {
+		return
+	}
+	c, msgs, err := s.opts.Coach.Conversation(userID, id)
+	if err != nil {
+		coachError(w, err)
+		return
+	}
+	writeCoachJSON(w, http.StatusOK, map[string]any{"id": c.ID, "title": c.Title, "updated_at": c.UpdatedAt, "messages": msgs})
+}
+
+// coachOpen makes a conversation the open one (0: a new chat), where the
+// reactions to logged sets go.
+func (s *Server) coachOpen(w http.ResponseWriter, r *http.Request, userID int64) {
+	var body struct {
+		Conversation int64 `json:"conversation"`
+	}
+	if !decodeCoachBody(w, r, &body) {
+		return
+	}
+	if body.Conversation < 0 {
+		writeCoachJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_request"})
+		return
+	}
+	if err := s.opts.Coach.OpenConversation(userID, body.Conversation); err != nil {
+		coachError(w, err)
+		return
+	}
+	writeCoachJSON(w, http.StatusOK, map[string]int64{"conversation": body.Conversation})
+}
+
+func (s *Server) coachRename(w http.ResponseWriter, r *http.Request, userID int64) {
+	id, ok := conversationID(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		Title string `json:"title"`
+	}
+	if !decodeCoachBody(w, r, &body) {
+		return
+	}
+	if err := s.opts.Coach.RenameConversation(userID, id, body.Title); err != nil {
+		coachError(w, err)
+		return
+	}
+	writeCoachJSON(w, http.StatusOK, map[string]string{"title": strings.TrimSpace(body.Title)})
+}
+
+func (s *Server) coachDelete(w http.ResponseWriter, r *http.Request, userID int64) {
+	id, ok := conversationID(w, r)
+	if !ok {
+		return
+	}
+	if err := s.opts.Coach.DeleteConversation(userID, id); err != nil {
+		coachError(w, err)
+		return
+	}
+	writeCoachJSON(w, http.StatusOK, map[string]bool{"deleted": true})
+}
+
+func (s *Server) coachDeleteAll(w http.ResponseWriter, _ *http.Request, userID int64) {
+	if err := s.opts.Coach.DeleteConversations(userID); err != nil {
+		coachError(w, err)
+		return
+	}
+	writeCoachJSON(w, http.StatusOK, map[string]bool{"deleted": true})
 }
 
 // coachStream is the open chat: every turn of this person, theirs and the

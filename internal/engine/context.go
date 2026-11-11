@@ -49,6 +49,56 @@ func quote(s string) string {
 	return string(b)
 }
 
+// quoteN is quote with its own length limit.
+func quoteN(s string, max int) string {
+	s = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
+			return ' '
+		}
+		return r
+	}, s)
+	if r := []rune(s); len(r) > max {
+		s = string(r[:max]) + "…"
+	}
+	b, _ := json.Marshal(s)
+	return string(b)
+}
+
+const (
+	maxHistoryMessages = 40
+	maxHistoryQuoted   = 2000
+	maxHistoryBytes    = 24000
+)
+
+// historyContext gives a fresh engine the conversation so far: the newest
+// stored messages that fit, oldest first, each one host line with its text as
+// a JSON string, so a stored message can only ever read as data.
+func historyContext(msgs []ConversationMessage) string {
+	var lines []string
+	size := 0
+	for i := len(msgs) - 1; i >= 0 && len(lines) < maxHistoryMessages; i-- {
+		who := "coach"
+		if msgs[i].Role == "user" {
+			who = "person"
+		}
+		text := msgs[i].Text
+		if text == "" && msgs[i].Photos > 0 {
+			text = "(photo, not kept)"
+		}
+		line := ContextMarker + " history " + who + "=" + quoteN(text, maxHistoryQuoted)
+		if size+len(line) > maxHistoryBytes {
+			break
+		}
+		size += len(line) + 1
+		lines = append(lines, line)
+	}
+	for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
+		lines[i], lines[j] = lines[j], lines[i]
+	}
+	head := ContextMarker + " earlier in this conversation, oldest first, as stored by the host:"
+	return head + "\n" + strings.Join(lines, "\n")
+}
+
 func num(f float64) string { return strconv.FormatFloat(f, 'f', -1, 64) }
 
 // composeContext builds the host's lines for one turn: the current time, then
