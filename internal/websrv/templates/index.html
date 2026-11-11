@@ -161,9 +161,9 @@
       {{range .Review.Pending}}
       <article class="chat-card proposal-card" data-proposal="{{.ID}}">
         <header><strong>{{.Label}}</strong> <span class="muted">{{.When}} · pendiente</span></header>
-        <dl>{{range .Fields}}
+        {{if .Summary}}<p class="summary">{{.Summary}}</p>{{else}}<dl>{{range .Fields}}
           <dt>{{.Name}}</dt><dd>{{.Value}}</dd>{{end}}
-        </dl>
+        </dl>{{end}}
         <div class="card-actions">
           <form method="post" action="{{$.Base}}/review/{{.ID}}/accept">{{if $.CSRF}}
             <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
@@ -208,6 +208,7 @@
     <button type="button" id="coach-stop" class="ghost" hidden>Detener</button>
   </form>
 </section>
+<script src="{{.Base}}/static/markdown.js" defer></script>
 <script src="{{.Base}}/static/coach.js" defer></script>
 {{end -}}
 

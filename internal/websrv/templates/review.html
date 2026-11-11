@@ -39,9 +39,15 @@
   {{range .Review.Pending}}
   <article class="card proposal">
     <header><strong>{{.Label}}</strong> <span class="muted">{{.When}}</span></header>
-    <dl>{{range .Fields}}
+    {{if .Summary}}<p class="summary">{{.Summary}}</p>
+    <details class="raw">
+      <summary>Datos exactos</summary>
+      <dl>{{range .Fields}}
+        <dt>{{.Name}}</dt><dd>{{.Value}}</dd>{{end}}
+      </dl>
+    </details>{{else}}<dl>{{range .Fields}}
       <dt>{{.Name}}</dt><dd>{{.Value}}</dd>{{end}}
-    </dl>
+    </dl>{{end}}
     <form method="post" action="{{$.Base}}/review/{{.ID}}/accept">{{if $.CSRF}}
       <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
       <fieldset class="remember">

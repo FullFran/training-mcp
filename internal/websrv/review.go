@@ -67,11 +67,14 @@ type ProposalView struct {
 	ID         int64
 	ActionType string
 	Label      string
-	Fields     []ProposalField
-	Status     string
-	DecidedBy  string
-	When       string
-	Error      string
+	// Summary says in words what the proposal does; empty for a type without
+	// one, which shows Fields instead.
+	Summary   string
+	Fields    []ProposalField
+	Status    string
+	DecidedBy string
+	When      string
+	Error     string
 }
 
 // RuleView is a remembered answer as the review page shows it.
@@ -124,7 +127,8 @@ func (s *Server) proposalView(p training.Proposal) ProposalView {
 		when = p.DecidedAt
 	}
 	return ProposalView{
-		ID: p.ID, ActionType: p.ActionType, Label: actionLabel(p.ActionType), Fields: proposalFields(p.Payload),
+		ID: p.ID, ActionType: p.ActionType, Label: actionLabel(p.ActionType), Summary: proposalSummary(p.Tool, p.Payload),
+		Fields: proposalFields(p.Payload),
 		Status: statusLabels[p.Status], DecidedBy: decidedByLabels[p.DecidedBy],
 		When: when.In(s.clock().Location()).Format("02/01 15:04"), Error: p.Error,
 	}
