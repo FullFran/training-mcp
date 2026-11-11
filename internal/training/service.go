@@ -28,6 +28,8 @@ func CalculateSI(rpe float64) float64 {
 type Service struct {
 	store UserStore
 	clock Clock
+	// imports is nil for a Service built without one; its import methods then fail.
+	imports ImportStore
 }
 
 func NewService(store UserStore, clock Clock) *Service { return &Service{store: store, clock: clock} }
@@ -45,7 +47,9 @@ type Services struct {
 func NewServices(store Store, clock Clock) *Services { return &Services{store: store, clock: clock} }
 
 func (s *Services) ForUser(userID int64) *Service {
-	return NewService(s.store.ForUser(userID), s.clock)
+	svc := NewService(s.store.ForUser(userID), s.clock)
+	svc.imports = s.store.ImportsFor(userID)
+	return svc
 }
 
 func (s *Service) StartSession(ctx context.Context, date string) (Session, error) {

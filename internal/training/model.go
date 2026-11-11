@@ -62,6 +62,8 @@ type Session struct {
 	// snapshot so renaming or deleting a plan never rewrites past sessions.
 	PlanID   int64  `json:"plan_id,omitempty"`
 	PlanName string `json:"plan_name,omitempty"`
+	// Notes are an imported workout's own notes; sessions logged here have none.
+	Notes string `json:"notes,omitempty"`
 }
 type Set struct {
 	ID        int64   `json:"id"`
