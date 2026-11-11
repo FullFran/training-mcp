@@ -165,7 +165,8 @@ shared with the MCP tools and cannot drift apart.
   Header buttons open history, plans, review and progress as panels that
   return to the same chat; the plan of the day, pending proposals (accept or
   reject) and logged sets appear as cards rendered by the server.
-- `/review` lists the agent's pending proposals with what each would change,
+- `/review` lists the agent's pending proposals with what each would change
+  (one sentence per write tool, the exact payload one tap away),
   accepts (once, 12 hours, always) or rejects them, shows the answer history
   and holds the accept-all switch. The person's own changes in the app apply
   directly.

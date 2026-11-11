@@ -1,6 +1,8 @@
 package websrv_test
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
@@ -152,6 +154,9 @@ func TestComposerHasVoiceAndTheExtrasSlot(t *testing.T) {
 			t.Fatalf("composer lacks %s: %s", want, composer)
 		}
 	}
+	if !strings.Contains(body, base+"/static/markdown.js") {
+		t.Fatal("the coach page does not load the reply renderer")
+	}
 	if !strings.Contains(body, `id="coach-speak"`) {
 		t.Fatal("no read-aloud switch")
 	}
@@ -167,9 +172,44 @@ func TestComposerHasVoiceAndTheExtrasSlot(t *testing.T) {
 func TestServiceWorkerCachesTheChatShell(t *testing.T) {
 	h, _ := newServer(t)
 	body := get(t, h, base+"/sw.js").Body.String()
-	for _, want := range []string{"const VERSION = 'v5';", "BASE + '/static/shell.js'", "BASE + '/static/coach.js'"} {
+	for _, want := range []string{"const VERSION = 'v6';", "BASE + '/static/shell.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("service worker lacks %s", want)
+		}
+	}
+}
+
+// The proposal card and /review say what the change does in words; the raw
+// payload stays one tap away on /review only.
+func TestProposalsReadAsASentence(t *testing.T) {
+	f := newReviewFixture(t)
+	f.propose(t, "Pierna <b>coach</b>")
+	want := "Crear rutina «Pierna &lt;b&gt;coach&lt;/b&gt;»: sentadilla 3 series"
+	cards := section(t, get(t, f.handler, "/").Body.String(), `id="chat-cards"`, `id="chat-end"`)
+	if !strings.Contains(cards, want) || strings.Contains(cards, "target_sets") {
+		t.Fatalf("chat card: %s", cards)
+	}
+	review := get(t, f.handler, "/review").Body.String()
+	if !strings.Contains(review, want) {
+		t.Fatalf("review page lacks the summary")
+	}
+	if !strings.Contains(section(t, review, `<details class="raw"`, "</details>"), "target_sets") {
+		t.Fatal("review page no longer offers the raw payload")
+	}
+}
+
+// A type without a summary keeps the key/value view everywhere.
+func TestUnknownProposalsKeepTheirFields(t *testing.T) {
+	f := newReviewFixture(t)
+	_, err := f.service.Propose(t.Context(), training.ProposalInput{Tool: "a_future_tool", ActionType: "future.thing", Payload: []byte(`{"widget":"azul"}`)},
+		func(context.Context) (json.RawMessage, error) { return nil, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/", "/review"} {
+		body := get(t, f.handler, path).Body.String()
+		if !strings.Contains(body, "<dt>widget</dt><dd>azul</dd>") {
+			t.Fatalf("%s lacks the fields of an unknown proposal", path)
 		}
 	}
 }

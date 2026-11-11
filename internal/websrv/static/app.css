@@ -702,7 +702,14 @@ main { padding-bottom: 140px; }
   overscroll-behavior: contain;
 }
 .coach-msg { margin: 8px 0; padding: 10px 12px; border-radius: 12px; max-width: 88%; }
-.coach-msg p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.coach-body { overflow-wrap: anywhere; }
+.coach-body p, .coach-body ul, .coach-body ol, .coach-body pre { margin: 0; }
+.coach-body > * + * { margin-top: 8px; }
+.coach-body ul, .coach-body ol { padding-left: 20px; }
+.coach-body code { font: .9em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--line); padding: 1px 4px; border-radius: 4px; }
+.coach-body pre { overflow-x: auto; padding: 8px; background: var(--line); border-radius: 8px; }
+.coach-body pre code { padding: 0; background: none; }
+.coach-me .coach-body { white-space: pre-wrap; }
 .coach-msg small { display: block; color: var(--muted); margin-bottom: 4px; }
 .coach-me { margin-left: auto; background: var(--accent); color: var(--accent-ink); }
 .coach-coach { background: var(--bg); border: 1px solid var(--line); }
@@ -800,6 +807,8 @@ main { padding-bottom: 140px; }
 .chat-card li.ok { color: var(--muted); }
 .chat-card li.ok::marker { content: "✓ "; color: var(--accent); }
 .chat-card li.skipped { color: var(--muted); text-decoration: line-through; }
+.chat-card .summary, .proposal .summary { margin: 0; }
+.raw summary { color: var(--muted); font-size: 14px; min-height: 36px; display: flex; align-items: center; }
 .proposal-card dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 15px; }
 .proposal-card dt { color: var(--muted); }
 .proposal-card dd { margin: 0; overflow-wrap: anywhere; }

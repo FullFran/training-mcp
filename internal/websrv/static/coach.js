@@ -1,7 +1,8 @@
 // Coach chat, the home screen. It talks to /coach/*: connect ChatGPT with a
 // device code, then chat. The stream stays open while the page is, so the
 // coach's reaction to a logged set arrives on its own. Every text from the
-// model is inserted as text, never as HTML.
+// model is inserted as text, never as HTML: replies go through markdown.js,
+// which builds a small Markdown subset from text nodes.
 //
 // Voice is the browser's own: speech recognition dictates into the composer
 // and speech synthesis reads replies aloud. No provider, no tokens.
@@ -91,11 +92,18 @@
       small.textContent = label;
       div.appendChild(small);
     }
-    const body = document.createElement('p');
+    const body = document.createElement('div');
+    body.className = 'coach-body';
     div.appendChild(body);
     log.appendChild(div);
     scroll();
     return body;
+  }
+
+  // The reply so far, as Markdown when the renderer loaded, else as text.
+  function render(el, value) {
+    if (window.coachMarkdown) el.replaceChildren(window.coachMarkdown(value));
+    else el.textContent = value;
   }
 
   function setRunning(on) {
@@ -149,9 +157,8 @@
     });
     stream.addEventListener('delta', (ev) => {
       if (!current) current = bubble('coach');
-      const piece = data(ev).text || '';
-      current.textContent += piece;
-      said += piece;
+      said += data(ev).text || '';
+      render(current, said);
       scroll();
     });
     stream.addEventListener('tool', (ev) => {
@@ -162,7 +169,7 @@
     });
     stream.addEventListener('done', (ev) => {
       if (data(ev).aborted) note('Detenido.');
-      else readAloud(said);
+      else if (current) readAloud(current.textContent);
       said = '';
       current = null;
       setRunning(false);
