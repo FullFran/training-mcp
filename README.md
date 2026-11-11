@@ -163,19 +163,24 @@ shared with the MCP tools and cannot drift apart.
   `WEB_OAUTH_CLIENT_ID` and `WEB_OAUTH_CLIENT_SECRET`, at the root to whoever
   signs in with the OAuth provider, each seeing only their own data. Neither
   set means not served at all. The database export is only on the secret prefix.
-- The home is a chat with the coach (when `TRAINING_COACH=1`, see
-  [docs/coach.md](docs/coach.md)) with the live workout pinned above it:
-  current exercise, one-tap log with pre-filled values and the rest timer.
-  Header buttons open history, plans, review and progress as panels that
-  return to the same chat; the plan of the day, pending proposals (accept or
-  reject) and logged sets appear as cards rendered by the server.
+- The home offers two modes. **Entrenar** is a training logger: start a plan
+  or an empty session, then each exercise is a card with its set table
+  (Serie, Anterior, kg, Reps, RPE), pre-filled from the plan, the set before
+  and last session; one check logs a set and starts the rest timer, supersets
+  keep their round rest, and **Terminar** shows the day's summary. A bar at
+  the bottom opens the coach (when `TRAINING_COACH=1`, see
+  [docs/coach.md](docs/coach.md)) as a sheet over the workout that closes back
+  to the same point. **Planificar** is the chat with the coach and the panels
+  (history, plans, review, progress); the plan of the day, pending proposals
+  (accept or reject) and logged sets appear there as cards rendered by the
+  server. The screen is kept in the URL (`/?modo=entrenar`, `/?modo=planificar`).
 - `/review` lists the agent's pending proposals with what each would change
   (one sentence per write tool, the exact payload one tap away),
   accepts or rejects them (once, or always in that session), shows the answer history
   and holds the accept-all switch. The person's own changes in the app apply
   directly.
-- A plan can be started for the day; its exercises become a checklist showing
-  done/target sets, and tapping one loads its prescription into the form.
+- A plan can be started for the day; its exercises become the cards of
+  Entrenar, each showing done/target sets.
 - The day's plan is fully adjustable mid-session: add or drop an exercise,
   change its set count, skip it, or substitute it when a machine is taken.
   Sets already logged are never touched by any of this — an exercise removed
