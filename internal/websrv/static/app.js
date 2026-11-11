@@ -32,6 +32,89 @@
     if (data.reps) reps.value = data.reps;
     if (data.rpe) setRPE(data.rpe);
     showPrevious();
+    syncQuick();
+  }
+
+  // Loads a planned exercise's prescription: the exercise, the middle of the
+  // target rep range and the target RPE, plus last time's weight, which the
+  // plan deliberately does not prescribe.
+  function fillPlanned(item) {
+    const name = item.dataset.exercise;
+    const known = info[name] || {};
+    fill({
+      exercise: name,
+      weight: known.last ? known.last.weight_kg : null,
+      reps: item.dataset.reps !== '0' ? item.dataset.reps : null,
+      rpe: item.dataset.rpe !== '0' ? item.dataset.rpe : null
+    });
+  }
+
+  const plannedItem = (name) => Array.from(document.querySelectorAll('.planned li'))
+    .find((li) => li.dataset.exercise === name) || null;
+
+  // --- pinned workout card -------------------------------------------------
+  // The bar above the chat shows what is loaded in the entry form and logs it
+  // in one tap through that same form, so nothing about logging is duplicated.
+  const card = document.getElementById('workout');
+  const quick = document.getElementById('wk-log');
+  const now = document.getElementById('wk-now');
+
+  function checkedRPE() {
+    const c = form && form.querySelector('input[name="rpe"]:checked');
+    return c ? c.value : '';
+  }
+
+  function syncQuick() {
+    if (!quick || !exercise) return;
+    const name = (exercise.value || '').trim();
+    quick.hidden = !name;
+    if (!name) return;
+    const rpe = checkedRPE();
+    const what = weight.value + ' kg × ' + reps.value + (rpe ? ' @' + rpe : '');
+    quick.textContent = '✓ ' + what;
+    quick.setAttribute('aria-label', 'Registrar ' + name + ', ' + what);
+    if (now) {
+      now.textContent = '';
+      const strong = document.createElement('strong');
+      strong.textContent = name;
+      now.appendChild(strong);
+      const panel = document.getElementById('panel');
+      if (panel && panel.dataset.next === name && panel.dataset.nextRx) {
+        now.appendChild(document.createTextNode(' · ' + panel.dataset.nextRx));
+      }
+    }
+  }
+
+  // With nothing typed, the card offers what comes next in the plan, or else
+  // the last set again.
+  function prefill() {
+    if (!exercise || (exercise.value || '').trim()) return;
+    const panel = document.getElementById('panel');
+    if (!panel) return;
+    const item = panel.dataset.next && plannedItem(panel.dataset.next);
+    if (item) { fillPlanned(item); return; }
+    if (panel.dataset.lastExercise) {
+      fill({
+        exercise: panel.dataset.lastExercise,
+        weight: panel.dataset.lastWeight,
+        reps: panel.dataset.lastReps,
+        rpe: panel.dataset.lastRpe
+      });
+    }
+  }
+
+  if (quick && form) {
+    quick.addEventListener('click', () => {
+      if (!form.checkValidity()) {
+        const more = document.getElementById('wk-more');
+        if (more) more.open = true;
+        form.reportValidity();
+        return;
+      }
+      form.requestSubmit();
+    });
+    form.addEventListener('input', syncQuick);
+    form.addEventListener('change', syncQuick);
   }
 
   // Shows what was done last time for the exercise being entered, plus the
@@ -66,6 +149,7 @@
     const btn = event.target.closest('.suggest');
     if (!btn) return;
     weight.value = btn.dataset.kg;
+    syncQuick();
     buzz(8);
   });
 
@@ -114,6 +198,7 @@
     const delta = parseFloat(pad.dataset.delta) * step;
     const next = Math.round(((parseFloat(input.value) || 0) + delta) * 100) / 100;
     input.value = next < min ? min : next;
+    syncQuick();
     buzz(8);
   });
 
@@ -186,16 +271,9 @@
     const item = event.target.closest('.planned li');
     if (!item) return;
     if (event.target.closest('.more, .item-actions')) return;
-    const name = item.dataset.exercise;
-    const known = info[name] || {};
-    fill({
-      exercise: name,
-      weight: known.last ? known.last.weight_kg : null,
-      reps: item.dataset.reps !== '0' ? item.dataset.reps : null,
-      rpe: item.dataset.rpe !== '0' ? item.dataset.rpe : null
-    });
+    fillPlanned(item);
     buzz(8);
-    window.scrollTo({ top: document.getElementById('entry').offsetTop - 60, behavior: 'smooth' });
+    document.getElementById('entry').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
   // --- inline edit -------------------------------------------------------
@@ -333,23 +411,35 @@
     if (event.target.id !== 'panel') return;
     syncRepeat();
     paintNext();
+    prefill();
+    syncQuick();
     const failed = document.querySelector('#panel .alert');
     if (failed) { buzz(18); return; }
     const newest = lastSetId();
     const logged = newest > seenSet;
     seenSet = newest;
     if (!logged) return;
-    const next = nextInSuperset((exercise.value || '').trim().toLowerCase());
+    const panel = document.getElementById('panel');
+    if (card && card.classList.contains('idle')) {
+      card.classList.remove('idle');
+      const summary = card.querySelector('#wk-more > summary');
+      if (summary) summary.textContent = 'Ver el entreno y ajustar';
+    }
+    // The chat shows the set as a card; the data is the server's, not the model's.
+    document.dispatchEvent(new CustomEvent('workout:set-logged', { detail: {
+      exercise: panel.dataset.lastExercise, weight: panel.dataset.lastWeight,
+      reps: panel.dataset.lastReps, rpe: panel.dataset.lastRpe
+    } }));
+    const justLogged = (exercise.value || '').trim().toLowerCase();
+    const next = nextInSuperset(justLogged);
     if (next) {
       // Load the next movement of the superset; rest only once the round is done.
-      const item = next.item;
-      const known = info[item.dataset.exercise] || {};
-      fill({
-        exercise: item.dataset.exercise,
-        weight: known.last ? known.last.weight_kg : null,
-        reps: item.dataset.reps !== '0' ? item.dataset.reps : null,
-        rpe: item.dataset.rpe !== '0' ? item.dataset.rpe : null
-      });
+      fillPlanned(next.item);
+    } else {
+      // An exercise whose sets are all done hands over to the next one planned.
+      const doneItem = plannedItem(justLogged);
+      const upcoming = panel.dataset.next && plannedItem(panel.dataset.next);
+      if (doneItem && doneItem.classList.contains('ok') && upcoming && upcoming !== doneItem) fillPlanned(upcoming);
     }
     if (!next || next.newRound) {
       startRest(parseInt(document.getElementById('panel').dataset.restElapsed || '0', 10));
@@ -376,6 +466,8 @@
 
   syncRepeat();
   showPrevious();
+  prefill();
+  syncQuick();
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

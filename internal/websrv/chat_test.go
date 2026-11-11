@@ -1,0 +1,175 @@
+package websrv_test
+
+import (
+	"net/http"
+	"net/url"
+	"strings"
+	"testing"
+
+	"github.com/fullfran/training-mcp/internal/training"
+)
+
+// section returns the HTML of the element whose opening tag carries marker, up
+// to the closing tag given, so an assertion cannot pass on text elsewhere.
+func section(t *testing.T, body, marker, closing string) string {
+	t.Helper()
+	start := strings.Index(body, marker)
+	if start < 0 {
+		t.Fatalf("no %q in page", marker)
+	}
+	end := strings.Index(body[start:], closing)
+	if end < 0 {
+		t.Fatalf("%q is never closed by %q", marker, closing)
+	}
+	return body[start : start+end]
+}
+
+// The home is the chat: panel buttons go to history, plans, review and
+// progress, each a plain link that also works without JavaScript.
+func TestHomeIsTheChatWithPanelButtons(t *testing.T) {
+	h, _ := newServer(t)
+	body := get(t, h, base+"/").Body.String()
+	nav := section(t, body, `class="panel-links"`, "</nav>")
+	for _, want := range []string{
+		`href="` + base + `/history" data-panel`,
+		`href="` + base + `/plans" data-panel`,
+		`href="` + base + `/review" data-panel`,
+		`href="` + base + `/history#progreso" data-panel`,
+	} {
+		if !strings.Contains(nav, want) {
+			t.Fatalf("panel buttons lack %s: %s", want, nav)
+		}
+	}
+	for _, want := range []string{`id="coach-log"`, `id="panel-sheet"`, `id="panel-back"`, base + "/static/shell.js"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("home lacks %s", want)
+		}
+	}
+	if !strings.Contains(get(t, h, base+"/history").Body.String(), `id="progreso"`) {
+		t.Fatal("history has no progress anchor for the progress panel")
+	}
+	if w := get(t, h, base+"/static/shell.js"); w.Code != http.StatusOK {
+		t.Fatalf("shell.js: %d", w.Code)
+	}
+}
+
+// With no workout the card collapses; once a set is logged it shows the
+// workout, built from the same entry form, panel and rest timer as before.
+func TestWorkoutCardCollapsesWithoutAWorkout(t *testing.T) {
+	h, _ := newServer(t)
+	idle := section(t, get(t, h, base+"/").Body.String(), `id="workout"`, `id="wk-more"`)
+	if !strings.Contains(idle, `class="workout idle"`) || !strings.Contains(idle, "Sin entreno activo") {
+		t.Fatalf("idle workout card: %s", idle)
+	}
+
+	post(t, h, base+"/sets", setForm("banca", "80", "8", "8"), true)
+	body := get(t, h, base+"/").Body.String()
+	card := section(t, body, `id="workout"`, "</section>\n\n<main")
+	if strings.Contains(card, `class="workout idle"`) {
+		t.Fatal("workout card stays collapsed with a set logged")
+	}
+	for _, want := range []string{`id="wk-log"`, `id="rest"`, `id="entry"`, `id="panel"`, "80 kg × 8"} {
+		if !strings.Contains(card, want) {
+			t.Fatalf("workout card lacks %s", want)
+		}
+	}
+}
+
+// The plan of the day is a card in the chat, rendered by the server.
+func TestChatShowsThePlanOfTheDay(t *testing.T) {
+	h, service := newServer(t)
+	plan, err := service.CreatePlan(t.Context(), training.Plan{Name: "Empuje A", Items: []training.PlanItem{
+		{Exercise: "banca", TargetSets: 3, RepMin: 8, RepMax: 10, TargetRPE: 9},
+		{Exercise: "fondos", TargetSets: 2},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pick := section(t, get(t, h, base+"/").Body.String(), `id="chat-cards"`, `id="chat-end"`)
+	if !strings.Contains(pick, `class="chat-card plan-pick"`) || !strings.Contains(pick, "Empuje A · 5 series") {
+		t.Fatalf("chat does not offer the plans: %s", pick)
+	}
+
+	post(t, h, base+"/plan", url.Values{"plan_id": {itoa(plan.ID)}}, false)
+	post(t, h, base+"/sets", setForm("banca", "80", "9", "9"), true)
+	cards := section(t, get(t, h, base+"/").Body.String(), `id="chat-cards"`, `id="chat-end"`)
+	for _, want := range []string{`class="chat-card plan-today"`, "Empuje A", "0/2", "banca", "1/3", "8-10 reps @9", "fondos"} {
+		if !strings.Contains(cards, want) {
+			t.Fatalf("plan of the day card lacks %q: %s", want, cards)
+		}
+	}
+}
+
+// A pending proposal is a card with accept and reject, posting to the same
+// CSRF-protected endpoints as /review.
+func TestChatShowsPendingProposalsWithAcceptAndReject(t *testing.T) {
+	f := newReviewFixture(t)
+	p := f.propose(t, "fuerza")
+	cards := section(t, get(t, f.handler, "/").Body.String(), `id="chat-cards"`, `id="chat-end"`)
+	for _, want := range []string{
+		`data-proposal="` + itoa(p.ID) + `"`, "Crear rutina", "fuerza",
+		`action="/review/` + itoa(p.ID) + `/accept"`, `action="/review/` + itoa(p.ID) + `/reject"`,
+		`name="csrf_token" value="tok"`,
+	} {
+		if !strings.Contains(cards, want) {
+			t.Fatalf("proposal card lacks %s: %s", want, cards)
+		}
+	}
+
+	// The card's form is the review endpoint itself: accepting applies it.
+	w := post(t, f.handler, "/review/"+itoa(p.ID)+"/accept", url.Values{"remember": {"once"}}, true)
+	if w.Code != http.StatusOK || len(f.plans(t)) != 1 {
+		t.Fatalf("accept from the card: %d, plans %d", w.Code, len(f.plans(t)))
+	}
+	if strings.Contains(get(t, f.handler, "/").Body.String(), `data-proposal="`) {
+		t.Fatal("an answered proposal is still offered in the chat")
+	}
+}
+
+// The chat cards are each person's own: the second person sees neither the
+// owner's proposal nor the owner's plan.
+func TestChatCardsAreEachPersonsOwn(t *testing.T) {
+	world := newWebWorld(t)
+	owner := get(t, world.owner, base+"/").Body.String()
+	if !strings.Contains(owner, `data-proposal="`+world.proposal+`"`) || !strings.Contains(owner, secretPlan) {
+		t.Fatal("the owner does not see their own proposal and plan")
+	}
+	second := get(t, world.second, base+"/").Body.String()
+	for _, leak := range []string{`data-proposal="`, secretPlan, secretExercise} {
+		if strings.Contains(second, leak) {
+			t.Fatalf("the second person's chat shows %q", leak)
+		}
+	}
+}
+
+// The composer has the voice controls and the slot the photo button mounts in.
+func TestComposerHasVoiceAndTheExtrasSlot(t *testing.T) {
+	world := newCoachWorld(t, newFakeCoach())
+	body := get(t, world.as(1), base+"/").Body.String()
+	composer := section(t, body, `id="coach-form"`, "</form>")
+	for _, want := range []string{`id="composer-extras"`, `id="coach-mic"`, `id="coach-text"`, `id="coach-send"`} {
+		if !strings.Contains(composer, want) {
+			t.Fatalf("composer lacks %s: %s", want, composer)
+		}
+	}
+	if !strings.Contains(body, `id="coach-speak"`) {
+		t.Fatal("no read-aloud switch")
+	}
+	// The workout and the panels do not depend on the coach.
+	for _, want := range []string{`id="workout"`, `class="panel-links"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("coach page lacks %s", want)
+		}
+	}
+}
+
+// The new shell is cached for offline use under a new version.
+func TestServiceWorkerCachesTheChatShell(t *testing.T) {
+	h, _ := newServer(t)
+	body := get(t, h, base+"/sw.js").Body.String()
+	for _, want := range []string{"const VERSION = 'v5';", "BASE + '/static/shell.js'", "BASE + '/static/coach.js'"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("service worker lacks %s", want)
+		}
+	}
+}
