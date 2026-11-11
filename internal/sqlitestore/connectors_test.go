@@ -121,14 +121,15 @@ func TestConnectorsAreCappedPerPerson(t *testing.T) {
 	}
 }
 
-// Production already ran 017 when 016 arrives: a missing lower version still applies.
+// Migration numbers are claimed by parallel branches (018 is #75's, 019 D1's, 020 #77's): whichever
+// lands first, a missing version still applies on a database that ran later ones.
 func TestConnectorsMigrationAppliesAfterALaterOne(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "training.db")
 	store, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.db.Exec(`DROP TABLE connectors; DELETE FROM schema_migrations WHERE version=16`); err != nil {
+	if _, err := store.db.Exec(`DROP TABLE connectors; DELETE FROM schema_migrations WHERE version=21`); err != nil {
 		t.Fatal(err)
 	}
 	store.Close()
@@ -138,10 +139,10 @@ func TestConnectorsMigrationAppliesAfterALaterOne(t *testing.T) {
 	}
 	defer again.Close()
 	var n int
-	if err := again.db.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version IN (16,17)`).Scan(&n); err != nil || n != 2 {
+	if err := again.db.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version IN (16,17,21)`).Scan(&n); err != nil || n != 3 {
 		t.Fatalf("versions = %d, %v", n, err)
 	}
 	if _, err := again.ListConnectors(context.Background(), 1); err != nil {
-		t.Fatalf("connectors table after a late 016: %v", err)
+		t.Fatalf("connectors table after a late 021: %v", err)
 	}
 }
