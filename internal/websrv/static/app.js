@@ -295,6 +295,8 @@
       `<input name="reps" type="number" step="1" min="1" inputmode="numeric" value="${li.dataset.reps}" aria-label="Reps">` +
       `<input name="rpe" type="number" step="0.5" min="1" max="10" inputmode="decimal" value="${li.dataset.rpe}" aria-label="RPE">` +
       `<input name="technique" type="text" list="techniques" placeholder="técnica" value="${li.dataset.technique || ''}" aria-label="Técnica">` +
+      `<input type="hidden" name="category" value="working">` +
+      `<label class="warmup-toggle"><input type="checkbox" name="category" value="warmup"${li.dataset.category === 'warmup' ? ' checked' : ''}> W</label>` +
       `<button type="submit" class="ok">Guardar</button>`;
     li.appendChild(f);
     if (window.htmx) window.htmx.process(f);

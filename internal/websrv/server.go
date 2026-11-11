@@ -126,12 +126,26 @@ type pageData struct {
 	ConnectorsOn bool
 }
 
-// LastSet returns the final set of the session, used to power "repeat last set".
+// LastSet returns the session's final working set, used to power "repeat last
+// set": repeating a warm-up would log its light weight as a working set.
 func (p pageData) LastSet() *training.Set {
-	if len(p.Session.Sets) == 0 {
-		return nil
+	for i := len(p.Session.Sets) - 1; i >= 0; i-- {
+		if p.Session.Sets[i].Category != training.SetWarmup {
+			return &p.Session.Sets[i]
+		}
 	}
-	return &p.Session.Sets[len(p.Session.Sets)-1]
+	return nil
+}
+
+// WorkingSetCount is how many sets count today; warm-ups do not.
+func (p pageData) WorkingSetCount() int {
+	n := 0
+	for _, set := range p.Session.Sets {
+		if set.Category != training.SetWarmup {
+			n++
+		}
+	}
+	return n
 }
 
 // IsRecord reports whether a set matches the exercise's all-time best, so it can
@@ -207,7 +221,7 @@ func NewWithOptions(service training.ServiceFor, snapshot func(context.Context, 
 			var last *training.Set
 			for i := range session.Sets {
 				set := &session.Sets[i]
-				if set.Exercise == exercise && (last == nil || set.ID > last.ID) {
+				if set.Exercise == exercise && set.Category != training.SetWarmup && (last == nil || set.ID > last.ID) {
 					last = set
 				}
 			}
@@ -368,6 +382,7 @@ func (s *Server) addSet(w http.ResponseWriter, r *http.Request) {
 	rpe, errRPE := strconv.ParseFloat(strings.TrimSpace(r.PostFormValue("rpe")), 64)
 	exercise := r.PostFormValue("exercise")
 	technique := r.PostFormValue("technique")
+	category := lastFormValue(r, "category")
 
 	message := ""
 	if errWeight != nil || errReps != nil || errRPE != nil {
@@ -380,7 +395,7 @@ func (s *Server) addSet(w http.ResponseWriter, r *http.Request) {
 		}
 		set, _, err := s.service(r.Context()).AddSet(r.Context(), training.AddSetInput{
 			SessionID: session.ID, Exercise: exercise, WeightKG: weight,
-			Reps: reps, RPE: rpe, Technique: technique,
+			Reps: reps, RPE: rpe, Technique: technique, Category: category,
 		})
 		switch {
 		case errors.Is(err, training.ErrValidation):
@@ -393,6 +408,16 @@ func (s *Server) addSet(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.renderPanel(w, r, message)
+}
+
+// lastFormValue is the last value sent for a field: a checkbox after a hidden
+// input of the same name overrides it only when ticked.
+func lastFormValue(r *http.Request, name string) string {
+	values := r.PostForm[name]
+	if len(values) == 0 {
+		return ""
+	}
+	return values[len(values)-1]
 }
 
 // updateSet edits an already logged set in place, so a mistyped weight does not
@@ -438,6 +463,12 @@ func (s *Server) updateSet(w http.ResponseWriter, r *http.Request) {
 	if r.Form.Has("technique") {
 		v := r.PostFormValue("technique")
 		patch.Technique = &v
+	}
+	// The edit form sends a hidden "working" before the warm-up checkbox, so
+	// the last value is the toggle's state; a form without it leaves it alone.
+	if r.Form.Has("category") {
+		v := lastFormValue(r, "category")
+		patch.Category = &v
 	}
 	if message == "" {
 		switch _, _, err := s.service(r.Context()).UpdateSet(r.Context(), id, patch); {
@@ -829,7 +860,14 @@ func (s *Server) choosePlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(sessions) > 0 {
-		if sessions[0].SetCount == 0 {
+		// SetCount leaves warm-ups out, so ask the session itself whether
+		// anything at all was logged before replacing it.
+		current, err := s.service(r.Context()).GetSession(r.Context(), sessions[0].ID)
+		if err != nil {
+			s.fail(w, err)
+			return
+		}
+		if len(current.Sets) == 0 {
 			// Nothing logged yet: replace the empty session outright.
 			if _, err := s.service(r.Context()).DeleteSession(r.Context(), sessions[0].ID); err != nil {
 				s.fail(w, err)
@@ -1098,7 +1136,7 @@ func (s *Server) infoFor(ctx context.Context, name, today string) (ExerciseInfo,
 	}
 	// "Last time" must skip today, or the form would echo the set just logged.
 	for i := range h.Sets {
-		if h.Sets[i].Date != today {
+		if h.Sets[i].Date != today && h.Sets[i].Category != training.SetWarmup {
 			entry.Last = &h.Sets[i]
 			break
 		}
@@ -1158,6 +1196,12 @@ func cacheStatic(next http.Handler) http.Handler {
 }
 
 // formatNumber trims trailing zeros so 36.0 renders as "36" and 2.5 stays "2.5".
+// formatNumber shows at most 2 decimals with no trailing zeros, so a weight
+// stored as 65.77089365 reads and pre-fills as 65.77.
 func formatNumber(v float64) string {
+	v = math.Round(v*100) / 100
+	if v == 0 {
+		v = 0 // no "-0"
+	}
 	return strconv.FormatFloat(v, 'f', -1, 64)
 }

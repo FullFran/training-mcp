@@ -434,10 +434,11 @@ func (s *Service) SuggestLoad(ctx context.Context, exercise string) (LoadSuggest
 		return LoadSuggestion{}, err
 	}
 	// Sets carrying an intensity technique are not comparable to straight sets,
-	// so they never drive the advice.
+	// and a warm-up is not an attempt at the working load, so neither drives
+	// the advice.
 	var last *ExerciseSet
 	for i := range history.Sets {
-		if history.Sets[i].Technique == "" {
+		if history.Sets[i].Technique == "" && history.Sets[i].Category != SetWarmup {
 			last = &history.Sets[i]
 			break
 		}
@@ -494,7 +495,7 @@ func (s *Service) SessionProgress(ctx context.Context, sessionID int64) ([]PlanP
 // LogSet is the one-call entry path: it finds today's session, creates it if
 // needed, and records count identical sets. Callers never handle a session id,
 // which is what makes conversational logging a single step.
-func (s *Service) LogSet(ctx context.Context, exercise string, weightKG float64, reps int, rpe float64, count int, technique string) (Session, []Set, error) {
+func (s *Service) LogSet(ctx context.Context, exercise string, weightKG float64, reps int, rpe float64, count int, technique, category string) (Session, []Set, error) {
 	if count <= 0 {
 		count = 1
 	}
@@ -512,7 +513,7 @@ func (s *Service) LogSet(ctx context.Context, exercise string, weightKG float64,
 	} else {
 		// Validate before creating, so a bad call never leaves an empty session
 		// behind as a side effect of a typo.
-		if !validSetFields(exercise, weightKG, reps, rpe) {
+		if _, _, ok := setCategory(category, technique); !ok || !validSetFields(exercise, weightKG, reps, rpe) {
 			return Session{}, nil, ErrValidation
 		}
 		if session, err = s.StartSession(ctx, today); err != nil {
@@ -523,7 +524,7 @@ func (s *Service) LogSet(ctx context.Context, exercise string, weightKG float64,
 	for range count {
 		set, total, err := s.AddSet(ctx, AddSetInput{
 			SessionID: session.ID, Exercise: exercise, WeightKG: weightKG,
-			Reps: reps, RPE: rpe, Technique: technique,
+			Reps: reps, RPE: rpe, Technique: technique, Category: category,
 		})
 		if err != nil {
 			return session, out, err
@@ -545,11 +546,20 @@ func (s *Service) LogSets(ctx context.Context, in LogSetsInput) (LogSetsResult, 
 	}
 	sets := make([]LoggedSet, len(in.Sets))
 	for i, set := range in.Sets {
-		set.Technique = normalizeTechnique(set.Technique)
+		category, technique, ok := setCategory(set.Category, set.Technique)
+		set.Technique = technique
+		// A working set keeps an empty category here, so the fingerprint of a
+		// batch with no warm-ups is what it was before categories existed and a
+		// retry across the upgrade still finds its original result.
+		set.Category = ""
+		if category == SetWarmup {
+			set.Category = SetWarmup
+		}
+		set.WeightKG = RoundWeight(set.WeightKG)
 		if set.RPE == 0 {
 			set.RPE, set.RPEImputed = ImputedRPE, true
 		}
-		if !validSetFields(exercise, set.WeightKG, set.Reps, set.RPE) || len(set.Technique) > maxTechniqueLen {
+		if !ok || !validSetFields(exercise, set.WeightKG, set.Reps, set.RPE) || len(set.Technique) > maxTechniqueLen {
 			return LogSetsResult{}, ErrValidation
 		}
 		sets[i] = set
@@ -578,9 +588,11 @@ func validSetFields(exercise string, weightKG float64, reps int, rpe float64) bo
 
 func (s *Service) AddSet(ctx context.Context, in AddSetInput) (Set, float64, error) {
 	in.Exercise = strings.ToLower(strings.TrimSpace(in.Exercise))
-	in.Technique = normalizeTechnique(in.Technique)
+	category, technique, ok := setCategory(in.Category, in.Technique)
+	in.Category, in.Technique = category, technique
 	in.Superset = normalizeSuperset(in.Superset)
-	if in.SessionID <= 0 || !validSetFields(in.Exercise, in.WeightKG, in.Reps, in.RPE) {
+	in.WeightKG = RoundWeight(in.WeightKG)
+	if !ok || in.SessionID <= 0 || !validSetFields(in.Exercise, in.WeightKG, in.Reps, in.RPE) {
 		return Set{}, 0, ErrValidation
 	}
 	if len(in.Technique) > maxTechniqueLen || len(in.Superset) > maxTechniqueLen {
@@ -623,6 +635,54 @@ func normalizeTechnique(v string) string {
 	return strings.Join(strings.Fields(strings.ToLower(strings.TrimSpace(v))), " ")
 }
 
+// warmupWords are what a warm-up was called before it was a category. As a
+// category they name a warm-up; as a technique they become one.
+var warmupWords = map[string]bool{"warmup": true, "warm-up": true, "calentamiento": true}
+
+// normalizeCategory returns SetWorking or SetWarmup. Empty means working; an
+// unknown value is not valid.
+func normalizeCategory(v string) (string, bool) {
+	v = normalizeTechnique(v)
+	switch {
+	case v == "" || v == SetWorking:
+		return SetWorking, true
+	case v == SetWarmup || warmupWords[v]:
+		return SetWarmup, true
+	}
+	return "", false
+}
+
+// setCategory resolves a set's category and technique together: a warm-up
+// word written as the technique, the way warm-ups were recorded before, makes
+// the set a warm-up with no technique.
+func setCategory(category, technique string) (string, string, bool) {
+	technique = normalizeTechnique(technique)
+	c, ok := normalizeCategory(category)
+	if warmupWords[technique] {
+		// An explicit category in the same call wins, as in UpdateSet.
+		if strings.TrimSpace(category) == "" {
+			c = SetWarmup
+		}
+		technique = ""
+	}
+	return c, technique, ok
+}
+
+// SetSI is a set's stimulus: its RPE's SI for a working set, nothing for a
+// warm-up, which never counts.
+func SetSI(rpe float64, category string) float64 {
+	if category == SetWarmup {
+		return 0
+	}
+	return CalculateSI(rpe)
+}
+
+// RoundWeight keeps a weight to 2 decimals, the precision a load is ever
+// measured at; anything finer is an artefact of a unit conversion.
+func RoundWeight(kg float64) float64 {
+	return math.Round(kg*100) / 100
+}
+
 // normalizeSuperset uppercases instead. A round label is an identifier, so "a"
 // and "A" must group together, but it reads as "A" everywhere it is shown.
 func normalizeSuperset(v string) string {
@@ -636,10 +696,33 @@ func (s *Service) UpdateSet(ctx context.Context, id int64, p SetPatch) (Set, flo
 		v := strings.ToLower(strings.TrimSpace(*p.Exercise))
 		p.Exercise = &v
 	}
+	if p.WeightKG != nil {
+		v := RoundWeight(*p.WeightKG)
+		if v <= 0 {
+			return Set{}, 0, ErrValidation
+		}
+		p.WeightKG = &v
+	}
+	if p.Category != nil {
+		v, ok := normalizeCategory(*p.Category)
+		if !ok {
+			return Set{}, 0, ErrValidation
+		}
+		p.Category = &v
+	}
 	if p.Technique != nil {
 		v := normalizeTechnique(*p.Technique)
 		if len(v) > maxTechniqueLen {
 			return Set{}, 0, ErrValidation
+		}
+		// Writing a warm-up word as the technique marks a warm-up, unless the
+		// same call states the category explicitly.
+		if warmupWords[v] {
+			if p.Category == nil {
+				warm := SetWarmup
+				p.Category = &warm
+			}
+			v = ""
 		}
 		p.Technique = &v
 	}

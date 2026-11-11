@@ -699,7 +699,7 @@ func TestServiceLogSetCreatesTodaysSessionOnceAndRecordsRepeats(t *testing.T) {
 	svc := NewService(store, func() time.Time { return time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC) })
 	ctx := context.Background()
 
-	session, sets, err := svc.LogSet(ctx, " Press Banca ", 80, 10, 9, 3, "")
+	session, sets, err := svc.LogSet(ctx, " Press Banca ", 80, 10, 9, 3, "", "")
 	if err != nil || len(sets) != 3 {
 		t.Fatalf("LogSet() = %#v, %v", sets, err)
 	}
@@ -709,13 +709,13 @@ func TestServiceLogSetCreatesTodaysSessionOnceAndRecordsRepeats(t *testing.T) {
 	// Invalid input must not leave an empty session behind.
 	store2 := newMemoryStore()
 	svc2 := NewService(store2, func() time.Time { return time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC) })
-	if _, _, err := svc2.LogSet(ctx, "", 80, 10, 9, 1, ""); !errors.Is(err, ErrValidation) {
+	if _, _, err := svc2.LogSet(ctx, "", 80, 10, 9, 1, "", ""); !errors.Is(err, ErrValidation) {
 		t.Fatalf("LogSet with empty exercise = %v, want validation", err)
 	}
 	if len(store2.sessions) != 0 {
 		t.Fatalf("a rejected log created a session: %#v", store2.sessions)
 	}
-	if _, _, err := svc.LogSet(ctx, "banca", 80, 10, 9, 21, ""); !errors.Is(err, ErrValidation) {
+	if _, _, err := svc.LogSet(ctx, "banca", 80, 10, 9, 21, "", ""); !errors.Is(err, ErrValidation) {
 		t.Fatalf("count above the cap = %v, want validation", err)
 	}
 }

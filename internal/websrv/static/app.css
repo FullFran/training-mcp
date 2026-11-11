@@ -587,7 +587,26 @@ main { padding-bottom: 140px; }
   color: var(--muted);
   font-size: 11px;
 }
-.edit-form.wide-edit { grid-template-columns: 1fr 1fr 1fr 1.4fr auto; }
+.edit-form.wide-edit { grid-template-columns: 1fr 1fr 1fr 1.4fr auto auto; }
+/* Warm-up sets: marked with a W and dimmed, since they never count. */
+.warmup-tag {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  border-radius: 6px;
+  background: #3b2f12;
+  color: #e0af68;
+  font-size: 12px;
+  font-weight: 700;
+}
+.sets li.warmup .detail, .sets li.warmup .si { opacity: .6; }
+.warmup-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 14px;
+}
 .bar-actions { display: flex; gap: 8px; }
 
 /* --- supersets and setup notes ------------------------------------------ */

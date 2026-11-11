@@ -40,6 +40,7 @@ const (
 // Reasons a set is left out of a drop-off comparison.
 const (
 	ExcludedTechnique      = "technique"
+	ExcludedWarmup         = "warmup"
 	ExcludedNoLoadOrReps   = "no_load_or_reps"
 	ExcludedProbableWarmup = "probable_warmup"
 )
@@ -215,8 +216,9 @@ var dropOffAssumptions = []string{
 }
 
 // AnalyzeDropOff compares the sets of one exercise logged in one session. Sets
-// are ordered by position. A set is comparable when it is a straight set (no
-// technique) with load and reps and is not a probable warm-up. The first
+// are ordered by position. A set is comparable when it is a working straight
+// set (not a warm-up, no technique) with load and reps and is not a probable
+// warm-up. The first
 // comparable set is the reference; each estimator reports every later set's
 // apparent drop against it, or abstains. It is pure: no store, no clock.
 func AnalyzeDropOff(exercise string, sets []Set) DropOffAnalysis {
@@ -242,6 +244,8 @@ func AnalyzeDropOff(exercise string, sets []Set) DropOffAnalysis {
 			d.RPE = s.RPE
 		}
 		switch {
+		case s.Category == SetWarmup:
+			d.ExcludedReason = ExcludedWarmup
 		case strings.TrimSpace(s.Technique) != "":
 			d.ExcludedReason = ExcludedTechnique
 		case s.WeightKG <= 0 || s.Reps <= 0:
@@ -273,7 +277,7 @@ func AnalyzeDropOff(exercise string, sets []Set) DropOffAnalysis {
 func probableWarmups(sets []Set) map[int]bool {
 	top, topAt := 0.0, -1
 	for i, s := range sets {
-		if s.Technique == "" && s.Reps > 0 && s.WeightKG > top {
+		if s.Technique == "" && s.Category != SetWarmup && s.Reps > 0 && s.WeightKG > top {
 			top, topAt = s.WeightKG, i
 		}
 	}

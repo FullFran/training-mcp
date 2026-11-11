@@ -236,7 +236,7 @@ func TestServerToolsDescribeTheirInputsAndValidationContract(t *testing.T) {
 		},
 		{
 			name:        "update_set",
-			description: "Update one or more fields of an existing set. Omitted fields remain unchanged; RPE changes recalculate SI." + pendingNote,
+			description: "Update one or more fields of an existing set. Omitted fields remain unchanged; RPE changes recalculate SI. Set category to 'warmup' when the user says a logged set was a warm-up, or to 'working' to undo that." + pendingNote,
 			required:    []string{"set_id"},
 			minProps:    2,
 			properties: map[string]map[string]any{

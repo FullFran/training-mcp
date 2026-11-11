@@ -58,9 +58,10 @@ is **comparable** when all of these hold; otherwise it is listed with an
 
 | Rule | `excluded_reason` |
 |---|---|
+| Working set: not recorded as a warm-up (`category` `warmup`) | `warmup` |
 | Straight set: no intensity technique (drop set, rest-pause, myo-reps, parciales, asistida, ...) | `technique` |
 | Load and reps are both positive | `no_load_or_reps` |
-| Not a probable warm-up: logged before the session's top straight load and lighter than 60% of it | `probable_warmup` |
+| Not a probable warm-up: logged before the session's top straight working load and lighter than 60% of it | `probable_warmup` |
 
 What the contract derives instead of storing:
 
