@@ -2,9 +2,13 @@ package mcpsrv
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 
+	"github.com/fullfran/training-mcp/internal/engine"
 	"github.com/fullfran/training-mcp/internal/training"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -12,7 +16,7 @@ import (
 // ProposalRef says what became of a write: every agent write is a proposal the
 // person may have to accept first.
 type ProposalRef struct {
-	Status     string `json:"status" jsonschema:"'accepted': the change is applied and the other fields show the result. 'pending': the change waits for the person to accept it in the app; nothing is applied yet, the other fields are empty, and it is validated only when accepted."`
+	Status     string `json:"status" jsonschema:"'accepted': the change is applied and the other fields show the result. 'pending': the change waits for the person to accept it in the app; nothing is applied yet, the other fields are empty, and it is validated only when accepted. 'rejected': the person already said to reject this kind of change in this session; nothing is applied and the other fields are empty."`
 	ProposalID int64  `json:"proposal_id" jsonschema:"ID of the proposal that records this change."`
 }
 
@@ -20,7 +24,7 @@ func (p *ProposalRef) setProposal(r ProposalRef) { *p = r }
 
 // pendingNote ends every write tool's description, so an agent never reports a
 // pending change as done.
-const pendingNote = " Every write is a proposal: the result's status is 'accepted' when it was applied, or 'pending' when it waits for the person to accept it in the app. A pending change is not applied yet; say so instead of reporting it as done."
+const pendingNote = " Every write is a proposal: the result's status is 'accepted' when it was applied, 'pending' when it waits for the person to accept it in the app, or 'rejected' when the person already rejected this kind of change for this session. A pending or rejected change is not applied; say so instead of reporting it as done."
 
 // writeAction applies a stored proposal of one tool.
 type writeAction func(ctx context.Context, svc *training.Service, payload json.RawMessage) (json.RawMessage, error)
@@ -57,9 +61,10 @@ func addWriteBy[In, Out any, PO interface {
 		}
 		return json.Marshal(out)
 	}
-	addTool(w.server, t, func(ctx context.Context, _ *mcp.CallToolRequest, in In) (*mcp.CallToolResult, Out, error) {
+	addTool(w.server, t, func(ctx context.Context, req *mcp.CallToolRequest, in In) (*mcp.CallToolResult, Out, error) {
 		var out Out
 		svc := w.service(ctx)
+		ctx = training.WithAgentSession(ctx, agentSession(req))
 		payload, err := json.Marshal(in)
 		if err != nil {
 			return nil, out, toolError(err)
@@ -77,12 +82,35 @@ func addWriteBy[In, Out any, PO interface {
 			return nil, out, toolError(err)
 		}
 		status := "pending"
-		if p.Status == training.ProposalAccepted {
+		switch p.Status {
+		case training.ProposalAccepted:
 			status = "accepted"
+		case training.ProposalRejected:
+			status = "rejected"
 		}
 		PO(&out).setProposal(ProposalRef{Status: status, ProposalID: p.ID})
 		return nil, out, nil
 	})
+}
+
+// agentSession is the session a tool call belongs to, for HCS-0005's
+// session-limited answers. The in-app coach's engine reaches /mcp with a bearer
+// minted for one engine process, which holds one chat conversation, so the
+// conversation's session is derived from that bearer (hashed, never stored as
+// is). Every other HTTP call comes from an external MCP client on a stateless
+// endpoint, which carries no session id, so all of them share the external
+// session that the 12-hour window ends. A call that did not come over HTTP has
+// no session, and no stored answer matches it.
+func agentSession(req *mcp.CallToolRequest) string {
+	if req == nil || req.Extra == nil || req.Extra.Header == nil {
+		return ""
+	}
+	bearer, ok := strings.CutPrefix(req.Extra.Header.Get("Authorization"), "Bearer ")
+	if bearer = strings.TrimSpace(bearer); ok && engine.LooksLikeToken(bearer) {
+		sum := sha256.Sum256([]byte(bearer))
+		return training.CoachSessionPrefix + hex.EncodeToString(sum[:12])
+	}
+	return training.ExternalSession
 }
 
 // Apply applies a stored proposal through its tool's code. It is the Applier the

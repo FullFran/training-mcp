@@ -16,8 +16,16 @@ import (
 
 const proposalsMigration = 14
 
+const sessionAnswersMigration = 18
+
 // databaseBeforeProposals is a database with two accounts, stopped before migration 14.
 func databaseBeforeProposals(t *testing.T) string {
+	t.Helper()
+	return databaseBefore(t, proposalsMigration)
+}
+
+// databaseBefore is a database with two accounts, stopped before a migration.
+func databaseBefore(t *testing.T, stop int) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "training.db")
 	db, err := sql.Open("sqlite", path+"?_pragma=foreign_keys(ON)")
@@ -37,7 +45,7 @@ func databaseBeforeProposals(t *testing.T) string {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if version >= proposalsMigration {
+		if version >= stop {
 			continue
 		}
 		body, err := migrationFS.ReadFile(name)
@@ -100,12 +108,12 @@ func TestProposalLifecycle(t *testing.T) {
 	if err != nil || done.Status != training.ProposalAccepted || string(done.Result) != `{"ok":true}` || !done.DecidedAt.Equal(at) || done.DecidedBy != training.DecidedByPerson {
 		t.Fatalf("finish = %+v, %v", done, err)
 	}
-	if _, err := user.RejectProposal(ctx, p.ID, at); !errors.Is(err, training.ErrNotPending) {
+	if _, err := user.RejectProposal(ctx, p.ID, training.DecidedByPerson, at); !errors.Is(err, training.ErrNotPending) {
 		t.Fatalf("reject answered = %v", err)
 	}
 	pending, _ := user.CreateProposal(ctx, proposal("add_set"))
-	rejected, err := user.RejectProposal(ctx, pending.ID, at)
-	if err != nil || rejected.Status != training.ProposalRejected {
+	rejected, err := user.RejectProposal(ctx, pending.ID, training.DecidedByDenial, at)
+	if err != nil || rejected.Status != training.ProposalRejected || rejected.DecidedBy != training.DecidedByDenial {
 		t.Fatalf("reject = %+v, %v", rejected, err)
 	}
 	open, _ := user.CreateProposal(ctx, proposal("delete_set"))
@@ -124,31 +132,115 @@ func TestRulesAndAcceptAll(t *testing.T) {
 	ctx := context.Background()
 	user := store.ForUser(2)
 	until := time.Date(2026, 11, 11, 22, 0, 0, 0, time.UTC)
-	if err := user.SetRule(ctx, training.ApprovalRule{ActionType: "set.log", Remember: training.RememberSession, ExpiresAt: until}); err != nil {
+	origin, err := user.RecordDecision(ctx, training.DecisionRecord{Time: until, Permission: "set.log", Outcome: training.OutcomeAllow,
+		Operation: "proposal:1", Session: "coach:a", DeciderKind: training.DeciderSubject, DeciderID: training.AccountHolder, Channel: training.ChannelWeb, Answer: training.AnswerAllowAlways})
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := user.SetRule(ctx, training.ApprovalRule{ActionType: "set.log", Remember: training.RememberAlways}); err != nil {
+	grant := training.AnswerRule{ActionType: "set.log", Effect: training.EffectAllow, Session: "coach:a", ExpiresAt: until, Origin: origin}
+	first, err := user.AddRule(ctx, grant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The same answer again in the same session replaces the first one.
+	grant.ExpiresAt = until.Add(time.Hour)
+	again, err := user.AddRule(ctx, grant)
+	if err != nil || again != first {
+		t.Fatalf("second grant = %d, %v; want id %d", again, err, first)
+	}
+	denial := grant
+	denial.Effect = training.EffectDeny
+	if _, err := user.AddRule(ctx, denial); err != nil {
 		t.Fatal(err)
 	}
 	if err := user.SetAcceptAll(ctx, true); err != nil {
 		t.Fatal(err)
 	}
 	perms, err := user.Permissions(ctx)
-	if err != nil || !perms.AcceptAll || len(perms.Rules) != 1 || perms.Rules[0].Remember != training.RememberAlways {
+	if err != nil || !perms.AcceptAll || len(perms.Rules) != 2 || perms.Rules[0].Effect != training.EffectAllow || !perms.Rules[0].ExpiresAt.Equal(grant.ExpiresAt) || perms.Rules[0].Origin != origin {
 		t.Fatalf("perms = %+v, %v", perms, err)
 	}
 	if err := user.SetAcceptAll(ctx, false); err != nil {
 		t.Fatal(err)
 	}
-	if err := user.ForgetRule(ctx, "set.log"); err != nil {
-		t.Fatal(err)
+	forgotten, err := user.ForgetRule(ctx, first)
+	if err != nil || forgotten.ID != first || forgotten.Session != "coach:a" {
+		t.Fatalf("forget = %+v, %v", forgotten, err)
+	}
+	if _, err := user.ForgetRule(ctx, first); !errors.Is(err, training.ErrNotFound) {
+		t.Fatalf("forget twice = %v", err)
 	}
 	perms, _ = user.Permissions(ctx)
-	if perms.AcceptAll || len(perms.Rules) != 0 {
+	if perms.AcceptAll || len(perms.Rules) != 1 || perms.Rules[0].Effect != training.EffectDeny {
 		t.Fatalf("after off and forget = %+v", perms)
 	}
-	if err := user.SetRule(ctx, training.ApprovalRule{ActionType: "set.log", Remember: "forever"}); err == nil {
-		t.Fatal("an unknown remember value was stored")
+	for _, bad := range []training.AnswerRule{
+		{ActionType: "set.log", Effect: "maybe", Session: "coach:a", ExpiresAt: until, Origin: origin},
+		{ActionType: "set.log", Effect: training.EffectAllow, Session: "", ExpiresAt: until, Origin: origin},
+		{ActionType: "set.log", Effect: training.EffectAllow, Session: "coach:a", Origin: origin},
+		{ActionType: "set.log", Effect: training.EffectAllow, Session: "coach:a", ExpiresAt: until},
+	} {
+		if _, err := user.AddRule(ctx, bad); !errors.Is(err, training.ErrValidation) {
+			t.Fatalf("stored %+v: %v", bad, err)
+		}
+	}
+	records, err := user.Decisions(ctx, 10)
+	if err != nil || len(records) != 1 || records[0].ID != origin || records[0].Session != "coach:a" || !records[0].Time.Equal(until) {
+		t.Fatalf("decisions = %+v, %v", records, err)
+	}
+}
+
+// databaseBeforeSessionAnswers is a database stopped before migration 18, with
+// a permanent and a 12-hour answer for one account and accept-all on another.
+func databaseBeforeSessionAnswers(t *testing.T) string {
+	t.Helper()
+	path := databaseBefore(t, sessionAnswersMigration)
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for _, q := range []string{
+		`INSERT INTO approval_rules(user_id,action_type,remember,expires_at,created_at) VALUES (2,'set.log','always','','2026-11-01T00:00:00Z')`,
+		`INSERT INTO approval_rules(user_id,action_type,remember,expires_at,created_at) VALUES (2,'plan.create','session','2099-01-01T00:00:00Z','2026-11-01T00:00:00Z')`,
+		`INSERT INTO proposals(user_id,tool,action_type,payload,status,decided_by,created_at) VALUES (2,'log_sets','set.log','{}','accepted','always','2026-11-01T00:00:00Z')`,
+		`UPDATE agent_permissions SET accept_all=0 WHERE user_id=2`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+	return path
+}
+
+// Migration 18 drops every stored answer, which had no session, records each as
+// revoked so the person is asked again, and leaves accept-all as it was.
+func TestSessionAnswersMigrationDropsUnlimitedAnswers(t *testing.T) {
+	store, err := Open(databaseBeforeSessionAnswers(t))
+	if err != nil {
+		t.Fatalf("migrating: %v", err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	perms, err := store.ForUser(2).Permissions(ctx)
+	if err != nil || perms.AcceptAll || len(perms.Rules) != 0 {
+		t.Fatalf("user 2 perms = %+v, %v", perms, err)
+	}
+	if owner, _ := store.ForUser(1).Permissions(ctx); !owner.AcceptAll {
+		t.Fatal("the owner's accept-all changed")
+	}
+	records, err := store.ForUser(2).Decisions(ctx, 10)
+	if err != nil || len(records) != 2 {
+		t.Fatalf("records = %+v, %v", records, err)
+	}
+	for _, r := range records {
+		if r.Outcome != training.OutcomeRevoked || r.DeciderKind != training.DeciderPolicy || r.Channel != "migration:018" || r.Time.IsZero() {
+			t.Fatalf("record = %+v", r)
+		}
+	}
+	history, err := store.ForUser(2).ListProposals(ctx, training.ProposalFilter{Limit: 10})
+	if err != nil || len(history) != 1 || history[0].DecidedBy != training.DecidedByAlways || history[0].Session != "" {
+		t.Fatalf("old proposal = %+v, %v", history, err)
 	}
 }
 
@@ -162,7 +254,13 @@ func TestProposalsAreIsolatedBetweenUsers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := owner.SetRule(ctx, training.ApprovalRule{ActionType: "set.log", Remember: training.RememberAlways}); err != nil {
+	origin, err := owner.RecordDecision(ctx, training.DecisionRecord{Time: time.Now(), Permission: "set.log", Outcome: training.OutcomeAllow,
+		DeciderKind: training.DeciderSubject, DeciderID: training.AccountHolder, Channel: training.ChannelWeb})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rule, err := owner.AddRule(ctx, training.AnswerRule{ActionType: "set.log", Effect: training.EffectAllow, Session: "coach:a", ExpiresAt: time.Now().Add(time.Hour), Origin: origin})
+	if err != nil {
 		t.Fatal(err)
 	}
 	before := dumpAll(t, store)
@@ -172,14 +270,17 @@ func TestProposalsAreIsolatedBetweenUsers(t *testing.T) {
 	if err := second.ClaimProposal(ctx, p.ID); !errors.Is(err, training.ErrNotFound) {
 		t.Fatalf("claim other's = %v", err)
 	}
-	if _, err := second.RejectProposal(ctx, p.ID, time.Now()); !errors.Is(err, training.ErrNotFound) {
+	if _, err := second.RejectProposal(ctx, p.ID, training.DecidedByPerson, time.Now()); !errors.Is(err, training.ErrNotFound) {
 		t.Fatalf("reject other's = %v", err)
 	}
 	if _, err := second.FinishProposal(ctx, p.ID, training.ProposalOutcome{Status: training.ProposalAccepted, At: time.Now()}); !errors.Is(err, training.ErrNotFound) {
 		t.Fatalf("finish other's = %v", err)
 	}
-	if err := second.ForgetRule(ctx, "set.log"); err != nil {
-		t.Fatal(err)
+	if _, err := second.ForgetRule(ctx, rule); !errors.Is(err, training.ErrNotFound) {
+		t.Fatalf("forget other's = %v", err)
+	}
+	if _, err := second.AddRule(ctx, training.AnswerRule{ActionType: "set.log", Effect: training.EffectAllow, Session: "coach:a", ExpiresAt: time.Now().Add(time.Hour), Origin: origin}); !errors.Is(err, training.ErrValidation) {
+		t.Fatalf("a grant naming another account's record = %v", err)
 	}
 	if after := dumpAll(t, store); after != before {
 		t.Fatalf("another user's calls changed data:\nbefore %s\nafter %s", before, after)
@@ -193,6 +294,9 @@ func TestProposalsAreIsolatedBetweenUsers(t *testing.T) {
 	perms, err := second.Permissions(ctx)
 	if err != nil || perms.AcceptAll || len(perms.Rules) != 0 {
 		t.Fatalf("second perms = %+v, %v", perms, err)
+	}
+	if records, err := second.Decisions(ctx, 10); err != nil || len(records) != 0 {
+		t.Fatalf("second sees records %+v, %v", records, err)
 	}
 	if err := second.SetAcceptAll(ctx, true); err != nil {
 		t.Fatal(err)

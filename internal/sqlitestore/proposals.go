@@ -10,7 +10,7 @@ import (
 	"github.com/fullfran/training-mcp/internal/training"
 )
 
-const proposalColumns = `id,tool,action_type,payload,status,decided_by,result,error,created_at,decided_at`
+const proposalColumns = `id,tool,action_type,payload,session,status,decided_by,result,error,created_at,decided_at`
 
 func formatTime(t time.Time) string {
 	if t.IsZero() {
@@ -31,7 +31,7 @@ type rowScanner interface{ Scan(...any) error }
 func scanProposal(row rowScanner) (training.Proposal, error) {
 	var p training.Proposal
 	var payload, result, created, decided string
-	if err := row.Scan(&p.ID, &p.Tool, &p.ActionType, &payload, &p.Status, &p.DecidedBy, &result, &p.Error, &created, &decided); err != nil {
+	if err := row.Scan(&p.ID, &p.Tool, &p.ActionType, &payload, &p.Session, &p.Status, &p.DecidedBy, &result, &p.Error, &created, &decided); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return training.Proposal{}, training.ErrNotFound
 		}
@@ -52,9 +52,9 @@ func scanProposal(row rowScanner) (training.Proposal, error) {
 }
 
 func (s *userStore) CreateProposal(ctx context.Context, p training.Proposal) (training.Proposal, error) {
-	row := s.db.QueryRowContext(ctx, `INSERT INTO proposals(user_id,tool,action_type,payload,status,created_at)
-		VALUES (?,?,?,?,?,?) RETURNING `+proposalColumns,
-		s.userID, p.Tool, p.ActionType, string(p.Payload), training.ProposalPending, formatTime(p.CreatedAt))
+	row := s.db.QueryRowContext(ctx, `INSERT INTO proposals(user_id,tool,action_type,payload,session,status,created_at)
+		VALUES (?,?,?,?,?,?,?) RETURNING `+proposalColumns,
+		s.userID, p.Tool, p.ActionType, string(p.Payload), p.Session, training.ProposalPending, formatTime(p.CreatedAt))
 	return scanProposal(row)
 }
 
@@ -119,10 +119,10 @@ func (s *userStore) FinishProposal(ctx context.Context, id int64, out training.P
 	return p, err
 }
 
-func (s *userStore) RejectProposal(ctx context.Context, id int64, at time.Time) (training.Proposal, error) {
+func (s *userStore) RejectProposal(ctx context.Context, id int64, decidedBy string, at time.Time) (training.Proposal, error) {
 	row := s.db.QueryRowContext(ctx, `UPDATE proposals SET status='rejected', decided_by=?, decided_at=?
 		WHERE id=? AND user_id=? AND status='pending' RETURNING `+proposalColumns,
-		training.DecidedByPerson, formatTime(at), id, s.userID)
+		decidedBy, formatTime(at), id, s.userID)
 	p, err := scanProposal(row)
 	if errors.Is(err, training.ErrNotFound) {
 		return training.Proposal{}, s.notPendingOrMissing(ctx, id)
@@ -136,23 +136,35 @@ func (s *userStore) Permissions(ctx context.Context) (training.Permissions, erro
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return training.Permissions{}, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT action_type,remember,expires_at FROM approval_rules WHERE user_id=? ORDER BY action_type`, s.userID)
+	rows, err := s.db.QueryContext(ctx, `SELECT `+ruleColumns+` FROM answer_rules WHERE user_id=? ORDER BY action_type, session, effect`, s.userID)
 	if err != nil {
 		return training.Permissions{}, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var r training.ApprovalRule
-		var expires string
-		if err := rows.Scan(&r.ActionType, &r.Remember, &expires); err != nil {
-			return training.Permissions{}, err
-		}
-		if r.ExpiresAt, err = parseTime(expires); err != nil {
+		r, err := scanRule(rows)
+		if err != nil {
 			return training.Permissions{}, err
 		}
 		perms.Rules = append(perms.Rules, r)
 	}
 	return perms, rows.Err()
+}
+
+const ruleColumns = `id,action_type,effect,session,expires_at,origin`
+
+func scanRule(row rowScanner) (training.AnswerRule, error) {
+	var r training.AnswerRule
+	var expires string
+	if err := row.Scan(&r.ID, &r.ActionType, &r.Effect, &r.Session, &expires, &r.Origin); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return training.AnswerRule{}, training.ErrNotFound
+		}
+		return training.AnswerRule{}, err
+	}
+	var err error
+	r.ExpiresAt, err = parseTime(expires)
+	return r, err
 }
 
 func (s *userStore) SetAcceptAll(ctx context.Context, on bool) error {
@@ -162,20 +174,55 @@ func (s *userStore) SetAcceptAll(ctx context.Context, on bool) error {
 	return err
 }
 
-func (s *userStore) SetRule(ctx context.Context, r training.ApprovalRule) error {
-	if r.Remember != training.RememberSession && r.Remember != training.RememberAlways {
-		return training.ErrValidation
+// AddRule stores a grant or denial. A newer answer of the same effect in the
+// same session replaces the older one, so its window and origin are the latest.
+func (s *userStore) AddRule(ctx context.Context, r training.AnswerRule) (int64, error) {
+	if (r.Effect != training.EffectAllow && r.Effect != training.EffectDeny) || r.Session == "" || r.ActionType == "" || r.ExpiresAt.IsZero() || r.Origin <= 0 {
+		return 0, training.ErrValidation
 	}
-	if r.Remember == training.RememberAlways {
-		r.ExpiresAt = time.Time{}
+	// The origin must be one of this account's own records.
+	var id int64
+	err := s.db.QueryRowContext(ctx, `INSERT INTO answer_rules(user_id,action_type,effect,session,expires_at,origin,created_at)
+		SELECT ?,?,?,?,?,id,? FROM decision_records WHERE id=? AND user_id=?
+		ON CONFLICT(user_id,action_type,effect,session) DO UPDATE SET expires_at=excluded.expires_at, origin=excluded.origin, created_at=excluded.created_at
+		RETURNING id`,
+		s.userID, r.ActionType, r.Effect, r.Session, formatTime(r.ExpiresAt), formatTime(time.Now()), r.Origin, s.userID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, training.ErrValidation
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO approval_rules(user_id,action_type,remember,expires_at,created_at) VALUES (?,?,?,?,?)
-		ON CONFLICT(user_id,action_type) DO UPDATE SET remember=excluded.remember, expires_at=excluded.expires_at, created_at=excluded.created_at`,
-		s.userID, r.ActionType, r.Remember, formatTime(r.ExpiresAt), formatTime(time.Now()))
-	return err
+	return id, err
 }
 
-func (s *userStore) ForgetRule(ctx context.Context, actionType string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM approval_rules WHERE user_id=? AND action_type=?`, s.userID, actionType)
-	return err
+func (s *userStore) ForgetRule(ctx context.Context, id int64) (training.AnswerRule, error) {
+	return scanRule(s.db.QueryRowContext(ctx, `DELETE FROM answer_rules WHERE id=? AND user_id=? RETURNING `+ruleColumns, id, s.userID))
+}
+
+func (s *userStore) RecordDecision(ctx context.Context, d training.DecisionRecord) (int64, error) {
+	var id int64
+	err := s.db.QueryRowContext(ctx, `INSERT INTO decision_records(user_id,time,permission,outcome,operation,session,decider_kind,decider_id,channel,answer)
+		VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING id`,
+		s.userID, formatTime(d.Time), d.Permission, d.Outcome, d.Operation, d.Session, d.DeciderKind, d.DeciderID, d.Channel, d.Answer).Scan(&id)
+	return id, err
+}
+
+func (s *userStore) Decisions(ctx context.Context, limit int) ([]training.DecisionRecord, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id,time,permission,outcome,operation,session,decider_kind,decider_id,channel,answer
+		FROM decision_records WHERE user_id=? ORDER BY id DESC LIMIT ?`, s.userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []training.DecisionRecord{}
+	for rows.Next() {
+		var d training.DecisionRecord
+		var at string
+		if err := rows.Scan(&d.ID, &at, &d.Permission, &d.Outcome, &d.Operation, &d.Session, &d.DeciderKind, &d.DeciderID, &d.Channel, &d.Answer); err != nil {
+			return nil, err
+		}
+		if d.Time, err = parseTime(at); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
 }

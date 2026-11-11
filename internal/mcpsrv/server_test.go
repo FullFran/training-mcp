@@ -606,15 +606,25 @@ func (acceptAllProposals) ClaimProposal(context.Context, int64) error { return n
 func (acceptAllProposals) FinishProposal(_ context.Context, id int64, out training.ProposalOutcome) (training.Proposal, error) {
 	return training.Proposal{ID: id, Status: out.Status, DecidedBy: out.DecidedBy, Result: out.Result, Error: out.Error}, nil
 }
-func (acceptAllProposals) RejectProposal(context.Context, int64, time.Time) (training.Proposal, error) {
+func (acceptAllProposals) RejectProposal(context.Context, int64, string, time.Time) (training.Proposal, error) {
 	return training.Proposal{}, training.ErrNotFound
 }
 func (acceptAllProposals) Permissions(context.Context) (training.Permissions, error) {
 	return training.Permissions{AcceptAll: true}, nil
 }
-func (acceptAllProposals) SetAcceptAll(context.Context, bool) error             { return nil }
-func (acceptAllProposals) SetRule(context.Context, training.ApprovalRule) error { return nil }
-func (acceptAllProposals) ForgetRule(context.Context, string) error             { return nil }
+func (acceptAllProposals) SetAcceptAll(context.Context, bool) error { return nil }
+func (acceptAllProposals) AddRule(context.Context, training.AnswerRule) (int64, error) {
+	return 0, nil
+}
+func (acceptAllProposals) ForgetRule(context.Context, int64) (training.AnswerRule, error) {
+	return training.AnswerRule{}, training.ErrNotFound
+}
+func (acceptAllProposals) RecordDecision(context.Context, training.DecisionRecord) (int64, error) {
+	return 1, nil
+}
+func (acceptAllProposals) Decisions(context.Context, int) ([]training.DecisionRecord, error) {
+	return nil, nil
+}
 
 func (testStore) SaveMemory(_ context.Context, m training.Memory, _ *bool) (training.Memory, error) {
 	return m, nil

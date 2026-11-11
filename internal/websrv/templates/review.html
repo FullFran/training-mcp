@@ -27,7 +27,7 @@
     {{if .Review.AcceptAll}}
     <p><strong>⚠ Aceptar todo está activado.</strong> El agente aplica cualquier cambio sin preguntarte, también los de tipos nuevos. Todo queda en el historial.</p>
     {{else}}
-    <p><strong>Aceptar todo</strong> está desactivado: el agente te pregunta antes de cada cambio que no hayas recordado.</p>
+    <p><strong>Aceptar todo</strong> está desactivado: el agente te pregunta antes de cada cambio, salvo los que aceptaste o rechazaste siempre en esa misma sesión.</p>
     {{end}}
     <form method="post" action="{{.Base}}/review/accept-all">{{if .CSRF}}
       <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
@@ -51,17 +51,13 @@
     </dl>{{end}}
     <form method="post" action="{{$.Base}}/review/{{.ID}}/accept">{{if $.CSRF}}
       <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
-      <fieldset class="remember">
-        <legend>Recordar para «{{.Label}}»</legend>
-        <label><input type="radio" name="remember" value="once" checked> Solo esta vez</label>
-        <label><input type="radio" name="remember" value="session"> 12 horas</label>
-        <label><input type="radio" name="remember" value="always"> Siempre</label>
-      </fieldset>
-      <button type="submit" class="primary wide">Aceptar</button>
+      <button type="submit" name="answer" value="allow_once" class="primary wide">{{index $.Review.Answers "allow_once"}}</button>
+      {{if .InSession}}<button type="submit" name="answer" value="allow_always" class="ghost wide">{{index $.Review.Answers "allow_always"}}</button>{{end}}
     </form>
     <form method="post" action="{{$.Base}}/review/{{.ID}}/reject">{{if $.CSRF}}
       <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
-      <button type="submit" class="ghost wide">Rechazar</button>
+      <button type="submit" name="answer" value="reject_once" class="ghost wide">{{index $.Review.Answers "reject_once"}}</button>
+      {{if .InSession}}<button type="submit" name="answer" value="reject_always" class="ghost wide">{{index $.Review.Answers "reject_always"}}</button>{{end}}
     </form>
   </article>
   {{else}}
@@ -76,7 +72,7 @@
       <span><strong>{{.Label}}</strong> <span class="muted">{{.Remember}}</span></span>
       <form method="post" action="{{$.Base}}/review/forget">{{if $.CSRF}}
         <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
-        <input type="hidden" name="action_type" value="{{.ActionType}}">
+        <input type="hidden" name="rule_id" value="{{.ID}}">
         <button type="submit" class="ghost">Olvidar</button>
       </form>
     </li>

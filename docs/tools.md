@@ -13,30 +13,104 @@ and applies it only when a standing answer covers its action type. Every write
 result therefore carries two extra fields:
 
 - `status`: `accepted` when the change was applied (the other fields show it,
-  exactly as before), or `pending` when it waits for the person on `/review`.
-  A pending change is not applied yet: its other fields are empty and it is
-  validated only when accepted, so the agent must not report it as done.
+  exactly as before), `pending` when it waits for the person on `/review` or
+  in the coach chat, or `rejected` when the person already rejected that action
+  type for this session (`reject_always`). A pending or rejected change is not
+  applied: its other fields are empty, a pending one is validated only when
+  accepted, and the agent must not report either as done.
 - `proposal_id`: the proposal that records the change.
 
 Read tools are unchanged: they record nothing and return no `status`.
 
-Answers are remembered per **action type**, never per tool name, so approving
-`set.log` covers `log_sets`, `log_set` and `add_set` alike, while removing a
-note (`exercise.note.remove`) is a different action from setting one
+Answers apply per **action type**, never per tool name, so allowing `set.log`
+covers `log_sets`, `log_set` and `add_set` alike, while removing a note
+(`exercise.note.remove`) is a different action from setting one
 (`exercise.note.set`). There is one plain confirmation for every action type,
 destructive ones included.
 
-| Answer | Meaning |
+### Answers (HCS-0005 section 3.2)
+
+The person answers on `/review` or on the proposal's card in the coach chat,
+with the four option kinds of [HCS-0005](https://github.com/FullFran/hcs)
+section 3.2:
+
+| Answer | Label in the app | Meaning |
+|---|---|---|
+| `allow_once` | Aceptar una vez | Apply this proposal only. Nothing is stored. |
+| `reject_once` | Rechazar | Reject this proposal only. Nothing is stored. |
+| `allow_always` | Aceptar siempre en esta sesión | Apply it and store a **grant** for its action type, limited to the session the proposal was asked in. |
+| `reject_always` | Rechazar siempre en esta sesión | Reject it and store a **denial** for its action type, limited the same way. A denial wins over any grant, accept-all included. |
+
+The always answers are offered only for a proposal asked inside a session; one
+asked outside every session can only be answered once. A stored grant or
+denial also ends 12 hours after the answer at most, and `/review` lists each
+one with its session so it can be forgotten (revoked) at any time.
+
+### Sessions
+
+A **session** is decided per channel by the server, never by the agent:
+
+| Channel | Session |
 |---|---|
-| once | Apply this proposal only. |
-| session | Accept this action type for the next 12 hours. The MCP server is stateless (no `Mcp-Session-Id`), so a session is one training day rather than a client connection. |
-| always | Accept this action type until the answer is forgotten on `/review`. |
-| accept-all | A per-account switch that accepts every proposal, including action types added later, like Claude Code's `--dangerously-skip-permissions`. Proposals are still recorded. Turning it off restores the remembered answers. |
+| In-app coach | One chat conversation. The coach's engine process holds the conversation in memory and reaches `/mcp` with a bearer minted for that process, so the session is derived from that bearer (`coach:` plus a hash; the bearer is never stored). A new conversation (the process stopped when idle, reached its maximum age or was reconnected) is a new session, and earlier answers do not carry over. |
+| External MCP client (ChatGPT, Claude) | A time window. `/mcp` is stateless (no `Mcp-Session-Id`), and an OAuth access token rotates within the hour, so there is no MCP-native identifier for a conversation. Every external call shares the session `mcp`, which a grant or denial covers for 12 hours from the answer. |
+| Anything else (no HTTP request) | No session. No stored grant or denial ever matches it (HCS-0005 R008). |
+
+### Accept-all
+
+A per-account switch that accepts every proposal, in every session and in
+none, including action types added later, like Claude Code's
+`--dangerously-skip-permissions`. It is modelled as an **account-level host
+grant**: it is set only from the person's own settings on `/review`, never by an
+agent, and every proposal it accepts is still recorded, with a decision record
+naming the `accept_all` grant. A session denial still wins over it. Turning it
+off leaves the session grants and denials as they were.
 
 Defaults: every account that existed when migration 014 ran keeps accept-all
 on, so its agents behave as before plus the two fields. Accounts created later
 start asking for everything. Changes a person makes in the PWA apply directly
 and are not proposals.
+
+Migration 018 dropped every answer stored before answers became
+session-limited (permanent "always" and 12-hour "session" answers): none had a
+session or an origin, so none could be kept under HCS-0005 R006 and R008. Each
+dropped answer has a `revoked` decision record (decider `policy`
+`HCS-0005-R008`, channel `migration:018`), and the person is asked again.
+Accept-all values were not touched.
+
+### Decision records (HCS-0005 section 3.3)
+
+Every decision on a proposal writes a decision record before it takes effect:
+`time`, `permission` (the action type), `outcome` (`allow`, `deny`, or
+`revoked` when a grant or denial is forgotten), `operation` (`proposal:<id>`),
+`session`, `decider` (`subject` `account` for the person's own answer, `grant`
+`rule:<id>` or `accept_all`, `denial` `rule:<id>`, or `policy`), `channel`
+(`web` for the person's answer, `grant-store` for a stored answer) and the
+`answer` the person chose. A record never holds the proposal's payload or
+result. A grant or denial carries the id of the record of the answer that
+created it as its `origin`. If the record cannot be written the change is not
+applied.
+
+### Conformance with HCS-0005
+
+| Rule | Status |
+|---|---|
+| R005 once answers never stored | Met. |
+| R006 `allow_always` is a session-limited grant with `origin`, revocable | Met. Revoking is "Olvidar" on `/review`; every later proposal is decided without it (R003). |
+| R007 `reject_always` is a session-limited denial that wins over a grant | Met, including over accept-all. |
+| R008 no match across sessions or without a session | Met. |
+| R009 nothing outside the host remembers answers | Met: the agent never sees or answers a proposal, and the engine and clients only get `accepted`, `pending` or `rejected` results. |
+| R014 fail closed | Met: a proposal is applied only on an explicit allow (person, grant or accept-all); a pending one waits with nothing applied, and a reject, an error or an unwritable decision record applies nothing. |
+| R015 answers only from the person's channel | Met: answers come only from the signed-in, CSRF-protected web routes; no MCP tool answers a proposal. |
+
+Remaining divergences: the external session is a 12-hour window shared by every
+external client of the account (ChatGPT and Claude are one session) because
+the stateless endpoint has no per-conversation identifier; the in-app coach
+session is one engine process rather than a stored chat id, so a long
+conversation that outlives its process asks again; and a pending proposal has
+no deadline (it waits, applying nothing, until answered), so no `timeout`
+record is written. Decision records stay in the database (HCS-0005 OQ-0005-6
+and OQ-0005-7).
 
 | Action type | Tools |
 |---|---|
