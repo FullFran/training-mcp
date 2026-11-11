@@ -85,19 +85,18 @@ The columns below come from real exports published by third parties, not from
 the vendors. No sample from the owner's own account was available when this was
 written; a real file from each app is the next thing to test against.
 
-- Hevy, from published exports such as
-  <https://raw.githubusercontent.com/matanabudy/workout-data-sync/main/examples/hevy_export_sample.csv>:
+- Hevy, from export samples published in open-source projects:
   `title,start_time,end_time,description,exercise_title,superset_id,exercise_notes,set_index,set_type,weight_kg,reps,distance_km,duration_seconds,rpe`,
   with `weight_lbs` and `distance_miles` when the app is set to imperial, and
   dates like `22 Dec 2025, 08:00` (Spanish month abbreviations are read too).
-- Strong, classic export, as documented in
-  <https://raw.githubusercontent.com/smyrick/sugarwod-to-hevy/main/docs/STRONG_FORMAT.md>:
+- Strong, classic export, as documented by an open-source converter that
+  produces Strong-format files:
   `Date,Workout Name,Duration,Exercise Name,Set Order,Weight,Reps,Distance,Seconds,Notes,Workout Notes,RPE`,
   dates like `2024-03-07 18:05:00`, and no weight unit: the page asks which
   unit Strong was set to.
 - Strong, newer export: semicolon-separated, with a byte-order mark, extra
-  columns such as `Workout #` and the unit in the weight header, as handled by
-  <https://raw.githubusercontent.com/DuarteSantos8/openGym/main/frontend/src/lib/import-csv.js>.
+  columns such as `Workout #` and the unit in the weight header, as handled by an
+  open-source importer of several apps' exports.
   The test fixture for it is a reconstruction, not a real file. Columns are
   matched by name, so their order and extra columns do not matter.
 
