@@ -279,7 +279,7 @@ debt, not a design: see the open issues.
 - [ChatGPT setup](docs/chatgpt-setup.md)
 - [Connection paths and tunnel safety](docs/connection-paths.md)
 - [SI formula](docs/si-formula.md)
-- [In-app coach](docs/coach.md) — chat with your own ChatGPT while you train; off by default, experimental
+- [In-app coach](docs/coach.md) — chat with your own ChatGPT while you train, and connect your own remote MCP servers (Notion and others) to it; off by default, experimental
 - [Deployment](docs/deployment.md) — how `main` reaches production, CI gate, rollback
 
 The external Secure MCP Tunnel smoke flow is **unverified in this repository**. Use the official provider documentation rather than invented commands.
