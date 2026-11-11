@@ -21,6 +21,7 @@
 </header>
 
 <main>
+  {{if .Session.Notes}}<p class="muted session-notes">{{.Session.Notes}}</p>{{end}}
   {{template "panel.html" .}}
 </main>
 </body>

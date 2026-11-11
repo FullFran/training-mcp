@@ -75,8 +75,9 @@ reaches `websrv` as a function of its own for `export.db`.
 |---|---|---|
 | `internal/training` | Domain model, rules, SI arithmetic, ports | nothing but stdlib |
 | `internal/sqlitestore` | Driven adapter: SQL, migrations, snapshots | `training` (implements `Store`) |
+| `internal/importer` | Reads Hevy and Strong exports and plans an import, deterministically | `training` |
 | `internal/mcpsrv` | Driving adapter: MCP tool surface | `training` |
-| `internal/websrv` | Driving adapter: PWA, templates, static | `training` |
+| `internal/websrv` | Driving adapter: PWA, templates, static | `training`, `importer` |
 | `internal/httpsrv` | Composition: routing, auth, health | the adapters above |
 | `internal/config` | Environment and flags | nothing |
 | `cmd/training-mcp` | Wiring | everything, briefly |
@@ -119,6 +120,12 @@ and soft delete on `coach_memory`, its earlier texts in `coach_memory_revisions`
 and the coach's judgements between similar facts in `coach_memory_relations`.
 Both go with a fact deleted for good (foreign keys cascade). Saves, edits,
 judgements and merges run in one transaction each.
+
+Migration 022 adds imported history: `imports`, `imported_sets` (one natural
+key per imported set, unique per user, which is what makes importing a file
+twice add nothing), `import_exercise_map` and `sessions.notes`. The import
+methods form `training.ImportStore`, reached through `Store.ImportsFor`, so the
+`UserStore` test doubles did not have to grow. See [import.md](import.md).
 
 `sqlitestore` carries the highest coverage floor in CI (70% statements) because
 it is the layer that touches the data: a bug in a driving adapter shows up as a

@@ -148,6 +148,11 @@ func (s *Store) ForUser(userID int64) training.UserStore {
 	return &userStore{db: s.db, failpoint: s.failpoint, userID: userID}
 }
 
+// ImportsFor returns one user's imports, bound like ForUser.
+func (s *Store) ImportsFor(userID int64) training.ImportStore {
+	return &userStore{db: s.db, failpoint: s.failpoint, userID: userID}
+}
+
 func (s *Store) UserBySubject(ctx context.Context, subject string) (int64, bool, error) {
 	var userID int64
 	err := s.db.QueryRowContext(ctx, `SELECT id FROM users WHERE clerk_subject=?`, subject).Scan(&userID)
@@ -457,8 +462,8 @@ func (s *userStore) DeleteSet(ctx context.Context, id int64) (int64, float64, in
 func (s *userStore) GetSession(ctx context.Context, id int64) (training.Session, error) {
 	var out training.Session
 	var planID sql.NullInt64
-	err := s.db.QueryRowContext(ctx, `SELECT id,date,plan_id,plan_name FROM sessions WHERE id=? AND user_id=?`, id, s.userID).
-		Scan(&out.ID, &out.Date, &planID, &out.PlanName)
+	err := s.db.QueryRowContext(ctx, `SELECT id,date,plan_id,plan_name,notes FROM sessions WHERE id=? AND user_id=?`, id, s.userID).
+		Scan(&out.ID, &out.Date, &planID, &out.PlanName, &out.Notes)
 	out.PlanID = planID.Int64
 	if errors.Is(err, sql.ErrNoRows) {
 		return out, training.ErrNotFound

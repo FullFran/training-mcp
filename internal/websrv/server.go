@@ -116,6 +116,8 @@ type pageData struct {
 	Review ReviewData
 	// Memory is the memory page: what the coach remembers about the person.
 	Memory MemoryData
+	// Import is the import page: earlier imports and a file's preview.
+	Import ImportData
 	// PendingCount is how many agent proposals wait for an answer.
 	PendingCount int
 	// CoachOn shows the coach chat.
@@ -186,7 +188,8 @@ func NewWithOptions(service training.ServiceFor, snapshot func(context.Context, 
 				return f.Recovery
 			}
 		},
-		"add": func(a, b int) int { return a + b },
+		"add":     func(a, b int) int { return a + b },
+		"countOf": countOf,
 		"doneCount": func(items []training.PlanProgress) int {
 			n := 0
 			for _, it := range items {
@@ -298,6 +301,9 @@ func (s *Server) routes() {
 	s.handle("POST "+b+"/memory/{id}/confirm", s.confirmMemory)
 	s.handle("POST "+b+"/memory/conflicts/{id}/resolve", s.resolveConflict)
 	s.handle("POST "+b+"/memory/delete-all", s.deleteAllMemory)
+	s.handle("GET "+b+"/import", s.importPage)
+	s.handle("POST "+b+"/import/preview", s.previewImport)
+	s.handle("POST "+b+"/import/apply", s.applyImport)
 	s.handle("GET "+b+"/manifest.webmanifest", s.manifest)
 	s.handle("GET "+b+"/sw.js", s.serviceWorker)
 

@@ -1,0 +1,84 @@
+{{define "import.html"}}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Importar historial</title>
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="{{.Base}}/manifest.webmanifest">
+<link rel="icon" href="{{.Base}}/static/icon-192.png">
+<link rel="stylesheet" href="{{.Base}}/static/app.css">
+{{if .CSRF}}<meta name="csrf-token" content="{{.CSRF}}">
+{{end}}</head>
+<body data-base="{{.Base}}">
+
+<header class="bar">
+  <div><strong>Importar historial</strong></div>
+  <div class="bar-actions">
+    <a class="ghost" href="{{.Base}}/history">Historial</a>
+    <a class="ghost" href="{{.Base}}/">Hoy</a>
+  </div>
+</header>
+
+<main class="review import">
+  {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
+  {{if .Import.Done}}<p class="card" role="status">{{.Import.Done}}</p>{{end}}
+
+  {{with .Import.Preview}}
+  <form method="post" action="{{$.Base}}/import/apply" class="card">{{if $.CSRF}}
+    <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+    <input type="hidden" name="payload" value="{{$.Import.Payload}}">
+    <input type="hidden" name="file_name" value="{{$.Import.FileName}}">
+    <input type="hidden" name="unit" value="{{$.Import.Unit}}">
+    <header><strong>Vista previa</strong> <span class="muted">{{if eq .Source "hevy"}}Hevy{{else}}Strong{{end}} · {{$.Import.FileName}}{{if .From}} · {{.From}} a {{.To}}{{end}}</span></header>
+    <p class="summary">{{countOf .Sessions "sesión nueva" "sesiones nuevas"}} · {{countOf .Sets "serie" "series"}} · {{countOf .Exercises "ejercicio" "ejercicios"}} · {{.Imputed}} sin RPE</p>
+    {{with .ImportedBefore}}<p class="alert" role="status">Este mismo archivo ya se importó el {{.CreatedAt.Format "2006-01-02"}} ({{.FileName}}). Volver a importarlo no añade lo que ya está.</p>{{end}}
+    {{if .Imputed}}<p class="muted">Las series sin RPE se guardan con RPE 8 marcado como imputado: cuentan una unidad de SI y nunca se leen como medida.</p>{{end}}
+    {{if or .AlreadyImported .InHistory}}<p class="muted">No se importan: {{if .AlreadyImported}}{{countOf .AlreadyImported "ya importada" "ya importadas"}}{{end}}{{if and .AlreadyImported .InHistory}} · {{end}}{{if .InHistory}}{{countOf .InHistory "ya en tu historial" "ya en tu historial"}} (mismo día, ejercicio, peso y reps){{end}}.</p>{{end}}
+    {{if $.Import.Skipped}}<ul class="muted">{{range $.Import.Skipped}}
+      <li>{{.Label}}: {{.N}}</li>{{end}}
+    </ul>{{end}}
+
+    <h2>Ejercicios{{if .Unmapped}} <span class="muted">({{countOf .Unmapped "nombre nuevo" "nombres nuevos"}})</span>{{end}}</h2>
+    <p class="muted">Pon a cada ejercicio el nombre que ya usas aquí, o deja el que trae para crearlo nuevo. Se recordará la próxima vez.</p>
+    <datalist id="catalogue">{{range .Catalogue}}
+      <option value="{{.}}">{{end}}
+    </datalist>
+    {{range .Names}}
+    <label>{{.Source}} <span class="muted">{{countOf .Sets "serie" "series"}}{{if .Known}} · ya lo usas{{else}} · nuevo{{end}}{{if .Remembered}} · como la última vez{{end}}{{if .Suggestion}} · ¿quizá «{{.Suggestion}}»?{{end}}</span>
+      <input type="hidden" name="src" value="{{.Source}}">
+      <input name="dst" value="{{.Exercise}}" list="catalogue" maxlength="120" autocomplete="off">
+    </label>
+    {{end}}
+    <button type="submit" formaction="{{$.Base}}/import/preview" class="ghost wide">Actualizar vista previa</button>
+    {{if .Sets}}<button type="submit" class="primary wide">Importar {{countOf .Sets "serie" "series"}}</button>
+    {{else}}<p class="empty">No hay nada nuevo que importar en este archivo.</p>{{end}}
+  </form>
+  {{end}}
+
+  <form method="post" action="{{.Base}}/import/preview" enctype="multipart/form-data" class="card">{{if .CSRF}}
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
+    <p class="muted">Sube el CSV de entrenos exportado de Hevy (Perfil › Ajustes › Exportar e importar datos › Exportar entrenos) o de Strong (Ajustes › Exportar datos). Primero verás qué se importaría; nada se guarda hasta que confirmes. Importar el mismo archivo dos veces no añade nada.</p>
+    <label>Archivo <input type="file" name="file" accept=".csv,text/csv" required></label>
+    <label>Unidad de peso en Strong
+      <select name="unit">
+        <option value="kg"{{if eq .Import.Unit "kg"}} selected{{end}}>kg</option>
+        <option value="lb"{{if eq .Import.Unit "lb"}} selected{{end}}>lb</option>
+      </select>
+    </label>
+    <button type="submit" class="ghost wide">Ver qué se importaría</button>
+  </form>
+
+  <h2>Importaciones anteriores</h2>
+  {{range .Import.History}}
+  <article class="card">
+    <header><strong>{{.FileName}}</strong> <span class="muted">{{if eq .Source "hevy"}}Hevy{{else}}Strong{{end}} · {{.CreatedAt.Format "2006-01-02"}}</span></header>
+    <p class="summary">{{countOf .Sets "serie" "series"}} en {{countOf .Sessions "sesión" "sesiones"}}{{if .Imputed}} · {{.Imputed}} con RPE imputado{{end}}</p>
+  </article>
+  {{else}}
+  <p class="empty">Todavía no has importado nada.</p>
+  {{end}}
+</main>
+</body>
+</html>
+{{end}}

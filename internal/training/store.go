@@ -9,6 +9,9 @@ import (
 // through ForUser, so a data method cannot be called without saying whose data it is.
 type Store interface {
 	ForUser(userID int64) UserStore
+	// ImportsFor is one user's imported history, a port of its own so the many
+	// UserStore doubles need not grow with it.
+	ImportsFor(userID int64) ImportStore
 	// UserBySubject finds the account of an identity provider's subject.
 	UserBySubject(ctx context.Context, subject string) (userID int64, found bool, err error)
 	// ProvisionUser returns the subject's account, creating it if needed. Concurrent

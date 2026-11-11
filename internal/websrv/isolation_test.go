@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fullfran/training-mcp/internal/importer"
 	"github.com/fullfran/training-mcp/internal/mcpsrv"
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
 	"github.com/fullfran/training-mcp/internal/training"
@@ -25,6 +26,11 @@ const (
 	secretNote     = "nota secreta"
 	secretMemory   = "memoria secreta"
 	missingWebID   = "999999"
+	secretImport   = "historial-secreto.csv"
+	// ownerExport is the owner's imported Hevy history: one set.
+	ownerExport = `"title","start_time","end_time","description","exercise_title","superset_id","exercise_notes","set_index","set_type","weight_kg","reps","distance_km","duration_seconds","rpe"
+"Push","3 Jan 2025, 08:00","3 Jan 2025, 09:00","","Bench Press (Barbell)",,"",0,"normal",70,6,,,8
+`
 )
 
 func webClock() time.Time { return time.Date(2026, 8, 7, 10, 0, 0, 0, time.UTC) }
@@ -128,6 +134,13 @@ func newWebWorld(t *testing.T) webWorld {
 	if _, err = owner.JudgeMemory(ctx, rival.Candidates[0].RelationID, training.RelationConflictsWith, "opuestos"); err != nil {
 		t.Fatal(err)
 	}
+	ownerFile, err := importer.Parse([]byte(ownerExport), importer.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = importer.Apply(ctx, owner, ownerFile, map[string]string{"Bench Press (Barbell)": secretExercise}, secretImport); err != nil {
+		t.Fatal(err)
+	}
 	// With no review date, confirming visibly changes the fact.
 	if _, err = db.Exec(`UPDATE coach_memory SET review_after=''`); err != nil {
 		t.Fatal(err)
@@ -144,7 +157,8 @@ func dumpDatabase(t *testing.T, db *sql.DB) string {
 	var out strings.Builder
 	for _, table := range []string{"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
 		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys",
-		"proposals", "answer_rules", "decision_records", "agent_permissions", "coach_memory", "coach_memory_revisions", "coach_memory_relations"} {
+		"proposals", "answer_rules", "decision_records", "agent_permissions", "coach_memory", "coach_memory_revisions", "coach_memory_relations",
+		"imports", "imported_sets", "import_exercise_map"} {
 		rows, err := db.Query(`SELECT * FROM ` + table + ` ORDER BY rowid`)
 		if err != nil {
 			t.Fatal(err)
@@ -228,6 +242,10 @@ var webRoutes = map[string]func(*testing.T){
 		return "/memory/conflicts/" + id + "/resolve", url.Values{"keep": {"new"}}
 	}),
 	"POST /memory/delete-all": testDeletingAllMemoryTouchesOnlyTheUsersOwn,
+
+	"GET /import":          pageRoute("/import", secretImport),
+	"POST /import/preview": testImportingTheSameFileAsAnotherUserIsYourOwn,
+	"POST /import/apply":   testApplyingAnImportTouchesOnlyTheUsersOwnRows,
 
 	"GET /manifest.webmanifest": sharedRoute("the same document for everyone"),
 	"GET /sw.js":                sharedRoute("the same document for everyone"),
@@ -448,6 +466,10 @@ func pageRoute(path, marker string) func(*testing.T) {
 func writeRoute(path string, form url.Values, count string) func(*testing.T) {
 	return func(t *testing.T) {
 		world := newWebWorld(t)
+		var owned int
+		if err := world.db.QueryRow(`SELECT COUNT(*) FROM sessions WHERE user_id=1`).Scan(&owned); err != nil {
+			t.Fatal(err)
+		}
 		if w := post(t, world.second, base+path, form, true); w.Code != http.StatusOK {
 			t.Fatalf("status = %d: %s", w.Code, w.Body)
 		}
@@ -462,8 +484,8 @@ func writeRoute(path string, form url.Values, count string) func(*testing.T) {
 		if err := world.db.QueryRow(`SELECT COUNT(*) FROM sessions WHERE user_id=1`).Scan(&touched); err != nil {
 			t.Fatal(err)
 		}
-		if touched != 1 {
-			t.Fatalf("user 1 now has %d sessions", touched)
+		if touched != owned {
+			t.Fatalf("user 1 now has %d sessions, had %d", touched, owned)
 		}
 	}
 }

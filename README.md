@@ -24,6 +24,8 @@ Assistant: logs the sets in today's training session
 - **Log naturally:** record sets, weight, reps and RPE with an MCP client.
 - **Train from your phone:** use the optional PWA for plans, set logging and a rest timer.
 - **See your progress:** review training history, estimated records and volume.
+- **Bring your history:** import a Hevy or Strong CSV export from the PWA, with a
+  preview first; importing the same file twice adds nothing.
 - **Keep your data:** the service stores workouts in SQLite; export and backup
   options are described below.
 
@@ -178,6 +180,9 @@ shared with the MCP tools and cannot drift apart.
   change its set count, skip it, or substitute it when a machine is taken.
   Sets already logged are never touched by any of this — an exercise removed
   from the plan simply reappears as off-plan work.
+- `/import` (linked from the history page) imports a Hevy or Strong workout
+  CSV: a preview of sessions, sets, exercise names to map and duplicates first,
+  then one all-or-nothing import on confirmation. See [docs/import.md](docs/import.md).
 - Sets are grouped by exercise, the way a workout is performed and read back.
 - The entry form shows what was done last time for that exercise and the
   standing estimated-1RM record; a set matching the record is badged `PR`.
@@ -279,6 +284,7 @@ debt, not a design: see the open issues.
 - [ChatGPT setup](docs/chatgpt-setup.md)
 - [Connection paths and tunnel safety](docs/connection-paths.md)
 - [SI formula](docs/si-formula.md)
+- [Importing from Hevy and Strong](docs/import.md) — formats, name mapping, duplicates, limits
 - [In-app coach](docs/coach.md) — chat with your own ChatGPT while you train, and connect your own remote MCP servers (Notion and others) to it; off by default, experimental
 - [Deployment](docs/deployment.md) — how `main` reaches production, CI gate, rollback
 

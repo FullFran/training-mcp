@@ -1051,6 +1051,9 @@ func (p *perUserStore) ForUser(userID int64) UserStore {
 	return newMemoryStore()
 }
 
+// ImportsFor gives no import store: these tests never import.
+func (p *perUserStore) ImportsFor(int64) ImportStore { return nil }
+
 func (p *perUserStore) UserBySubject(context.Context, string) (int64, bool, error) {
 	return 0, false, nil
 }
