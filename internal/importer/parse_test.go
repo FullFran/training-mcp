@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/fullfran/training-mcp/internal/training"
 )
 
 func readFixture(t *testing.T, name string) []byte {
@@ -49,6 +51,7 @@ func TestParseHevyReadsWorkoutsOldestFirstWithTheirNotesAndSets(t *testing.T) {
 		t.Fatalf("push = %+v", push)
 	}
 	want := []Set{
+		{Exercise: "Bench Press (Barbell)", WeightKG: 40, Reps: 10, Category: training.SetWarmup},
 		{Exercise: "Bench Press (Barbell)", WeightKG: 80, Reps: 8, RPE: 8.5},
 		{Exercise: "Bench Press (Barbell)", WeightKG: 80, Reps: 7},
 		{Exercise: "Bench Press (Barbell)", WeightKG: 60, Reps: 10, RPE: 10, Technique: "drop set"},
@@ -56,7 +59,7 @@ func TestParseHevyReadsWorkoutsOldestFirstWithTheirNotesAndSets(t *testing.T) {
 	if !reflect.DeepEqual(strip(push.Sets), want) {
 		t.Fatalf("push sets = %+v", push.Sets)
 	}
-	if want := map[string]int{SkipWarmup: 1, SkipNoLoad: 2}; !reflect.DeepEqual(f.Skipped, want) {
+	if want := map[string]int{SkipNoLoad: 2}; !reflect.DeepEqual(f.Skipped, want) {
 		t.Fatalf("skipped = %v", f.Skipped)
 	}
 }
@@ -71,7 +74,7 @@ func TestParseHevyConvertsPounds(t *testing.T) {
 	}
 }
 
-func TestParseStrongSkipsWarmupsRestTimersAndCardio(t *testing.T) {
+func TestParseStrongReadsWarmupsAndSkipsRestTimersAndCardio(t *testing.T) {
 	f, err := Parse(readFixture(t, "strong.csv"), Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -84,6 +87,7 @@ func TestParseStrongSkipsWarmupsRestTimersAndCardio(t *testing.T) {
 		t.Fatalf("workout = %+v", w)
 	}
 	want := []Set{
+		{Exercise: "Squat (Barbell)", WeightKG: 60, Reps: 5, Category: training.SetWarmup},
 		{Exercise: "Squat (Barbell)", WeightKG: 100, Reps: 5, RPE: 8},
 		{Exercise: "Squat (Barbell)", WeightKG: 100, Reps: 5},
 		{Exercise: "Leg Press", WeightKG: 140, Reps: 12, Technique: "drop set"},
@@ -91,7 +95,7 @@ func TestParseStrongSkipsWarmupsRestTimersAndCardio(t *testing.T) {
 	if !reflect.DeepEqual(strip(w.Sets), want) {
 		t.Fatalf("sets = %+v", w.Sets)
 	}
-	if want := map[string]int{SkipWarmup: 1, SkipNotASet: 1, SkipNoLoad: 1}; !reflect.DeepEqual(f.Skipped, want) {
+	if want := map[string]int{SkipNotASet: 1, SkipNoLoad: 1}; !reflect.DeepEqual(f.Skipped, want) {
 		t.Fatalf("skipped = %v", f.Skipped)
 	}
 }
@@ -102,7 +106,7 @@ func TestParseStrongUsesTheUnitThePersonChose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := f.Workouts[0].Sets[0].WeightKG; got != 45.36 {
+	if got := f.Workouts[0].Sets[1].WeightKG; got != 45.36 {
 		t.Fatalf("100 lb = %v kg", got)
 	}
 	if _, err = Parse(readFixture(t, "strong.csv"), Options{StrongUnit: "stone"}); !errors.Is(err, ErrFormat) {
@@ -207,5 +211,44 @@ func TestParseHevyReadsSpanishDates(t *testing.T) {
 	}
 	if len(f.Workouts) != 2 || f.Workouts[0].StartedAt != "2025-12-22 08:05:00" || f.Workouts[1].StartedAt != "2026-01-03 18:00:00" {
 		t.Fatalf("workouts = %+v", f.Workouts)
+	}
+}
+
+// Reading warm-ups must not move a working set's key: an earlier import found
+// its sets by these keys, and a re-import has to recognise every one of them.
+// These are the keys the parser produced when warm-up rows were skipped.
+func TestWorkingSetKeysDoNotChangeNowThatWarmupsAreRead(t *testing.T) {
+	want := map[string][]string{
+		"hevy_kg.csv": {
+			"hevy:40f08bf66f07fccef1ddd7f91ff91b34eb8d205ff2601d74897fb19a9239a0d1",
+			"hevy:191cf808d3e01a8bba666abd100bdc30dcd1a822314676766d60fef56dce2fde",
+			"hevy:8bef72e51d8dfbdac8c0088f7e14099ead7597d08c3a887c837e84e47df235f1",
+			"hevy:579068c006f2b28b9c8d7ee5fd64f97409300632f807349d59762cef8e93623c",
+		},
+		"strong.csv": {
+			"strong:1956c51c8f5796ee5a24775b700aa97ba4aa04ddf999899a81ff35d20fb2ee90",
+			"strong:f9a031edc21b91c6764fcd0d73c94be74ae2735ec55c3a323c03a6654084b7d6",
+			"strong:3cd7166c37f00bbc81f38d7963ea133bf865a07081b7f005685f3614bf8b9785",
+		},
+	}
+	for name, keys := range want {
+		f, err := Parse(readFixture(t, name), Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		warmups := 0
+		for _, w := range f.Workouts {
+			for _, s := range w.Sets {
+				if s.Category == training.SetWarmup {
+					warmups++
+					continue
+				}
+				got = append(got, s.Key)
+			}
+		}
+		if !reflect.DeepEqual(got, keys) || warmups != 1 {
+			t.Fatalf("%s: working keys %v, warm-ups %d", name, got, warmups)
+		}
 	}
 }

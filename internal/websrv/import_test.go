@@ -85,7 +85,7 @@ func TestImportPreviewShowsWhatWouldBeImportedAndWritesNothing(t *testing.T) {
 		t.Fatalf("status %d: %s", w.Code, w.Body)
 	}
 	body := w.Body.String()
-	for _, want := range []string{"2 sesiones", "3 series", "1 sin RPE", "Bench Press (Barbell)", "Squat (Barbell)", "Calentamientos: 1", `name="dst"`, "Importar"} {
+	for _, want := range []string{"2 sesiones", "4 series (1 de calentamiento)", "1 sin RPE", "Bench Press (Barbell)", "Squat (Barbell)", `name="dst"`, "Importar"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("preview lacks %q:\n%s", want, body)
 		}
@@ -100,13 +100,13 @@ func TestImportApplyRecordsTheHistoryOnceAndRemembersNames(t *testing.T) {
 	preview := upload(t, world.second, base+"/import/preview", nil, "workouts.csv", hevyExport)
 	form := confirmForm(t, preview.Body.String(), map[string]string{"Bench Press (Barbell)": "Press banca", "Squat (Barbell)": ""})
 	w := post(t, world.second, base+"/import/apply", form, false)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "Importadas 3 series en 2 sesiones") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "Importadas 4 series en 2 sesiones") {
 		t.Fatalf("status %d: %s", w.Code, w.Body)
 	}
-	if n := countSQL(t, world.db, `SELECT COUNT(*) FROM sets st JOIN sessions se ON se.id=st.session_id WHERE se.user_id=2 AND st.exercise='press banca'`); n != 2 {
+	if n := countSQL(t, world.db, `SELECT COUNT(*) FROM sets st JOIN sessions se ON se.id=st.session_id WHERE se.user_id=2 AND st.exercise='press banca'`); n != 3 {
 		t.Fatalf("bench sets = %d", n)
 	}
-	if n := countSQL(t, world.db, `SELECT COUNT(*) FROM sets st JOIN sessions se ON se.id=st.session_id WHERE se.user_id=2 AND st.rpe_imputed=1`); n != 1 {
+	if n := countSQL(t, world.db, `SELECT COUNT(*) FROM sets st JOIN sessions se ON se.id=st.session_id WHERE se.user_id=2 AND st.rpe_imputed=1 AND st.category='working'`); n != 1 {
 		t.Fatalf("imputed sets = %d", n)
 	}
 	before := dumpDatabase(t, world.db)
@@ -118,12 +118,12 @@ func TestImportApplyRecordsTheHistoryOnceAndRemembersNames(t *testing.T) {
 		t.Fatalf("a second import changed rows:\nbefore\n%s\nafter\n%s", before, after)
 	}
 	page := get(t, world.second, base+"/import")
-	if !strings.Contains(page.Body.String(), "workouts.csv") || !strings.Contains(page.Body.String(), "3 series") {
+	if !strings.Contains(page.Body.String(), "workouts.csv") || !strings.Contains(page.Body.String(), "4 series") {
 		t.Fatalf("history:\n%s", page.Body)
 	}
 	// The next preview starts from the name chosen this time.
 	next := upload(t, world.second, base+"/import/preview", nil, "workouts.csv", hevyExport)
-	if !strings.Contains(next.Body.String(), `value="press banca"`) || !strings.Contains(next.Body.String(), "3 ya importadas") || !strings.Contains(next.Body.String(), "ya se importó") {
+	if !strings.Contains(next.Body.String(), `value="press banca"`) || !strings.Contains(next.Body.String(), "4 ya importadas") || !strings.Contains(next.Body.String(), "ya se importó") {
 		t.Fatalf("next preview:\n%s", next.Body)
 	}
 }

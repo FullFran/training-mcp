@@ -169,7 +169,7 @@ func TestDaySetsAndExerciseNamesReadTheUsersHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []training.DaySet{{Date: importDay, Exercise: "banca", WeightKG: 60, Reps: 8}}; !reflect.DeepEqual(sets, want) {
+	if want := []training.DaySet{{Date: importDay, Exercise: "banca", WeightKG: 60, Reps: 8, Category: training.SetWorking}}; !reflect.DeepEqual(sets, want) {
 		t.Fatalf("day sets = %+v", sets)
 	}
 	names, err := store.ImportsFor(1).ExerciseNames(ctx)

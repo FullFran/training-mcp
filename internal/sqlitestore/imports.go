@@ -2,6 +2,8 @@ package sqlitestore
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"strings"
 	"time"
 
@@ -41,7 +43,7 @@ func (s *userStore) ImportedSetKeys(ctx context.Context, keys []string) (map[str
 }
 
 func (s *userStore) DaySets(ctx context.Context, from, to string) ([]training.DaySet, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT se.date,st.exercise,st.weight_kg,st.reps FROM sets st JOIN sessions se ON se.id=st.session_id
+	rows, err := s.db.QueryContext(ctx, `SELECT se.date,st.exercise,st.weight_kg,st.reps,st.category FROM sets st JOIN sessions se ON se.id=st.session_id
 WHERE se.user_id=? AND se.date BETWEEN ? AND ? ORDER BY se.date,se.id,st.position`, s.userID, from, to)
 	if err != nil {
 		return nil, err
@@ -50,7 +52,7 @@ WHERE se.user_id=? AND se.date BETWEEN ? AND ? ORDER BY se.date,se.id,st.positio
 	var out []training.DaySet
 	for rows.Next() {
 		var d training.DaySet
-		if err = rows.Scan(&d.Date, &d.Exercise, &d.WeightKG, &d.Reps); err != nil {
+		if err = rows.Scan(&d.Date, &d.Exercise, &d.WeightKG, &d.Reps, &d.Category); err != nil {
 			return nil, err
 		}
 		out = append(out, d)
@@ -136,6 +138,16 @@ func (s *userStore) ApplyImport(ctx context.Context, in training.ImportRecord) (
 				continue
 			}
 			if sessionID == 0 {
+				// A workout an earlier import already recorded, such as a file
+				// imported again now that its warm-ups are read, keeps its session:
+				// the one holding imported sets that started at the same moment.
+				err = tx.QueryRowContext(ctx, `SELECT se.id FROM sessions se JOIN sets st ON st.session_id=se.id JOIN imported_sets i ON i.set_id=st.id AND i.user_id=se.user_id
+WHERE se.user_id=? AND se.date=? AND se.started_at=? ORDER BY se.id LIMIT 1`, s.userID, w.Date, w.StartedAt).Scan(&sessionID)
+				if err != nil && !errors.Is(err, sql.ErrNoRows) {
+					return training.ImportSummary{}, err
+				}
+			}
+			if sessionID == 0 {
 				started, err := tx.ExecContext(ctx, `INSERT INTO sessions(user_id,date,started_at,plan_id,plan_name,notes) VALUES (?,?,?,NULL,'',?)`,
 					s.userID, w.Date, w.StartedAt, w.Notes)
 				if err != nil {
@@ -147,7 +159,7 @@ func (s *userStore) ApplyImport(ctx context.Context, in training.ImportRecord) (
 				out.Sessions++
 			}
 			stored, _, err := insertSet(ctx, tx, s.userID, training.AddSetInput{SessionID: sessionID, Exercise: set.Exercise,
-				WeightKG: set.WeightKG, Reps: set.Reps, RPE: set.RPE, RPEImputed: set.RPEImputed, Technique: set.Technique})
+				WeightKG: set.WeightKG, Reps: set.Reps, RPE: set.RPE, RPEImputed: set.RPEImputed, Technique: set.Technique, Category: set.Category})
 			if err != nil {
 				return training.ImportSummary{}, err
 			}
@@ -155,7 +167,8 @@ func (s *userStore) ApplyImport(ctx context.Context, in training.ImportRecord) (
 				return training.ImportSummary{}, err
 			}
 			out.Sets++
-			if set.RPEImputed {
+			// A warm-up's missing RPE weighs nothing, so it is not reported.
+			if set.RPEImputed && set.Category != training.SetWarmup {
 				out.Imputed++
 			}
 		}

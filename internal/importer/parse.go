@@ -38,7 +38,6 @@ var (
 
 // Why a row of the file was not taken as a set.
 const (
-	SkipWarmup     = "warmup"
 	SkipNoLoad     = "no_load"
 	SkipNotASet    = "not_a_set"
 	SkipUnreadable = "unreadable"
@@ -53,7 +52,7 @@ type Options struct {
 	StrongUnit string
 }
 
-// Set is one working set as the app recorded it. RPE is 0 when none was stated.
+// Set is one set as the app recorded it, working or warm-up. RPE is 0 when none was stated.
 type Set struct {
 	// Exercise is the app's own name for it, before mapping.
 	Exercise  string
@@ -61,6 +60,9 @@ type Set struct {
 	Reps      int
 	RPE       float64
 	Technique string
+	// Category is training.SetWarmup for a row the app marked as a warm-up,
+	// empty for a working set.
+	Category string
 	// Key identifies the set across exports of the same history.
 	Key string
 }
@@ -193,7 +195,7 @@ func hevyReader(cols map[string]int) (rowReader, error) {
 		}
 		switch strings.ToLower(get("settype")) {
 		case "warmup":
-			return out, SkipWarmup
+			set.Category = training.SetWarmup
 		case "dropset":
 			set.Technique = "drop set"
 		}
@@ -231,15 +233,16 @@ func strongReader(cols map[string]int, unit string) (rowReader, error) {
 		switch order {
 		case "rest timer", "note":
 			return out, SkipNotASet
-		case "w":
-			return out, SkipWarmup
 		}
 		set, ok := measure(get(weight), get("reps"), get("rpe"), factor)
 		if !ok {
 			return out, SkipUnreadable
 		}
-		if order == "d" {
+		switch order {
+		case "d":
 			set.Technique = "drop set"
+		case "w":
+			set.Category = training.SetWarmup
 		}
 		out.set = set
 		return out, loadSkip(set)
