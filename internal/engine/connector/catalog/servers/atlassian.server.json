@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.atlassian/atlassian-mcp-server",
+  "title": "Atlassian",
+  "description": "Official Atlassian MCP server: Jira and Confluence in the person's site.",
+  "version": "1.0.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.atlassian.com/v2/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer token for this person, obtained by the host with OAuth and added by its proxy.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

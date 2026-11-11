@@ -1,0 +1,20 @@
+{
+  "id": "dev.training-mcp.connectors",
+  "version": "2026.11.12-1",
+  "entries": [
+    {"id": "notion", "server": "servers/notion.server.json", "icon": "📝", "category": "notes",
+     "summary": "Tu diario de entrenamiento, notas y planes en Notion: el coach puede leerlos y apuntar ahí."},
+    {"id": "todoist", "server": "servers/todoist.server.json", "icon": "✅", "category": "tasks",
+     "summary": "Tus tareas y recordatorios: el coach puede ver qué tienes pendiente y añadir sesiones o hábitos."},
+    {"id": "airtable", "server": "servers/airtable.server.json", "icon": "📊", "category": "data",
+     "summary": "Tus tablas de Airtable (registros de peso, comidas, sueño...) para que el coach las consulte."},
+    {"id": "zapier", "server": "servers/zapier.server.json", "icon": "⚡", "category": "automation",
+     "summary": "Las acciones que actives en Zapier (calendario, correo, otras apps) al alcance del coach."},
+    {"id": "linear", "server": "servers/linear.server.json", "icon": "📐", "category": "productivity",
+     "summary": "Tus issues y proyectos de Linear, para cuadrar el entrenamiento con la carga de trabajo."},
+    {"id": "atlassian", "server": "servers/atlassian.server.json", "icon": "🧩", "category": "productivity",
+     "summary": "Jira y Confluence: tareas y páginas de tu trabajo, para planificar alrededor de ellas."},
+    {"id": "monday", "server": "servers/monday.server.json", "icon": "📅", "category": "productivity",
+     "summary": "Tus tableros de monday.com, para ver la semana de trabajo al planificar."}
+  ]
+}
