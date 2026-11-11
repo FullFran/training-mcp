@@ -659,7 +659,11 @@ func setCategory(category, technique string) (string, string, bool) {
 	technique = normalizeTechnique(technique)
 	c, ok := normalizeCategory(category)
 	if warmupWords[technique] {
-		c, technique = SetWarmup, ""
+		// An explicit category in the same call wins, as in UpdateSet.
+		if strings.TrimSpace(category) == "" {
+			c = SetWarmup
+		}
+		technique = ""
 	}
 	return c, technique, ok
 }

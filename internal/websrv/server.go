@@ -126,12 +126,26 @@ type pageData struct {
 	ConnectorsOn bool
 }
 
-// LastSet returns the final set of the session, used to power "repeat last set".
+// LastSet returns the session's final working set, used to power "repeat last
+// set": repeating a warm-up would log its light weight as a working set.
 func (p pageData) LastSet() *training.Set {
-	if len(p.Session.Sets) == 0 {
-		return nil
+	for i := len(p.Session.Sets) - 1; i >= 0; i-- {
+		if p.Session.Sets[i].Category != training.SetWarmup {
+			return &p.Session.Sets[i]
+		}
 	}
-	return &p.Session.Sets[len(p.Session.Sets)-1]
+	return nil
+}
+
+// WorkingSetCount is how many sets count today; warm-ups do not.
+func (p pageData) WorkingSetCount() int {
+	n := 0
+	for _, set := range p.Session.Sets {
+		if set.Category != training.SetWarmup {
+			n++
+		}
+	}
+	return n
 }
 
 // IsRecord reports whether a set matches the exercise's all-time best, so it can
@@ -207,7 +221,7 @@ func NewWithOptions(service training.ServiceFor, snapshot func(context.Context, 
 			var last *training.Set
 			for i := range session.Sets {
 				set := &session.Sets[i]
-				if set.Exercise == exercise && (last == nil || set.ID > last.ID) {
+				if set.Exercise == exercise && set.Category != training.SetWarmup && (last == nil || set.ID > last.ID) {
 					last = set
 				}
 			}
@@ -846,7 +860,14 @@ func (s *Server) choosePlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(sessions) > 0 {
-		if sessions[0].SetCount == 0 {
+		// SetCount leaves warm-ups out, so ask the session itself whether
+		// anything at all was logged before replacing it.
+		current, err := s.service(r.Context()).GetSession(r.Context(), sessions[0].ID)
+		if err != nil {
+			s.fail(w, err)
+			return
+		}
+		if len(current.Sets) == 0 {
 			// Nothing logged yet: replace the empty session outright.
 			if _, err := s.service(r.Context()).DeleteSession(r.Context(), sessions[0].ID); err != nil {
 				s.fail(w, err)
@@ -1115,7 +1136,7 @@ func (s *Server) infoFor(ctx context.Context, name, today string) (ExerciseInfo,
 	}
 	// "Last time" must skip today, or the form would echo the set just logged.
 	for i := range h.Sets {
-		if h.Sets[i].Date != today {
+		if h.Sets[i].Date != today && h.Sets[i].Category != training.SetWarmup {
 			entry.Last = &h.Sets[i]
 			break
 		}

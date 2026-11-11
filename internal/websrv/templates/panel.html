@@ -85,7 +85,7 @@
   {{end}}
 
   <div class="total">
-    <span>{{len .Session.Sets}} serie{{if ne (len .Session.Sets) 1}}s{{end}} · {{len .Blocks}} ejercicio{{if ne (len .Blocks) 1}}s{{end}}</span>
+    <span>{{.WorkingSetCount}} serie{{if ne .WorkingSetCount 1}}s{{end}} · {{len .Blocks}} ejercicio{{if ne (len .Blocks) 1}}s{{end}}</span>
     <strong>SI {{num .Session.TotalSI}}</strong>
   </div>
 

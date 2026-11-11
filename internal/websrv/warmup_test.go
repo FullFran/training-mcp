@@ -70,3 +70,44 @@ func TestWeightsAreShownRounded(t *testing.T) {
 		t.Fatalf("weight not rounded: %s", body)
 	}
 }
+
+// A session holding only warm-ups is not empty: choosing a plan keeps them.
+func TestChoosingAPlanKeepsASessionWithOnlyWarmups(t *testing.T) {
+	h, service := newServer(t)
+	plan, err := service.CreatePlan(t.Context(), training.Plan{Name: "legs", Items: []training.PlanItem{{Exercise: "squat", TargetSets: 3}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	form := setForm("squat", "60", "5", "6")
+	form.Set("category", "warmup")
+	post(t, h, base+"/sets", form, true)
+	post(t, h, base+"/plan", url.Values{"plan_id": {itoa(plan.ID)}}, false)
+	sessions, err := service.ListSessions(t.Context(), training.ListFilter{Limit: 5})
+	if err != nil || len(sessions) != 1 {
+		t.Fatalf("sessions = %+v, %v", sessions, err)
+	}
+	session, err := service.GetSession(t.Context(), sessions[0].ID)
+	if err != nil || len(session.Sets) != 1 || session.Sets[0].Category != training.SetWarmup {
+		t.Fatalf("the warm-up was lost: %+v, %v", session, err)
+	}
+	// The one-tap weight is today's last working set; a warm-up is not one.
+	if page := get(t, h, base+"/").Body.String(); strings.Contains(page, `data-today-weight="60"`) {
+		t.Fatalf("one-tap weight offers the warm-up: %s", page)
+	}
+}
+
+// The panel counts working sets only, and "repeat last" and the one-tap
+// weight offer the last working set, never a warm-up.
+func TestPanelCountsAndRepeatsWorkingSetsOnly(t *testing.T) {
+	h, _ := newServer(t)
+	post(t, h, base+"/sets", setForm("squat", "100", "5", "8"), true)
+	form := setForm("squat", "60", "5", "6")
+	form.Set("category", "warmup")
+	body := post(t, h, base+"/sets", form, true).Body.String()
+	if !strings.Contains(body, "1 serie ·") {
+		t.Fatalf("panel count includes the warm-up: %s", body)
+	}
+	if !strings.Contains(body, `data-last-weight="100"`) {
+		t.Fatalf("repeat last offers the warm-up: %s", body)
+	}
+}

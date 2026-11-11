@@ -58,6 +58,8 @@ func TestAddSetNormalizesCategory(t *testing.T) {
 		// The way the coach recorded a warm-up before the category existed.
 		{"", "Warm-Up", SetWarmup, ""},
 		{"", "calentamiento", SetWarmup, ""},
+		// An explicit category in the same call wins, as in UpdateSet.
+		{"working", "warmup", SetWorking, ""},
 	} {
 		svc, store := newRecordingService()
 		if _, _, err := svc.AddSet(ctx, AddSetInput{SessionID: 1, Exercise: "squat", WeightKG: 60, Reps: 5, RPE: 6, Category: tt.category, Technique: tt.technique}); err != nil {
