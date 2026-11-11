@@ -86,7 +86,7 @@ func TestCoachPurgeDeletesOnlyOldConversations(t *testing.T) {
 	edge, _ := st.CreateCoachConversation(ctx, 2, "justo", cutoff)
 	revived, _ := st.CreateCoachConversation(ctx, 1, "revivida", cutoff.Add(-24*time.Hour))
 	st.AppendCoachMessage(ctx, 1, revived, engine.ConversationMessage{Role: "user", Text: "sigo", At: now.Add(-time.Hour)})
-	users := countRows(t, st, "users")
+	users := countRows(t, st, "SELECT COUNT(*) FROM users")
 	if n, err := st.PurgeCoachConversations(ctx, cutoff); err != nil || n != 1 {
 		t.Fatalf("purged %d, %v", n, err)
 	}
@@ -102,18 +102,9 @@ func TestCoachPurgeDeletesOnlyOldConversations(t *testing.T) {
 	if l, _ := st.CoachConversations(ctx, 1, now.Add(-time.Hour+time.Second)); len(l) != 0 {
 		t.Fatalf("list ignores since: %v", l)
 	}
-	if got := countRows(t, st, "users"); got != users {
+	if got := countRows(t, st, "SELECT COUNT(*) FROM users"); got != users {
 		t.Fatalf("purge touched people: %d -> %d", users, got)
 	}
 }
 
 func second[A, B any](_ A, _ B, err error) error { return err }
-
-func countRows(t *testing.T, st *Store, table string) int {
-	t.Helper()
-	var n int
-	if err := st.db.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	return n
-}
