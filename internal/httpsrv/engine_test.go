@@ -16,9 +16,10 @@ import (
 )
 
 type engineFixture struct {
-	tokens  *engine.Tokens
-	handler http.Handler
-	store   *sqlitestore.Store
+	tokens   *engine.Tokens
+	handler  http.Handler
+	store    *sqlitestore.Store
+	services *training.Services
 }
 
 func newEngineFixture(t *testing.T, authDisabled bool) *engineFixture {
@@ -34,7 +35,7 @@ func newEngineFixture(t *testing.T, authDisabled bool) *engineFixture {
 	if authDisabled {
 		token = ""
 	}
-	return &engineFixture{tokens: tokens, store: store, handler: RoutesWithEngine(mcpsrv.New(services.ForRequest).Handler(), authDisabled, token, nil, nil, nil, tokens)}
+	return &engineFixture{tokens: tokens, store: store, services: services, handler: RoutesWithEngine(mcpsrv.New(services.ForRequest).Handler(), authDisabled, token, nil, nil, nil, tokens)}
 }
 
 // engineCall is a tools/call as the engine sends it: straight to the loopback
@@ -60,6 +61,11 @@ func TestEngineTokenActsAsItsOwnPerson(t *testing.T) {
 	ctx := t.Context()
 	guest, err := f.store.ProvisionUser(ctx, "user_guest")
 	if err != nil {
+		t.Fatal(err)
+	}
+	// Writes are proposals; with accept-all on they apply at once, so the plan
+	// shows who it landed on.
+	if err := f.services.ForUser(guest).SetAcceptAll(ctx, true); err != nil {
 		t.Fatal(err)
 	}
 	ownerTok := f.tokens.Mint(training.OwnerUserID, time.Hour)
@@ -106,9 +112,16 @@ func TestEngineTokenIsNotTheOwnerUnderTheAuthBypass(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := f.services.ForUser(training.OwnerUserID).SetAcceptAll(t.Context(), true); err != nil {
+		t.Fatal(err)
+	}
 	plan := map[string]any{"name": "Owner plan", "items": []map[string]any{{"exercise": "banca", "target_sets": 1}}}
-	if w := engineCall(t, f.handler, "", "create_plan", plan, func(r *http.Request) { r.Header.Del("Authorization") }); w.Code != http.StatusOK {
+	noAuth := func(r *http.Request) { r.Header.Del("Authorization") }
+	if w := engineCall(t, f.handler, "", "create_plan", plan, noAuth); w.Code != http.StatusOK {
 		t.Fatalf("bypass create_plan: %d", w.Code)
+	}
+	if w := engineCall(t, f.handler, "", "list_plans", map[string]any{}, noAuth); !strings.Contains(w.Body.String(), "Owner plan") {
+		t.Fatalf("the owner's plan was not created, so the check below proves nothing: %s", w.Body)
 	}
 	if w := engineCall(t, f.handler, f.tokens.Mint(guest, time.Hour), "list_plans", map[string]any{}, nil); strings.Contains(w.Body.String(), "Owner plan") {
 		t.Fatalf("guest's engine acted as the owner: %s", w.Body)
