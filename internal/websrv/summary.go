@@ -71,7 +71,16 @@ func plural(n int, one, many string) string {
 }
 
 // kg prints a number the way the app does: 80, 82.5, 8.5.
-func kg(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) }
+func kg(v float64) string { return formatNumber(v) }
+
+// warmupText marks a warm-up set's text, so accepting a proposal shows which
+// sets will not count.
+func warmupText(set, category string) string {
+	if strings.EqualFold(strings.TrimSpace(category), "warmup") {
+		return set + " (calentamiento)"
+	}
+	return set
+}
 
 // setText is "80 kg × 8 @9", without the RPE when there is none.
 func setText(weight float64, reps int, rpe float64) string {
@@ -194,11 +203,12 @@ var summaries = map[string]func(json.RawMessage) string{
 		WeightKG  float64 `json:"weight_kg"`
 		Reps      int     `json:"reps"`
 		RPE       float64 `json:"rpe"`
+		Category  string  `json:"category"`
 	}) string {
 		if in.Exercise == "" {
 			return ""
 		}
-		return fmt.Sprintf("Registrar %s: %s en la sesión %d", in.Exercise, setText(in.WeightKG, in.Reps, in.RPE), in.SessionID)
+		return fmt.Sprintf("Registrar %s: %s en la sesión %d", in.Exercise, warmupText(setText(in.WeightKG, in.Reps, in.RPE), in.Category), in.SessionID)
 	}),
 	"log_set": summary(func(in struct {
 		Exercise string  `json:"exercise"`
@@ -206,6 +216,7 @@ var summaries = map[string]func(json.RawMessage) string{
 		Reps     int     `json:"reps"`
 		RPE      float64 `json:"rpe"`
 		Count    int     `json:"count"`
+		Category string  `json:"category"`
 	}) string {
 		if in.Exercise == "" {
 			return ""
@@ -214,6 +225,7 @@ var summaries = map[string]func(json.RawMessage) string{
 		if in.Count > 1 {
 			set = fmt.Sprintf("%d series de %s", in.Count, set)
 		}
+		set = warmupText(set, in.Category)
 		return fmt.Sprintf("Registrar %s: %s", in.Exercise, set)
 	}),
 	"log_sets": summary(func(in struct {
@@ -222,6 +234,7 @@ var summaries = map[string]func(json.RawMessage) string{
 			WeightKG float64 `json:"weight_kg"`
 			Reps     int     `json:"reps"`
 			RPE      float64 `json:"rpe"`
+			Category string  `json:"category"`
 		} `json:"sets"`
 	}) string {
 		if in.Exercise == "" || len(in.Sets) == 0 {
@@ -229,7 +242,7 @@ var summaries = map[string]func(json.RawMessage) string{
 		}
 		sets := make([]string, len(in.Sets))
 		for i, s := range in.Sets {
-			sets[i] = setText(s.WeightKG, s.Reps, s.RPE)
+			sets[i] = warmupText(setText(s.WeightKG, s.Reps, s.RPE), s.Category)
 		}
 		return fmt.Sprintf("Registrar %s: %s", in.Exercise, strings.Join(sets, ", "))
 	}),
@@ -240,6 +253,7 @@ var summaries = map[string]func(json.RawMessage) string{
 		Reps      *int     `json:"reps"`
 		RPE       *float64 `json:"rpe"`
 		Technique *string  `json:"technique"`
+		Category  *string  `json:"category"`
 	}) string {
 		var changes []string
 		if in.Exercise != nil {
@@ -256,6 +270,13 @@ var summaries = map[string]func(json.RawMessage) string{
 		}
 		if in.Technique != nil {
 			changes = append(changes, "técnica «"+*in.Technique+"»")
+		}
+		if in.Category != nil {
+			if strings.EqualFold(strings.TrimSpace(*in.Category), "warmup") {
+				changes = append(changes, "calentamiento")
+			} else {
+				changes = append(changes, "serie efectiva")
+			}
 		}
 		if len(changes) == 0 {
 			return ""

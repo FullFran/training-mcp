@@ -368,6 +368,7 @@ func (s *Server) addSet(w http.ResponseWriter, r *http.Request) {
 	rpe, errRPE := strconv.ParseFloat(strings.TrimSpace(r.PostFormValue("rpe")), 64)
 	exercise := r.PostFormValue("exercise")
 	technique := r.PostFormValue("technique")
+	category := lastFormValue(r, "category")
 
 	message := ""
 	if errWeight != nil || errReps != nil || errRPE != nil {
@@ -380,7 +381,7 @@ func (s *Server) addSet(w http.ResponseWriter, r *http.Request) {
 		}
 		set, _, err := s.service(r.Context()).AddSet(r.Context(), training.AddSetInput{
 			SessionID: session.ID, Exercise: exercise, WeightKG: weight,
-			Reps: reps, RPE: rpe, Technique: technique,
+			Reps: reps, RPE: rpe, Technique: technique, Category: category,
 		})
 		switch {
 		case errors.Is(err, training.ErrValidation):
@@ -393,6 +394,16 @@ func (s *Server) addSet(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.renderPanel(w, r, message)
+}
+
+// lastFormValue is the last value sent for a field: a checkbox after a hidden
+// input of the same name overrides it only when ticked.
+func lastFormValue(r *http.Request, name string) string {
+	values := r.PostForm[name]
+	if len(values) == 0 {
+		return ""
+	}
+	return values[len(values)-1]
 }
 
 // updateSet edits an already logged set in place, so a mistyped weight does not
@@ -438,6 +449,12 @@ func (s *Server) updateSet(w http.ResponseWriter, r *http.Request) {
 	if r.Form.Has("technique") {
 		v := r.PostFormValue("technique")
 		patch.Technique = &v
+	}
+	// The edit form sends a hidden "working" before the warm-up checkbox, so
+	// the last value is the toggle's state; a form without it leaves it alone.
+	if r.Form.Has("category") {
+		v := lastFormValue(r, "category")
+		patch.Category = &v
 	}
 	if message == "" {
 		switch _, _, err := s.service(r.Context()).UpdateSet(r.Context(), id, patch); {
@@ -1158,6 +1175,12 @@ func cacheStatic(next http.Handler) http.Handler {
 }
 
 // formatNumber trims trailing zeros so 36.0 renders as "36" and 2.5 stays "2.5".
+// formatNumber shows at most 2 decimals with no trailing zeros, so a weight
+// stored as 65.77089365 reads and pre-fills as 65.77.
 func formatNumber(v float64) string {
+	v = math.Round(v*100) / 100
+	if v == 0 {
+		v = 0 // no "-0"
+	}
 	return strconv.FormatFloat(v, 'f', -1, 64)
 }
