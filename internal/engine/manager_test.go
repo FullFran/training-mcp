@@ -424,3 +424,96 @@ func TestNodeCommandCarriesNoSecret(t *testing.T) {
 		t.Fatalf("args = %v", cmd.Args)
 	}
 }
+
+// Found by the independent verifier: replacing an old process could forget the
+// person and leave the new process outside every cap, status and disconnect.
+func TestReplacingAnOldProcessKeepsThePersonTracked(t *testing.T) {
+	h := newHarness(t, "ok", func(s *Settings) {
+		s.MaxAge = 600 * time.Millisecond
+		s.TurnTimeout = 200 * time.Millisecond
+		s.LoginWindow = time.Millisecond
+		s.MaxProcesses = 1
+	})
+	h.connect(1)
+	for i := range 3 {
+		time.Sleep(450 * time.Millisecond)
+		if err := h.m.Prompt(1, "hi"); err != nil {
+			t.Fatalf("prompt %d: %v", i, err)
+		}
+		waitFor(t, "turn end", func() bool {
+			h.m.mu.Lock()
+			defer h.m.mu.Unlock()
+			p := h.m.people[1]
+			return p != nil && p.proc != nil && p.proc.turn == nil
+		})
+	}
+	if live := h.m.LiveCount(); live != 1 {
+		t.Fatalf("live = %d", live)
+	}
+	waitFor(t, "old processes gone", func() bool {
+		h.m.mu.Lock()
+		defer h.m.mu.Unlock()
+		return len(h.m.alive) == 1
+	})
+	if err := h.m.Disconnect(1); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "disconnect reaches the process", func() bool {
+		h.m.mu.Lock()
+		defer h.m.mu.Unlock()
+		return len(h.m.alive) == 0
+	})
+}
+
+func TestDisconnectDiscardsARefreshStillInFlight(t *testing.T) {
+	h := newHarness(t, "refreshslow", nil)
+	h.connect(1)
+	if err := h.m.Prompt(1, "hi"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "refresh sent", func() bool {
+		h.m.mu.Lock()
+		defer h.m.mu.Unlock()
+		p := h.m.people[1]
+		return p != nil && p.proc != nil && len(p.proc.refreshes) > 0
+	})
+	h.m.mu.Lock()
+	h.m.stop(h.m.people[1], "idle", nil) // kept alive for the refresh grace
+	h.m.mu.Unlock()
+	if err := h.m.Disconnect(1); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(700 * time.Millisecond)
+	if c, err := h.vault.Read(1); c != nil || err != nil {
+		t.Fatalf("a refresh wrote a credential back after disconnect: %+v %v", c, err)
+	}
+}
+
+func TestStaleEventsAreNotDelivered(t *testing.T) {
+	now := time.Date(2026, 11, 11, 18, 0, 0, 0, time.UTC)
+	h := newHarness(t, "ok", func(s *Settings) { s.Now = func() time.Time { return now } })
+	h.m.Notify(1, SetLogged(now.Add(-4*time.Hour), "old", 50, 5, 7, ""))
+	h.m.Notify(1, SetLogged(now.Add(-time.Minute), "fresh", 60, 5, 7, ""))
+	if n := h.m.PendingEvents(1); n != 1 {
+		t.Fatalf("pending = %d", n)
+	}
+}
+
+func TestARefusedLoginStartIsNotCounted(t *testing.T) {
+	h := newHarness(t, "loginslow", func(s *Settings) {
+		s.MaxProcesses = 1
+		s.LoginLimit = 1
+	})
+	if _, err := h.m.StartLogin(1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.m.StartLogin(2); codeOf(err) != CodeBusy {
+		t.Fatalf("no slot: %v", err)
+	}
+	h.m.mu.Lock()
+	h.m.stop(h.m.people[1], "idle", nil)
+	h.m.mu.Unlock()
+	if _, err := h.m.StartLogin(2); err != nil {
+		t.Fatalf("a busy refusal used up the limit: %v", err)
+	}
+}

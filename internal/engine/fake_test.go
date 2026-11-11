@@ -84,7 +84,7 @@ func runFakeEngine(mode string) {
 				go func() {
 					time.Sleep(20 * time.Millisecond)
 					expires := time.Now().Add(time.Hour).UnixMilli()
-					if mode == "nearexpiry" || mode == "refreshfail" {
+					if mode == "nearexpiry" || mode == "refreshfail" || mode == "refreshslow" {
 						expires = time.Now().Add(time.Minute).UnixMilli()
 					}
 					send(map[string]any{"type": "login.done", "credential": map[string]any{"access": "fake-access-0", "refresh": "fake-refresh-0", "expires": expires, "accountId": "acct"}})
@@ -97,7 +97,11 @@ func runFakeEngine(mode string) {
 			id := m["id"]
 			cred, _ := m["credential"].(map[string]any)
 			go func() {
-				time.Sleep(30 * time.Millisecond)
+				delay := 30 * time.Millisecond
+				if mode == "refreshslow" {
+					delay = 400 * time.Millisecond
+				}
+				time.Sleep(delay)
 				if mode == "refreshfail" {
 					send(map[string]any{"type": "refresh.failed", "id": id})
 					return

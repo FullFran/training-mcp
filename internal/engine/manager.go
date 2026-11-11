@@ -148,6 +148,7 @@ type turnState struct {
 
 type proc struct {
 	cmd          *exec.Cmd
+	userID       int64
 	out          chan []byte
 	startedAt    time.Time
 	token        string
@@ -245,15 +246,16 @@ func (m *Manager) StartLogin(userID int64) (LoginInfo, error) {
 		m.mu.Unlock()
 		return LoginInfo{}, fail(CodeRateLimited)
 	}
-	p.loginStarts = append(p.loginStarts, m.s.Now())
 	if p.login != nil {
 		m.endLogin(p, CodeLoginFailed, true, true)
 	}
 	pr, err := m.ensureProc(p, false)
 	if err != nil {
+		m.forget(p)
 		m.mu.Unlock()
 		return LoginInfo{}, err
 	}
+	p.loginStarts = append(p.loginStarts, m.s.Now())
 	l := &loginState{result: make(chan loginResult, 1)}
 	l.expiry = time.AfterFunc(m.s.LoginTTL, func() {
 		m.mu.Lock()
@@ -296,6 +298,13 @@ func (m *Manager) Disconnect(userID int64) error {
 		m.stop(p, "disconnect", nil)
 		p.reconnect = false
 		p.events = nil
+	}
+	// A process already stopped but kept for a refresh in flight must not write
+	// the refreshed credential back after this.
+	for pr := range m.alive {
+		if pr.userID == userID {
+			pr.discard = true
+		}
 	}
 	err := m.s.Vault.Delete(userID)
 	if p != nil {
@@ -364,6 +373,7 @@ func (m *Manager) Notify(userID int64, ev WorkoutEvent) {
 		return
 	}
 	p := m.personOf(userID)
+	m.dropStaleEvents(p)
 	p.events = append(p.events, ev)
 	if over := len(p.events) - m.s.MaxPendingEvents; over > 0 {
 		p.events = append([]WorkoutEvent(nil), p.events[over:]...)
@@ -431,6 +441,20 @@ func (m *Manager) personOf(userID int64) *person {
 	return p
 }
 
+// eventTTL: a set older than this says nothing about the workout in progress.
+const eventTTL = 3 * time.Hour
+
+func (m *Manager) dropStaleEvents(p *person) {
+	now := m.s.Now()
+	kept := p.events[:0]
+	for _, ev := range p.events {
+		if now.Sub(ev.At) < eventTTL {
+			kept = append(kept, ev)
+		}
+	}
+	p.events = kept
+}
+
 func (m *Manager) pruneStarts(p *person) {
 	now := m.s.Now()
 	kept := p.loginStarts[:0]
@@ -487,6 +511,7 @@ func (m *Manager) startTurn(p *person, text, origin string) error {
 		m.limitTurn(p, pr, t)
 	})
 	pr.turn = t
+	m.dropStaleEvents(p)
 	contextLines := composeContext(m.s.Now(), p.events)
 	p.events = nil
 	m.broadcast(p, Event{Name: "turn", Data: map[string]any{"origin": origin}})
@@ -523,8 +548,12 @@ func (m *Manager) ensureProc(p *person, forTurn bool) (*proc, error) {
 		m.log("start_failed", "spawn_error")
 		return nil, fail(CodeEngineUnavailable)
 	}
-	pr := &proc{cmd: cmd, out: make(chan []byte, outBuffer), startedAt: m.s.Now(), refreshes: map[string]chan *Credential{}, done: make(chan struct{})}
+	pr := &proc{cmd: cmd, userID: p.id, out: make(chan []byte, outBuffer), startedAt: m.s.Now(), refreshes: map[string]chan *Credential{}, done: make(chan struct{})}
 	p.proc = pr
+	// A stop just before (max age, eviction) may have forgotten this person; a
+	// process must always belong to a tracked person, or no cap, status,
+	// disconnect or shutdown would reach it.
+	m.people[p.id] = p
 	m.alive[pr] = true
 	go writeLoop(stdin, pr.out)
 	go m.readLoop(p, pr, stdout)
