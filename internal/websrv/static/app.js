@@ -85,7 +85,8 @@
   }
 
   // Within a superset you move straight to the next exercise of the round, so
-  // the next one is pre-loaded and the rest timer is held back.
+  // the next one is pre-loaded and the rest timer is held back. Finishing the
+  // round (wrapping back to its first pending exercise) pre-loads it and rests.
   function nextInSuperset(justLogged) {
     const items = Array.from(document.querySelectorAll('.planned li'));
     const current = items.find((li) => li.dataset.exercise === justLogged);
@@ -95,7 +96,7 @@
     for (let i = 1; i <= round.length; i++) {
       const candidate = round[(from + i) % round.length];
       if (candidate !== current && !candidate.classList.contains('ok') && !candidate.classList.contains('skipped')) {
-        return candidate;
+        return { item: candidate, newRound: from + i >= round.length };
       }
     }
     return null;
@@ -340,15 +341,17 @@
     if (!logged) return;
     const next = nextInSuperset((exercise.value || '').trim().toLowerCase());
     if (next) {
-      // Same round: no rest, load the next movement instead.
-      const known = info[next.dataset.exercise] || {};
+      // Load the next movement of the superset; rest only once the round is done.
+      const item = next.item;
+      const known = info[item.dataset.exercise] || {};
       fill({
-        exercise: next.dataset.exercise,
+        exercise: item.dataset.exercise,
         weight: known.last ? known.last.weight_kg : null,
-        reps: next.dataset.reps !== '0' ? next.dataset.reps : null,
-        rpe: next.dataset.rpe !== '0' ? next.dataset.rpe : null
+        reps: item.dataset.reps !== '0' ? item.dataset.reps : null,
+        rpe: item.dataset.rpe !== '0' ? item.dataset.rpe : null
       });
-    } else {
+    }
+    if (!next || next.newRound) {
       startRest(parseInt(document.getElementById('panel').dataset.restElapsed || '0', 10));
     }
     buzz(18);
