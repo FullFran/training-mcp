@@ -28,7 +28,8 @@
   function fill(data) {
     if (!data || !data.exercise) return;
     exercise.value = data.exercise;
-    if (data.weight) weight.value = data.weight;
+    // Stored weights can carry float noise (65.77089365): two decimals at most.
+    if (data.weight) weight.value = num(data.weight);
     if (data.reps) reps.value = data.reps;
     if (data.rpe) setRPE(data.rpe);
     showPrevious();
@@ -452,6 +453,9 @@
     }
     buzz(18);
   });
+
+  // Finishing the workout ends any rest still counting.
+  document.addEventListener('workout:finish', () => { if (restBar) stopRest(); });
 
   // A reload mid-rest picks the timer up where it was.
   (function resumeRest() {

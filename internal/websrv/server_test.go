@@ -186,15 +186,15 @@ func TestDeleteMissingSetReportsInsteadOfFailing(t *testing.T) {
 }
 
 // Without htmx the browser performs a normal form post, so it must be redirected
-// rather than shown a bare fragment.
+// rather than shown a bare fragment: back to the training screen it came from.
 func TestNonHtmxPostRedirectsToTheAppRoot(t *testing.T) {
 	h, _ := newServer(t)
 	w := post(t, h, base+"/sets", setForm("squat", "100", "5", "8"), false)
 	if w.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want 303", w.Code)
 	}
-	if got := w.Header().Get("Location"); got != base+"/" {
-		t.Fatalf("Location = %q, want %q", got, base+"/")
+	if got := w.Header().Get("Location"); got != base+"/?modo=entrenar" {
+		t.Fatalf("Location = %q, want %q", got, base+"/?modo=entrenar")
 	}
 }
 

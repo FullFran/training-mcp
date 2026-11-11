@@ -5,6 +5,22 @@
 
   {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
 
+  {{if and (not .ReadOnly) (not .Progress) (not .Session.Sets)}}
+  <!-- Nothing done today: start from a plan or train freely. -->
+  <section id="train-start" class="train-start" aria-label="Empezar">
+    <h2>Elige tu entreno</h2>
+    {{range .Plans}}
+    <form method="post" action="{{$.Base}}/plan" class="plan-pick start-plan">{{if $.CSRF}}
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+      <input type="hidden" name="plan_id" value="{{.ID}}">
+      <button type="submit" class="start-btn"><strong>{{.Name}}</strong> <span class="muted">{{len .Items}} ejercicio{{if ne (len .Items) 1}}s{{end}} · {{.TotalSets}} series</span></button>
+    </form>
+    {{end}}
+    <button type="button" id="free-session" class="start-btn free"><strong>Sesión libre</strong> <span class="muted">Elige los ejercicios sobre la marcha</span></button>
+    {{if not .Plans}}<p class="muted">Crea rutinas en Planificar para empezar con un toque.</p>{{end}}
+  </section>
+  {{end}}
+
   {{if .Progress}}
   <section class="plan card" aria-label="Plan de hoy">
     <header class="plan-head">
@@ -127,33 +143,48 @@
   <p class="empty">Sin series todavía. Añade la primera.</p>
   {{end}}
 
-  {{if and .TrainedGroups (not .ReadOnly)}}
-  <details class="feedback">
-    <summary>Valorar la sesión <span class="muted">({{len .Feedback}}/{{len .TrainedGroups}})</span></summary>
-    <p class="hint">Solo los músculos que has entrenado hoy. 0 = nada, 3 = mucho.</p>
-    {{range $group := .TrainedGroups}}
-    {{$given := index $.Feedback $group}}
-    <form class="fb" hx-post="{{$.Base}}/feedback" hx-target="#panel" hx-swap="outerHTML">
-      <input type="hidden" name="muscle_group" value="{{$group}}">
-      <div class="fb-head">
-        <strong>{{$group}}</strong>
-        {{if $given.MuscleGroup}}<span class="mag">magnitud {{$given.Magnitude}}</span>{{end}}
-      </div>
-      {{range $dim := ratingDims}}
-      <div class="fb-row">
-        <span>{{index $dim 1}}</span>
-        <div class="scale">
-          {{range $v := ratingScale}}
-          <label><input type="radio" name="{{index $dim 0}}" value="{{$v}}"
-            {{if eq $v (fbValue $given (index $dim 0))}}checked{{end}}><span>{{$v}}</span></label>
-          {{end}}
-        </div>
-      </div>
+
+  {{if not .ReadOnly}}
+  <!-- Finishing: what was done today, from the server's data. -->
+  <section id="finish" class="finish" role="dialog" aria-label="Resumen del entreno" hidden>
+    <div class="sheet-head"><span class="grab" aria-hidden="true"></span><button type="button" class="ghost mini" data-close-finish>Seguir entrenando</button></div>
+    <h2>Resumen de hoy</h2>
+    <p class="finish-totals"><strong>{{len .Session.Sets}} serie{{if ne (len .Session.Sets) 1}}s{{end}}</strong> · {{len .Blocks}} ejercicio{{if ne (len .Blocks) 1}}s{{end}} · SI {{num .Session.TotalSI}}{{if .Progress}} · plan {{doneCount .Progress}}/{{len .Progress}}{{end}}</p>
+    {{if .Blocks}}<ul class="finish-list">
+      {{range .Blocks}}{{$block := .}}
+      <li><span>{{.Exercise}}</span> <span class="muted">{{len .Sets}} × · mejor {{with $block.Top}}{{num .WeightKG}} kg × {{.Reps}}{{end}}</span>{{range .Sets}}{{if $block.IsRecord .}} <span class="pr">PR</span>{{end}}{{end}}</li>
       {{end}}
-      <button type="submit" class="mini">Guardar</button>
-    </form>
+    </ul>{{else}}<p class="muted">Todavía no hay series hoy.</p>{{end}}
+    {{if and .TrainedGroups (not .ReadOnly)}}
+    <details class="feedback">
+      <summary>Valorar la sesión <span class="muted">({{len .Feedback}}/{{len .TrainedGroups}})</span></summary>
+      <p class="hint">Solo los músculos que has entrenado hoy. 0 = nada, 3 = mucho.</p>
+      {{range $group := .TrainedGroups}}
+      {{$given := index $.Feedback $group}}
+      <form class="fb" hx-post="{{$.Base}}/feedback" hx-target="#panel" hx-swap="outerHTML">
+        <input type="hidden" name="muscle_group" value="{{$group}}">
+        <div class="fb-head">
+          <strong>{{$group}}</strong>
+          {{if $given.MuscleGroup}}<span class="mag">magnitud {{$given.Magnitude}}</span>{{end}}
+        </div>
+        {{range $dim := ratingDims}}
+        <div class="fb-row">
+          <span>{{index $dim 1}}</span>
+          <div class="scale">
+            {{range $v := ratingScale}}
+            <label><input type="radio" name="{{index $dim 0}}" value="{{$v}}"
+              {{if eq $v (fbValue $given (index $dim 0))}}checked{{end}}><span>{{$v}}</span></label>
+            {{end}}
+          </div>
+        </div>
+        {{end}}
+        <button type="submit" class="mini">Guardar</button>
+      </form>
+      {{end}}
+    </details>
     {{end}}
-  </details>
+    <button type="button" id="finish-done" class="primary wide">Terminar entreno</button>
+  </section>
   {{end}}
 </section>
 {{end}}

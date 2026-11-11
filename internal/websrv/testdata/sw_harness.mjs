@@ -120,6 +120,13 @@ const scenarios = {
     sw.offline();
     return { today: await sw.get('/'), caches: await sw.caches.keys() };
   },
+  // The home is one page for every ?modo=: a reload offline on any screen
+  // serves the last copy of the home, whichever screen fetched it.
+  async modeQuery(sw) {
+    await sw.get('/?modo=planificar', as(`aaaa-${future()}`, 'A today'));
+    sw.offline();
+    return { today: await sw.get('/?modo=entrenar') };
+  },
   // Errors are never kept as the offline copy.
   async errors(sw) {
     await sw.get('/', as(`aaaa-${future()}`, 'A today'));
