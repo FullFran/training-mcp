@@ -313,7 +313,7 @@ func TestSetLoggedIsQueuedWithoutAnOpenChat(t *testing.T) {
 	h.connect(1)
 	// Relative to now: the host drops events older than eventTTL, so a fixed date fails later in the day.
 	at := time.Now().Add(-time.Minute).UTC().Truncate(time.Second)
-	h.m.Notify(1, SetLogged(at, "press banca", 80, 8, 8.5, ""))
+	h.m.Notify(1, SetLogged(at, "press banca", 80, 8, 8.5, "", ""))
 	if n := h.m.PendingEvents(1); n != 1 {
 		t.Fatalf("pending = %d", n)
 	}
@@ -323,7 +323,7 @@ func TestSetLoggedIsQueuedWithoutAnOpenChat(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, text := collect(t, ch)
-	want := ContextMarker + ` event=set_logged at=` + at.Format(time.RFC3339) + ` exercise="press banca" weight_kg=80 reps=8 rpe=8.5 (rest started at this time)`
+	want := ContextMarker + ` event=set_logged at=` + at.Format(time.RFC3339) + ` exercise="press banca" weight_kg=80 reps=8 rpe=8.5 category=working (rest started at this time)`
 	if !strings.Contains(text, want) {
 		t.Fatalf("answer = %q, want the event line %q", text, want)
 	}
@@ -337,7 +337,7 @@ func TestSetLoggedWithOpenChatStartsAReaction(t *testing.T) {
 	h.connect(1)
 	ch, closeSub := h.m.Subscribe(1)
 	defer closeSub()
-	h.m.Notify(1, SetLogged(time.Now(), "sentadilla", 100, 5, 9, ""))
+	h.m.Notify(1, SetLogged(time.Now(), "sentadilla", 100, 5, 9, "", ""))
 	events, text := collect(t, ch)
 	if events[0].Data["origin"] != "reaction" {
 		t.Fatalf("first event = %+v", events[0])
@@ -353,7 +353,7 @@ func TestSetLoggedNeverReachesAnotherPerson(t *testing.T) {
 	h.connect(2)
 	other, closeOther := h.m.Subscribe(2)
 	defer closeOther()
-	h.m.Notify(1, SetLogged(time.Now(), "secret lift", 200, 1, 10, ""))
+	h.m.Notify(1, SetLogged(time.Now(), "secret lift", 200, 1, 10, "", ""))
 	if n := h.m.PendingEvents(2); n != 0 {
 		t.Fatalf("person 2 has %d events of person 1", n)
 	}
@@ -375,7 +375,7 @@ func TestSetLoggedNeverReachesAnotherPerson(t *testing.T) {
 func TestPendingEventsAreBounded(t *testing.T) {
 	h := newHarness(t, "ok", func(s *Settings) { s.MaxPendingEvents = 3 })
 	for i := range 10 {
-		h.m.Notify(1, SetLogged(time.Now(), "e", float64(i+1), 1, 7, ""))
+		h.m.Notify(1, SetLogged(time.Now(), "e", float64(i+1), 1, 7, "", ""))
 	}
 	if n := h.m.PendingEvents(1); n != 3 {
 		t.Fatalf("pending = %d", n)
@@ -494,8 +494,8 @@ func TestDisconnectDiscardsARefreshStillInFlight(t *testing.T) {
 func TestStaleEventsAreNotDelivered(t *testing.T) {
 	now := time.Date(2026, 11, 11, 18, 0, 0, 0, time.UTC)
 	h := newHarness(t, "ok", func(s *Settings) { s.Now = func() time.Time { return now } })
-	h.m.Notify(1, SetLogged(now.Add(-4*time.Hour), "old", 50, 5, 7, ""))
-	h.m.Notify(1, SetLogged(now.Add(-time.Minute), "fresh", 60, 5, 7, ""))
+	h.m.Notify(1, SetLogged(now.Add(-4*time.Hour), "old", 50, 5, 7, "", ""))
+	h.m.Notify(1, SetLogged(now.Add(-time.Minute), "fresh", 60, 5, 7, "", ""))
 	if n := h.m.PendingEvents(1); n != 1 {
 		t.Fatalf("pending = %d", n)
 	}

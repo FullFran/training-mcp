@@ -350,9 +350,16 @@ func TestLoggingASetTellsThatPersonsCoach(t *testing.T) {
 		t.Fatalf("events %v for %v", coach.events, coach.callers)
 	}
 	ev := coach.events[0]
-	if ev.Kind != "set_logged" || ev.WeightKG != 80 || ev.Reps != 8 || ev.RPE != 8.5 || ev.Exercise == "" || !ev.At.Equal(webClock()) {
+	if ev.Kind != "set_logged" || ev.WeightKG != 80 || ev.Reps != 8 || ev.RPE != 8.5 || ev.Exercise == "" || !ev.At.Equal(webClock()) || ev.Category != "working" {
 		t.Fatalf("event = %+v", ev)
 	}
+	// A warm-up says so, so the coach does not read it as a working set.
+	warm := url.Values{"exercise": {"Press banca"}, "weight_kg": {"40"}, "reps": {"10"}, "rpe": {"6"}, "category": {"warmup"}}
+	post(t, world.as(2), base+"/sets", warm, true)
+	if len(coach.events) != 2 || coach.events[1].Category != "warmup" {
+		t.Fatalf("warm-up event = %+v", coach.events)
+	}
+	coach.events = coach.events[:1]
 	// A refused set is not an event.
 	bad := url.Values{"exercise": {"Press banca"}, "weight_kg": {"80"}, "reps": {"8"}, "rpe": {"11"}}
 	post(t, world.as(2), base+"/sets", bad, true)
