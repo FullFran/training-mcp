@@ -550,7 +550,7 @@ func (m *Manager) startEngine(p *person) (*proc, error) {
 	}
 	if pr.token == "" {
 		pr.token = m.s.Tokens.Mint(p.id, m.s.MaxAge)
-		pr.cs = m.newConnectorState(p.id)
+		pr.cs = m.newConnectorState(p.id, pr.token)
 		m.send(pr, parentMessage{Type: "start", MCPURL: m.s.MCPURL, MCPToken: pr.token, SystemPrompt: m.s.SystemPrompt, Servers: m.engineServers(pr)})
 	}
 	return pr, nil

@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/fullfran/training-mcp/internal/training"
 )
 
 // Remote MCP servers a person connected ("connectors") reach the engine as
@@ -37,11 +39,12 @@ type Connectors interface {
 // Answers a person can give to a permission request, as ACP names them. An
 // "always" answer is held by the host and lasts until the session ends or the
 // person revokes it (HCS-0005-R006, R007).
+// They are the same four answers training-data proposals take (#75).
 const (
-	AnswerAllowOnce    = "allow_once"
-	AnswerAllowAlways  = "allow_always"
-	AnswerRejectOnce   = "reject_once"
-	AnswerRejectAlways = "reject_always"
+	AnswerAllowOnce    = training.AnswerAllowOnce
+	AnswerAllowAlways  = training.AnswerAllowAlways
+	AnswerRejectOnce   = training.AnswerRejectOnce
+	AnswerRejectAlways = training.AnswerRejectAlways
 )
 
 var (
@@ -54,7 +57,9 @@ var (
 const (
 	defaultApprovalTimeout = 2 * time.Minute
 	maxApprovalArgs        = 2000
-	approvalChannel        = "coach:approval"
+	// approvalChannel is the person's own channel, the signed-in web app, as
+	// for proposals (HCS-0005-R015).
+	approvalChannel = training.ChannelWeb
 	// ticketTTL bounds how long an allowed call may take to reach the proxy.
 	ticketTTL = 2 * time.Minute
 )
@@ -96,9 +101,17 @@ type connectorState struct {
 	reload    bool
 }
 
-func (m *Manager) newConnectorState(userID int64) connectorState {
+// coachSession is the HCS-0005 session of one coach conversation: the same id
+// mcpsrv derives from the engine bearer for that engine's /mcp calls, so
+// connector approvals and training-data proposals share one session.
+func coachSession(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return training.CoachSessionPrefix + hex.EncodeToString(sum[:12])
+}
+
+func (m *Manager) newConnectorState(userID int64, token string) connectorState {
 	cs := connectorState{
-		session:   randomID(),
+		session:   coachSession(token),
 		servers:   map[string]string{},
 		answers:   map[string]sessionAnswer{},
 		approvals: map[string]*approval{},
@@ -367,7 +380,7 @@ func (m *Manager) Revoke(userID int64, server string) {
 	for tool := range pr.cs.answers {
 		if serverOf(tool, pr.cs.servers) == server {
 			delete(pr.cs.answers, tool)
-			rec := decisionRecord{Entry: entryID(server), Permission: permissionID(tool), Session: pr.cs.session, Channel: "coach:revoke"}
+			rec := decisionRecord{Entry: entryID(server), Permission: permissionID(tool), Session: pr.cs.session, Channel: approvalChannel}
 			m.record(rec, "revoked", "subject", subjectID(userID), "")
 		}
 	}

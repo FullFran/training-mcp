@@ -1,11 +1,15 @@
 package engine
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/fullfran/training-mcp/internal/training"
 )
 
 // fakeConnectors gives every person the servers listed for them.
@@ -154,7 +158,7 @@ func TestAllowOnceAsksAgainAndGivesOneCallTicket(t *testing.T) {
 	if strings.Contains(logs, "secret-arg") {
 		t.Fatal("a decision record holds the call's arguments")
 	}
-	for _, want := range []string{`"event":"coach.decision"`, `"answer":"allow_once"`, `"answer":"reject_once"`, `"entry":"connector.notion"`, `"permission":"tool.search"`, `"channel":"coach:approval"`} {
+	for _, want := range []string{`"event":"coach.decision"`, `"answer":"allow_once"`, `"answer":"reject_once"`, `"entry":"connector.notion"`, `"permission":"tool.search"`, `"channel":"web"`} {
 		if !strings.Contains(logs, want) {
 			t.Fatalf("logs lack %s: %s", want, logs)
 		}
@@ -285,5 +289,34 @@ func TestPermissionIDsAreDotted(t *testing.T) {
 		if !dottedID.MatchString(got) || !dottedID.MatchString(entryID("notion")) {
 			t.Errorf("%s is not a dotted id", got)
 		}
+	}
+}
+
+// Connector approvals and training-data proposals (#75) share HCS-0005's
+// vocabulary and session: one coach conversation is "coach:" and a hash of its
+// engine bearer, the same id mcpsrv derives for that engine's /mcp calls.
+func TestConnectorDecisionsShareTheProposalsSession(t *testing.T) {
+	for _, pair := range [][2]string{
+		{AnswerAllowOnce, training.AnswerAllowOnce}, {AnswerAllowAlways, training.AnswerAllowAlways},
+		{AnswerRejectOnce, training.AnswerRejectOnce}, {AnswerRejectAlways, training.AnswerRejectAlways},
+	} {
+		if pair[0] != pair[1] {
+			t.Fatalf("answer %q differs from the proposals' %q", pair[0], pair[1])
+		}
+	}
+	h, _ := connectorHarness(t, "approval", nil)
+	ch, done := approvalTurn(t, h, 1)
+	defer done()
+	ev := nextEvent(t, ch, "approval")
+	sum := sha256.Sum256([]byte(h.engineToken(1)))
+	want := training.CoachSessionPrefix + hex.EncodeToString(sum[:12])
+	h.m.Answer(1, ev.Data["id"].(string), AnswerAllowOnce)
+	waitFor(t, "record", func() bool { return strings.Contains(h.logs.String(), `"answer":"allow_once"`) })
+	logs := h.logs.String()
+	if !strings.Contains(logs, `"session":"`+want+`"`) {
+		t.Fatalf("records lack session %s: %s", want, logs)
+	}
+	if !strings.Contains(logs, `"channel":"`+training.ChannelWeb+`"`) || strings.Contains(logs, h.engineToken(1)) {
+		t.Fatalf("channel or token in records: %s", logs)
 	}
 }

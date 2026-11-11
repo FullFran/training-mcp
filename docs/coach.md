@@ -104,7 +104,7 @@ A connector tool never runs on the model's word alone. Before each call the engi
 - "En esta sesión" is held by the host, for the engine process it was given in. It ends with that process (idle stop, a connector change, disconnect, restart) and the panel's **Retirar permisos de la sesión** takes it back at once. Nothing is remembered in the database.
 - No answer within 2 minutes, a closed chat, an engine error, or an answer that is not one of the four: the call is denied.
 - The proxy enforces it too: each allow gives exactly one `tools/call` of that tool, through that engine's token, within 2 minutes. A call that was not allowed gets a JSON-RPC error `permission_denied` and never reaches the server. JSON-RPC batches are refused.
-- Training-data writes keep working as before: they are proposals the person accepts on cards or on `/review`. Connector approvals are separate from them.
+- Training-data writes keep working as before: they are proposals the person answers on cards or on `/review`. Both use the same four answers and the same session: one coach conversation, `coach:` and a hash of its engine bearer, so an always answer for a connector tool and one for a proposal end together. They stay separate grants: a connector answer never decides a proposal, nor the other way round.
 
 ### Routes
 
@@ -151,7 +151,7 @@ The engine waits up to 8 seconds for the connectors' tools after training-mcp's 
 - **SSRF guard** (`internal/engine/connector/guard.go`) on every request for a connector: discovery, registration, tokens, tool listing and proxied MCP traffic. `https` only, no user info, no fragment, at most 2048 characters. Names such as `localhost`, single labels and `.local`, `.internal`, `.lan`, `.home.arpa`, `.corp`, `.intranet` are refused when added, and the name is resolved then too. The address is checked again **when each connection is made**, after DNS resolution, so a name that later resolves elsewhere (DNS rebinding) is still refused: loopback, `0.0.0.0/8`, private ranges, link-local (cloud metadata included), CGNAT `100.64.0.0/10`, unique-local `fc00::/7`, IPv4-mapped, NAT64 and 6to4 addresses, multicast, reserved and documentation ranges. Every redirect is checked like the first URL, at most 3. Proxy settings from the environment are ignored. Discovery and OAuth calls have 15 seconds and 256 KiB per response; headers have 30 seconds.
 - **Secrets** (static token, OAuth client, access and refresh tokens, and the discovered endpoints) live in the same vault as ChatGPT credentials, one file per person and connector, with the person and the connector bound in as associated data: a file moved to another person or connector does not decrypt. The `connectors` table (migration 021) holds the person, name, label, URL, kind of authorization and state, and no secret.
 - **Isolation.** Every store query, service call, route and proxy request names the person. Tests cover two people for each.
-- **Decision records.** Every permission decision is logged as one `{"event":"coach.decision", ...}` line in the HCS-0005 `decisionRecord` shape: `entry` (`connector.<name>`), `permission` (`tool.<tool>`), `outcome`, `operation` (the engine's request id), `session`, `decider` (a pseudonym `subject-<hash>` for the person, the grant or denial record, or the rule `HCS-0005-R001`/`R014`), `channel` and `answer`. Never the call's arguments or result.
+- **Decision records.** Every permission decision is logged as one `{"event":"coach.decision", ...}` line in the HCS-0005 `decisionRecord` shape: `entry` (`connector.<name>`), `permission` (`tool.<tool>`), `outcome`, `operation` (the engine's request id), `session` (`coach:<hash>`, the same id proposals use), `decider` (a pseudonym `subject-<hash>` for the person, the grant or denial record, or the rule `HCS-0005-R001`/`R014`), `channel` (`web` for the person's answer, `grant-store` for a stored one, as for proposals) and `answer`. Never the call's arguments or result.
 
 ### Against HCS
 
@@ -175,7 +175,7 @@ Divergences, recorded rather than worked around:
 - **Permission ids.** HCS 0.1 defines none (OQ-0005-1). Connector tools use `connector.<name>` as the entry and `tool.<tool>` as the permission, with a short hash when a tool name loses its case.
 - **Where decision records go.** They go to the server log only (OQ-0005-7); they are not sent as CloudEvents (R013 is a SHOULD).
 - **Pseudonymous decider.** `decider.id` for a person is a hash of their account (OQ-0005-6), not their subject id.
-- **Training-data proposals** keep storing "always" per action type without a session limit (issues #34 and #35); that divergence from HCS-0005-R006 is outside this change.
+- **Where records live.** Proposal decisions are stored in the database (#75); connector decisions are log lines, since the connector call itself leaves nothing in the database.
 
 ## Routes
 
