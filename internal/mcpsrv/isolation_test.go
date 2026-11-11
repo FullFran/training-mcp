@@ -23,6 +23,10 @@ const (
 
 type toolIDs struct {
 	session, set, plan, memory int64
+	// sibling is a fact like memory; relation is pending between them, and
+	// fingerprint confirms merging the two.
+	sibling, relation int64
+	fingerprint       string
 }
 
 // isolationCase says how one tool is called. Tools addressed by an id must answer
@@ -44,6 +48,16 @@ var isolationCases = map[string]isolationCase{
 		return map[string]any{"topic_key": "lesion/hombro", "title": "suya", "body": "suya"}
 	}},
 	"memory_search":  {args: func(toolIDs) map[string]any { return map[string]any{"query": "hombro"} }},
+	"memory_confirm": {byID: true, args: func(id toolIDs) map[string]any { return map[string]any{"memory_id": id.memory} }},
+	"memory_judge": {byID: true, args: func(id toolIDs) map[string]any {
+		return map[string]any{"relation_id": id.relation, "relation": "supersedes"}
+	}},
+	"memory_consolidate_preview": {byID: true, args: func(id toolIDs) map[string]any {
+		return map[string]any{"memory_ids": []int64{id.memory, id.sibling}, "title": "fusion", "body": "fusion"}
+	}},
+	"memory_consolidate": {byID: true, args: func(id toolIDs) map[string]any {
+		return map[string]any{"memory_ids": []int64{id.memory, id.sibling}, "title": "fusion", "body": "fusion", "fingerprint": id.fingerprint}
+	}},
 	"memory_context": {args: noArgs},
 	"start_session": {byID: true, args: func(id toolIDs) map[string]any {
 		return map[string]any{"date": isolationDay, "plan_id": id.plan}
@@ -200,6 +214,14 @@ func newIsolationWorld(t *testing.T) isolationWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
+	sibling, err := owner.SaveMemory(ctx, training.MemoryInput{TopicKey: "lesion/hombro-2", Type: "limitation", Title: "hombro derecho", Body: "sigue"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	merge, err := owner.PreviewConsolidation(ctx, training.ConsolidationInput{MemoryIDs: []int64{memory.Memory.ID, sibling.Memory.ID}, Title: "fusion", Body: "fusion"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	// User 2 accepts every proposal, so each write tool reaches its data path. The
 	// pending path is isolated by TestPendingProposalsAreIsolatedBetweenUsers.
 	if err = services.ForUser(2).SetAcceptAll(ctx, true); err != nil {
@@ -213,14 +235,15 @@ func newIsolationWorld(t *testing.T) isolationWorld {
 		ownerService: owner,
 		owner:        mustConnect(t, ownerServer.Handler()),
 		second:       mustConnect(t, New(only(services.ForUser(2))).Handler()),
-		ids:          toolIDs{session: session.ID, set: set.ID, plan: plan.ID, memory: memory.ID},
+		ids: toolIDs{session: session.ID, set: set.ID, plan: plan.ID, memory: memory.Memory.ID,
+			sibling: sibling.Memory.ID, relation: sibling.Candidates[0].RelationID, fingerprint: merge.Fingerprint},
 	}
 }
 
 func dumpTables(t *testing.T, db *sql.DB, where map[string]string) string {
 	t.Helper()
 	tables := []string{"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
-		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys", "coach_memory"}
+		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys", "coach_memory", "coach_memory_revisions", "coach_memory_relations"}
 	var out strings.Builder
 	for _, table := range tables {
 		rows, err := db.Query(`SELECT * FROM ` + table + ` ` + where[table] + ` ORDER BY rowid`)
@@ -248,18 +271,20 @@ func dumpTables(t *testing.T, db *sql.DB, where map[string]string) string {
 }
 
 var ownersRows = map[string]string{
-	"users":            `WHERE id=1`,
-	"sessions":         `WHERE user_id=1`,
-	"plans":            `WHERE user_id=1`,
-	"sets":             `WHERE session_id IN (SELECT id FROM sessions WHERE user_id=1)`,
-	"session_items":    `WHERE session_id IN (SELECT id FROM sessions WHERE user_id=1)`,
-	"session_feedback": `WHERE session_id IN (SELECT id FROM sessions WHERE user_id=1)`,
-	"plan_items":       `WHERE plan_id IN (SELECT id FROM plans WHERE user_id=1)`,
-	"exercise_notes":   `WHERE user_id=1`,
-	"exercise_groups":  `WHERE user_id=1`,
-	"volume_landmarks": `WHERE user_id=1`,
-	"idempotency_keys": `WHERE user_id=1`,
-	"coach_memory":     `WHERE user_id=1`,
+	"users":                  `WHERE id=1`,
+	"sessions":               `WHERE user_id=1`,
+	"plans":                  `WHERE user_id=1`,
+	"sets":                   `WHERE session_id IN (SELECT id FROM sessions WHERE user_id=1)`,
+	"session_items":          `WHERE session_id IN (SELECT id FROM sessions WHERE user_id=1)`,
+	"session_feedback":       `WHERE session_id IN (SELECT id FROM sessions WHERE user_id=1)`,
+	"plan_items":             `WHERE plan_id IN (SELECT id FROM plans WHERE user_id=1)`,
+	"exercise_notes":         `WHERE user_id=1`,
+	"exercise_groups":        `WHERE user_id=1`,
+	"volume_landmarks":       `WHERE user_id=1`,
+	"idempotency_keys":       `WHERE user_id=1`,
+	"coach_memory":           `WHERE user_id=1`,
+	"coach_memory_revisions": `WHERE memory_id IN (SELECT id FROM coach_memory WHERE user_id=1)`,
+	"coach_memory_relations": `WHERE user_id=1`,
 }
 
 func answer(t *testing.T, result *mcp.CallToolResult) string {
@@ -272,7 +297,7 @@ func answer(t *testing.T, result *mcp.CallToolResult) string {
 }
 
 func TestEveryToolIsIsolatedBetweenUsers(t *testing.T) {
-	missing := toolIDs{session: missingToolID, set: missingToolID, plan: missingToolID, memory: missingToolID}
+	missing := toolIDs{session: missingToolID, set: missingToolID, plan: missingToolID, memory: missingToolID, sibling: missingToolID + 1, relation: missingToolID, fingerprint: "absent"}
 	for name, tc := range isolationCases {
 		t.Run(name, func(t *testing.T) {
 			world := newIsolationWorld(t)
