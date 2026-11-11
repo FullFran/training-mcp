@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/fullfran/training-mcp/internal/engine"
 	"github.com/fullfran/training-mcp/internal/training"
 )
 
@@ -86,15 +87,29 @@ func RoutesWithOAuth(mcp http.Handler, authDisabled bool, token string, web *Web
 // signs in with the provider, as their own user. Every route above keeps its own
 // guard: a browser session opens neither /mcp nor the secret mount.
 func RoutesWithLogin(mcp http.Handler, authDisabled bool, token string, web *WebUI, oauth *OAuth, root *RootWeb) http.Handler {
+	return RoutesWithEngine(mcp, authDisabled, token, web, oauth, root, nil)
+}
+
+// EngineTokens resolves the bearers the in-app coach gives its own engine
+// processes. Nil leaves /mcp exactly as it is without the coach.
+type EngineTokens interface {
+	Resolve(token string) (userID int64, ok bool)
+}
+
+// RoutesWithEngine also lets the coach's engine processes call /mcp, each as its
+// own person.
+func RoutesWithEngine(mcp http.Handler, authDisabled bool, token string, web *WebUI, oauth *OAuth, root *RootWeb, engineTokens EngineTokens) http.Handler {
 	mux := http.NewServeMux()
+	var door http.Handler
 	if oauth != nil && !authDisabled {
-		mux.Handle("/mcp", MaxBody(oauth.guard(token, mcp)))
+		door = oauth.guard(token, mcp)
 		metadata := oauth.metadataHandler()
 		mux.Handle("/.well-known/oauth-protected-resource", metadata)
 		mux.Handle("/.well-known/oauth-protected-resource/mcp", metadata)
 	} else {
-		mux.Handle("/mcp", MaxBody(Bearer(token, authDisabled, asOwner(mcp))))
+		door = Bearer(token, authDisabled, asOwner(mcp))
 	}
+	mux.Handle("/mcp", MaxBody(engineGuard(engineTokens, mcp, door)))
 	if web != nil && web.Handler != nil && web.BasePath != "" {
 		// The secret path is the outer gate, but the same bearer still guards
 		// these routes so the app is never reachable from inside the network
@@ -119,4 +134,28 @@ func RoutesWithLogin(mcp http.Handler, authDisabled bool, token string, web *Web
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	})
 	return mux
+}
+
+// engineGuard admits an engine token as the person it was minted for, and only
+// on a direct loopback connection. It runs before every other door, so not even
+// the auth bypass turns an engine into the owner. Any other bearer goes on to
+// the usual door unchanged.
+func engineGuard(tokens EngineTokens, mcp, next http.Handler) http.Handler {
+	if tokens == nil {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		raw = strings.TrimSpace(raw)
+		if !ok || !engine.LooksLikeToken(raw) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		userID, live := tokens.Resolve(raw)
+		if !live || !engine.DirectLoopback(r) {
+			unauthorized(w)
+			return
+		}
+		mcp.ServeHTTP(w, r.WithContext(training.WithUser(r.Context(), userID)))
+	})
 }

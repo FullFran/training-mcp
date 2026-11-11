@@ -116,6 +116,8 @@ type pageData struct {
 	Review ReviewData
 	// PendingCount is how many agent proposals wait for an answer.
 	PendingCount int
+	// CoachOn shows the coach chat.
+	CoachOn bool
 }
 
 // LastSet returns the final set of the session, used to power "repeat last set".
@@ -143,6 +145,9 @@ type Options struct {
 	// Apply applies an accepted proposal through its MCP tool's code. Nil means
 	// proposals can be listed and rejected here but not accepted.
 	Apply training.Applier
+	// Coach is the in-app coach. Nil leaves the app exactly as it is without it:
+	// no chat, no coach routes.
+	Coach Coach
 }
 
 // New serves the app under the secret base path, as the owner's backup route
@@ -283,6 +288,8 @@ func (s *Server) routes() {
 	s.handle("GET "+b+"/manifest.webmanifest", s.manifest)
 	s.handle("GET "+b+"/sw.js", s.serviceWorker)
 
+	s.coachRoutes()
+
 	sub, err := fs.Sub(staticFS, "static")
 	if err != nil {
 		panic(err)
@@ -333,7 +340,7 @@ func (s *Server) addSet(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, err)
 			return
 		}
-		_, _, err = s.service(r.Context()).AddSet(r.Context(), training.AddSetInput{
+		set, _, err := s.service(r.Context()).AddSet(r.Context(), training.AddSetInput{
 			SessionID: session.ID, Exercise: exercise, WeightKG: weight,
 			Reps: reps, RPE: rpe, Technique: technique,
 		})
@@ -343,6 +350,8 @@ func (s *Server) addSet(w http.ResponseWriter, r *http.Request) {
 		case err != nil:
 			s.fail(w, err)
 			return
+		default:
+			s.notifySetLogged(r, set)
 		}
 	}
 	s.renderPanel(w, r, message)
@@ -1086,6 +1095,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 		data.CSRF = s.opts.CSRFToken(r)
 	}
 	data.CanExport = s.opts.Export
+	data.CoachOn = s.opts.Coach != nil
 	s.renderTo(w, name, data)
 }
 

@@ -126,10 +126,42 @@ jobs:
           echo "/data/training.db header: $header"
           test "$header" = "SQLite format 3"
 
+      # The coach's engine runs on Node inside the same image. With its stdin
+      # closed at once it must still load the Pi SDK, report its version and
+      # exit cleanly: a broken install or unreadable files fail here.
+      - name: the coach engine loads in the image
+        run: |
+          set -euo pipefail
+          line="$(docker run --rm -i --entrypoint /nodejs/bin/node "$IMAGE" /app/engine/main.ts </dev/null)"
+          echo "engine: $line"
+          jq -e '.type == "ready" and .piVersion == "1.5.2"' <<<"$line" >/dev/null
+
+      # Enabled, the coach must not stop the server from booting, and its routes
+      # answer behind the web app's guard. The key is a throwaway for this
+      # container only. No login is started: that would call OpenAI.
+      - name: boot with the coach enabled
+        run: |
+          set -euo pipefail
+          docker run -d --name "$CONTAINER-coach" -p 127.0.0.1:8081:8080 \
+            -e MCP_BEARER_TOKEN=ci-smoke-token -e WEB_BASE_PATH=app \
+            -e TRAINING_COACH=1 -e TRAINING_COACH_KEY="$(head -c 32 /dev/urandom | base64)" "$IMAGE"
+          for _ in $(seq 1 30); do
+            curl -fsS --max-time 2 http://127.0.0.1:8081/health >/dev/null 2>&1 && break
+            sleep 1
+          done
+          status="$(curl -fsS -H 'Authorization: Bearer ci-smoke-token' http://127.0.0.1:8081/app/coach/status)"
+          echo "/app/coach/status: $status"
+          jq -e '.state == "disconnected"' <<<"$status" >/dev/null
+          code="$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/app/coach/status)"
+          echo "/app/coach/status without the token: $code"
+          test "$code" = "401"
+
       - name: container logs
         if: failure()
-        run: docker logs "$CONTAINER" || true
+        run: |
+          docker logs "$CONTAINER" || true
+          docker logs "$CONTAINER-coach" || true
 
       - name: remove the container
         if: always()
-        run: docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+        run: docker rm -f "$CONTAINER" "$CONTAINER-coach" >/dev/null 2>&1 || true

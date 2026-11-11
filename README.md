@@ -112,6 +112,7 @@ Docker image the way the server does. Merging to `main` deploys; see
 | `MCP_OAUTH_PROVISION` | off | `1` gives any subject the OAuth provider vouches for an account of its own; off, only the owner and existing accounts get in |
 | `WEB_BASE_PATH` | empty (web UI disabled) | Secret prefix the PWA is served from, e.g. `/a1b2c3…` |
 | `WEB_OAUTH_CLIENT_ID`, `WEB_OAUTH_CLIENT_SECRET` | off | The provider's OAuth application for the web login; set both, with the `MCP_OAUTH_*` settings, to serve the PWA at the root behind a login, see [connection paths](docs/connection-paths.md) |
+| `TRAINING_COACH`, `TRAINING_COACH_KEY` | off | `1` and a 32-byte base64 key turn on the in-app coach, which chats with each person's own ChatGPT account; experimental, see [in-app coach](docs/coach.md) |
 
 The unauthenticated `GET /health` endpoint returns `{"status":"ok"}`. Alternatively, `training-mcp healthcheck` sends `GET /health` to the local listener (defaulting to port 8080 or derived from `--addr`) and exits 0 on HTTP 200 or 1 on failure, designed for distroless container healthchecks without a shell, `curl`, or `wget`. MCP is only available at `/mcp` for GET, POST, and DELETE. Public ChatGPT access requires HTTPS at the TLS termination boundary.
 
@@ -269,6 +270,7 @@ debt, not a design: see the open issues.
 - [ChatGPT setup](docs/chatgpt-setup.md)
 - [Connection paths and tunnel safety](docs/connection-paths.md)
 - [SI formula](docs/si-formula.md)
+- [In-app coach](docs/coach.md) — chat with your own ChatGPT while you train; off by default, experimental
 - [Deployment](docs/deployment.md) — how `main` reaches production, CI gate, rollback
 
 The external Secure MCP Tunnel smoke flow is **unverified in this repository**. Use the official provider documentation rather than invented commands.
