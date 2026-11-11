@@ -120,3 +120,28 @@ func TestConnectorsAreCappedPerPerson(t *testing.T) {
 		t.Fatalf("list = %d items, %v", len(list), err)
 	}
 }
+
+// Production already ran 017 when 016 arrives: a missing lower version still applies.
+func TestConnectorsMigrationAppliesAfterALaterOne(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "training.db")
+	store, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.Exec(`DROP TABLE connectors; DELETE FROM schema_migrations WHERE version=16`); err != nil {
+		t.Fatal(err)
+	}
+	store.Close()
+	again, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer again.Close()
+	var n int
+	if err := again.db.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version IN (16,17)`).Scan(&n); err != nil || n != 2 {
+		t.Fatalf("versions = %d, %v", n, err)
+	}
+	if _, err := again.ListConnectors(context.Background(), 1); err != nil {
+		t.Fatalf("connectors table after a late 016: %v", err)
+	}
+}
