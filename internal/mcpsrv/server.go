@@ -215,6 +215,15 @@ type NoteInput struct {
 	Exercise string `json:"exercise" jsonschema:"Non-empty exercise name; trimmed and lowercased to match stored sets."`
 	Note     string `json:"note" jsonschema:"Setup reminder, e.g. 'asiento en 4, agarre ancho'. Pass an empty string to remove it."`
 }
+type LiveWorkoutOut struct {
+	Live training.LiveWorkout `json:"live"`
+}
+type RestTargetInput struct {
+	RestSeconds int `json:"rest_seconds" jsonschema:"Target rest between sets in seconds, 30 through 900."`
+}
+type RestTargetOut struct {
+	RestSeconds int `json:"rest_seconds"`
+}
 type NotesOut struct {
 	Notes []training.ExerciseNote `json:"notes"`
 }
@@ -435,6 +444,21 @@ func New(service training.ServiceFor) *Server {
 			out.PlanName = sess.PlanName
 		}
 		return nil, out, toolError(err)
+	})
+
+	addTool(s, &mcp.Tool{Name: "live_workout", Description: "What is happening in today's workout right now: the session with its sets, planned versus done per exercise, the exercise planned next, the last set and when it was logged, and the rest since it against the person's target (state none, resting, ready, superset or idle, with elapsed, remaining or over-by seconds). Call it before giving feedback during a workout. Needs no session id."}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, LiveWorkoutOut, error) {
+		v, err := service(ctx).LiveWorkout(ctx)
+		return nil, LiveWorkoutOut{Live: v}, toolError(err)
+	})
+	restSchema := mustInputSchema[RestTargetInput]()
+	restSchema.Properties["rest_seconds"].Minimum = jsonschema.Ptr(float64(training.MinRestSeconds))
+	restSchema.Properties["rest_seconds"].Maximum = jsonschema.Ptr(float64(training.MaxRestSeconds))
+	addTool(s, &mcp.Tool{Name: "set_rest_target", Description: "Set the person's target rest between sets, in seconds. The phone's rest timer and live_workout use it. Until set it is 120 seconds.", InputSchema: restSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in RestTargetInput) (*mcp.CallToolResult, RestTargetOut, error) {
+		if err := service(ctx).SetRestTarget(ctx, in.RestSeconds); err != nil {
+			return nil, RestTargetOut{}, toolError(err)
+		}
+		v, err := service(ctx).RestTarget(ctx)
+		return nil, RestTargetOut{RestSeconds: v}, toolError(err)
 	})
 
 	setItemSchema := mustInputSchema[SessionItemInput]()

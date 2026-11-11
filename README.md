@@ -171,7 +171,12 @@ shared with the MCP tools and cannot drift apart.
 - `/plans` builds and edits routines from the phone: rename, add, reorder and
   remove exercises, and write the routine's notes. It is a separate screen
   because planning is deliberate work, not something done between sets.
-- A rest timer starts on every logged set and remembers the adjusted duration.
+- A rest timer starts when a new set is logged, counts from when the server
+  stored it (so a reload resumes it) and shows the exercise planned next. Its
+  ±30 s buttons change the rest target the agent also reads (`live_workout`).
+- Every in-session change the MCP offers is on the workout screen: add an
+  exercise to today's plan, change its sets, rep range or RPE, skip, swap or
+  remove it, and edit or delete a logged set, including its exercise.
 - Sets can be edited in place instead of deleted and re-entered.
 - Today's session is created lazily on the first set, so opening the app never
   leaves an empty session behind.

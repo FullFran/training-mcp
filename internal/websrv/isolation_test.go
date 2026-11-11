@@ -149,6 +149,8 @@ var webRoutes = map[string]func(*testing.T){
 	"POST /plan/item": writeRoute("/plan/item", url.Values{"action": {"adopt"}, "exercise": {secretExercise}, "done": {"1"}},
 		`session_items i JOIN sessions se ON se.id=i.session_id WHERE se.user_id=2 AND i.exercise='`+secretExercise+`'`),
 
+	"POST /rest": testRestTargetBelongsToWhoSetsIt,
+
 	"GET /manifest.webmanifest": sharedRoute("the same document for everyone"),
 	"GET /sw.js":                sharedRoute("the same document for everyone"),
 	"GET /static/":              sharedRoute("embedded assets, the same for everyone"),
@@ -349,5 +351,25 @@ func writeRoute(path string, form url.Values, count string) func(*testing.T) {
 		if touched != 1 {
 			t.Fatalf("user 1 now has %d sessions", touched)
 		}
+	}
+}
+
+// The rest target lives on the user's own row: setting it never reaches the owner's.
+func testRestTargetBelongsToWhoSetsIt(t *testing.T) {
+	world := newWebWorld(t)
+	if w := post(t, world.owner, base+"/rest", url.Values{"seconds": {"150"}}, true); w.Code != http.StatusOK {
+		t.Fatalf("owner: %d %s", w.Code, w.Body)
+	}
+	if w := post(t, world.second, base+"/rest", url.Values{"seconds": {"75"}}, true); w.Code != http.StatusOK {
+		t.Fatalf("second user: %d %s", w.Code, w.Body)
+	}
+	for id, want := range map[int]int{1: 150, 2: 75} {
+		var got int
+		if err := world.db.QueryRow(`SELECT rest_seconds FROM users WHERE id=?`, id).Scan(&got); err != nil || got != want {
+			t.Fatalf("user %d rest = %d, %v, want %d", id, got, err, want)
+		}
+	}
+	if body := get(t, world.second, base+"/").Body.String(); !strings.Contains(body, `data-rest-target="75"`) {
+		t.Fatalf("second user's page should show their own target")
 	}
 }

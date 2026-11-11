@@ -142,6 +142,9 @@ func seedUser(t *testing.T, user training.UserStore, group string) seeded {
 	if _, err = user.LogSets(ctx, logged); err != nil {
 		t.Fatal(err)
 	}
+	if err = user.SetRestTarget(ctx, 90); err != nil {
+		t.Fatal(err)
+	}
 	return seeded{session: session.ID, set: set.ID, plan: plan.ID}
 }
 
@@ -214,6 +217,10 @@ var idCases = map[string]func(context.Context, training.UserStore, seeded) (any,
 	"SupersetFor": func(c context.Context, u training.UserStore, id seeded) (any, error) {
 		return u.SupersetFor(c, id.session, "banca")
 	},
+	"LastSetAt": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		set, at, err := u.LastSetAt(c, id.session)
+		return []any{set, at}, err
+	},
 }
 
 func TestAnotherUsersIDBehavesExactlyLikeAMissingOne(t *testing.T) {
@@ -267,6 +274,7 @@ var readCases = map[string]func(context.Context, training.UserStore) (any, error
 		return u.VolumeByGroup(c, training.ListFilter{})
 	},
 	"ExerciseNotes": func(c context.Context, u training.UserStore) (any, error) { return u.ExerciseNotes(c) },
+	"RestTarget":    func(c context.Context, u training.UserStore) (any, error) { return u.RestTarget(c) },
 }
 
 func TestReadsSeeNothingOfAnotherUser(t *testing.T) {
@@ -334,6 +342,10 @@ var writeCases = map[string]struct {
 			return u.SetExerciseNote(c, training.ExerciseNote{Exercise: "sentadilla", Note: "barra baja"})
 		},
 		`SELECT COUNT(*) FROM exercise_notes WHERE user_id=2 AND exercise='sentadilla'`,
+	},
+	"SetRestTarget": {
+		func(c context.Context, u training.UserStore) error { return u.SetRestTarget(c, 75) },
+		`SELECT COUNT(*) FROM users WHERE id=2 AND rest_seconds=75`,
 	},
 }
 

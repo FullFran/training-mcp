@@ -1,4 +1,6 @@
 {{define "panel.html"}}<section id="panel" class="panel"
+  data-last-set-id="{{if .LastSetID}}{{.LastSetID}}{{end}}" data-rest-state="{{.Rest.State}}" data-rest-elapsed="{{.Rest.ElapsedSeconds}}"
+  {{with .Next}}data-next="{{.Exercise}}" data-next-rx="{{rx .}}"{{end}}
   {{with .LastSet}}data-last-exercise="{{.Exercise}}" data-last-weight="{{num .WeightKG}}" data-last-reps="{{.Reps}}" data-last-rpe="{{if not .RPEImputed}}{{num .RPE}}{{end}}"{{end}}>
 
   {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
@@ -38,6 +40,15 @@
           <button type="button" class="mini" hx-post="{{$.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML"
                   hx-vals='{"action":"{{if .Skipped}}unskip{{else}}skip{{end}}","exercise":"{{.Exercise}}"}'>{{if .Skipped}}retomar{{else}}saltar{{end}}</button>
           <button type="button" class="mini swap" data-exercise="{{.Exercise}}">sustituir</button>
+          <form class="rx-edit" hx-post="{{$.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML">
+            <input type="hidden" name="action" value="rx">
+            <input type="hidden" name="exercise" value="{{.Exercise}}">
+            <input name="rep_min" type="number" inputmode="numeric" min="0" step="1" placeholder="reps" value="{{if .RepMin}}{{.RepMin}}{{end}}" aria-label="Reps mínimas">
+            <span class="muted">–</span>
+            <input name="rep_max" type="number" inputmode="numeric" min="0" step="1" placeholder="máx" value="{{if .RepMax}}{{.RepMax}}{{end}}" aria-label="Reps máximas">
+            <input name="target_rpe" type="number" inputmode="decimal" min="1" max="10" step="0.5" placeholder="RPE" value="{{if .TargetRPE}}{{num .TargetRPE}}{{end}}" aria-label="RPE objetivo">
+            <button type="submit" class="mini">Guardar</button>
+          </form>
           <button type="button" class="mini danger" hx-post="{{$.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML"
                   hx-vals='{"action":"remove","exercise":"{{.Exercise}}"}'
                   hx-confirm="¿Quitar del plan de hoy? Las series ya hechas se conservan.">quitar</button>
@@ -51,6 +62,25 @@
       {{end}}
     </ol>
   </section>
+  {{end}}
+
+  {{if not .ReadOnly}}
+  <details class="add-item card">
+    <summary>Añadir ejercicio a hoy</summary>
+    <form hx-post="{{.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML" autocomplete="off">
+      <input type="hidden" name="action" value="add">
+      <input name="exercise" type="text" required list="catalogue" autocapitalize="none" spellcheck="false" placeholder="ejercicio" aria-label="Ejercicio">
+      <div class="rx-edit">
+        <input name="target_sets" type="number" inputmode="numeric" min="1" max="20" step="1" value="3" aria-label="Series">
+        <span class="muted">×</span>
+        <input name="rep_min" type="number" inputmode="numeric" min="0" step="1" placeholder="reps" aria-label="Reps mínimas">
+        <span class="muted">–</span>
+        <input name="rep_max" type="number" inputmode="numeric" min="0" step="1" placeholder="máx" aria-label="Reps máximas">
+        <input name="target_rpe" type="number" inputmode="decimal" min="1" max="10" step="0.5" placeholder="RPE" aria-label="RPE objetivo">
+      </div>
+      <button type="submit" class="mini">Añadir al plan de hoy</button>
+    </form>
+  </details>
   {{end}}
 
   <div class="total">
