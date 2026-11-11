@@ -288,3 +288,17 @@ func TestOldConversationsArePurged(t *testing.T) {
 		t.Fatalf("list = %+v %v", list, err)
 	}
 }
+
+// Closing the coach stores what was already queued before it returns.
+func TestCloseStoresQueuedMessages(t *testing.T) {
+	store := newMemoryConversations()
+	h := newHarness(t, "ok", withConversations(store))
+	h.connect(1)
+	id, _ := turn(t, h, 1, 0, "última")
+	ctx, cancel := contextWithTimeout(5 * time.Second)
+	defer cancel()
+	h.m.Close(ctx)
+	if n := len(store.messages(id)); n != 2 {
+		t.Fatalf("stored %d messages before Close returned", n)
+	}
+}

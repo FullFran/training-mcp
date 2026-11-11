@@ -274,6 +274,7 @@ type Manager struct {
 	// writes stores conversation messages in order, off the lock.
 	writes       chan func(context.Context)
 	writesClosed bool
+	writesDone   chan struct{}
 	quit         chan struct{}
 }
 
@@ -282,7 +283,7 @@ func NewManager(s Settings) (*Manager, error) {
 		return nil, errors.New("engine: vault, tokens, command and MCP URL are required")
 	}
 	s.defaults()
-	m := &Manager{s: s, people: map[int64]*person{}, alive: map[*proc]bool{}, writes: make(chan func(context.Context), 256), quit: make(chan struct{})}
+	m := &Manager{s: s, people: map[int64]*person{}, alive: map[*proc]bool{}, writes: make(chan func(context.Context), 256), writesDone: make(chan struct{}), quit: make(chan struct{})}
 	go m.writeLoop()
 	if s.Conversations != nil {
 		go m.purgeLoop()
@@ -293,6 +294,7 @@ func NewManager(s Settings) (*Manager, error) {
 // writeLoop runs stored-message writes one at a time, in the order the turns
 // produced them, so a reply is never stored before the message it answers.
 func (m *Manager) writeLoop() {
+	defer close(m.writesDone)
 	for w := range m.writes {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		w(ctx)
@@ -920,6 +922,8 @@ func (m *Manager) Close(ctx context.Context) {
 		close(m.writes)
 	}
 	m.mu.Unlock()
+	// Messages already queued are stored before the database closes.
+	waits = append(waits, m.writesDone)
 	for _, d := range waits {
 		select {
 		case <-d:
