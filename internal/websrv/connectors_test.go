@@ -65,6 +65,19 @@ func (f *fakeConnectors) Descriptor(_ context.Context, userID, id int64) (connec
 	return connector.ServerJSON{Name: "com.notion.mcp/notion"}, nil
 }
 
+func (f *fakeConnectors) Catalog(_ context.Context, userID int64) ([]connector.CatalogView, error) {
+	f.rec("catalog", userID)
+	return []connector.CatalogView{{CatalogEntry: connector.CatalogEntry{ID: "notion", Title: "Notion", Category: "notes", CategoryLabel: "Notas y diario", URL: "https://mcp.notion.com/mcp"}}}, nil
+}
+
+func (f *fakeConnectors) AddFromCatalog(_ context.Context, userID int64, entry string) (connector.View, error) {
+	f.rec("add-catalog:"+entry, userID)
+	if entry != "notion" {
+		return connector.View{}, &connector.Error{Code: "not_found"}
+	}
+	return connector.View{ID: 5, Name: "notion", Label: "Notion", URL: "https://mcp.notion.com/mcp"}, nil
+}
+
 func (f *fakeConnectors) Remove(_ context.Context, userID, id int64) error {
 	f.rec("remove", userID)
 	return nil
@@ -127,6 +140,12 @@ func TestEveryConnectorRouteActsAsTheRequestsPerson(t *testing.T) {
 		},
 		"POST /coach/connectors": func() *httptest.ResponseRecorder {
 			return coachRequest(t, h, "POST", "/coach/connectors", `{"url":"https://x.test/mcp","label":"X"}`, true)
+		},
+		"GET /coach/connectors/catalog": func() *httptest.ResponseRecorder {
+			return coachRequest(t, h, "GET", "/coach/connectors/catalog", "", false)
+		},
+		"POST /coach/connectors/catalog": func() *httptest.ResponseRecorder {
+			return coachRequest(t, h, "POST", "/coach/connectors/catalog", `{"entry":"notion"}`, true)
 		},
 		"GET /coach/connectors/callback": func() *httptest.ResponseRecorder {
 			return coachRequest(t, h, "GET", "/coach/connectors/callback?state=s&code=c", "", false)
@@ -258,5 +277,38 @@ func TestConnectorsPanelIsLinkedOnlyWhenOn(t *testing.T) {
 		if w := get(t, as(1), base+f); w.Code != http.StatusOK {
 			t.Fatalf("%s = %d", f, w.Code)
 		}
+	}
+}
+
+func TestCatalogRoutes(t *testing.T) {
+	_, conns, _, as := newConnectorWorld(t)
+	w := coachRequest(t, as(2), "GET", "/coach/connectors/catalog", "", false)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"entries":[{"id":"notion"`) || !strings.Contains(w.Body.String(), `"category_label":"Notas y diario"`) {
+		t.Fatalf("catalog = %d %s", w.Code, w.Body)
+	}
+	w = coachRequest(t, as(2), "POST", "/coach/connectors/catalog", `{"entry":"notion"}`, true)
+	if w.Code != http.StatusCreated || !strings.Contains(w.Body.String(), `"name":"notion"`) {
+		t.Fatalf("one tap = %d %s", w.Code, w.Body)
+	}
+	if w := coachRequest(t, as(2), "POST", "/coach/connectors/catalog", `{"entry":"nope"}`, true); w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), "not_found") {
+		t.Fatalf("unknown entry = %d %s", w.Code, w.Body)
+	}
+	// Only an entry id: no URL, label or token can ride along.
+	for _, body := range []string{`{"entry":"notion","url":"https://x.test"}`, `{"entry":"notion","token":"x"}`, `not json`} {
+		if w := coachRequest(t, as(2), "POST", "/coach/connectors/catalog", body, true); w.Code != http.StatusBadRequest {
+			t.Errorf("%s = %d", body, w.Code)
+		}
+	}
+	if w := coachRequest(t, as(2), "POST", "/coach/connectors/catalog", `{"entry":"notion"}`, false); w.Code < 400 {
+		t.Fatalf("without X-Coach = %d", w.Code)
+	}
+	for _, c := range conns.calls {
+		if strings.Contains(c, "x.test") {
+			t.Fatalf("a URL reached the service: %v", conns.calls)
+		}
+	}
+	page := get(t, as(1), base+"/coach/connectors").Body.String()
+	if !strings.Contains(page, `id="cx-catalog"`) || !strings.Contains(page, `id="cx-add"`) || strings.Index(page, `id="cx-catalog"`) > strings.Index(page, `id="cx-add"`) {
+		t.Fatal("the catalog must come first and the free URL field must stay")
 	}
 }

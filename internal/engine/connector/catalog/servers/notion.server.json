@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.notion/mcp",
+  "title": "Notion",
+  "description": "Official Notion MCP server: search, read and write the person's Notion pages and databases.",
+  "version": "1.0.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.notion.com/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer token for this person, obtained by the host with OAuth and added by its proxy.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

@@ -140,7 +140,9 @@ type Service struct {
 	Reload func(userID int64)
 	// Loaded reports which servers the person's coach session loaded.
 	Loaded func(userID int64) map[string]bool
-	Now    func() time.Time
+	// CatalogEntries replaces the built-in catalog when set (tests).
+	CatalogEntries []CatalogEntry
+	Now            func() time.Time
 
 	mu    sync.Mutex
 	flows map[string]*flow

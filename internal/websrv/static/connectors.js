@@ -1,4 +1,5 @@
-// Connectors panel: add a remote MCP server, connect it (signing in at its
+// Connectors panel: connect a popular server from the host's catalog with one
+// tap, or add any other remote MCP server, connect it (signing in at its
 // provider when it uses OAuth), see its tools, disconnect, remove, and take
 // back this session's "always" answers. Text from servers is always set as
 // text, never as markup.
@@ -10,6 +11,7 @@
   const grants = document.getElementById('cx-grants');
   const empty = document.getElementById('cx-empty');
   const flash = document.getElementById('cx-flash');
+  const catalog = document.getElementById('cx-catalog');
 
   const MESSAGES = {
     bad_url: 'La URL debe empezar por https:// y no llevar usuario ni contraseña.',
@@ -28,6 +30,7 @@
     state_invalid: 'El inicio de sesión caducó o no era tuyo. Vuelve a intentarlo.',
     denied: 'Cancelaste el inicio de sesión.',
     vault: 'No se pudo guardar la credencial.',
+    catalog: 'El catálogo no está disponible ahora mismo.',
   };
   const say = (code) => MESSAGES[code] || 'Algo falló.';
 
@@ -64,6 +67,52 @@
     return b;
   }
 
+  // connect starts the connection of an existing connector: with OAuth the
+  // browser goes to the provider's own sign-in page, which sends it back here.
+  async function connect(id) {
+    const r = await call('POST', '/coach/connectors/' + id + '/connect', {});
+    if (r.authorize_url) {
+      window.location.assign(r.authorize_url);
+      return;
+    }
+    show('Conectado.');
+    await load();
+  }
+
+  // renderCatalog shows the host's catalog as cards grouped by category, in
+  // the order the catalog gives them.
+  function renderCatalog(entries) {
+    catalog.replaceChildren();
+    let group = null;
+    let current = null;
+    for (const e of entries) {
+      if (e.category !== current) {
+        current = e.category;
+        catalog.append(el('h3', 'cx-group', e.category_label));
+        group = el('ul', 'cx-catalog');
+        catalog.append(group);
+      }
+      const li = el('li', 'cx-card');
+      li.append(el('span', 'cx-icon', e.icon));
+      const body = el('div', 'cx-card-body');
+      const head = el('div');
+      head.append(el('strong', '', e.title));
+      const c = e.connector;
+      if (c) head.append(el('span', 'cx-badge' + (c.state === 'connected' ? ' ok' : ''), c.state === 'connected' ? 'conectado' : 'añadido'));
+      body.append(head, el('div', 'muted', e.summary));
+      li.append(body);
+      if (!c) {
+        li.append(button('Conectar', 'primary mini', async () => {
+          const v = await call('POST', '/coach/connectors/catalog', { entry: e.id });
+          await connect(v.id);
+        }));
+      } else if (c.state !== 'connected') {
+        li.append(button('Conectar', 'primary mini', () => connect(c.id)));
+      }
+      group.append(li);
+    }
+  }
+
   function render(data) {
     list.replaceChildren();
     empty.hidden = data.connectors.length > 0;
@@ -86,16 +135,7 @@
         }));
         actions.append(button('Desconectar', 'ghost mini', async () => { await call('POST', '/coach/connectors/' + c.id + '/disconnect', {}); await load(); }));
       } else {
-        actions.append(button('Conectar', 'primary mini', async () => {
-          const r = await call('POST', '/coach/connectors/' + c.id + '/connect', {});
-          if (r.authorize_url) {
-            // The provider's own sign-in page; it sends the browser back here.
-            window.location.assign(r.authorize_url);
-            return;
-          }
-          show('Conectado.');
-          await load();
-        }));
+        actions.append(button('Conectar', 'primary mini', () => connect(c.id)));
       }
       actions.append(button('Quitar', 'ghost mini risky', async () => {
         if (!window.confirm('¿Quitar ' + c.label + '? Se borran sus credenciales.')) return;
@@ -113,7 +153,11 @@
   }
 
   async function load() {
-    try { render(await call('GET', '/coach/connectors/list')); } catch (err) { show(say(err.message)); }
+    try {
+      const [list, cat] = await Promise.all([call('GET', '/coach/connectors/list'), call('GET', '/coach/connectors/catalog')]);
+      render(list);
+      renderCatalog(cat.entries);
+    } catch (err) { show(say(err.message)); }
   }
 
   document.getElementById('cx-add').addEventListener('submit', async (event) => {

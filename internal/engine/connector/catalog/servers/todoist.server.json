@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "net.todoist/mcp",
+  "title": "Todoist",
+  "description": "Official Todoist MCP server: read and manage the person's tasks and projects.",
+  "version": "1.0.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://ai.todoist.net/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer token for this person, obtained by the host with OAuth and added by its proxy.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

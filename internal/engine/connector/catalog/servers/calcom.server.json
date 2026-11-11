@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.cal/mcp",
+  "title": "Cal.com",
+  "description": "Official Cal.com MCP server: the person's bookings, event types and availability.",
+  "version": "1.0.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.cal.com/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer token for this person, obtained by the host with OAuth and added by its proxy.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.akiflow/akiflow",
+  "title": "Akiflow",
+  "description": "Official Akiflow MCP for tasks, calendars, scheduling, time slots, and meeting transcripts.",
+  "version": "1.0.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.akiflow.com/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer token for this person, obtained by the host with OAuth and added by its proxy.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
