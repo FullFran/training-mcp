@@ -50,7 +50,11 @@ pull request and on every push to `main`:
   boots it with a throwaway bearer token and no volume, waits up to 30 s for
   `GET /health` to answer `{"status":"ok"}`, checks that `/mcp` refuses a
   request without a token, and checks that `/data/training.db` was created as
-  a SQLite file. A failure prints the container's logs.
+  a SQLite file. It then runs the coach engine in the image (Node and the Pi
+  SDK must load and report Pi 1.5.2) and boots a second container with
+  `TRAINING_COACH=1` and a throwaway key, which must answer `/app/coach/status`
+  behind the token and refuse it without. No login is started: that would call
+  OpenAI. A failure prints the containers' logs.
 
 Merge only when both jobs are green. The branch is not protected, so this is
 a rule to follow, not one GitHub enforces.
