@@ -38,15 +38,28 @@
     if (freshCards) {
       cards.replaceChildren(...Array.from(freshCards.childNodes).map((n) => document.importNode(n, true)));
     }
-    const freshLink = doc.getElementById('review-link');
-    const link = $('review-link');
-    if (freshLink && link) {
-      link.textContent = freshLink.textContent;
-      link.className = freshLink.className;
-    }
+    syncReview(doc);
     const workout = $('workout');
     const freshWorkout = doc.getElementById('workout');
     if (workout && freshWorkout) workout.classList.toggle('idle', freshWorkout.classList.contains('idle'));
+  }
+
+  // The review count, in the drawer and as the badge in the top bar.
+  function setReview(count) {
+    const link = $('review-link');
+    if (link) {
+      link.textContent = '✅ Revisar' + (count ? ' (' + count + ')' : '');
+      link.classList.toggle('attention', count > 0);
+    }
+    const badge = $('review-badge');
+    if (badge) {
+      badge.hidden = !count;
+      badge.querySelector('span').textContent = String(count);
+    }
+  }
+  function syncReview(doc) {
+    const fresh = doc.getElementById('review-badge');
+    if (fresh) setReview(fresh.hidden ? 0 : parseInt(fresh.textContent.replace(/\D/g, ''), 10) || 0);
   }
 
   // Only the server's cards and the review count, after a set: the workout
@@ -70,6 +83,27 @@
       .then(apply)
       .catch(() => {});
   }
+
+  // --- drawer ---------------------------------------------------------------
+  // The menu: panels and the account. It closes on the scrim, Escape, or when
+  // a panel opens from it.
+  const drawer = $('drawer');
+  const scrim = $('drawer-scrim');
+  const menu = $('menu-open');
+  function setDrawer(open) {
+    if (!drawer) return;
+    drawer.hidden = !open;
+    if (scrim) scrim.hidden = !open;
+    if (menu) menu.setAttribute('aria-expanded', String(open));
+  }
+  if (menu) menu.addEventListener('click', () => setDrawer(drawer.hidden));
+  if (scrim) scrim.addEventListener('click', () => setDrawer(false));
+
+  // --- workout sheet ----------------------------------------------------------
+  const more = $('wk-more');
+  document.addEventListener('click', (event) => {
+    if (more && event.target.closest('[data-close-sheet]')) more.open = false;
+  });
 
   // --- panels ---------------------------------------------------------------
   let changed = false;
@@ -99,12 +133,16 @@
     const link = event.target.closest('a[data-panel]');
     if (!link || event.metaKey || event.ctrlKey || event.shiftKey) return;
     event.preventDefault();
+    setDrawer(false);
     openPanel(link);
   });
 
   $('panel-back').addEventListener('click', closePanel);
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closePanel();
+    if (event.key !== 'Escape') return;
+    if (more && more.open) more.open = false;
+    else if (drawer && !drawer.hidden) setDrawer(false);
+    else closePanel();
   });
 
   // Inside the panel, the page's own link home closes it, and any form sent
@@ -114,6 +152,7 @@
     let doc;
     try { doc = frame.contentDocument; } catch (e) { return; }
     if (!doc || sheet.hidden || frame.src === 'about:blank') return;
+    doc.documentElement.classList.add('in-panel');
     if (isHome(doc.location.href)) {
       changed = true;
       closePanel();
@@ -146,12 +185,22 @@
     return article;
   }
 
-  // A set logged from the workout card, with the values the server stored.
+  // A set logged from the workout card, with the values the server stored. The
+  // server starts the coach's reaction as soon as it stores the set, so that
+  // reaction can reach the chat before this card: the card goes before it.
+  let setSentAt = 0;
+  document.body.addEventListener('htmx:beforeRequest', (event) => {
+    if (event.target && event.target.id === 'entry') setSentAt = Date.now();
+  });
   document.addEventListener('workout:set-logged', (event) => {
     const d = event.detail || {};
     if (!d.exercise) return;
-    log.appendChild(card('set-card', '✓ ' + d.exercise,
-      d.weight + ' kg × ' + d.reps + (d.rpe ? ' @' + d.rpe : '')));
+    const el = card('set-card', '✓ ' + d.exercise,
+      d.weight + ' kg × ' + d.reps + (d.rpe ? ' @' + d.rpe : ''));
+    const reaction = Array.from(log.querySelectorAll('.coach-turn[data-origin="reaction"]'))
+      .find((t) => Number(t.dataset.at) >= setSentAt);
+    if (setSentAt && reaction) log.insertBefore(el, reaction);
+    else log.appendChild(el);
     scroll();
     refreshCards();
   });
@@ -167,12 +216,7 @@
           if (document.querySelector('[data-proposal="' + fresh.dataset.proposal + '"]')) return;
           log.appendChild(document.importNode(fresh, true));
         });
-        const freshLink = doc.getElementById('review-link');
-        const link = $('review-link');
-        if (freshLink && link) {
-          link.textContent = freshLink.textContent;
-          link.className = freshLink.className;
-        }
+        syncReview(doc);
         scroll();
       })
       .catch(() => {});
@@ -205,12 +249,7 @@
           : (form.action.endsWith('/accept') ? 'Aceptada.' : 'Rechazada.');
         proposal.querySelector('.card-actions').replaceWith(verdict);
         proposal.removeAttribute('data-proposal');
-        const link = $('review-link');
-        const left = doc.querySelectorAll('article.proposal').length;
-        if (link) {
-          link.textContent = 'Revisar' + (left ? ' (' + left + ')' : '');
-          link.classList.toggle('attention', left > 0);
-        }
+        setReview(doc.querySelectorAll('article.proposal').length);
       })
       .catch(() => {
         form.querySelectorAll('button').forEach((b) => { b.disabled = false; });

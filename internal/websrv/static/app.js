@@ -423,8 +423,11 @@
     if (card && card.classList.contains('idle')) {
       card.classList.remove('idle');
       const summary = card.querySelector('#wk-more > summary');
-      if (summary) summary.textContent = 'Ver el entreno y ajustar';
+      if (summary) summary.textContent = 'Ajustar';
     }
+    // Logged from the sheet: close it so the chat and the timer show.
+    const more = document.getElementById('wk-more');
+    if (more) more.open = false;
     // The chat shows the set as a card; the data is the server's, not the model's.
     document.dispatchEvent(new CustomEvent('workout:set-logged', { detail: {
       exercise: panel.dataset.lastExercise, weight: panel.dataset.lastWeight,

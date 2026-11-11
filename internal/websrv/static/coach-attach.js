@@ -28,8 +28,7 @@
   const button = document.createElement('button');
   button.type = 'button';
   button.id = 'coach-photo';
-  button.className = 'ghost';
-  button.style.cssText = 'min-height: var(--tap); min-width: var(--tap); font-size: 20px; padding: 0 10px;';
+  button.className = 'mic'; // the round composer button
   button.textContent = '📷';
   button.setAttribute('aria-label', 'Añadir fotos para el coach');
 
