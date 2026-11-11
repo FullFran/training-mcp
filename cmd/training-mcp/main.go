@@ -100,7 +100,7 @@ func runWithContext(ctx context.Context, args []string) error {
 	logger := log.Default()
 	httpsrv.WarningIfDisabled(cfg.AuthDisabled, logger)
 
-	coach, engineTokens, err := startCoach(cfg.Coach, logger)
+	coach, engineTokens, err := startCoach(cfg.Coach, store, logger)
 	if err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func runWithContext(ctx context.Context, args []string) error {
 
 // startCoach builds the in-app coach when it is enabled. Disabled, it returns
 // nils and nothing of the coach exists.
-func startCoach(c config.Coach, logger *log.Logger) (*engine.Manager, httpsrv.EngineTokens, error) {
+func startCoach(c config.Coach, prefs engine.PreferenceStore, logger *log.Logger) (*engine.Manager, httpsrv.EngineTokens, error) {
 	if !c.Enabled {
 		return nil, nil, nil
 	}
@@ -184,7 +184,7 @@ func startCoach(c config.Coach, logger *log.Logger) (*engine.Manager, httpsrv.En
 	tokens := engine.NewTokens(nil)
 	manager, err := engine.NewManager(engine.Settings{
 		Vault: vault, Tokens: tokens, Command: engine.NodeCommand(c.Node, c.Engine),
-		MCPURL: c.MCPURL, SystemPrompt: engine.SystemPrompt,
+		MCPURL: c.MCPURL, SystemPrompt: engine.SystemPrompt, Preferences: prefs,
 		MaxProcesses: c.MaxProcesses, Idle: time.Duration(c.IdleSeconds) * time.Second, Logger: logger,
 	})
 	if err != nil {

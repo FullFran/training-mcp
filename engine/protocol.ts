@@ -84,7 +84,9 @@ export type ParentMessage =
    * `context` is the host's lines for this turn; the person's text never comes before them.
    * `images` are the person's photos for this turn only, in base64.
    */
-  | { type: 'prompt'; text: string; context?: string; images?: { mimeType: string; data: string }[] }
+  | { type: 'prompt'; text: string; context?: string; images?: { mimeType: string; data: string }[]; model?: string; thinking?: string }
+  /** Asks for the models the person's login can use and the current choice. */
+  | { type: 'models.get' }
   | { type: 'abort' }
   | { type: 'shutdown' };
 
@@ -98,9 +100,44 @@ export type ChildMessage =
   | { type: 'token.get'; id: string }
   | { type: 'session'; tools: string[] }
   | { type: 'delta'; text: string }
+  /** The model's reasoning text, apart from the answer. */
+  | { type: 'thinking'; text: string }
+  | { type: 'models'; models: ModelEntry[]; model: string; thinking: string }
+  | { type: 'models.failed'; code: EngineErrorCode }
   | { type: 'tool'; name: string; phase: 'start' | 'end'; ok: boolean; call?: number; pending?: boolean }
   | { type: 'done'; aborted: boolean }
   | { type: 'error'; code: EngineErrorCode };
+
+/** One model the person can choose, with the thinking levels it takes. */
+export interface ModelEntry {
+  id: string;
+  name: string;
+  thinking: ThinkingLevel[];
+}
+
+/** Pi's thinking levels, in order (the host accepts these and nothing else). */
+export const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
+export type ThinkingLevel = typeof THINKING_LEVELS[number];
+
+/**
+ * The thinking levels a model takes, as Pi decides them: none but `off` without
+ * reasoning; a level mapped to null is not offered; `xhigh` and `max` only when
+ * the model maps them. (Pi's own `getSupportedThinkingLevels` is not exported.)
+ */
+export function thinkingLevels(model: { reasoning: boolean; thinkingLevelMap?: Partial<Record<string, unknown>> }): ThinkingLevel[] {
+  if (!model.reasoning) return ['off'];
+  return THINKING_LEVELS.filter((level) => {
+    const mapped = model.thinkingLevelMap?.[level];
+    if (mapped === null) return false;
+    if (level === 'xhigh' || level === 'max') return mapped !== undefined;
+    return true;
+  });
+}
+
+/** The chosen model when the account lists it, else the account's first. */
+export function pickModel<T extends { id: string }>(available: T[], id: string | undefined): T | undefined {
+  return available.find((model) => model.id === id) ?? available[0];
+}
 
 export function encode(message: ChildMessage): string {
   return `${JSON.stringify(message)}\n`;

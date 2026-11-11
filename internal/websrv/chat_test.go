@@ -183,7 +183,7 @@ func TestComposerHasVoiceAndTheExtrasSlot(t *testing.T) {
 func TestServiceWorkerCachesTheChatShell(t *testing.T) {
 	h, _ := newServer(t)
 	body := get(t, h, base+"/sw.js").Body.String()
-	for _, want := range []string{"const VERSION = 'v9';", "BASE + '/static/shell.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'", "BASE + '/static/coach-attach.js'"} {
+	for _, want := range []string{"const VERSION = 'v10';", "BASE + '/static/shell.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'", "BASE + '/static/coach-attach.js'"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("service worker lacks %s", want)
 		}
@@ -271,5 +271,29 @@ func TestHomeIsAChatGPTStyleShell(t *testing.T) {
 	}
 	if !strings.Contains(body, `id="chat-jump"`) {
 		t.Fatal("no jump-to-latest button")
+	}
+}
+
+// The model and thinking picker: the title opens it, a chip in the composer
+// shows the thinking level, and the sheet's lists are filled from the person's
+// own engine, never written into the page.
+func TestHomeHasTheModelPicker(t *testing.T) {
+	world := newCoachWorld(t, newFakeCoach())
+	body := get(t, world.as(1), base+"/").Body.String()
+	if bar := section(t, body, `class="bar chat-bar"`, "</header>"); !strings.Contains(bar, `id="model-open"`) || !strings.Contains(bar, `aria-controls="model-sheet"`) {
+		t.Fatalf("title does not open the picker: %s", bar)
+	}
+	sheet := section(t, body, `id="model-sheet"`, "</section>")
+	for _, want := range []string{`id="model-list"`, `id="thinking-levels"`, `id="model-close"`} {
+		if !strings.Contains(sheet, want) {
+			t.Fatalf("picker lacks %s: %s", want, sheet)
+		}
+	}
+	if !strings.Contains(section(t, body, `id="coach-form"`, "</form>"), `id="thinking-chip"`) {
+		t.Fatal("composer has no thinking chip")
+	}
+	h, _ := newServer(t)
+	if off := get(t, h, base+"/").Body.String(); strings.Contains(off, `id="model-sheet"`) || strings.Contains(off, `id="model-open"`) {
+		t.Fatal("picker shown with the coach off")
 	}
 }

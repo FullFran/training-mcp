@@ -1270,3 +1270,26 @@ func (s *userStore) SetRestTarget(ctx context.Context, seconds int) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE users SET rest_seconds=? WHERE id=?`, seconds, s.userID)
 	return err
 }
+
+// CoachPreferences returns the person's coach model and thinking level; empty
+// when never chosen.
+func (s *Store) CoachPreferences(ctx context.Context, userID int64) (model, thinking string, err error) {
+	var m, th sql.NullString
+	err = s.db.QueryRowContext(ctx, `SELECT coach_model, coach_thinking FROM users WHERE id=?`, userID).Scan(&m, &th)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", nil
+	}
+	return m.String, th.String, err
+}
+
+// SetCoachPreferences keeps the person's coach model and thinking level.
+func (s *Store) SetCoachPreferences(ctx context.Context, userID int64, model, thinking string) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE users SET coach_model=?, coach_thinking=? WHERE id=?`, model, thinking, userID)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil || n != 1 {
+		return fmt.Errorf("coach preferences: no user %d", userID)
+	}
+	return nil
+}

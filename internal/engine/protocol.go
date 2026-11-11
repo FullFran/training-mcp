@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"regexp"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -35,6 +36,9 @@ const (
 	CodeLoginFailed       ErrorCode = "login_failed"
 	CodeRateLimited       ErrorCode = "rate_limited"
 	CodeTurnLimit         ErrorCode = "turn_limit"
+	// CodeBadRequest is the host's own refusal of a request it cannot serve as
+	// asked (a model the person's engine did not list). An engine never sends it.
+	CodeBadRequest ErrorCode = "bad_request"
 )
 
 var knownCodes = map[ErrorCode]bool{
@@ -108,6 +112,111 @@ type parentMessage struct {
 	// Images are the photos of a prompt, base64 in JSON. They make a prompt
 	// line far longer than anything the engine sends back.
 	Images []promptImage `json:"images,omitempty"`
+	// Model and Thinking are the person's choice for a prompt; empty means the
+	// engine's default.
+	Model    string `json:"model,omitempty"`
+	Thinking string `json:"thinking,omitempty"`
+}
+
+// ModelInfo is one model the person's ChatGPT login can use, as their engine
+// reports it, with the thinking levels it takes.
+type ModelInfo struct {
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	Thinking []string `json:"thinking"`
+}
+
+// ModelList is what the person can choose from and what is chosen now.
+type ModelList struct {
+	Models   []ModelInfo `json:"models"`
+	Model    string      `json:"model"`
+	Thinking string      `json:"thinking"`
+}
+
+// ThinkingLevels are Pi's thinking levels, in order. Nothing else is accepted.
+var ThinkingLevels = []string{"off", "minimal", "low", "medium", "high", "xhigh", "max"}
+
+const (
+	maxModels        = 64
+	maxModelNameRune = 80
+)
+
+var reModelID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
+
+func knownLevel(level string) bool {
+	for _, l := range ThinkingLevels {
+		if l == level {
+			return true
+		}
+	}
+	return false
+}
+
+// validModelName is printable text of a sane length, as the engine reports it.
+func validModelName(name string) bool {
+	if name == "" || !utf8.ValidString(name) || utf8.RuneCountInString(name) > maxModelNameRune {
+		return false
+	}
+	for _, r := range name {
+		if !unicode.IsPrint(r) {
+			return false
+		}
+	}
+	return true
+}
+
+// parseModels validates a model list from the engine: known ids and levels,
+// no duplicates, and a current choice that is one of them.
+func parseModels(raw json.RawMessage, model, thinking string) (ModelList, bool) {
+	var models []ModelInfo
+	if err := json.Unmarshal(raw, &models); err != nil || len(models) > maxModels {
+		return ModelList{}, false
+	}
+	seen := map[string]bool{}
+	var current *ModelInfo
+	for i := range models {
+		mi := &models[i]
+		if !reModelID.MatchString(mi.ID) || seen[mi.ID] || !validModelName(mi.Name) || len(mi.Thinking) == 0 || len(mi.Thinking) > len(ThinkingLevels) {
+			return ModelList{}, false
+		}
+		seen[mi.ID] = true
+		levels := map[string]bool{}
+		for _, l := range mi.Thinking {
+			if !knownLevel(l) || levels[l] {
+				return ModelList{}, false
+			}
+			levels[l] = true
+		}
+		if mi.ID == model {
+			current = mi
+		}
+	}
+	if model != "" && current == nil {
+		return ModelList{}, false
+	}
+	if thinking != "" && (current == nil || !current.takes(thinking)) {
+		return ModelList{}, false
+	}
+	return ModelList{Models: models, Model: model, Thinking: thinking}, true
+}
+
+func (mi *ModelInfo) takes(level string) bool {
+	for _, l := range mi.Thinking {
+		if l == level {
+			return true
+		}
+	}
+	return false
+}
+
+// find returns the listed model with this id.
+func (l ModelList) find(id string) *ModelInfo {
+	for i := range l.Models {
+		if l.Models[i].ID == id {
+			return &l.Models[i]
+		}
+	}
+	return nil
 }
 
 // childMessage is a parsed, validated message from the engine.
@@ -127,6 +236,10 @@ type childMessage struct {
 	Pending bool
 	Aborted bool
 	Code    ErrorCode
+	// Models is a validated model list (type "models").
+	Models   []ModelInfo
+	Model    string
+	Thinking string
 }
 
 var (
@@ -156,6 +269,9 @@ func parseChildMessage(line []byte) (childMessage, bool) {
 		Pending    bool            `json:"pending"`
 		Aborted    bool            `json:"aborted"`
 		Code       string          `json:"code"`
+		Models     json.RawMessage `json:"models"`
+		Model      string          `json:"model"`
+		Thinking   string          `json:"thinking"`
 	}
 	if err := json.Unmarshal(line, &raw); err != nil {
 		return childMessage{}, false
@@ -200,7 +316,7 @@ func parseChildMessage(line []byte) (childMessage, bool) {
 			}
 		}
 		m.Tools = tools
-	case "delta":
+	case "delta", "thinking":
 		if raw.Text == nil || utf8.RuneCountInString(*raw.Text) > maxDeltaChars || !utf8.ValidString(*raw.Text) {
 			return m, false
 		}
@@ -221,8 +337,14 @@ func parseChildMessage(line []byte) (childMessage, bool) {
 		}
 	case "done":
 		m.Aborted = raw.Aborted
-	case "error":
+	case "error", "models.failed":
 		m.Code = toCode(raw.Code)
+	case "models":
+		list, ok := parseModels(raw.Models, raw.Model, raw.Thinking)
+		if !ok {
+			return m, false
+		}
+		m.Models, m.Model, m.Thinking = list.Models, list.Model, list.Thinking
 	default:
 		return m, false
 	}

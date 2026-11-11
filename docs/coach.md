@@ -40,7 +40,8 @@ The Go server never loads Node code. With the coach off, nothing in `engine/` is
 The host speaks RE;write's engine protocol (one JSON object per line over the engine's stdin and stdout), not the Agent Client Protocol that haga-harness's `pi-sidecar` uses. For a Go host this is the simpler of the two:
 
 - It is a dozen flat message types that a Go struct and `encoding/json` parse directly; ACP is JSON-RPC 2.0 with requests, responses, notifications, session and permission methods, which needs a client library or a hand-written JSON-RPC layer.
-- It already carries what the security boundaries need and ACP has no slot for: the host-held credential (`token.get`), the single refresher (`refresh`), and the device login (`login.start`, `login.code`).
+- It already carries what the security boundaries need: the host-held credential (`token.get`), the single refresher (`refresh`), and the device login (`login.start`, `login.code`). ACP has no standard method for these; they would be extension methods (haga-harness carries the credential that way).
+- The ChatGPT-style picker and reasoning needed three more flat messages (`models.get`, `models`, `thinking`) and two optional fields on `prompt`. ACP stays a later option, for when another agent should run the coach (decided 2026-11-11).
 - ACP's permission requests and file-system callbacks exist for a coding agent; here they would be dead surface, since the engine has no tools besides `/mcp`.
 
 ## Enable it
@@ -77,7 +78,9 @@ Credentials are stored in `coach/credentials/` next to the database (`/data/coac
 8. The 📷 button (in the message box) attaches up to 4 photos to the next message: on a phone it offers the camera or the gallery. Before anything leaves the phone, each photo is redrawn on a canvas, which drops its EXIF data (location included), and saved as a JPEG of at most 1600 px on its longer side (`static/coach-attach.js`). A message can be photos only. The photos show in the person's bubble and go to their model with that turn.
 9. **Desconectar ChatGPT** (in the menu) deletes the stored credential, stops their engine process and revokes its token.
 
-The model is the first one OpenAI lists for the account. Every model of the `openai-codex` provider in Pi 1.5.2 declares image input; Pi resizes a photo to the model's limits before the request. The conversation lives in the engine process only: it is lost when the process stops (idle, disconnect, restart) and is never written to disk.
+10. Tapping the title (**Coach · modelo ▾**) opens the model picker, like ChatGPT's: the models of their own ChatGPT login and, for the chosen model, how much to think before answering (**No**, **Mínimo**, **Bajo**, **Medio**, **Alto**, **Muy alto**, **Máximo**, only the levels that model takes). The **💡 Pensar** chip in the message box opens it too. The choice is kept per person and goes with every turn, the reactions to sets included. While the model thinks, **Pensando…** shows its reasoning as it streams; once it answers it closes to **Pensó N s**, one tap away. The list is read from the person's engine when the picker opens or after a turn, never on page load, so an open page starts no engine.
+
+Without a choice, the model is the first one OpenAI lists for the account. Every model of the `openai-codex` provider in Pi 1.5.2 declares image input; Pi resizes a photo to the model's limits before the request. The conversation lives in the engine process only: it is lost when the process stops (idle, disconnect, restart) and is never written to disk.
 
 ## Routes
 
@@ -88,11 +91,13 @@ Under the app's base path, behind its existing login: the bearer of the secret m
 | `GET /coach/status` | `{state}`: `disconnected`, `pending` (with `user_code` and `verification_uri`), `connected` or `reconnect` |
 | `POST /coach/login` | Starts a device login: `{user_code, verification_uri, expires_in}`. One pending login per person; a new one cancels the previous. At most 3 starts per person in 15 minutes, then `rate_limited` |
 | `POST /coach/disconnect` | Disconnects |
-| `GET /coach/stream` | `text/event-stream`: `turn {origin: "user" or "reaction"}`, `delta {text}`, `tool {name, phase, ok?, call?, pending?}`, then `done {aborted}` or `error {code}` |
+| `GET /coach/stream` | `text/event-stream`: `turn {origin: "user" or "reaction"}`, `thinking {text}`, `delta {text}`, `tool {name, phase, ok?, call?, pending?}`, then `done {aborted}` or `error {code}` |
 | `POST /coach/prompt` `{text, images?}` | `202 {started}`; the answer arrives on the stream. Text is up to 4000 characters and may be empty only with photos; any other field is 400. `images` is a list of `{type, data}` with `data` in base64: at most 4 (`too_many_images`), each JPEG, PNG or WebP as its own bytes confirm, 1 byte to 2 MiB, 6 MiB in all (`bad_image`); a body over that size is 413 `images_too_large`. The request has 60 seconds to arrive |
 | `POST /coach/abort` | `{aborted}`: stops the running turn |
+| `GET /coach/models` | `{models: [{id, name, thinking}], model, thinking}`: the models of the person's ChatGPT login, as their engine reports them, with the thinking levels each takes, and the current choice. Starts their engine if none runs |
+| `POST /coach/settings` `{model, thinking}` | Keeps the choice. A model their engine did not list, or a level that model does not take, is 400 `bad_request` and changes nothing |
 
-Errors are a closed set of codes: `model_busy`, `reconnect`, `provider_error`, `busy`, `rate_limited`, `turn_in_progress`, `turn_limit`, `not_connected`, `engine_unavailable`, `login_failed`. Provider error text can quote response bodies, so it never reaches a response or a log.
+Errors are a closed set of codes: `bad_request`, `model_busy`, `reconnect`, `provider_error`, `busy`, `rate_limited`, `turn_in_progress`, `turn_limit`, `not_connected`, `engine_unavailable`, `login_failed`. Provider error text can quote response bodies, so it never reaches a response or a log.
 
 The service worker never handles `/coach/*`, so nothing of the chat is cached.
 
@@ -122,6 +127,7 @@ Sets the coach itself logs through MCP are not echoed back as events.
 - **Shutdown.** Engine processes exit when their stdin closes, which covers a server that dies. On SIGTERM or SIGINT the server stops them before draining HTTP connections, which also ends open chat streams.
 - **Tools.** Pi has no sandbox, so its shell and file tools are off (`noTools: 'builtin'`) and its script tool is not activated (`direct` exposure). The engine reports its tool list when the session starts; the engine and the server each stop it if any tool is not `mcp__training__*`.
 - **Model providers.** The engine process gets an environment with `PATH` only and a private temporary home, so no provider key of the operator reaches it. Before the first request it checks that every available model belongs to the person's OpenAI login.
+- **Model choice.** A person can only choose among the models their own engine listed from their login: the server refuses any other id before storing it, and the engine, given a stored id the account no longer lists, uses the account's first model instead. The choice is two columns of the person's row (`coach_model`, `coach_thinking`); reasoning text streams like the answer, under the same size limit, and is never stored.
 - **Isolation.** Every coach call names the person the request was authenticated as; events, streams, slots and credentials are kept per person. Tests cover two people for each route and for events.
 - **Not a sandbox against the operator.** Anyone with a shell in the container and the key can read stored credentials.
 
