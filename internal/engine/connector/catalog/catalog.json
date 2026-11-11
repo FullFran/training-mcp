@@ -1,20 +1,22 @@
 {
   "id": "dev.training-mcp.connectors",
-  "version": "2026.11.12-1",
+  "version": "2026.11.12-2",
+  "categories": [
+    {"id": "calendar", "label": "Calendario y horarios"},
+    {"id": "routes", "label": "Mapas y rutas"},
+    {"id": "tasks", "label": "Tareas y hábitos"},
+    {"id": "notes", "label": "Notas y diario"}
+  ],
   "entries": [
-    {"id": "notion", "server": "servers/notion.server.json", "icon": "📝", "category": "notes",
-     "summary": "Tu diario de entrenamiento, notas y planes en Notion: el coach puede leerlos y apuntar ahí."},
+    {"id": "calcom", "server": "servers/calcom.server.json", "icon": "📅", "category": "calendar",
+     "summary": "Tus citas y huecos libres: el coach ve cuándo puedes entrenar y cuadra las sesiones con tu agenda."},
+    {"id": "akiflow", "server": "servers/akiflow.server.json", "icon": "🗓️", "category": "calendar",
+     "summary": "Tu calendario y bloques de tiempo: el coach puede reservar el hueco del entrenamiento."},
+    {"id": "mapbox", "server": "servers/mapbox.server.json", "icon": "🗺️", "category": "routes",
+     "summary": "Lugares, rutas y distancias: el coach puede buscar un gimnasio cerca o medir una ruta para correr."},
     {"id": "todoist", "server": "servers/todoist.server.json", "icon": "✅", "category": "tasks",
-     "summary": "Tus tareas y recordatorios: el coach puede ver qué tienes pendiente y añadir sesiones o hábitos."},
-    {"id": "airtable", "server": "servers/airtable.server.json", "icon": "📊", "category": "data",
-     "summary": "Tus tablas de Airtable (registros de peso, comidas, sueño...) para que el coach las consulte."},
-    {"id": "zapier", "server": "servers/zapier.server.json", "icon": "⚡", "category": "automation",
-     "summary": "Las acciones que actives en Zapier (calendario, correo, otras apps) al alcance del coach."},
-    {"id": "linear", "server": "servers/linear.server.json", "icon": "📐", "category": "productivity",
-     "summary": "Tus issues y proyectos de Linear, para cuadrar el entrenamiento con la carga de trabajo."},
-    {"id": "atlassian", "server": "servers/atlassian.server.json", "icon": "🧩", "category": "productivity",
-     "summary": "Jira y Confluence: tareas y páginas de tu trabajo, para planificar alrededor de ellas."},
-    {"id": "monday", "server": "servers/monday.server.json", "icon": "📅", "category": "productivity",
-     "summary": "Tus tableros de monday.com, para ver la semana de trabajo al planificar."}
+     "summary": "Tus tareas y recordatorios: el coach puede añadir sesiones, hábitos o la compra de la semana."},
+    {"id": "notion", "server": "servers/notion.server.json", "icon": "📝", "category": "notes",
+     "summary": "Tu diario de entrenamiento, notas y planes en Notion: el coach puede leerlos y apuntar ahí."}
   ]
 }

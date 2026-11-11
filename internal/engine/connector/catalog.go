@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"path"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"unicode/utf8"
@@ -30,20 +31,16 @@ type CatalogEntry struct {
 	Title    string `json:"title"`
 	Icon     string `json:"icon"`
 	Category string `json:"category"`
-	Summary  string `json:"summary"`
-	URL      string `json:"url"`
+	// CategoryLabel is the category's name as the panel shows it (Spanish).
+	CategoryLabel string `json:"category_label"`
+	Summary       string `json:"summary"`
+	URL           string `json:"url"`
 }
 
 // CatalogView is a catalog entry with the person's connector for it, if any.
 type CatalogView struct {
 	CatalogEntry
 	Connector *View `json:"connector,omitempty"`
-}
-
-// catalogCategories are the categories an entry can have.
-var catalogCategories = map[string]bool{
-	"calendar": true, "notes": true, "tasks": true, "fitness": true, "data": true,
-	"automation": true, "productivity": true,
 }
 
 var (
@@ -60,9 +57,17 @@ const (
 )
 
 type catalogDoc struct {
-	ID      string            `json:"id"`
-	Version string            `json:"version"`
-	Entries []catalogDocEntry `json:"entries"`
+	ID         string               `json:"id"`
+	Version    string               `json:"version"`
+	Categories []catalogDocCategory `json:"categories"`
+	Entries    []catalogDocEntry    `json:"entries"`
+}
+
+// catalogDocCategory is a group of cards; the panel shows the groups in the
+// order they are declared.
+type catalogDocCategory struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
 }
 
 type catalogDocEntry struct {
@@ -107,6 +112,20 @@ func LoadCatalog(fsys fs.FS) ([]CatalogEntry, error) {
 	if len(doc.Entries) == 0 || len(doc.Entries) > maxCatalogEntries {
 		return nil, errors.New("catalog: wrong number of entries")
 	}
+	if len(doc.Categories) == 0 {
+		return nil, errors.New("catalog: categories are required")
+	}
+	labels := map[string]string{}
+	order := map[string]int{}
+	for i, c := range doc.Categories {
+		if !catalogIDPattern.MatchString(c.ID) || labels[c.ID] != "" {
+			return nil, fmt.Errorf("catalog category %q: bad or duplicate id", c.ID)
+		}
+		if strings.TrimSpace(c.Label) == "" || utf8.RuneCountInString(c.Label) > maxLabelRunes {
+			return nil, fmt.Errorf("catalog category %q: bad label", c.ID)
+		}
+		labels[c.ID], order[c.ID] = c.Label, i
+	}
 	strict := &Guard{}
 	seen := map[string]bool{}
 	out := make([]CatalogEntry, 0, len(doc.Entries))
@@ -119,7 +138,7 @@ func LoadCatalog(fsys fs.FS) ([]CatalogEntry, error) {
 			return nil, bad("duplicate id")
 		case e.Icon == "" || len(e.Icon) > maxIconBytes || !utf8.ValidString(e.Icon):
 			return nil, bad("bad icon")
-		case !catalogCategories[e.Category]:
+		case labels[e.Category] == "":
 			return nil, bad("unknown category")
 		case strings.TrimSpace(e.Summary) == "" || utf8.RuneCountInString(e.Summary) > maxSummaryRunes:
 			return nil, bad("bad summary")
@@ -158,8 +177,9 @@ func LoadCatalog(fsys fs.FS) ([]CatalogEntry, error) {
 		if len(r.Headers) != 1 || r.Headers[0].Name != "Authorization" || !r.Headers[0].IsSecret || !r.Headers[0].IsRequired {
 			return nil, bad("the one header must be the required, secret Authorization")
 		}
-		out = append(out, CatalogEntry{ID: e.ID, Title: s.Title, Icon: e.Icon, Category: e.Category, Summary: e.Summary, URL: r.URL})
+		out = append(out, CatalogEntry{ID: e.ID, Title: s.Title, Icon: e.Icon, Category: e.Category, CategoryLabel: labels[e.Category], Summary: e.Summary, URL: r.URL})
 	}
+	sort.SliceStable(out, func(i, j int) bool { return order[out[i].Category] < order[out[j].Category] })
 	return out, nil
 }
 

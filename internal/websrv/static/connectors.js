@@ -79,9 +79,19 @@
     await load();
   }
 
+  // renderCatalog shows the host's catalog as cards grouped by category, in
+  // the order the catalog gives them.
   function renderCatalog(entries) {
     catalog.replaceChildren();
+    let group = null;
+    let current = null;
     for (const e of entries) {
+      if (e.category !== current) {
+        current = e.category;
+        catalog.append(el('h3', 'cx-group', e.category_label));
+        group = el('ul', 'cx-catalog');
+        catalog.append(group);
+      }
       const li = el('li', 'cx-card');
       li.append(el('span', 'cx-icon', e.icon));
       const body = el('div', 'cx-card-body');
@@ -99,7 +109,7 @@
       } else if (c.state !== 'connected') {
         li.append(button('Conectar', 'primary mini', () => connect(c.id)));
       }
-      catalog.append(li);
+      group.append(li);
     }
   }
 

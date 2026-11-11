@@ -67,7 +67,7 @@ func (f *fakeConnectors) Descriptor(_ context.Context, userID, id int64) (connec
 
 func (f *fakeConnectors) Catalog(_ context.Context, userID int64) ([]connector.CatalogView, error) {
 	f.rec("catalog", userID)
-	return []connector.CatalogView{{CatalogEntry: connector.CatalogEntry{ID: "notion", Title: "Notion", URL: "https://mcp.notion.com/mcp"}}}, nil
+	return []connector.CatalogView{{CatalogEntry: connector.CatalogEntry{ID: "notion", Title: "Notion", Category: "notes", CategoryLabel: "Notas y diario", URL: "https://mcp.notion.com/mcp"}}}, nil
 }
 
 func (f *fakeConnectors) AddFromCatalog(_ context.Context, userID int64, entry string) (connector.View, error) {
@@ -283,7 +283,7 @@ func TestConnectorsPanelIsLinkedOnlyWhenOn(t *testing.T) {
 func TestCatalogRoutes(t *testing.T) {
 	_, conns, _, as := newConnectorWorld(t)
 	w := coachRequest(t, as(2), "GET", "/coach/connectors/catalog", "", false)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"entries":[{"id":"notion"`) {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"entries":[{"id":"notion"`) || !strings.Contains(w.Body.String(), `"category_label":"Notas y diario"`) {
 		t.Fatalf("catalog = %d %s", w.Code, w.Body)
 	}
 	w = coachRequest(t, as(2), "POST", "/coach/connectors/catalog", `{"entry":"notion"}`, true)

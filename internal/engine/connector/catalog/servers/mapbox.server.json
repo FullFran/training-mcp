@@ -1,13 +1,13 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "app.linear/linear",
-  "title": "Linear",
-  "description": "Official Linear MCP server: issues, projects and comments in the person's workspace.",
+  "name": "com.mapbox/mcp",
+  "title": "Mapbox",
+  "description": "Official Mapbox MCP server: places, directions, travel times and maps.",
   "version": "1.0.0",
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://mcp.linear.app/mcp",
+      "url": "https://mcp.mapbox.com/mcp",
       "headers": [
         {
           "name": "Authorization",

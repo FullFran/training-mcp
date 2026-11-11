@@ -106,37 +106,39 @@ Issue [#70](https://github.com/FullFran/training-mcp/issues/70). With the coach 
 
 ### Catalog: popular servers with one tap
 
-Issue [#84](https://github.com/FullFran/training-mcp/issues/84). The panel opens with **Populares**: cards of popular remote MCP servers, each with an icon, a name and one line of what it gives the coach. **Conectar** adds the server and starts its sign-in in one tap; an entry the person already has shows its state (`añadido` or `conectado`). **Añadir otro servidor** (the free URL field) stays for anything else.
+Issue [#84](https://github.com/FullFran/training-mcp/issues/84). The panel opens with **Populares**: cards of official remote MCP servers that make sense at the gym and in daily life, grouped by category (Spanish labels), each with an icon, a name and one line of what it gives the coach. **Conectar** adds the server and starts its sign-in in one tap; an entry the person already has shows its state (`añadido` or `conectado`). **Añadir otro servidor** (the free URL field) stays for anything else.
 
 The catalog is a host-owned, versioned document in the repository, `internal/engine/connector/catalog/`, embedded in the binary, so adding or removing an entry is a reviewed change:
 
-- `catalog.json`: `id`, `version` and `entries`, each with `id`, `server` (the path of its server.json), `icon`, `category` (`calendar`, `notes`, `tasks`, `fitness`, `data`, `automation`, `productivity`) and `summary` (Spanish, up to 160 characters). It borrows the top-level shape of an HCS-0001 catalog (`id`, opaque `version`, `entries` with unique ids) but is not an HCS-0001 manifest: its entries are remote endpoints, not packages with a `contentHash`, so it declares no `hcsVersion`.
-- `servers/<id>.server.json`: the entry as an MCP Registry server.json (2025-12-11, HCS-0008-R010), with the provider's official registry `name`, its `title`, one `streamable-http` remote and one required, secret `Authorization` header with no value or default (R011). The token is obtained by the host's OAuth client and stays in the person's vault (R012).
+- `catalog.json`: `id`, `version`, `categories` (each an `id` and a Spanish `label`; the panel shows the groups in this order) and `entries`, each with `id`, `server` (the path of its server.json), `icon`, `category` (one of the declared ids) and `summary` (Spanish, up to 160 characters). It borrows the top-level shape of an HCS-0001 catalog (`id`, opaque `version`, `entries` with unique ids) but is not an HCS-0001 manifest: its entries are remote endpoints, not packages with a `contentHash`, so it declares no `hcsVersion`.
+- `servers/<id>.server.json`: the entry as an MCP Registry server.json (2025-12-11, HCS-0008-R010), with the provider's official registry `name` (reverse DNS of the provider's domain when the provider has not published one), its `title`, one `streamable-http` remote and one required, secret `Authorization` header with no value or default (R011). The token is obtained by the host's OAuth client and stays in the person's vault (R012).
 
-Loading refuses the whole catalog when any rule fails (the test suite loads the built-in one, so a bad entry fails the build; at run time the catalog routes would answer `catalog`): unknown members anywhere (so a header `value` or `default` is refused), a duplicate or malformed id, a schema other than 2025-12-11, a transport other than one `streamable-http`, a URL the guard's static check refuses (not `https`, user info, query, fragment, an IP in a private range, `localhost` or an internal name), an `Authorization` header that is not required and secret, missing display metadata, or a `title` whose server name is not the entry `id` (the coach's tools are `mcp__<id>__*`).
+Loading refuses the whole catalog when any rule fails (the test suite loads the built-in one, so a bad entry fails the build; at run time the catalog routes would answer `catalog`): unknown members anywhere (so a header `value` or `default` is refused), a duplicate or malformed id, a schema other than 2025-12-11, a transport other than one `streamable-http`, a URL the guard's static check refuses (not `https`, user info, query, fragment, an IP in a private range, `localhost` or an internal name), an `Authorization` header that is not required and secret, a category that is not declared or a declared category without a label, missing display metadata, or a `title` whose server name is not the entry `id` (the coach's tools are `mcp__<id>__*`).
 
 One tap is exactly the manual path: `AddFromCatalog` calls `Add` with the entry's URL and title and no token, so the guard (resolution and dial-time checks), the name rules, the limit of 10 and the OAuth flow are the same, and the stored connector and its server.json are identical to adding that URL by hand. The request names only the entry id; a URL, label or token in it is refused. An entry is matched to the person's connector by URL.
 
-Entries (2026-11-12) are only servers whose official remote endpoint is listed by the provider's verified namespace in the official MCP Registry and whose authorization server advertises dynamic client registration, which the OAuth client needs. Each was checked with an unauthenticated `initialize` (401), its protected resource metadata and its authorization server metadata (`registration_endpoint` present):
+Entries (2026-11-12) are only servers whose official remote endpoint is published by the provider (its documentation, or its verified namespace in the official MCP Registry), and that the host's own OAuth client can sign in to: each was checked with an unauthenticated `initialize` (401) and with this package's `Probe` and `Discover` against the live endpoint (protected resource metadata, authorization server metadata with a matching `issuer`, PKCE `S256` and a `registration_endpoint`). No client was registered and no sign-in was completed.
 
-| Entry | Endpoint | Source |
-| --- | --- | --- |
-| Notion | `https://mcp.notion.com/mcp` | Registry `com.notion/mcp`; [Notion MCP docs](https://developers.notion.com/docs/mcp) |
-| Todoist | `https://ai.todoist.net/mcp` | Registry `net.todoist/mcp` |
-| Airtable | `https://mcp.airtable.com/mcp` | Registry `com.airtable/mcp` |
-| Zapier | `https://mcp.zapier.com/api/v1/connect` | Registry `com.zapier/mcp` |
-| Linear | `https://mcp.linear.app/mcp` | Registry `app.linear/linear`; [Linear MCP docs](https://linear.app/docs/mcp) |
-| Atlassian | `https://mcp.atlassian.com/v2/mcp` | Registry `com.atlassian/atlassian-mcp-server` |
-| Monday | `https://mcp.monday.com/mcp` | Registry `com.monday/monday.com` |
+| Group | Entry | Endpoint | Source |
+| --- | --- | --- | --- |
+| Calendario y horarios | Cal.com | `https://mcp.cal.com/mcp` | [Cal.com MCP server docs](https://cal.com/docs/mcp-server) |
+| Calendario y horarios | Akiflow | `https://mcp.akiflow.com/mcp` | Registry `com.akiflow/akiflow`; [akiflow.com/mcp](https://akiflow.com/mcp) |
+| Mapas y rutas | Mapbox | `https://mcp.mapbox.com/mcp` | [Mapbox MCP server docs](https://docs.mapbox.com/api/guides/mcp-server/) |
+| Tareas y hábitos | Todoist | `https://ai.todoist.net/mcp` | Registry `net.todoist/mcp` |
+| Notas y diario | Notion | `https://mcp.notion.com/mcp` | Registry `com.notion/mcp`; [Notion MCP docs](https://developers.notion.com/docs/mcp) |
 
 Registry entries are read at `https://registry.modelcontextprotocol.io/v0/servers?search=<name>&version=latest`.
 
-Left out:
+No official remote server yet, or none one tap can use (checked 2026-11-12 in the registry by provider namespace, on the providers' domains and in their documentation):
 
-- **Fitness and health platforms** (Strava, Garmin, Whoop, Oura, Fitbit, Polar, Suunto, Withings, intervals.icu, TrainingPeaks): the registry lists only third-party servers for them, no official remote endpoint.
-- **Google Calendar and Gmail**: Google's official remote servers in the registry (`com.googleapis.*`) cover cloud and Maps APIs, not Calendar or Gmail.
-- **GitHub** (`https://api.githubcopilot.com/mcp/`, registry `io.github.github/github-mcp-server`) and **Asana** (`https://mcp.asana.com/v2/mcp`): official, but their authorization servers advertise no dynamic client registration, so one tap would end in `registration_failed`. They still work through the free URL field with a static token.
-- Official servers with little to give a training coach (for example Canva, Sentry, Stripe, Hugging Face, Cloudflare) are left out to keep the list short.
+- **Training and fitness platforms.** Strava has an official remote server (`https://mcp.strava.com/mcp`, OAuth with dynamic registration), but its authorization server metadata does not match the issuer its resource metadata names (`https://www.strava.com/mcp-issuer` against `https://www.strava.com`) and does not list PKCE `S256`, so `Discover` refuses it (`discovery_failed`). Accepting it would mean relaxing the OAuth checks, which this catalog does not do. Garmin, Polar, Coros, Suunto, Peloton, Zwift, TrainingPeaks and intervals.icu: no official remote server; the registry lists only third-party ones.
+- **Health and sleep** (Oura, Whoop, Fitbit, Withings, Eight Sleep, Apple Health): none; `mcp.ouraring.com` and `mcp.whoop.com` do not resolve, the registry lists only third-party servers.
+- **Nutrition and food logging** (MyFitnessPal, Cronometer, Yazio, Lose It): none from the providers; the registry lists only third-party trackers.
+- **Music** (Spotify, Apple Music, YouTube Music, Deezer, Tidal): none; `mcp.spotify.com` does not resolve.
+- **Habit tracking** (Habitica, Streaks, TickTick): none; Todoist covers recurring tasks.
+- **Weather.** OpenWeather has an official server (`https://mcp.openweathermap.org/mcp`, registry `org.openweathermap/agents`), but it is a pay-per-call data store: without a paid data key it only lists products and sign-up, and a key that works could not be checked. AccuWeather and Tomorrow.io: none.
+- **Google Calendar and Google Maps.** No official remote server for Calendar. Google's Maps server (`https://mapstools.googleapis.com/mcp`, registry `com.googleapis.mapstools/mcp`) uses Google accounts with no dynamic registration, or an API key in its own header, which the proxy does not send.
+- **GitHub** and **Asana**: official, but no dynamic registration; they work through the free URL field with a static token.
 
 OAuth needs the app at the root (`WEB_OAUTH_CLIENT_ID` and `MCP_OAUTH_RESOURCE`): the redirect URI is `<origin of MCP_OAUTH_RESOURCE>/coach/connectors/callback`. On the secret mount alone, only servers with a static token or none can be connected (`oauth_unavailable`).
 

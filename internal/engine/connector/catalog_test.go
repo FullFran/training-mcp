@@ -29,7 +29,7 @@ func TestBuiltinCatalogIsValid(t *testing.T) {
 		if !strings.HasPrefix(e.URL, "https://") {
 			t.Errorf("%s: %s is not https", e.ID, e.URL)
 		}
-		if e.Title == "" || e.Icon == "" || e.Summary == "" || e.Category == "" {
+		if e.Title == "" || e.Icon == "" || e.Summary == "" || e.Category == "" || e.CategoryLabel == "" {
 			t.Errorf("%s: missing display metadata: %+v", e.ID, e)
 		}
 	}
@@ -64,6 +64,27 @@ func TestBuiltinCatalogIsValid(t *testing.T) {
 // credentialShape is a bearer value or a well-known token prefix.
 var credentialShape = regexp.MustCompile(`(?i)bearer\s+[a-z0-9._~+/=-]{16,}|\b(sk|ghp|gho|xoxb|xoxp|lin_api|ntn|secret)_?-?[a-z0-9]{12,}`)
 
+func TestCatalogIsGroupedByCategoryInDeclaredOrder(t *testing.T) {
+	two := strings.Replace(goodCatalog, `]}`,
+		`, {"id": "agenda", "server": "servers/agenda.server.json", "icon": "📅", "category": "calendar", "summary": "Agenda."},
+		   {"id": "example2", "server": "servers/example2.server.json", "icon": "📝", "category": "notes", "summary": "Más notas."}]}`, 1)
+	fsys := catalogFSWith(two, goodServer)
+	fsys["servers/agenda.server.json"] = &fstest.MapFile{Data: []byte(strings.Replace(goodServer, `"title": "Example"`, `"title": "Agenda"`, 1))}
+	fsys["servers/example2.server.json"] = &fstest.MapFile{Data: []byte(strings.Replace(goodServer, `"title": "Example"`, `"title": "Example2"`, 1))}
+	entries, err := LoadCatalog(fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, e := range entries {
+		got = append(got, e.Category+":"+e.CategoryLabel+":"+e.ID)
+	}
+	want := "notes:Notas:example notes:Notas:example2 calendar:Calendario:agenda"
+	if strings.Join(got, " ") != want {
+		t.Fatalf("order = %v, want %s", got, want)
+	}
+}
+
 func walkJSON(v any, f func(key string, v any)) {
 	switch x := v.(type) {
 	case map[string]any:
@@ -88,7 +109,9 @@ const goodServer = `{
     "headers": [{"name": "Authorization", "description": "Bearer token held by the host.", "isRequired": true, "isSecret": true}]}]
 }`
 
-const goodCatalog = `{"id": "dev.test.connectors", "version": "1", "entries": [
+const goodCatalog = `{"id": "dev.test.connectors", "version": "1",
+ "categories": [{"id": "notes", "label": "Notas"}, {"id": "calendar", "label": "Calendario"}],
+ "entries": [
   {"id": "example", "server": "servers/example.server.json", "icon": "📝", "category": "notes", "summary": "Notas."}
 ]}`
 
@@ -141,7 +164,7 @@ func TestLoadCatalogRefusesBadDocuments(t *testing.T) {
 func catalogFixture(t *testing.T) (*fixture, *fakeRemote) {
 	f := newFakeRemote(t)
 	fx := newFixture(t, f)
-	fx.svc.CatalogEntries = []CatalogEntry{{ID: "notion", Title: "Notion", Icon: "📝", Category: "notes", Summary: "Notas.", URL: f.URL()}}
+	fx.svc.CatalogEntries = []CatalogEntry{{ID: "notion", Title: "Notion", Icon: "📝", Category: "notes", CategoryLabel: "Notas", Summary: "Notas.", URL: f.URL()}}
 	return fx, f
 }
 
@@ -217,7 +240,7 @@ func TestCatalogURLsStillGoThroughTheGuard(t *testing.T) {
 	fx, _ := catalogFixture(t)
 	fx.svc.Guard = &Guard{} // the strict one: the loopback fake is refused
 	fx.svc.CatalogEntries = append(fx.svc.CatalogEntries,
-		CatalogEntry{ID: "metadata", Title: "Metadata", Icon: "x", Category: "notes", Summary: "x", URL: "https://169.254.169.254/mcp"})
+		CatalogEntry{ID: "metadata", Title: "Metadata", Icon: "x", Category: "notes", CategoryLabel: "Notas", Summary: "x", URL: "https://169.254.169.254/mcp"})
 	ctx := context.Background()
 	for _, id := range []string{"notion", "metadata"} {
 		if _, err := fx.svc.AddFromCatalog(ctx, fx.a, id); CodeOf(err) != "blocked_address" {
