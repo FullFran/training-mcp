@@ -187,21 +187,45 @@ func ftsQuery(text string) string {
 }
 
 func ftsWords(text string) []string {
-	words := strings.FieldsFunc(text, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) && !unicode.Is(unicode.Mn, r) })
+	words := searchWords(text)
 	for i, w := range words {
 		words[i] = `"` + w + `"*`
 	}
 	return words
 }
 
-// ftsAnyQuery matches any word of three or more characters instead of all of
-// them: the deterministic "is this about the same thing?".
+// searchWords splits text into runs of letters, digits and combining marks.
+func searchWords(text string) []string {
+	return strings.FieldsFunc(text, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) && !unicode.Is(unicode.Mn, r) })
+}
+
+// candidateStopwords are common Spanish and English words that say nothing
+// about what a fact is about, so sharing them does not make two facts similar.
+var candidateStopwords = map[string]bool{}
+
+func init() {
+	for _, w := range strings.Fields(`
+		por para con sin del los las una uno unos unas que como más mas muy pero sus son está esta este esto estos estas ese esa eso
+		hay tiene tengo ser sobre entre hasta desde cuando donde también tambien porque todo toda todos todas nada algo cada otro otra
+		the and for with from that this these those but not are was were has have had its into over under than then when
+		where which who what will would can could should about after before`) {
+		candidateStopwords[w] = true
+	}
+}
+
+// minCandidateWord is the shortest word that counts toward similarity.
+const minCandidateWord = 3
+
+// ftsAnyQuery matches any meaningful word instead of all of them: the
+// deterministic "is this about the same thing?". Stopwords and words shorter
+// than minCandidateWord are left out.
 func ftsAnyQuery(text string) string {
 	var words []string
-	for _, w := range ftsWords(text) {
-		if utf8.RuneCountInString(w) >= len(`""*`)+3 {
-			words = append(words, w)
+	for _, w := range searchWords(text) {
+		if utf8.RuneCountInString(w) < minCandidateWord || candidateStopwords[strings.ToLower(w)] {
+			continue
 		}
+		words = append(words, `"`+w+`"*`)
 	}
 	return strings.Join(words, " OR ")
 }

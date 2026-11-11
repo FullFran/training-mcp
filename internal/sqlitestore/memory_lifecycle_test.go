@@ -315,7 +315,7 @@ func TestConsolidationNeverOverwritesAnotherActiveFact(t *testing.T) {
 	}
 }
 
-// A database at 017 gets review dates from each fact's type.
+// A database without 020 gets review dates from each fact's type.
 func TestMigrationGivesExistingFactsAReviewDate(t *testing.T) {
 	store := openTwoUsers(t)
 	if _, err := store.db.Exec(`UPDATE coach_memory SET review_after=''`); err != nil {
@@ -326,7 +326,7 @@ func TestMigrationGivesExistingFactsAReviewDate(t *testing.T) {
 	if _, err := store.db.Exec(`UPDATE coach_memory SET review_after=''`); err != nil {
 		t.Fatal(err)
 	}
-	body, err := migrationFS.ReadFile("migrations/018_memory_lifecycle.sql")
+	body, err := migrationFS.ReadFile("migrations/020_memory_lifecycle.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,5 +436,20 @@ func TestDeletingASurvivorClearsItsSourcesPointer(t *testing.T) {
 	forgotten, err := u.ListMemory(ctx, training.MemoryQuery{View: training.MemoryViewForgotten, Limit: 10})
 	if err != nil || len(forgotten) != 2 || forgotten[0].ConsolidatedInto != 0 || forgotten[1].ConsolidatedInto != 0 {
 		t.Fatalf("forgotten = %#v, %v", forgotten, err)
+	}
+}
+
+// Sharing only stopwords or very short words is not being about the same thing.
+func TestCandidatesIgnoreStopwordsAndShortWords(t *testing.T) {
+	u := openTwoUsers(t).ForUser(1)
+	save(t, u, training.Memory{TopicKey: "a", Title: "No tiene barra para dominadas por la casa", Body: "x"})
+	save(t, u, training.Memory{TopicKey: "b", Title: "The bar and the rack", Body: "x"})
+	saved := save(t, u, training.Memory{TopicKey: "c", Title: "Prefiere entrenar por la mañana con the and", Body: "x"})
+	if len(saved.Candidates) != 0 {
+		t.Fatalf("stopwords made candidates: %#v", saved.Candidates)
+	}
+	// A real shared word still counts.
+	if again := save(t, u, training.Memory{TopicKey: "d", Title: "Dominadas con lastre", Body: "x"}); len(again.Candidates) != 1 {
+		t.Fatalf("candidates = %#v", again.Candidates)
 	}
 }

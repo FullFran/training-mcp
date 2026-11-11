@@ -256,7 +256,8 @@ asking never lets it forget, retire or merge facts without asking.
 - **Revisions.** A topic key keeps one row and a revision count; each earlier
   text is kept, numbered from 1.
 - **Conflict surfacing.** Saving looks for active facts sharing a word of three
-  or more letters with the title (at most 5) and returns them as candidates.
+  or more letters with the title, common Spanish and English stopwords aside
+  (at most 5), and returns them as candidates.
   `supersedes` retires the old fact from context and search at once.
   `conflicts_with` keeps both and lists them in the app's Conflicts view,
   where the person keeps the newer, the older or both.
