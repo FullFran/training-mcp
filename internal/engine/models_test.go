@@ -138,3 +138,28 @@ func TestModelsMessageIsValidated(t *testing.T) {
 		t.Fatalf("models.failed: %+v %v", m, ok)
 	}
 }
+
+// Disconnecting forgets the account's model list: nothing is served or chosen
+// from it until the person connects again and their new engine reports one.
+func TestDisconnectForgetsTheModelList(t *testing.T) {
+	h := newHarness(t, "ok", nil)
+	h.connect(1)
+	_, closeSub := h.m.Subscribe(1) // an open chat keeps the person tracked
+	defer closeSub()
+	if _, err := h.m.Models(1); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.m.Disconnect(1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.m.Models(1); codeOf(err) != CodeNotConnected {
+		t.Fatalf("models after disconnect: %v", err)
+	}
+	if err := h.m.SetPreferences(1, "gpt-a", "high"); codeOf(err) != CodeNotConnected {
+		t.Fatalf("choice after disconnect: %v", err)
+	}
+	h.connect(1)
+	if list, err := h.m.Models(1); err != nil || list.Model != "gpt-a" || list.Thinking != "medium" {
+		t.Fatalf("after reconnecting: %+v %v", list, err)
+	}
+}

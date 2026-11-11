@@ -337,6 +337,7 @@ func (m *Manager) Disconnect(userID int64) error {
 		m.stop(p, "disconnect", nil)
 		p.reconnect = false
 		p.events = nil
+		p.models = nil
 	}
 	// A process already stopped but kept for a refresh in flight must not write
 	// the refreshed credential back after this.
@@ -418,6 +419,13 @@ func (m *Manager) Models(userID int64) (ModelList, error) {
 	model, thinking := m.preferences(userID)
 	m.mu.Lock()
 	p := m.personOf(userID)
+	// The list belongs to the login it came from: no login, no list.
+	if err := m.connected(p); err != nil {
+		p.models = nil
+		m.forget(p)
+		m.mu.Unlock()
+		return ModelList{}, err
+	}
 	list := p.models
 	var wait chan struct{}
 	if list == nil {
@@ -823,6 +831,7 @@ func (m *Manager) handle(p *person, pr *proc, msg childMessage) {
 			return
 		}
 		p.reconnect = false
+		p.models = nil // a new login may be another account
 		m.endLogin(p, CodeLoginFailed, false, false)
 	case "login.failed":
 		if p.login != nil && p.proc == pr {
