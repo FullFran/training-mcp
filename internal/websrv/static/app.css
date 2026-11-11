@@ -732,8 +732,30 @@ main { padding-bottom: 140px; }
 .coach-form #coach-stop { flex-basis: 100%; }
 .composer-extras { display: flex; gap: 8px; }
 .composer-extras:empty { display: none; }
-.mic { min-height: var(--tap); font-size: 20px; }
-.mic.on { border-color: var(--danger); color: var(--danger); }
+/* The mic sits by the send button, big enough to hit with a thumb mid-set. */
+.mic {
+  flex: none;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: var(--card);
+  color: var(--text);
+  font-size: 26px;
+}
+.mic.on {
+  border-color: var(--danger);
+  background: var(--danger);
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, .55); }
+  50% { box-shadow: 0 0 0 10px rgba(248, 113, 113, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .mic.on { animation: none; } }
+.listening { flex-basis: 100%; order: -1; margin: 0; color: var(--danger); font-size: 14px; font-weight: 600; }
+.autosend { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); min-height: 32px; }
+.autosend input { width: 20px; height: 20px; }
 .coach-pending { color: var(--accent); }
 
 /* --- chat-first home ------------------------------------------------------

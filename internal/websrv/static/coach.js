@@ -4,8 +4,8 @@
 // model is inserted as text, never as HTML: replies go through markdown.js,
 // which builds a small Markdown subset from text nodes.
 //
-// Voice is the browser's own: speech recognition dictates into the composer
-// and speech synthesis reads replies aloud. No provider, no tokens.
+// Voice is the browser's own speech recognition dictating into the composer.
+// No provider, no tokens.
 (function () {
   'use strict';
 
@@ -22,7 +22,8 @@
   const stop = $('coach-stop');
   const disconnect = $('coach-disconnect');
   const mic = $('coach-mic');
-  const speak = $('coach-speak');
+  const listeningNote = $('coach-listening');
+  const autosend = $('coach-autosend');
 
   const MESSAGES = {
     model_busy: 'El modelo está saturado. Prueba en un momento.',
@@ -169,7 +170,6 @@
     });
     stream.addEventListener('done', (ev) => {
       if (data(ev).aborted) note('Detenido.');
-      else if (current) readAloud(current.textContent);
       said = '';
       current = null;
       setRunning(false);
@@ -186,61 +186,57 @@
     });
   }
 
-  // --- voice ----------------------------------------------------------------
-  // Read-aloud is a per-device choice; it only speaks finished replies.
-  const SPEAK_KEY = 'coach-speak';
-  const canSpeak = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
-  let speaking = canSpeak && localStorage.getItem(SPEAK_KEY) === '1';
-
-  function paintSpeak() {
-    speak.hidden = !canSpeak;
-    speak.setAttribute('aria-pressed', String(speaking));
-    speak.textContent = speaking ? '🔊 Leyendo respuestas' : '🔈 Leer respuestas';
-  }
-
-  function readAloud(textToRead) {
-    if (!speaking || !textToRead.trim()) return;
-    const u = new SpeechSynthesisUtterance(textToRead);
-    u.lang = document.documentElement.lang || 'es';
-    window.speechSynthesis.speak(u);
-  }
-
-  speak.addEventListener('click', () => {
-    speaking = !speaking;
-    localStorage.setItem(SPEAK_KEY, speaking ? '1' : '0');
-    if (!speaking) window.speechSynthesis.cancel();
-    paintSpeak();
-  });
-  paintSpeak();
-
-  // Dictation appends to whatever is already typed; the person still sends.
+  // --- dictation ---------------------------------------------------------------
+  // One thumb mid-set: tap the mic and talk. Recognition stops by itself after
+  // a silence, or on a second tap; the words land in the message box, added to
+  // whatever was typed. With auto-send on, they go to the coach right away.
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const AUTOSEND_KEY = 'coach-autosend';
   let listening = null;
+
+  function setListening(rec) {
+    listening = rec;
+    const on = Boolean(rec);
+    mic.classList.toggle('on', on);
+    mic.setAttribute('aria-pressed', String(on));
+    mic.setAttribute('aria-label', on ? 'Terminar de dictar' : 'Dictar');
+    listeningNote.hidden = !on;
+  }
+
   if (Recognition) {
     mic.hidden = false;
+    $('coach-autosend-wrap').hidden = false;
+    autosend.checked = localStorage.getItem(AUTOSEND_KEY) === '1';
+    autosend.addEventListener('change', () => {
+      localStorage.setItem(AUTOSEND_KEY, autosend.checked ? '1' : '0');
+    });
+
     mic.addEventListener('click', () => {
       if (listening) { listening.stop(); return; }
       const rec = new Recognition();
       rec.lang = document.documentElement.lang === 'es' ? 'es-ES' : (document.documentElement.lang || 'es-ES');
       rec.interimResults = true;
+      rec.continuous = false; // ends on its own after a pause
       const before = text.value ? text.value.replace(/\s*$/, ' ') : '';
+      let heard = '';
       rec.onresult = (ev) => {
-        let heard = '';
+        heard = '';
         for (let i = 0; i < ev.results.length; i++) heard += ev.results[i][0].transcript;
         text.value = before + heard;
       };
       rec.onerror = (ev) => {
         if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') note('Sin permiso para usar el micrófono.', 'error');
+        else if (ev.error === 'no-speech') note('No te he oído. Toca 🎤 y habla.');
+        else if (ev.error === 'network') note('El dictado necesita conexión.', 'error');
       };
       rec.onend = () => {
-        listening = null;
-        mic.classList.remove('on');
-        mic.setAttribute('aria-pressed', 'false');
-        text.focus();
+        if (listening !== rec) return;
+        setListening(null);
+        if (heard.trim() && autosend.checked && !running) form.requestSubmit();
+        else text.focus();
       };
-      listening = rec;
-      mic.classList.add('on');
-      mic.setAttribute('aria-pressed', 'true');
+      setListening(rec);
+      if (navigator.vibrate) navigator.vibrate(8);
       try { rec.start(); } catch (e) { rec.onend(); }
     });
   }
