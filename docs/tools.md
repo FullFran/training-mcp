@@ -52,7 +52,7 @@ A **session** is decided per channel by the server, never by the agent:
 
 | Channel | Session |
 |---|---|
-| In-app coach | One chat conversation. The coach's engine process holds the conversation in memory and reaches `/mcp` with a bearer minted for that process, so the session is derived from that bearer (`coach:` plus a hash; the bearer is never stored). A new conversation (the process stopped when idle, reached its maximum age or was reconnected) is a new session, and earlier answers do not carry over. |
+| In-app coach | One stored chat conversation, `coach:conversation-<id>`. The coach's engine process reaches `/mcp` with a bearer minted for that process, and the coach resolves the bearer to the conversation that process serves, so answers given in a chat hold when it is reopened later (on a new process) and never in another chat. Conversation ids are never reused. A turn outside any stored conversation is its own session, derived from the bearer (`coach:` plus a hash; the bearer is never stored). |
 | External MCP client (ChatGPT, Claude) | A time window. `/mcp` is stateless (no `Mcp-Session-Id`), and an OAuth access token rotates within the hour, so there is no MCP-native identifier for a conversation. Every external call shares the session `mcp`, which a grant or denial covers for 12 hours from the answer. |
 | Anything else (no HTTP request) | No session. No stored grant or denial ever matches it (HCS-0005 R008). |
 
@@ -106,8 +106,10 @@ applied.
 Remaining divergences: the external session is a 12-hour window shared by every
 external client of the account (ChatGPT and Claude are one session) because
 the stateless endpoint has no per-conversation identifier; the in-app coach
-session is one engine process rather than a stored chat id, so a long
-conversation that outlives its process asks again; and a pending proposal has
+session is the stored conversation (`coach:conversation-<id>`), so a grant or
+denial given in a chat holds there across engine processes and nowhere else;
+connector-tool always answers for a conversation are held in memory, so a server
+restart asks again; and a pending proposal has
 no deadline (it waits, applying nothing, until answered), so no `timeout`
 record is written. Decision records stay in the database (HCS-0005 OQ-0005-6
 and OQ-0005-7).

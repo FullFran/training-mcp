@@ -106,6 +106,8 @@ func runWithContext(ctx context.Context, args []string) error {
 		return err
 	}
 	if coach != nil {
+		// A coach proposal belongs to the stored conversation it was made in.
+		mcpServer.SetCoachSessions(coach.SessionOf)
 		// Engine processes must not outlive the server, even when it stops on error.
 		defer func() {
 			closeCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

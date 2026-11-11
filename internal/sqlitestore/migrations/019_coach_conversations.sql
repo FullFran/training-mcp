@@ -1,8 +1,10 @@
 -- The coach's conversations, per person. Times are Unix milliseconds. A
 -- conversation is deleted 90 days after its last message (updated_at), and with
 -- its person. Photos are never stored: a message keeps only how many it had.
+-- AUTOINCREMENT: a conversation id is an HCS-0005 session, so a deleted id is
+-- never given to a new chat, which would otherwise inherit its answers.
 CREATE TABLE coach_conversations (
-  id INTEGER PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   created_at INTEGER NOT NULL,

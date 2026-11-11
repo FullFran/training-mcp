@@ -269,8 +269,12 @@ type Manager struct {
 	s      Settings
 	mu     sync.Mutex
 	people map[int64]*person
-	alive  map[*proc]bool
-	closed bool
+	// convAnswers holds the always answers given in each stored conversation,
+	// by conversation id: a conversation is one HCS-0005 session, whatever
+	// engine process serves it.
+	convAnswers map[int64]*conversationAnswers
+	alive       map[*proc]bool
+	closed      bool
 	// writes stores conversation messages in order, off the lock.
 	writes       chan func(context.Context)
 	writesClosed bool
@@ -283,7 +287,7 @@ func NewManager(s Settings) (*Manager, error) {
 		return nil, errors.New("engine: vault, tokens, command and MCP URL are required")
 	}
 	s.defaults()
-	m := &Manager{s: s, people: map[int64]*person{}, alive: map[*proc]bool{}, writes: make(chan func(context.Context), 256), writesDone: make(chan struct{}), quit: make(chan struct{})}
+	m := &Manager{s: s, people: map[int64]*person{}, convAnswers: map[int64]*conversationAnswers{}, alive: map[*proc]bool{}, writes: make(chan func(context.Context), 256), writesDone: make(chan struct{}), quit: make(chan struct{})}
 	go m.writeLoop()
 	if s.Conversations != nil {
 		go m.purgeLoop()
@@ -325,6 +329,9 @@ func (m *Manager) purgeLoop() {
 		if _, err := m.s.Conversations.PurgeCoachConversations(ctx, m.cutoff()); err != nil {
 			m.log("store_failed", "purge")
 		}
+		m.mu.Lock()
+		m.dropConversationAnswers(func(a *conversationAnswers) bool { return a.used.Before(m.cutoff()) })
+		m.mu.Unlock()
 		cancel()
 		select {
 		case <-tick.C:
@@ -689,6 +696,7 @@ func (m *Manager) forgetConversations(userID int64, deleted func(int64) bool) {
 	if deleted(p.conv) {
 		p.conv = 0
 	}
+	m.dropConversationAnswers(func(a *conversationAnswers) bool { return a.user == userID && deleted(a.conv) })
 	if p.proc != nil && p.proc.used && deleted(p.proc.conv) {
 		m.stop(p, "conversation_deleted", nil)
 	}

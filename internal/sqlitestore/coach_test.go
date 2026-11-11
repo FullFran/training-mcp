@@ -108,3 +108,26 @@ func TestCoachPurgeDeletesOnlyOldConversations(t *testing.T) {
 }
 
 func second[A, B any](_ A, _ B, err error) error { return err }
+
+// A conversation id is an HCS-0005 session: a deleted one is never handed to a
+// new chat, which would otherwise inherit its always answers.
+func TestADeletedConversationIDIsNeverReused(t *testing.T) {
+	ctx := context.Background()
+	st := openTwoUsers(t)
+	t0 := time.Date(2026, 11, 1, 10, 0, 0, 0, time.UTC)
+	a, _ := st.CreateCoachConversation(ctx, 1, "Pierna", t0)
+	b, _ := st.CreateCoachConversation(ctx, 1, "Espalda", t0)
+	if err := st.DeleteCoachConversation(ctx, 1, b); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.DeleteCoachConversations(ctx, 1); err != nil {
+		t.Fatal(err)
+	}
+	c, err := st.CreateCoachConversation(ctx, 2, "Hombro", t0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c == a || c == b || c < b {
+		t.Fatalf("new conversation got id %d after deleting %d and %d", c, a, b)
+	}
+}
