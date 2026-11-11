@@ -23,6 +23,8 @@ type Connectors interface {
 	Disconnect(ctx context.Context, userID, id int64) error
 	Remove(ctx context.Context, userID, id int64) error
 	Descriptor(ctx context.Context, userID, id int64) (connector.ServerJSON, error)
+	Catalog(ctx context.Context, userID int64) ([]connector.CatalogView, error)
+	AddFromCatalog(ctx context.Context, userID int64, entryID string) (connector.View, error)
 }
 
 // Approvals is the part of the coach that answers connector tool permission
@@ -51,6 +53,7 @@ var connectorHTTPStatus = map[string]int{
 	"unauthorized":        http.StatusBadGateway,
 	"unreachable":         http.StatusBadGateway,
 	"vault":               http.StatusServiceUnavailable,
+	"catalog":             http.StatusServiceUnavailable,
 }
 
 func (s *Server) connectorRoutes() {
@@ -61,6 +64,8 @@ func (s *Server) connectorRoutes() {
 	s.handle("GET "+b+"/coach/connectors", s.coachUser(s.connectorsPage))
 	s.handle("GET "+b+"/coach/connectors/list", s.coachUser(s.connectorsList))
 	s.handle("POST "+b+"/coach/connectors", s.coachWrite(s.connectorAdd))
+	s.handle("GET "+b+"/coach/connectors/catalog", s.coachUser(s.connectorCatalog))
+	s.handle("POST "+b+"/coach/connectors/catalog", s.coachWrite(s.connectorAddFromCatalog))
 	s.handle("GET "+b+"/coach/connectors/callback", s.coachUser(s.connectorCallback))
 	s.handle("POST "+b+"/coach/connectors/{id}/connect", s.coachWrite(s.connectorAction))
 	s.handle("GET "+b+"/coach/connectors/{id}/tools", s.coachUser(s.connectorAction))
@@ -115,6 +120,37 @@ func (s *Server) connectorAdd(w http.ResponseWriter, r *http.Request, userID int
 		return
 	}
 	v, err := s.opts.Connectors.Add(r.Context(), userID, body.URL, body.Label, body.Token)
+	if err != nil {
+		connectorError(w, err)
+		return
+	}
+	writeCoachJSON(w, http.StatusCreated, v)
+}
+
+// connectorCatalog is the host's catalog of popular servers, each with the
+// person's own connector for it when they have one.
+func (s *Server) connectorCatalog(w http.ResponseWriter, r *http.Request, userID int64) {
+	entries, err := s.opts.Connectors.Catalog(r.Context(), userID)
+	if err != nil {
+		connectorError(w, err)
+		return
+	}
+	writeCoachJSON(w, http.StatusOK, map[string]any{"entries": entries})
+}
+
+// connectorAddFromCatalog is the one tap: the body names a catalog entry and
+// nothing else, so the URL always comes from the host's catalog.
+func (s *Server) connectorAddFromCatalog(w http.ResponseWriter, r *http.Request, userID int64) {
+	var body struct {
+		Entry string `json:"entry"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxConnectorBody))
+	dec.DisallowUnknownFields()
+	if dec.Decode(&body) != nil {
+		writeCoachJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_request"})
+		return
+	}
+	v, err := s.opts.Connectors.AddFromCatalog(r.Context(), userID, body.Entry)
 	if err != nil {
 		connectorError(w, err)
 		return

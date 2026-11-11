@@ -9,6 +9,11 @@
 .cx-item .cx-url { word-break: break-all; font-size: .85em; opacity: .8; }
 .cx-item .cx-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; }
 .cx-item .cx-tools { margin: .5rem 0 0; padding-left: 1.1rem; font-size: .9em; }
+.cx-catalog { list-style: none; padding: 0; display: grid; gap: .5rem; }
+.cx-card { display: grid; grid-template-columns: 2.2rem 1fr auto; align-items: center; gap: .6rem;
+  padding: .7rem; border-radius: .6rem; border: 1px solid rgba(127,127,127,.35); }
+.cx-card .cx-icon { font-size: 1.5rem; text-align: center; }
+.cx-card .muted { font-size: .85em; }
 .cx-badge { font-size: .8em; padding: .05rem .4rem; border-radius: .4rem; border: 1px solid currentColor; margin-left: .3rem; }
 .cx-badge.bad { color: #e5534b; }
 .cx-badge.ok { color: #57ab5a; }

@@ -23,8 +23,14 @@
   <p class="muted">Conecta tus propios servidores MCP remotos (Notion u otros) y el coach podrá usar sus herramientas. Cada llamada a una herramienta de un conector te pide permiso antes de ejecutarse.</p>
   <p id="cx-flash" class="alert" role="status" hidden></p>
 
+  <section aria-labelledby="cx-catalog-title">
+    <h2 id="cx-catalog-title">Populares</h2>
+    <p class="muted">Servidores oficiales de cada proveedor. Pulsa «Conectar» e inicia sesión en su página.</p>
+    <ul id="cx-catalog" class="cx-catalog"></ul>
+  </section>
+
   <section class="card" aria-labelledby="cx-add-title">
-    <h2 id="cx-add-title">Añadir un servidor</h2>
+    <h2 id="cx-add-title">Añadir otro servidor</h2>
     <form id="cx-add" class="cx-form">
       <label>URL (https)<input name="url" type="url" required placeholder="https://mcp.notion.com/mcp" inputmode="url" autocomplete="off"></label>
       <label>Nombre<input name="label" maxlength="40" placeholder="Notion" autocomplete="off"></label>

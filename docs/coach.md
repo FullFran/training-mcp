@@ -104,6 +104,40 @@ Issue [#70](https://github.com/FullFran/training-mcp/issues/70). With the coach 
 3. **Ver herramientas** lists the server's tools with the name the coach sees. A badge says whether the coach's current session loaded the server.
 4. **Desconectar** forgets the OAuth tokens (the OAuth client registration and a static token are kept, so **Conectar** works again); **Quitar** deletes the server and every secret of it. Either stops the person's engine so the next turn starts with the current list, and drops the always answers given for connector tools in every conversation; the stored conversation itself continues.
 
+### Catalog: popular servers with one tap
+
+Issue [#84](https://github.com/FullFran/training-mcp/issues/84). The panel opens with **Populares**: cards of popular remote MCP servers, each with an icon, a name and one line of what it gives the coach. **Conectar** adds the server and starts its sign-in in one tap; an entry the person already has shows its state (`añadido` or `conectado`). **Añadir otro servidor** (the free URL field) stays for anything else.
+
+The catalog is a host-owned, versioned document in the repository, `internal/engine/connector/catalog/`, embedded in the binary, so adding or removing an entry is a reviewed change:
+
+- `catalog.json`: `id`, `version` and `entries`, each with `id`, `server` (the path of its server.json), `icon`, `category` (`calendar`, `notes`, `tasks`, `fitness`, `data`, `automation`, `productivity`) and `summary` (Spanish, up to 160 characters). It borrows the top-level shape of an HCS-0001 catalog (`id`, opaque `version`, `entries` with unique ids) but is not an HCS-0001 manifest: its entries are remote endpoints, not packages with a `contentHash`, so it declares no `hcsVersion`.
+- `servers/<id>.server.json`: the entry as an MCP Registry server.json (2025-12-11, HCS-0008-R010), with the provider's official registry `name`, its `title`, one `streamable-http` remote and one required, secret `Authorization` header with no value or default (R011). The token is obtained by the host's OAuth client and stays in the person's vault (R012).
+
+Loading refuses the whole catalog when any rule fails (the test suite loads the built-in one, so a bad entry fails the build; at run time the catalog routes would answer `catalog`): unknown members anywhere (so a header `value` or `default` is refused), a duplicate or malformed id, a schema other than 2025-12-11, a transport other than one `streamable-http`, a URL the guard's static check refuses (not `https`, user info, query, fragment, an IP in a private range, `localhost` or an internal name), an `Authorization` header that is not required and secret, missing display metadata, or a `title` whose server name is not the entry `id` (the coach's tools are `mcp__<id>__*`).
+
+One tap is exactly the manual path: `AddFromCatalog` calls `Add` with the entry's URL and title and no token, so the guard (resolution and dial-time checks), the name rules, the limit of 10 and the OAuth flow are the same, and the stored connector and its server.json are identical to adding that URL by hand. The request names only the entry id; a URL, label or token in it is refused. An entry is matched to the person's connector by URL.
+
+Entries (2026-11-12) are only servers whose official remote endpoint is listed by the provider's verified namespace in the official MCP Registry and whose authorization server advertises dynamic client registration, which the OAuth client needs. Each was checked with an unauthenticated `initialize` (401), its protected resource metadata and its authorization server metadata (`registration_endpoint` present):
+
+| Entry | Endpoint | Source |
+| --- | --- | --- |
+| Notion | `https://mcp.notion.com/mcp` | Registry `com.notion/mcp`; [Notion MCP docs](https://developers.notion.com/docs/mcp) |
+| Todoist | `https://ai.todoist.net/mcp` | Registry `net.todoist/mcp` |
+| Airtable | `https://mcp.airtable.com/mcp` | Registry `com.airtable/mcp` |
+| Zapier | `https://mcp.zapier.com/api/v1/connect` | Registry `com.zapier/mcp` |
+| Linear | `https://mcp.linear.app/mcp` | Registry `app.linear/linear`; [Linear MCP docs](https://linear.app/docs/mcp) |
+| Atlassian | `https://mcp.atlassian.com/v2/mcp` | Registry `com.atlassian/atlassian-mcp-server` |
+| Monday | `https://mcp.monday.com/mcp` | Registry `com.monday/monday.com` |
+
+Registry entries are read at `https://registry.modelcontextprotocol.io/v0/servers?search=<name>&version=latest`.
+
+Left out:
+
+- **Fitness and health platforms** (Strava, Garmin, Whoop, Oura, Fitbit, Polar, Suunto, Withings, intervals.icu, TrainingPeaks): the registry lists only third-party servers for them, no official remote endpoint.
+- **Google Calendar and Gmail**: Google's official remote servers in the registry (`com.googleapis.*`) cover cloud and Maps APIs, not Calendar or Gmail.
+- **GitHub** (`https://api.githubcopilot.com/mcp/`, registry `io.github.github/github-mcp-server`) and **Asana** (`https://mcp.asana.com/v2/mcp`): official, but their authorization servers advertise no dynamic client registration, so one tap would end in `registration_failed`. They still work through the free URL field with a static token.
+- Official servers with little to give a training coach (for example Canva, Sentry, Stripe, Hugging Face, Cloudflare) are left out to keep the list short.
+
 OAuth needs the app at the root (`WEB_OAUTH_CLIENT_ID` and `MCP_OAUTH_RESOURCE`): the redirect URI is `<origin of MCP_OAUTH_RESOURCE>/coach/connectors/callback`. On the secret mount alone, only servers with a static token or none can be connected (`oauth_unavailable`).
 
 ### Every call asks first
@@ -125,6 +159,8 @@ Behind the same login, header and CSRF rules as the other coach routes.
 | `GET /coach/connectors` | The panel |
 | `GET /coach/connectors/list` | `{connectors: [{id, name, label, url, auth, state, loaded?}], grants: [{tool, server, answer}]}`: no secret ever |
 | `POST /coach/connectors` `{url, label, token?}` | `201` with the connector |
+| `GET /coach/connectors/catalog` | `{entries: [{id, title, icon, category, summary, url, connector?}]}`: `connector` is the person's own, as in the list |
+| `POST /coach/connectors/catalog` `{entry}` | `201` with the connector, as `POST /coach/connectors` with the entry's URL and title |
 | `POST /coach/connectors/{id}/connect` | `{state: "connected"}` or `{state: "authorize", authorize_url}` |
 | `GET /coach/connectors/callback?state&code` | Redirect to the panel with `?connected=<id>` or `?error=<code>` |
 | `GET /coach/connectors/{id}/tools` | `{tools: [{name, model, description}]}` |
@@ -134,7 +170,7 @@ Behind the same login, header and CSRF rules as the other coach routes.
 | `POST /coach/connectors/{id}/revoke` | `{revoked: true}`: ends this session's always answers for that server |
 | `POST /coach/approval` `{id, answer}` | `{answered: true}`; `404 no_approval`, `400 bad_answer` |
 
-The stream adds `approval {id, server, tool, args?}` and `approval_closed {id}`. Connector errors are a closed set: `bad_url`, `blocked_address`, `bad_label`, `bad_token`, `exists`, `too_many`, `not_found`, `oauth_unavailable`, `discovery_failed`, `registration_failed`, `token_failed`, `unauthorized`, `unreachable`, `state_invalid`, `vault`. Nothing a remote server or an authorization server wrote reaches a response or a log.
+The stream adds `approval {id, server, tool, args?}` and `approval_closed {id}`. Connector errors are a closed set: `bad_url`, `blocked_address`, `bad_label`, `bad_token`, `exists`, `too_many`, `not_found`, `oauth_unavailable`, `discovery_failed`, `registration_failed`, `token_failed`, `unauthorized`, `unreachable`, `state_invalid`, `vault`, `catalog`. Nothing a remote server or an authorization server wrote reaches a response or a log.
 
 ### How the engine reaches them
 
