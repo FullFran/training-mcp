@@ -318,3 +318,53 @@ func TestHistoryMatchesSetsOfTheSameCategoryOnly(t *testing.T) {
 		t.Fatalf("logged warm-up did not hide the file's warm-up: %+v, %v", p, err)
 	}
 }
+
+// Two workouts starting at the same second are two sessions, as they were
+// before warm-ups were imported.
+func TestWorkoutsSharingAStartStaySeparateSessions(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	data := []byte(`"title","start_time","end_time","description","exercise_title","superset_id","exercise_notes","set_index","set_type","weight_kg","reps","distance_km","duration_seconds","rpe"
+"Upper","7 Mar 2024, 18:05","7 Mar 2024, 19:00","","Bench Press (Barbell)",,"",0,"normal",80,8,,,8
+"Lower","7 Mar 2024, 18:05","7 Mar 2024, 19:00","","Squat (Barbell)",,"",0,"warmup",60,5,,,
+"Lower","7 Mar 2024, 18:05","7 Mar 2024, 19:00","","Squat (Barbell)",,"",1,"normal",100,5,,,8
+`)
+	f, err := importer.Parse(data, importer.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := w.services.ForUser(1)
+	if _, s, err := importer.Apply(ctx, svc, withoutWarmups(f), nil, "twin.csv"); err != nil || s.Sessions != 2 {
+		t.Fatalf("first import = %+v, %v", s, err)
+	}
+	// The re-imported warm-up joins its own workout, not the other one.
+	p, s, err := importer.Apply(ctx, svc, f, nil, "twin.csv")
+	if err != nil || s.Sets != 1 || s.Sessions != 0 || p.Sessions != 0 {
+		t.Fatalf("re-import = %+v, preview %+v, %v", s, p, err)
+	}
+	if n := count(t, w.db, `SELECT COUNT(DISTINCT session_id) FROM sets WHERE exercise='squat (barbell)'`); n != 1 {
+		t.Fatalf("squat sessions = %d", n)
+	}
+	if n := count(t, w.db, `SELECT COUNT(DISTINCT session_id) FROM sets`); n != 2 {
+		t.Fatalf("sessions holding sets = %d", n)
+	}
+}
+
+// A working set new to an already imported workout still gets a session of
+// its own, as before: only warm-ups join the earlier session.
+func TestANewWorkingSetOfAnImportedWorkoutKeepsItsOwnSession(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	svc := w.services.ForUser(1)
+	f := hevyFile(t)
+	full := f
+	trimmed := f
+	trimmed.Workouts = append([]importer.Workout(nil), f.Workouts...)
+	trimmed.Workouts[1].Sets = f.Workouts[1].Sets[:len(f.Workouts[1].Sets)-1]
+	if _, _, err := importer.Apply(ctx, svc, trimmed, nil, "a.csv"); err != nil {
+		t.Fatal(err)
+	}
+	if _, s, err := importer.Apply(ctx, svc, full, nil, "b.csv"); err != nil || s.Sets != 1 || s.Sessions != 1 {
+		t.Fatalf("second import = %+v, %v", s, err)
+	}
+}

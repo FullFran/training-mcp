@@ -125,7 +125,12 @@ func (s *userStore) ApplyImport(ctx context.Context, in training.ImportRecord) (
 		return training.ImportSummary{}, err
 	}
 	for _, w := range in.Workouts {
-		var sessionID int64
+		// newSession is the session this import creates for the workout, made
+		// once its first set needs it. A warm-up that an earlier import left
+		// out joins the session that import created for the same workout
+		// instead (same start and notes); working sets never do, as before.
+		var newSession, earlier int64
+		lookedUp := false
 		for _, set := range w.Sets {
 			claimed, err := tx.ExecContext(ctx, `INSERT INTO imported_sets(user_id,natural_key,import_id) VALUES (?,?,?) ON CONFLICT(user_id,natural_key) DO NOTHING`,
 				s.userID, set.Key, out.ID)
@@ -137,15 +142,17 @@ func (s *userStore) ApplyImport(ctx context.Context, in training.ImportRecord) (
 			} else if n == 0 {
 				continue
 			}
-			if sessionID == 0 {
-				// A workout an earlier import already recorded, such as a file
-				// imported again now that its warm-ups are read, keeps its session:
-				// the one holding imported sets that started at the same moment.
+			if set.Category == training.SetWarmup && !lookedUp {
+				lookedUp = true
 				err = tx.QueryRowContext(ctx, `SELECT se.id FROM sessions se JOIN sets st ON st.session_id=se.id JOIN imported_sets i ON i.set_id=st.id AND i.user_id=se.user_id
-WHERE se.user_id=? AND se.date=? AND se.started_at=? ORDER BY se.id LIMIT 1`, s.userID, w.Date, w.StartedAt).Scan(&sessionID)
+WHERE se.user_id=? AND se.date=? AND se.started_at=? AND se.notes=? AND i.import_id<>? ORDER BY se.id LIMIT 1`, s.userID, w.Date, w.StartedAt, w.Notes, out.ID).Scan(&earlier)
 				if err != nil && !errors.Is(err, sql.ErrNoRows) {
 					return training.ImportSummary{}, err
 				}
+			}
+			sessionID := newSession
+			if set.Category == training.SetWarmup && earlier != 0 {
+				sessionID = earlier
 			}
 			if sessionID == 0 {
 				started, err := tx.ExecContext(ctx, `INSERT INTO sessions(user_id,date,started_at,plan_id,plan_name,notes) VALUES (?,?,?,NULL,'',?)`,
@@ -153,9 +160,10 @@ WHERE se.user_id=? AND se.date=? AND se.started_at=? ORDER BY se.id LIMIT 1`, s.
 				if err != nil {
 					return training.ImportSummary{}, err
 				}
-				if sessionID, err = started.LastInsertId(); err != nil {
+				if newSession, err = started.LastInsertId(); err != nil {
 					return training.ImportSummary{}, err
 				}
+				sessionID = newSession
 				out.Sessions++
 			}
 			stored, _, err := insertSet(ctx, tx, s.userID, training.AddSetInput{SessionID: sessionID, Exercise: set.Exercise,

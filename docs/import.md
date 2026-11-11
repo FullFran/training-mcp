@@ -51,8 +51,10 @@ outside 1 to 10 is treated as missing.
   that workout. Warm-ups count in that order, so changing what is skipped never
   renumbers a set: working sets kept the keys they had while warm-ups were
   skipped, and a file imported then gains only its warm-ups, once, in the
-  session its working sets were imported into (a session is reused when it
-  already holds imported sets from a workout with the same start). `imported_sets` keeps the keys per user; a set whose key is
+  session an earlier import created for that workout (same start and notes).
+  Only warm-ups join an earlier session: a new working set of a workout already
+  imported still gets a session of its own, and workouts sharing a start time
+  stay separate. The preview counts only the sessions that will be created. `imported_sets` keeps the keys per user; a set whose key is
   there is never imported again, even if the set it created was deleted later.
   Importing the same file twice therefore adds nothing, and a later export of
   the whole history adds only the new workouts.

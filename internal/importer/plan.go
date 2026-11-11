@@ -151,6 +151,9 @@ func Plan(ctx context.Context, svc *training.Service, f File, chosen map[string]
 	exercises := map[string]bool{}
 	for _, w := range f.Workouts {
 		out := training.ImportedWorkout{Date: w.Date, StartedAt: w.StartedAt, Notes: workoutNotes(w)}
+		// A new warm-up of a workout an earlier import recorded joins that
+		// session, so the workout needs a new one only for a new working set.
+		earlier, working := false, false
 		for _, s := range w.Sets {
 			exercise := resolved[s.Exercise]
 			id := setID(w.Date, exercise, s.WeightKG, s.Reps, s.Category == training.SetWarmup)
@@ -163,6 +166,7 @@ func Plan(ctx context.Context, svc *training.Service, f File, chosen map[string]
 			switch {
 			case imported[s.Key]:
 				p.AlreadyImported++
+				earlier = true
 				continue
 			case matched:
 				p.InHistory++
@@ -178,13 +182,17 @@ func Plan(ctx context.Context, svc *training.Service, f File, chosen map[string]
 			}
 			if set.Category == training.SetWarmup {
 				p.Warmups++
+			} else {
+				working = true
 			}
 			out.Sets = append(out.Sets, set)
 			exercises[exercise] = true
 		}
 		if len(out.Sets) > 0 {
 			p.Record.Workouts = append(p.Record.Workouts, out)
-			p.Sessions++
+			if working || !earlier {
+				p.Sessions++
+			}
 			p.Sets += len(out.Sets)
 		}
 	}
