@@ -789,3 +789,50 @@ func TestStorePlanItemsCanBeEditedReorderedAndRemoved(t *testing.T) {
 		}
 	}
 }
+
+// Re-adding an exercise already in today's session (web "add", MCP
+// add_session_exercise, adopting a plan mid-session) keeps whatever the caller
+// did not send: superset, notes, RPE and the rep range. Issue #54.
+func TestStoreSessionItemReAddKeepsUnsentFields(t *testing.T) {
+	store, err := Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	session, _ := store.ForUser(1).Start(ctx, training.Session{Date: "2026-08-08"})
+	if err := store.ForUser(1).SetSessionItem(ctx, session.ID, training.PlanItem{
+		Exercise: "curl", TargetSets: 3, RepMin: 10, RepMax: 12, TargetRPE: 8, Superset: "A", Notes: "control",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.ForUser(1).SetSessionItem(ctx, session.ID, training.PlanItem{Exercise: "curl", TargetSets: 4}); err != nil {
+		t.Fatal(err)
+	}
+	progress, err := store.ForUser(1).SessionProgress(ctx, session.ID)
+	if err != nil || len(progress) != 1 {
+		t.Fatalf("progress = %#v, %v", progress, err)
+	}
+	got := progress[0]
+	if got.TargetSets != 4 || got.RepMin != 10 || got.RepMax != 12 || got.TargetRPE != 8 || got.Superset != "A" || got.Notes != "control" {
+		t.Fatalf("re-add clobbered unsent fields: %#v", got)
+	}
+
+	// A rep range is one value: sending either bound replaces both, so a
+	// partial send never leaves an inverted range behind.
+	if err := store.ForUser(1).SetSessionItem(ctx, session.ID, training.PlanItem{Exercise: "curl", TargetSets: 4, RepMax: 6}); err != nil {
+		t.Fatal(err)
+	}
+	progress, _ = store.ForUser(1).SessionProgress(ctx, session.ID)
+	if got := progress[0]; got.RepMin != 0 || got.RepMax != 6 || got.Superset != "A" || got.Notes != "control" {
+		t.Fatalf("rep range resend = %#v, want 0-6 with superset and notes kept", got)
+	}
+
+	// Another user re-adding the same exercise to this session changes nothing.
+	if err := store.ForUser(2).SetSessionItem(ctx, session.ID, training.PlanItem{Exercise: "curl", TargetSets: 9, Notes: "ajeno"}); !errors.Is(err, training.ErrNotFound) {
+		t.Fatalf("other user's re-add = %v, want not found", err)
+	}
+	progress, _ = store.ForUser(1).SessionProgress(ctx, session.ID)
+	if got := progress[0]; got.TargetSets != 4 || got.Notes != "control" {
+		t.Fatalf("other user's re-add leaked: %#v", got)
+	}
+}

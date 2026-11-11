@@ -181,8 +181,10 @@ func (s *Service) DeletePlan(ctx context.Context, id int64) error {
 	return s.store.DeletePlan(ctx, id)
 }
 
-// SetSessionItem adds an exercise to today's session plan or replaces its
-// prescription. Adjusting a session never touches the plan it came from.
+// SetSessionItem adds an exercise to today's session plan. Re-adding one that
+// is already there replaces its set count and keeps every optional field left
+// empty (rep range, RPE, superset, notes). Adjusting a session never touches
+// the plan it came from.
 func (s *Service) SetSessionItem(ctx context.Context, sessionID int64, it PlanItem) error {
 	if sessionID <= 0 {
 		return ErrValidation

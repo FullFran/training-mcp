@@ -841,17 +841,23 @@ WHERE st.session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?) GROUP 
 	return out, extra.Err()
 }
 
-// SetSessionItem adds an exercise to today's session plan, or replaces its
-// prescription if it is already there. New items go last.
+// SetSessionItem adds an exercise to today's session plan, or updates its
+// prescription if it is already there. New items go last. On re-add the set
+// count is replaced and every optional field the caller left empty keeps its
+// stored value: superset, notes, RPE, and the rep range (sent as a pair, so
+// either bound replaces both and a partial send cannot invert it).
 func (s *userStore) SetSessionItem(ctx context.Context, sessionID int64, it training.PlanItem) error {
 	res, err := s.db.ExecContext(ctx, `
 INSERT INTO session_items (session_id,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset,notes)
 SELECT id,(SELECT COALESCE(MAX(position),0)+1 FROM session_items WHERE session_id=?),?,?,?,?,?,?,?
 FROM sessions WHERE id=? AND user_id=?
 ON CONFLICT(session_id,exercise) DO UPDATE SET
- target_sets=excluded.target_sets, rep_min=excluded.rep_min,
- rep_max=excluded.rep_max, target_rpe=excluded.target_rpe,
- superset=excluded.superset, notes=excluded.notes`,
+ target_sets=excluded.target_sets,
+ rep_min=CASE WHEN excluded.rep_min=0 AND excluded.rep_max=0 THEN session_items.rep_min ELSE excluded.rep_min END,
+ rep_max=CASE WHEN excluded.rep_min=0 AND excluded.rep_max=0 THEN session_items.rep_max ELSE excluded.rep_max END,
+ target_rpe=CASE WHEN excluded.target_rpe=0 THEN session_items.target_rpe ELSE excluded.target_rpe END,
+ superset=CASE WHEN excluded.superset='' THEN session_items.superset ELSE excluded.superset END,
+ notes=CASE WHEN excluded.notes='' THEN session_items.notes ELSE excluded.notes END`,
 		sessionID, it.Exercise, it.TargetSets, it.RepMin, it.RepMax, it.TargetRPE, it.Superset, it.Notes, sessionID, s.userID)
 	if err != nil {
 		return err

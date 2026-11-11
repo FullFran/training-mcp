@@ -179,8 +179,8 @@ type SessionItemInput struct {
 	RepMin     int     `json:"rep_min,omitempty" jsonschema:"Lower bound of the target rep range."`
 	RepMax     int     `json:"rep_max,omitempty" jsonschema:"Upper bound of the target rep range."`
 	TargetRPE  float64 `json:"target_rpe,omitempty" jsonschema:"Target RPE from 1 through 10."`
-	Superset   string  `json:"superset,omitempty" jsonschema:"Label grouping exercises done back to back. Omit for a standalone exercise."`
-	Notes      string  `json:"notes,omitempty" jsonschema:"Free-text intent for this exercise in today's session."`
+	Superset   string  `json:"superset,omitempty" jsonschema:"Label grouping exercises done back to back. Omit for a standalone exercise, or to keep the current label when the exercise is already in the session."`
+	Notes      string  `json:"notes,omitempty" jsonschema:"Free-text intent for this exercise in today's session. Omit to keep the current notes when the exercise is already in the session."`
 }
 type AdjustItemInput struct {
 	SessionID  int64    `json:"session_id" jsonschema:"Positive ID of the session to adjust."`
@@ -495,7 +495,7 @@ func New(service training.ServiceFor) *Server {
 	setItemSchema := mustInputSchema[SessionItemInput]()
 	setPositiveID(setItemSchema.Properties["session_id"])
 	setItemSchema.Properties["exercise"].Pattern = `.*\S.*`
-	addWrite(w, &mcp.Tool{Name: "add_session_exercise", Description: "Add an exercise to today's session plan, or replace its prescription. Adjusting a session never edits the plan it was started from.", InputSchema: setItemSchema}, "session.exercise.set", func(ctx context.Context, svc *training.Service, in SessionItemInput) (ItemOut, error) {
+	addWrite(w, &mcp.Tool{Name: "add_session_exercise", Description: "Add an exercise to today's session plan. If it is already there, target_sets is replaced and every optional field you omit (rep range, RPE, superset, notes) keeps its current value; sending either rep bound replaces the whole range. Adjusting a session never edits the plan it was started from.", InputSchema: setItemSchema}, "session.exercise.set", func(ctx context.Context, svc *training.Service, in SessionItemInput) (ItemOut, error) {
 		err := svc.SetSessionItem(ctx, in.SessionID, training.PlanItem{
 			Exercise: in.Exercise, TargetSets: in.TargetSets,
 			RepMin: in.RepMin, RepMax: in.RepMax, TargetRPE: in.TargetRPE,

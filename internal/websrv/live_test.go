@@ -125,3 +125,26 @@ func TestFreeSessionShowsNoPlanCard(t *testing.T) {
 		t.Fatalf("a session without planned exercises has no plan card and nothing next: %q", body)
 	}
 }
+
+// Adding an exercise that is already in today's plan from the phone keeps its
+// superset and notes, which the add form never sends. Issue #54.
+func TestReAddingAnExerciseFromThePhoneKeepsItsSupersetAndNotes(t *testing.T) {
+	h, service := newServer(t)
+	startPlan(t, h, service, training.PlanItem{Exercise: "curl", TargetSets: 3, Superset: "A", Notes: "control"})
+
+	w := post(t, h, base+"/plan/item", url.Values{"action": {"add"}, "exercise": {"curl"}, "target_sets": {"4"}}, true)
+	if w.Code != http.StatusOK {
+		t.Fatalf("POST /plan/item = %d %q", w.Code, w.Body)
+	}
+	live, err := service.LiveWorkout(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	progress, err := service.SessionProgress(t.Context(), live.Session.ID)
+	if err != nil || len(progress) != 1 {
+		t.Fatalf("progress = %#v, %v", progress, err)
+	}
+	if got := progress[0]; got.TargetSets != 4 || got.Superset != "A" || got.Notes != "control" {
+		t.Fatalf("re-add from the phone clobbered superset or notes: %#v", got)
+	}
+}
