@@ -45,6 +45,7 @@ type fakeRemote struct {
 	n        int
 	seenAuth []string
 	calls    []string // tools/call names
+	lastHdr  http.Header
 	// Static, when set, is the one bearer /mcp accepts (no OAuth).
 	Static string
 	// Open: /mcp needs no token at all.
@@ -187,6 +188,7 @@ func (f *fakeRemote) token(w http.ResponseWriter, r *http.Request) {
 func (f *fakeRemote) mcp(w http.ResponseWriter, r *http.Request) {
 	auth := r.Header.Get("Authorization")
 	f.seenAuth = append(f.seenAuth, auth)
+	f.lastHdr = r.Header.Clone()
 	token := strings.TrimPrefix(auth, "Bearer ")
 	ok := f.Open || (f.Static != "" && token == f.Static) || f.access[token]
 	if ok && f.RejectAccess > 0 {
