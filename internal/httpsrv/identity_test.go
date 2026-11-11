@@ -97,6 +97,15 @@ func TestEveryTokenActsAsItsOwnUser(t *testing.T) {
 	if got := listPlans(t, f.handler, guest); strings.Contains(got, "Owner plan") {
 		t.Fatalf("the guest sees the owner's plan: %s", got)
 	}
+	// The guest's account was created by that call, after migration 14, so it asks
+	// before applying agent writes. Accepting everything lets create_plan land.
+	guestID, found, err := f.store.UserBySubject(context.Background(), "user_guest")
+	if err != nil || !found {
+		t.Fatalf("guest account: %v, %v", found, err)
+	}
+	if err := f.store.ForUser(guestID).SetAcceptAll(context.Background(), true); err != nil {
+		t.Fatal(err)
+	}
 	createPlan(t, f.handler, guest, "Guest plan")
 	if got := listPlans(t, f.handler, owner); strings.Contains(got, "Guest plan") || !strings.Contains(got, "Owner plan") {
 		t.Fatalf("owner's plans = %s", got)

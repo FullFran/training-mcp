@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/fullfran/training-mcp/internal/training"
 	"github.com/google/jsonschema-go/jsonschema"
@@ -15,6 +16,7 @@ import (
 type Server struct {
 	mcp     *mcp.Server
 	handler *mcp.StreamableHTTPHandler
+	writes  *writes
 }
 type StartInput struct {
 	Date   string `json:"date,omitempty" jsonschema:"Training date in exact YYYY-MM-DD format."`
@@ -43,6 +45,7 @@ type LogOut struct {
 	Session training.Session `json:"session"`
 	Sets    []training.Set   `json:"sets"`
 	TotalSI float64          `json:"total_si"`
+	ProposalRef
 }
 type LoggedSetInput struct {
 	WeightKG  float64  `json:"weight_kg" jsonschema:"Weight in kilograms; must be strictly positive."`
@@ -60,10 +63,30 @@ type LogSetsOut struct {
 	Sets     []training.Set   `json:"sets"`
 	TotalSI  float64          `json:"total_si"`
 	Replayed bool             `json:"replayed"`
+	ProposalRef
+}
+
+// StartOut is start_session's result. Write results carry the proposal's status.
+type StartOut struct {
+	Session training.Session `json:"session"`
+	ProposalRef
+}
+type PlanWriteOut struct {
+	Plan training.Plan `json:"plan"`
+	ProposalRef
+}
+type NotesWriteOut struct {
+	Notes []training.ExerciseNote `json:"notes"`
+	ProposalRef
+}
+type LandmarksWriteOut struct {
+	Landmarks []training.Landmarks `json:"landmarks"`
+	ProposalRef
 }
 type SetOut struct {
 	Set     training.Set `json:"set"`
 	TotalSI float64      `json:"total_si"`
+	ProposalRef
 }
 type UpdateInput struct {
 	SetID     int64    `json:"set_id" jsonschema:"Positive ID of the existing set to update."`
@@ -80,6 +103,7 @@ type DeleteOut struct {
 	SessionID int64   `json:"session_id"`
 	TotalSI   float64 `json:"total_si"`
 	Remaining int     `json:"remaining"`
+	ProposalRef
 }
 type SessionInput struct {
 	SessionID int64 `json:"session_id" jsonschema:"Positive ID of the existing training session to retrieve."`
@@ -141,6 +165,7 @@ type PlanMoveInput struct {
 }
 type PlanDeleteOut struct {
 	PlanID int64 `json:"plan_id"`
+	ProposalRef
 }
 type ProgressOut struct {
 	SessionID int64                   `json:"session_id"`
@@ -182,6 +207,7 @@ type SaveAsPlanInput struct {
 type ItemOut struct {
 	SessionID int64  `json:"session_id"`
 	Exercise  string `json:"exercise"`
+	ProposalRef
 }
 type FeedbackInput struct {
 	SessionID   int64  `json:"session_id" jsonschema:"Positive ID of the session being rated."`
@@ -193,6 +219,7 @@ type FeedbackInput struct {
 type FeedbackOut struct {
 	SessionID int64               `json:"session_id"`
 	Feedback  []training.Feedback `json:"feedback"`
+	ProposalRef
 }
 type LandmarksInput struct {
 	MuscleGroup string `json:"muscle_group" jsonschema:"Muscle group; must be one of the supported values."`
@@ -230,6 +257,7 @@ type NotesOut struct {
 type DeleteSessionOut struct {
 	SessionID   int64 `json:"session_id"`
 	DeletedSets int   `json:"deleted_sets"`
+	ProposalRef
 }
 type HistoryInput struct {
 	Exercise string `json:"exercise" jsonschema:"Non-empty exercise name; it is trimmed and lowercased to match stored sets."`
@@ -248,6 +276,7 @@ type GroupInput struct {
 type GroupOut struct {
 	Exercise    string `json:"exercise"`
 	MuscleGroup string `json:"muscle_group"`
+	ProposalRef
 }
 type GroupsOut struct {
 	Groups []training.ExerciseGroup `json:"groups"`
@@ -262,11 +291,12 @@ type VolumeOut struct {
 
 func New(service training.ServiceFor) *Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "training-mcp", Version: "0.1.0"}, &mcp.ServerOptions{Instructions: serverInstructions})
+	w := &writes{server: s, service: service, actions: map[string]writeAction{}}
 	startSchema := mustInputSchema[StartInput]()
 	startSchema.Properties["date"].Pattern = `^\d{4}-\d{2}-\d{2}$`
-	addTool(s, &mcp.Tool{Name: "start_session", Description: "Start a training session on an optional date, optionally following a plan. Omit date to use the server's current local date.", InputSchema: startSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in StartInput) (*mcp.CallToolResult, SessionOut, error) {
-		v, err := service(ctx).StartPlannedSession(ctx, in.Date, in.PlanID)
-		return nil, SessionOut{Session: v}, toolError(err)
+	addWrite(w, &mcp.Tool{Name: "start_session", Description: "Start a training session on an optional date, optionally following a plan. Omit date to use the server's current local date.", InputSchema: startSchema}, "session.start", func(ctx context.Context, svc *training.Service, in StartInput) (StartOut, error) {
+		v, err := svc.StartPlannedSession(ctx, in.Date, in.PlanID)
+		return StartOut{Session: v}, err
 	})
 	addSchema := mustInputSchema[AddInput]()
 	setPositiveID(addSchema.Properties["session_id"])
@@ -274,9 +304,9 @@ func New(service training.ServiceFor) *Server {
 	addSchema.Properties["weight_kg"].ExclusiveMinimum = jsonschema.Ptr(0.0)
 	addSchema.Properties["reps"].Minimum = jsonschema.Ptr(1.0)
 	setRPERange(addSchema.Properties["rpe"])
-	addTool(s, &mcp.Tool{Name: "add_set", Description: "Add a set to an existing training session and return the set plus the session's recalculated total SI.", InputSchema: addSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in AddInput) (*mcp.CallToolResult, SetOut, error) {
-		v, total, err := service(ctx).AddSet(ctx, training.AddSetInput{SessionID: in.SessionID, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, Technique: in.Technique})
-		return nil, SetOut{Set: v, TotalSI: total}, toolError(err)
+	addWrite(w, &mcp.Tool{Name: "add_set", Description: "Add a set to an existing training session and return the set plus the session's recalculated total SI.", InputSchema: addSchema}, "set.log", func(ctx context.Context, svc *training.Service, in AddInput) (SetOut, error) {
+		v, total, err := svc.AddSet(ctx, training.AddSetInput{SessionID: in.SessionID, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, Technique: in.Technique})
+		return SetOut{Set: v, TotalSI: total}, err
 	})
 	logSchema := mustInputSchema[LogInput]()
 	logSchema.Properties["exercise"].Pattern = `.*\S.*`
@@ -286,9 +316,9 @@ func New(service training.ServiceFor) *Server {
 	logSchema.Properties["count"].Default = json.RawMessage("1")
 	logSchema.Properties["count"].Minimum = jsonschema.Ptr(1.0)
 	logSchema.Properties["count"].Maximum = jsonschema.Ptr(20.0)
-	addTool(s, &mcp.Tool{Name: "log_set", Description: "Record one or more identical sets into today's session, creating that session if it does not exist yet. It needs no session id but is not safe to retry, since repeating it records the sets again. Prefer log_sets, which is.", InputSchema: logSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in LogInput) (*mcp.CallToolResult, LogOut, error) {
-		session, sets, err := service(ctx).LogSet(ctx, in.Exercise, in.WeightKG, in.Reps, in.RPE, in.Count, in.Technique)
-		return nil, LogOut{Session: session, Sets: sets, TotalSI: session.TotalSI}, toolError(err)
+	addWrite(w, &mcp.Tool{Name: "log_set", Description: "Record one or more identical sets into today's session, creating that session if it does not exist yet. It needs no session id but is not safe to retry, since repeating it records the sets again. Prefer log_sets, which is.", InputSchema: logSchema}, "set.log", func(ctx context.Context, svc *training.Service, in LogInput) (LogOut, error) {
+		session, sets, err := svc.LogSet(ctx, in.Exercise, in.WeightKG, in.Reps, in.RPE, in.Count, in.Technique)
+		return LogOut{Session: session, Sets: sets, TotalSI: session.TotalSI}, err
 	})
 	logSetsSchema := mustInputSchema[LogSetsInput]()
 	logSetsSchema.Properties["idempotency_key"].Pattern = `.*\S.*`
@@ -301,7 +331,7 @@ func New(service training.ServiceFor) *Server {
 	loggedSetSchema.Properties["reps"].Minimum = jsonschema.Ptr(1.0)
 	setNonNullableType(loggedSetSchema.Properties["rpe"], "number")
 	setRPERange(loggedSetSchema.Properties["rpe"])
-	addTool(s, &mcp.Tool{Name: "log_sets", Description: "Record the sets of one exercise into today's session in a single call, creating the session if needed. The sets may differ, as in '12, 12, 10 and 8 reps'. All are stored or none. Omit rpe unless the user stated it. Repeating a call with the same idempotency_key returns the original result with replayed true and stores nothing new, so retrying is always safe. Prefer this over log_set.", InputSchema: logSetsSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in LogSetsInput) (*mcp.CallToolResult, LogSetsOut, error) {
+	addWrite(w, &mcp.Tool{Name: "log_sets", Description: "Record the sets of one exercise into today's session in a single call, creating the session if needed. The sets may differ, as in '12, 12, 10 and 8 reps'. All are stored or none. Omit rpe unless the user stated it. Repeating a call with the same idempotency_key returns the original result with replayed true and stores nothing new, so retrying is always safe. Prefer this over log_set.", InputSchema: logSetsSchema}, "set.log", func(ctx context.Context, svc *training.Service, in LogSetsInput) (LogSetsOut, error) {
 		batch := training.LogSetsInput{Key: in.IdempotencyKey, Exercise: in.Exercise}
 		for _, set := range in.Sets {
 			logged := training.LoggedSet{WeightKG: set.WeightKG, Reps: set.Reps, Technique: set.Technique}
@@ -310,8 +340,8 @@ func New(service training.ServiceFor) *Server {
 			}
 			batch.Sets = append(batch.Sets, logged)
 		}
-		v, err := service(ctx).LogSets(ctx, batch)
-		return nil, LogSetsOut{Session: v.Session, Sets: v.Sets, TotalSI: v.Session.TotalSI, Replayed: v.Replayed}, toolError(err)
+		v, err := svc.LogSets(ctx, batch)
+		return LogSetsOut{Session: v.Session, Sets: v.Sets, TotalSI: v.Session.TotalSI, Replayed: v.Replayed}, err
 	})
 
 	updateSchema := mustInputSchema[UpdateInput]()
@@ -326,15 +356,15 @@ func New(service training.ServiceFor) *Server {
 	setNonNullableType(updateSchema.Properties["rpe"], "number")
 	setRPERange(updateSchema.Properties["rpe"])
 	setNonNullableType(updateSchema.Properties["technique"], "string")
-	addTool(s, &mcp.Tool{Name: "update_set", Description: "Update one or more fields of an existing set. Omitted fields remain unchanged; RPE changes recalculate SI.", InputSchema: updateSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in UpdateInput) (*mcp.CallToolResult, SetOut, error) {
-		v, total, err := service(ctx).UpdateSet(ctx, in.SetID, training.SetPatch{Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, Technique: in.Technique})
-		return nil, SetOut{Set: v, TotalSI: total}, toolError(err)
+	addWrite(w, &mcp.Tool{Name: "update_set", Description: "Update one or more fields of an existing set. Omitted fields remain unchanged; RPE changes recalculate SI.", InputSchema: updateSchema}, "set.update", func(ctx context.Context, svc *training.Service, in UpdateInput) (SetOut, error) {
+		v, total, err := svc.UpdateSet(ctx, in.SetID, training.SetPatch{Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, Technique: in.Technique})
+		return SetOut{Set: v, TotalSI: total}, err
 	})
 	deleteSchema := mustInputSchema[DeleteInput]()
 	setPositiveID(deleteSchema.Properties["set_id"])
-	addTool(s, &mcp.Tool{Name: "delete_set", Description: "Permanently delete an existing set and compact the remaining set positions to a dense sequence.", InputSchema: deleteSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in DeleteInput) (*mcp.CallToolResult, DeleteOut, error) {
-		sid, total, n, err := service(ctx).DeleteSet(ctx, in.SetID)
-		return nil, DeleteOut{SessionID: sid, TotalSI: total, Remaining: n}, toolError(err)
+	addWrite(w, &mcp.Tool{Name: "delete_set", Description: "Permanently delete an existing set and compact the remaining set positions to a dense sequence.", InputSchema: deleteSchema}, "set.delete", func(ctx context.Context, svc *training.Service, in DeleteInput) (DeleteOut, error) {
+		sid, total, n, err := svc.DeleteSet(ctx, in.SetID)
+		return DeleteOut{SessionID: sid, TotalSI: total, Remaining: n}, err
 	})
 	sessionSchema := mustInputSchema[SessionInput]()
 	setPositiveID(sessionSchema.Properties["session_id"])
@@ -354,7 +384,7 @@ func New(service training.ServiceFor) *Server {
 	})
 	createPlanSchema := mustInputSchema[CreatePlanInput]()
 	createPlanSchema.Properties["name"].Pattern = `.*\S.*`
-	addTool(s, &mcp.Tool{Name: "create_plan", Description: "Create a reusable workout plan: an ordered list of exercises with a target set count and an optional rep range and RPE. Load is not planned; it is filled in at the gym.", InputSchema: createPlanSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in CreatePlanInput) (*mcp.CallToolResult, PlanOut, error) {
+	addWrite(w, &mcp.Tool{Name: "create_plan", Description: "Create a reusable workout plan: an ordered list of exercises with a target set count and an optional rep range and RPE. Load is not planned; it is filled in at the gym.", InputSchema: createPlanSchema}, "plan.create", func(ctx context.Context, svc *training.Service, in CreatePlanInput) (PlanWriteOut, error) {
 		plan := training.Plan{Name: in.Name, Notes: in.Notes}
 		for _, it := range in.Items {
 			plan.Items = append(plan.Items, training.PlanItem{
@@ -363,8 +393,8 @@ func New(service training.ServiceFor) *Server {
 				Superset: it.Superset, Notes: it.Notes,
 			})
 		}
-		v, err := service(ctx).CreatePlan(ctx, plan)
-		return nil, PlanOut{Plan: v}, toolError(err)
+		v, err := svc.CreatePlan(ctx, plan)
+		return PlanWriteOut{Plan: v}, err
 	})
 	addTool(s, &mcp.Tool{Name: "list_plans", Description: "List every saved workout plan with its total planned set count."}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, PlansOut, error) {
 		v, err := service(ctx).ListPlans(ctx)
@@ -381,59 +411,59 @@ func New(service training.ServiceFor) *Server {
 	updatePlanSchema.MinProperties = jsonschema.Ptr(2)
 	setNonNullableType(updatePlanSchema.Properties["name"], "string")
 	setNonNullableType(updatePlanSchema.Properties["notes"], "string")
-	addTool(s, &mcp.Tool{Name: "update_plan", Description: "Edit a plan's name or notes without touching its exercises. Plan notes are free text describing the routine's intent, and are returned by get_plan and list_plans.", InputSchema: updatePlanSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in UpdatePlanInput) (*mcp.CallToolResult, PlanOut, error) {
-		if err := service(ctx).UpdatePlan(ctx, in.PlanID, training.PlanPatch{Name: in.Name, Notes: in.Notes}); err != nil {
-			return nil, PlanOut{}, toolError(err)
+	addWrite(w, &mcp.Tool{Name: "update_plan", Description: "Edit a plan's name or notes without touching its exercises. Plan notes are free text describing the routine's intent, and are returned by get_plan and list_plans.", InputSchema: updatePlanSchema}, "plan.update", func(ctx context.Context, svc *training.Service, in UpdatePlanInput) (PlanWriteOut, error) {
+		if err := svc.UpdatePlan(ctx, in.PlanID, training.PlanPatch{Name: in.Name, Notes: in.Notes}); err != nil {
+			return PlanWriteOut{}, err
 		}
-		v, err := service(ctx).GetPlan(ctx, in.PlanID)
-		return nil, PlanOut{Plan: v}, toolError(err)
+		v, err := svc.GetPlan(ctx, in.PlanID)
+		return PlanWriteOut{Plan: v}, err
 	})
 
 	planItemSchema := mustInputSchema[PlanItemEditInput]()
 	setPositiveID(planItemSchema.Properties["plan_id"])
 	planItemSchema.Properties["exercise"].Pattern = `.*\S.*`
-	addTool(s, &mcp.Tool{Name: "set_plan_exercise", Description: "Add an exercise to a saved plan, or replace its prescription. Editing a template never changes sessions already started from it.", InputSchema: planItemSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in PlanItemEditInput) (*mcp.CallToolResult, PlanOut, error) {
-		err := service(ctx).SetPlanItem(ctx, in.PlanID, training.PlanItem{
+	addWrite(w, &mcp.Tool{Name: "set_plan_exercise", Description: "Add an exercise to a saved plan, or replace its prescription. Editing a template never changes sessions already started from it.", InputSchema: planItemSchema}, "plan.exercise.set", func(ctx context.Context, svc *training.Service, in PlanItemEditInput) (PlanWriteOut, error) {
+		err := svc.SetPlanItem(ctx, in.PlanID, training.PlanItem{
 			Exercise: in.Exercise, TargetSets: in.TargetSets, RepMin: in.RepMin,
 			RepMax: in.RepMax, TargetRPE: in.TargetRPE, Superset: in.Superset, Notes: in.Notes,
 		})
 		if err != nil {
-			return nil, PlanOut{}, toolError(err)
+			return PlanWriteOut{}, err
 		}
-		v, err := service(ctx).GetPlan(ctx, in.PlanID)
-		return nil, PlanOut{Plan: v}, toolError(err)
+		v, err := svc.GetPlan(ctx, in.PlanID)
+		return PlanWriteOut{Plan: v}, err
 	})
 	planRefSchema := mustInputSchema[PlanItemRefInput]()
 	setPositiveID(planRefSchema.Properties["plan_id"])
 	planRefSchema.Properties["exercise"].Pattern = `.*\S.*`
-	addTool(s, &mcp.Tool{Name: "remove_plan_exercise", Description: "Remove an exercise from a saved plan and close the gap in its order.", InputSchema: planRefSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in PlanItemRefInput) (*mcp.CallToolResult, PlanOut, error) {
-		if err := service(ctx).RemovePlanItem(ctx, in.PlanID, in.Exercise); err != nil {
-			return nil, PlanOut{}, toolError(err)
+	addWrite(w, &mcp.Tool{Name: "remove_plan_exercise", Description: "Remove an exercise from a saved plan and close the gap in its order.", InputSchema: planRefSchema}, "plan.exercise.remove", func(ctx context.Context, svc *training.Service, in PlanItemRefInput) (PlanWriteOut, error) {
+		if err := svc.RemovePlanItem(ctx, in.PlanID, in.Exercise); err != nil {
+			return PlanWriteOut{}, err
 		}
-		v, err := service(ctx).GetPlan(ctx, in.PlanID)
-		return nil, PlanOut{Plan: v}, toolError(err)
+		v, err := svc.GetPlan(ctx, in.PlanID)
+		return PlanWriteOut{Plan: v}, err
 	})
 	planMoveSchema := mustInputSchema[PlanMoveInput]()
 	setPositiveID(planMoveSchema.Properties["plan_id"])
 	planMoveSchema.Properties["exercise"].Pattern = `.*\S.*`
 	planMoveSchema.Properties["direction"].Enum = []any{"up", "down"}
-	addTool(s, &mcp.Tool{Name: "move_plan_exercise", Description: "Move an exercise one place up or down within a plan. The order is the order the session is performed in.", InputSchema: planMoveSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in PlanMoveInput) (*mcp.CallToolResult, PlanOut, error) {
+	addWrite(w, &mcp.Tool{Name: "move_plan_exercise", Description: "Move an exercise one place up or down within a plan. The order is the order the session is performed in.", InputSchema: planMoveSchema}, "plan.exercise.move", func(ctx context.Context, svc *training.Service, in PlanMoveInput) (PlanWriteOut, error) {
 		delta := 1
 		if in.Direction == "up" {
 			delta = -1
 		}
-		if err := service(ctx).MovePlanItem(ctx, in.PlanID, in.Exercise, delta); err != nil {
-			return nil, PlanOut{}, toolError(err)
+		if err := svc.MovePlanItem(ctx, in.PlanID, in.Exercise, delta); err != nil {
+			return PlanWriteOut{}, err
 		}
-		v, err := service(ctx).GetPlan(ctx, in.PlanID)
-		return nil, PlanOut{Plan: v}, toolError(err)
+		v, err := svc.GetPlan(ctx, in.PlanID)
+		return PlanWriteOut{Plan: v}, err
 	})
 
 	deletePlanSchema := mustInputSchema[PlanInput]()
 	setPositiveID(deletePlanSchema.Properties["plan_id"])
-	addTool(s, &mcp.Tool{Name: "delete_plan", Description: "Permanently delete a plan. Sessions that followed it keep their recorded plan name.", InputSchema: deletePlanSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in PlanInput) (*mcp.CallToolResult, PlanDeleteOut, error) {
-		err := service(ctx).DeletePlan(ctx, in.PlanID)
-		return nil, PlanDeleteOut{PlanID: in.PlanID}, toolError(err)
+	addWrite(w, &mcp.Tool{Name: "delete_plan", Description: "Permanently delete a plan. Sessions that followed it keep their recorded plan name.", InputSchema: deletePlanSchema}, "plan.delete", func(ctx context.Context, svc *training.Service, in PlanInput) (PlanDeleteOut, error) {
+		err := svc.DeletePlan(ctx, in.PlanID)
+		return PlanDeleteOut{PlanID: in.PlanID}, err
 	})
 	progressSchema := mustInputSchema[SessionInput]()
 	setPositiveID(progressSchema.Properties["session_id"])
@@ -464,13 +494,13 @@ func New(service training.ServiceFor) *Server {
 	setItemSchema := mustInputSchema[SessionItemInput]()
 	setPositiveID(setItemSchema.Properties["session_id"])
 	setItemSchema.Properties["exercise"].Pattern = `.*\S.*`
-	addTool(s, &mcp.Tool{Name: "add_session_exercise", Description: "Add an exercise to today's session plan, or replace its prescription. Adjusting a session never edits the plan it was started from.", InputSchema: setItemSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in SessionItemInput) (*mcp.CallToolResult, ItemOut, error) {
-		err := service(ctx).SetSessionItem(ctx, in.SessionID, training.PlanItem{
+	addWrite(w, &mcp.Tool{Name: "add_session_exercise", Description: "Add an exercise to today's session plan, or replace its prescription. Adjusting a session never edits the plan it was started from.", InputSchema: setItemSchema}, "session.exercise.set", func(ctx context.Context, svc *training.Service, in SessionItemInput) (ItemOut, error) {
+		err := svc.SetSessionItem(ctx, in.SessionID, training.PlanItem{
 			Exercise: in.Exercise, TargetSets: in.TargetSets,
 			RepMin: in.RepMin, RepMax: in.RepMax, TargetRPE: in.TargetRPE,
 			Superset: in.Superset, Notes: in.Notes,
 		})
-		return nil, ItemOut{SessionID: in.SessionID, Exercise: in.Exercise}, toolError(err)
+		return ItemOut{SessionID: in.SessionID, Exercise: in.Exercise}, err
 	})
 	adjustSchema := mustInputSchema[AdjustItemInput]()
 	setPositiveID(adjustSchema.Properties["session_id"])
@@ -481,34 +511,34 @@ func New(service training.ServiceFor) *Server {
 	setNonNullableType(adjustSchema.Properties["rep_max"], "integer")
 	setNonNullableType(adjustSchema.Properties["target_rpe"], "number")
 	setNonNullableType(adjustSchema.Properties["skipped"], "boolean")
-	addTool(s, &mcp.Tool{Name: "adjust_session_exercise", Description: "Change one exercise of today's session: its set count, rep range, RPE, or whether it is skipped. Omitted fields stay as they are. Use when the session does not go as planned.", InputSchema: adjustSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in AdjustItemInput) (*mcp.CallToolResult, ItemOut, error) {
-		err := service(ctx).AdjustSessionItem(ctx, in.SessionID, in.Exercise, training.SessionItemPatch{
+	addWrite(w, &mcp.Tool{Name: "adjust_session_exercise", Description: "Change one exercise of today's session: its set count, rep range, RPE, or whether it is skipped. Omitted fields stay as they are. Use when the session does not go as planned.", InputSchema: adjustSchema}, "session.exercise.adjust", func(ctx context.Context, svc *training.Service, in AdjustItemInput) (ItemOut, error) {
+		err := svc.AdjustSessionItem(ctx, in.SessionID, in.Exercise, training.SessionItemPatch{
 			TargetSets: in.TargetSets, RepMin: in.RepMin, RepMax: in.RepMax,
 			TargetRPE: in.TargetRPE, Skipped: in.Skipped,
 		})
-		return nil, ItemOut{SessionID: in.SessionID, Exercise: in.Exercise}, toolError(err)
+		return ItemOut{SessionID: in.SessionID, Exercise: in.Exercise}, err
 	})
 	swapSchema := mustInputSchema[SwapItemInput]()
 	setPositiveID(swapSchema.Properties["session_id"])
 	swapSchema.Properties["exercise"].Pattern = `.*\S.*`
 	swapSchema.Properties["replacement"].Pattern = `.*\S.*`
-	addTool(s, &mcp.Tool{Name: "swap_session_exercise", Description: "Substitute one exercise for another in today's session, keeping the same prescription. Use when the planned machine is taken or the movement does not feel right.", InputSchema: swapSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in SwapItemInput) (*mcp.CallToolResult, ItemOut, error) {
-		err := service(ctx).SwapSessionItem(ctx, in.SessionID, in.Exercise, in.Replacement)
-		return nil, ItemOut{SessionID: in.SessionID, Exercise: in.Replacement}, toolError(err)
+	addWrite(w, &mcp.Tool{Name: "swap_session_exercise", Description: "Substitute one exercise for another in today's session, keeping the same prescription. Use when the planned machine is taken or the movement does not feel right.", InputSchema: swapSchema}, "session.exercise.swap", func(ctx context.Context, svc *training.Service, in SwapItemInput) (ItemOut, error) {
+		err := svc.SwapSessionItem(ctx, in.SessionID, in.Exercise, in.Replacement)
+		return ItemOut{SessionID: in.SessionID, Exercise: in.Replacement}, err
 	})
 	removeItemSchema := mustInputSchema[RemoveItemInput]()
 	setPositiveID(removeItemSchema.Properties["session_id"])
 	removeItemSchema.Properties["exercise"].Pattern = `.*\S.*`
-	addTool(s, &mcp.Tool{Name: "remove_session_exercise", Description: "Drop an exercise from today's session plan. Sets already logged against it are kept and reappear as off-plan work.", InputSchema: removeItemSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in RemoveItemInput) (*mcp.CallToolResult, ItemOut, error) {
-		err := service(ctx).RemoveSessionItem(ctx, in.SessionID, in.Exercise)
-		return nil, ItemOut{SessionID: in.SessionID, Exercise: in.Exercise}, toolError(err)
+	addWrite(w, &mcp.Tool{Name: "remove_session_exercise", Description: "Drop an exercise from today's session plan. Sets already logged against it are kept and reappear as off-plan work.", InputSchema: removeItemSchema}, "session.exercise.remove", func(ctx context.Context, svc *training.Service, in RemoveItemInput) (ItemOut, error) {
+		err := svc.RemoveSessionItem(ctx, in.SessionID, in.Exercise)
+		return ItemOut{SessionID: in.SessionID, Exercise: in.Exercise}, err
 	})
 	saveAsPlanSchema := mustInputSchema[SaveAsPlanInput]()
 	setPositiveID(saveAsPlanSchema.Properties["session_id"])
 	saveAsPlanSchema.Properties["name"].Pattern = `.*\S.*`
-	addTool(s, &mcp.Tool{Name: "save_session_as_plan", Description: "Turn a session — including any in-session adjustments and off-plan work — into a new reusable plan. Skipped exercises are left out.", InputSchema: saveAsPlanSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in SaveAsPlanInput) (*mcp.CallToolResult, PlanOut, error) {
-		v, err := service(ctx).SaveSessionAsPlan(ctx, in.SessionID, in.Name)
-		return nil, PlanOut{Plan: v}, toolError(err)
+	addWrite(w, &mcp.Tool{Name: "save_session_as_plan", Description: "Turn a session — including any in-session adjustments and off-plan work — into a new reusable plan. Skipped exercises are left out.", InputSchema: saveAsPlanSchema}, "plan.create", func(ctx context.Context, svc *training.Service, in SaveAsPlanInput) (PlanWriteOut, error) {
+		v, err := svc.SaveSessionAsPlan(ctx, in.SessionID, in.Name)
+		return PlanWriteOut{Plan: v}, err
 	})
 
 	loadSchema := mustInputSchema[LoadInput]()
@@ -520,12 +550,12 @@ func New(service training.ServiceFor) *Server {
 
 	noteSchema := mustInputSchema[NoteInput]()
 	noteSchema.Properties["exercise"].Pattern = `.*\S.*`
-	addTool(s, &mcp.Tool{Name: "set_exercise_note", Description: "Store a persistent setup reminder for an exercise, such as seat height or grip width. It is shown every time that exercise is logged. An empty note removes it.", InputSchema: noteSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in NoteInput) (*mcp.CallToolResult, NotesOut, error) {
-		if err := service(ctx).SetExerciseNote(ctx, in.Exercise, in.Note); err != nil {
-			return nil, NotesOut{}, toolError(err)
+	addWriteBy(w, &mcp.Tool{Name: "set_exercise_note", Description: "Store a persistent setup reminder for an exercise, such as seat height or grip width. It is shown every time that exercise is logged. An empty note removes it.", InputSchema: noteSchema}, noteAction, func(ctx context.Context, svc *training.Service, in NoteInput) (NotesWriteOut, error) {
+		if err := svc.SetExerciseNote(ctx, in.Exercise, in.Note); err != nil {
+			return NotesWriteOut{}, err
 		}
-		v, err := service(ctx).ExerciseNotes(ctx)
-		return nil, NotesOut{Notes: v}, toolError(err)
+		v, err := svc.ExerciseNotes(ctx)
+		return NotesWriteOut{Notes: v}, err
 	})
 	addTool(s, &mcp.Tool{Name: "list_exercise_notes", Description: "List every exercise that has a setup note."}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, NotesOut, error) {
 		v, err := service(ctx).ExerciseNotes(ctx)
@@ -539,26 +569,26 @@ func New(service training.ServiceFor) *Server {
 		feedbackSchema.Properties[dim].Minimum = jsonschema.Ptr(0.0)
 		feedbackSchema.Properties[dim].Maximum = jsonschema.Ptr(3.0)
 	}
-	addTool(s, &mcp.Tool{Name: "record_feedback", Description: "Rate how one muscle group responded to a session: fatigue, pump and recovery, each 0 to 3. Only rate groups actually trained. This drives next week's set-count recommendation.", InputSchema: feedbackSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in FeedbackInput) (*mcp.CallToolResult, FeedbackOut, error) {
-		err := service(ctx).RecordFeedback(ctx, in.SessionID, training.Feedback{
+	addWrite(w, &mcp.Tool{Name: "record_feedback", Description: "Rate how one muscle group responded to a session: fatigue, pump and recovery, each 0 to 3. Only rate groups actually trained. This drives next week's set-count recommendation.", InputSchema: feedbackSchema}, "feedback.record", func(ctx context.Context, svc *training.Service, in FeedbackInput) (FeedbackOut, error) {
+		err := svc.RecordFeedback(ctx, in.SessionID, training.Feedback{
 			MuscleGroup: in.MuscleGroup, Fatigue: in.Fatigue, Pump: in.Pump, Recovery: in.Recovery,
 		})
 		if err != nil {
-			return nil, FeedbackOut{SessionID: in.SessionID}, toolError(err)
+			return FeedbackOut{SessionID: in.SessionID}, err
 		}
-		all, err := service(ctx).SessionFeedback(ctx, in.SessionID)
-		return nil, FeedbackOut{SessionID: in.SessionID, Feedback: all}, toolError(err)
+		all, err := svc.SessionFeedback(ctx, in.SessionID)
+		return FeedbackOut{SessionID: in.SessionID, Feedback: all}, err
 	})
 	landmarksSchema := mustInputSchema[LandmarksInput]()
 	landmarksSchema.Properties["muscle_group"].Enum = muscleGroupEnum()
 	landmarksSchema.Properties["mev"].Minimum = jsonschema.Ptr(0.0)
 	landmarksSchema.Properties["mrv"].Minimum = jsonschema.Ptr(0.0)
-	addTool(s, &mcp.Tool{Name: "set_volume_landmarks", Description: "Record a muscle group's personal weekly-set boundaries: MEV below which it stops growing, MRV above which fatigue outpaces recovery. These are individual, and volume_recommendation refuses to push past them. Leave a value at 0 if unknown.", InputSchema: landmarksSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in LandmarksInput) (*mcp.CallToolResult, LandmarksOut, error) {
-		if err := service(ctx).SetLandmarks(ctx, training.Landmarks{MuscleGroup: in.MuscleGroup, MEV: in.MEV, MRV: in.MRV}); err != nil {
-			return nil, LandmarksOut{}, toolError(err)
+	addWrite(w, &mcp.Tool{Name: "set_volume_landmarks", Description: "Record a muscle group's personal weekly-set boundaries: MEV below which it stops growing, MRV above which fatigue outpaces recovery. These are individual, and volume_recommendation refuses to push past them. Leave a value at 0 if unknown.", InputSchema: landmarksSchema}, "landmarks.set", func(ctx context.Context, svc *training.Service, in LandmarksInput) (LandmarksWriteOut, error) {
+		if err := svc.SetLandmarks(ctx, training.Landmarks{MuscleGroup: in.MuscleGroup, MEV: in.MEV, MRV: in.MRV}); err != nil {
+			return LandmarksWriteOut{}, err
 		}
-		v, err := service(ctx).Landmarks(ctx)
-		return nil, LandmarksOut{Landmarks: v}, toolError(err)
+		v, err := svc.Landmarks(ctx)
+		return LandmarksWriteOut{Landmarks: v}, err
 	})
 	addTool(s, &mcp.Tool{Name: "list_volume_landmarks", Description: "List the muscle groups that have personal volume landmarks recorded."}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, LandmarksOut, error) {
 		v, err := service(ctx).Landmarks(ctx)
@@ -571,9 +601,9 @@ func New(service training.ServiceFor) *Server {
 
 	deleteSessionSchema := mustInputSchema[SessionInput]()
 	setPositiveID(deleteSessionSchema.Properties["session_id"])
-	addTool(s, &mcp.Tool{Name: "delete_session", Description: "Permanently delete a training session and every set in it. Irreversible; returns how many sets were destroyed. Use to remove an empty or mistaken session.", InputSchema: deleteSessionSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in SessionInput) (*mcp.CallToolResult, DeleteSessionOut, error) {
-		n, err := service(ctx).DeleteSession(ctx, in.SessionID)
-		return nil, DeleteSessionOut{SessionID: in.SessionID, DeletedSets: n}, toolError(err)
+	addWrite(w, &mcp.Tool{Name: "delete_session", Description: "Permanently delete a training session and every set in it. Irreversible; returns how many sets were destroyed. Use to remove an empty or mistaken session.", InputSchema: deleteSessionSchema}, "session.delete", func(ctx context.Context, svc *training.Service, in SessionInput) (DeleteSessionOut, error) {
+		n, err := svc.DeleteSession(ctx, in.SessionID)
+		return DeleteSessionOut{SessionID: in.SessionID, DeletedSets: n}, err
 	})
 	historySchema := mustInputSchema[HistoryInput]()
 	historySchema.Properties["exercise"].Pattern = `.*\S.*`
@@ -595,9 +625,9 @@ func New(service training.ServiceFor) *Server {
 	groupSchema := mustInputSchema[GroupInput]()
 	groupSchema.Properties["exercise"].Pattern = `.*\S.*`
 	groupSchema.Properties["muscle_group"].Enum = muscleGroupEnum()
-	addTool(s, &mcp.Tool{Name: "set_exercise_group", Description: "Assign an exercise to one muscle group so its sets count toward that group's volume. Re-assigning replaces the previous group.", InputSchema: groupSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in GroupInput) (*mcp.CallToolResult, GroupOut, error) {
-		err := service(ctx).SetExerciseGroup(ctx, in.Exercise, in.MuscleGroup)
-		return nil, GroupOut{Exercise: in.Exercise, MuscleGroup: in.MuscleGroup}, toolError(err)
+	addWrite(w, &mcp.Tool{Name: "set_exercise_group", Description: "Assign an exercise to one muscle group so its sets count toward that group's volume. Re-assigning replaces the previous group.", InputSchema: groupSchema}, "exercise.group.set", func(ctx context.Context, svc *training.Service, in GroupInput) (GroupOut, error) {
+		err := svc.SetExerciseGroup(ctx, in.Exercise, in.MuscleGroup)
+		return GroupOut{Exercise: in.Exercise, MuscleGroup: in.MuscleGroup}, err
 	})
 	addTool(s, &mcp.Tool{Name: "list_exercise_groups", Description: "List every exercise that has a muscle group assigned, ordered by group."}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, GroupsOut, error) {
 		v, err := service(ctx).ExerciseGroups(ctx)
@@ -618,7 +648,7 @@ func New(service training.ServiceFor) *Server {
 		func(*http.Request) *mcp.Server { return s },
 		&mcp.StreamableHTTPOptions{Stateless: true},
 	)
-	return &Server{mcp: s, handler: h}
+	return &Server{mcp: s, handler: h, writes: w}
 }
 func (s *Server) Handler() http.Handler { return s.handler }
 func (s *Server) ToolNames() []string {
@@ -633,6 +663,15 @@ func (s *Server) ToolNames() []string {
 		"set_volume_landmarks", "list_volume_landmarks",
 		"set_exercise_note", "list_exercise_notes", "suggest_load"}
 }
+
+// noteAction tells setting a note from removing one: an empty note deletes it.
+func noteAction(in NoteInput) string {
+	if strings.TrimSpace(in.Note) == "" {
+		return "exercise.note.remove"
+	}
+	return "exercise.note.set"
+}
+
 func muscleGroupEnum() []any {
 	out := make([]any, 0, len(training.MuscleGroups))
 	for _, g := range training.MuscleGroups {

@@ -131,6 +131,10 @@ type isolationWorld struct {
 	db            *sql.DB
 	owner, second *mcp.ClientSession
 	ids           toolIDs
+	// ownerServer and ownerService answer the owner's calls, for accepting proposals.
+	ownerServer  *Server
+	ownerService *training.Service
+	services     *training.Services
 }
 
 func isolationClock() time.Time { return time.Date(2026, 8, 7, 10, 0, 0, 0, time.UTC) }
@@ -185,11 +189,20 @@ func newIsolationWorld(t *testing.T) isolationWorld {
 	if _, err = owner.LogSets(ctx, training.LogSetsInput{Key: "clave", Exercise: isolationExercise, Sets: []training.LoggedSet{{WeightKG: 70, Reps: 10, RPE: 7}}}); err != nil {
 		t.Fatal(err)
 	}
+	// User 2 accepts every proposal, so each write tool reaches its data path. The
+	// pending path is isolated by TestPendingProposalsAreIsolatedBetweenUsers.
+	if err = services.ForUser(2).SetAcceptAll(ctx, true); err != nil {
+		t.Fatal(err)
+	}
+	ownerServer := New(only(owner))
 	return isolationWorld{
-		db:     db,
-		owner:  mustConnect(t, New(only(owner)).Handler()),
-		second: mustConnect(t, New(only(services.ForUser(2))).Handler()),
-		ids:    toolIDs{session: session.ID, set: set.ID, plan: plan.ID},
+		db:           db,
+		ownerServer:  ownerServer,
+		services:     services,
+		ownerService: owner,
+		owner:        mustConnect(t, ownerServer.Handler()),
+		second:       mustConnect(t, New(only(services.ForUser(2))).Handler()),
+		ids:          toolIDs{session: session.ID, set: set.ID, plan: plan.ID},
 	}
 }
 
