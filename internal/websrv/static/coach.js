@@ -105,6 +105,7 @@
   let running = false;
   let connected = false;
   let lastPrompt = null; // { text, images } for «Volver a intentarlo»
+  let restored = false; // the remembered conversation was reopened
 
   // --- scroll ------------------------------------------------------------------
   // The view follows the stream until the person scrolls up; reaching the end
@@ -330,7 +331,13 @@
       poll = setTimeout(refresh, 3000);
     }
     showEmpty();
-    if (connected) openStream();
+    if (connected) {
+      openStream();
+      if (conversation && !restored) {
+        restored = true;
+        openConversation(conversation);
+      }
+    }
   }
 
   function refresh() {
@@ -346,7 +353,10 @@
     const data = (ev) => { try { return JSON.parse(ev.data); } catch (e) { return {}; } };
     stream.addEventListener('turn', (ev) => {
       endTurn();
-      turn = startTurn(data(ev).origin);
+      const d = data(ev);
+      // A reaction can start the conversation of a new chat.
+      if (d.conversation && !conversation) setConversation(d.conversation);
+      turn = startTurn(d.origin);
       setRunning(true);
     });
     stream.addEventListener('thinking', (ev) => {
@@ -420,8 +430,19 @@
     }
     lastPrompt = { text: value, images };
     scroll(true);
-    return post('prompt', images.length ? { text: value, images } : { text: value }).then(({ ok, data }) => {
-      if (ok) return;
+    const body = images.length ? { text: value, images } : { text: value };
+    if (conversation) body.conversation = conversation;
+    return post('prompt', body).then(({ ok, data }) => {
+      if (ok) {
+        if (data.conversation) setConversation(data.conversation);
+        return;
+      }
+      if (data.error === 'not_found') {
+        // The conversation went (deleted, or past 90 days): start a new one.
+        newChat();
+        note('Esa conversación ya no existe. Empieza una nueva.', 'error');
+        return;
+      }
       if (echo && images.length && window.coachAttach) window.coachAttach.restore(images);
       if (['bad_request', 'too_many_images', 'bad_image', 'images_too_large'].includes(data.error)) {
         note(MESSAGES[data.error], 'error');
@@ -498,8 +519,7 @@
     post('disconnect').then(() => {
       if (stream) { stream.close(); stream = null; }
       // Only the conversation goes; the server's cards stay.
-      log.querySelectorAll('.coach-msg, .coach-note, .run-card').forEach((el) => el.remove());
-      turn = null;
+      clearChat();
       models = null;
       modelName.textContent = '';
       chip.hidden = true;
@@ -545,6 +565,176 @@
   }
 
   stop.addEventListener('click', () => post('abort'));
+
+  // --- conversations ----------------------------------------------------------
+  // Like ChatGPT: the drawer lists the person's conversations, newest first; a
+  // new chat starts empty and becomes a conversation with its first message.
+  // The open one is remembered per device and reopened on load.
+  const CONV_KEY = 'coach-conversation';
+  const convList = $('conversations');
+  const deleteAll = $('conv-delete-all');
+  let conversation = parseInt(localStorage.getItem(CONV_KEY) || '0', 10) || 0;
+
+  function setConversation(id) {
+    conversation = id || 0;
+    localStorage.setItem(CONV_KEY, String(conversation));
+    convList.querySelectorAll('.conv-row').forEach((row) => row.classList.toggle('on', Number(row.dataset.id) === conversation));
+  }
+
+  function clearChat() {
+    log.querySelectorAll('.coach-msg, .coach-note, .run-card, .set-card').forEach((el) => el.remove());
+    turn = null;
+    lastPrompt = null;
+    showEmpty();
+  }
+
+  function newChat() {
+    if (running) return note('Espera a que termine la respuesta.');
+    clearChat();
+    setConversation(0);
+    post('open', { conversation: 0 });
+    text.focus();
+  }
+
+  // A stored answer reads as a live one did: steps row, then the text.
+  function storedTurn(m) {
+    const t = startTurn(m.origin === 'reaction' ? 'reaction' : 'user');
+    t.live.remove();
+    (m.steps || []).forEach((step) => {
+      const [name, outcome] = String(step).split(':');
+      const w = words(name);
+      const row = document.createElement('li');
+      row.dataset.doing = w[0];
+      if (outcome === 'error') { row.className = 'error'; row.textContent = w[0] + ': ha fallado'; }
+      else if (outcome === 'pending') { row.className = 'waiting'; row.textContent = 'Cambio propuesto, pendiente de tu aprobación'; }
+      else row.textContent = w[1];
+      t.list.appendChild(row);
+    });
+    paintSteps(t, false);
+    t.text = m.text || '';
+    if (t.text) render(t.body, t.text); else t.body.remove();
+    tools(t);
+  }
+
+  function openConversation(id) {
+    if (running) return note('Espera a que termine la respuesta.');
+    return fetch(base + '/coach/conversations/' + id, { credentials: 'same-origin' })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) { if (data.error === 'not_found') newChat(); return; }
+        clearChat();
+        setConversation(data.id);
+        (data.messages || []).forEach((m) => {
+          if (m.role === 'user') {
+            const me = mine(m.text || '');
+            if (m.photos) {
+              const small = document.createElement('small');
+              small.textContent = '📷 ' + m.photos + (m.photos === 1 ? ' foto (no se guarda)' : ' fotos (no se guardan)');
+              me.appendChild(small);
+            }
+          } else storedTurn(m);
+        });
+        showEmpty();
+        scroll(true);
+        post('open', { conversation: data.id });
+      })
+      .catch(() => {});
+  }
+
+  const DAY = 86400000;
+  function group(at) {
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const t = new Date(at).getTime();
+    if (t >= start.getTime()) return 'Hoy';
+    if (t >= start.getTime() - DAY) return 'Ayer';
+    if (t >= start.getTime() - 7 * DAY) return 'Últimos 7 días';
+    if (t >= start.getTime() - 30 * DAY) return 'Últimos 30 días';
+    return 'Anteriores';
+  }
+
+  function rowActions(row, c) {
+    const open = row.nextElementSibling;
+    if (open && open.classList.contains('conv-actions')) { open.remove(); return; }
+    const bar = document.createElement('div');
+    bar.className = 'conv-actions';
+    const rename = document.createElement('button');
+    rename.type = 'button'; rename.className = 'ghost'; rename.textContent = 'Renombrar';
+    rename.addEventListener('click', () => {
+      const title = window.prompt('Nuevo nombre', c.title);
+      if (!title || !title.trim()) return;
+      post('conversations/' + c.id + '/rename', { title: title.trim() }).then(({ ok, data }) => {
+        if (!ok) return note(data.error === 'bad_request' ? 'Ese nombre no vale (1 a 80 caracteres).' : 'No se pudo renombrar.', 'error');
+        loadConversations();
+      });
+    });
+    const del = document.createElement('button');
+    del.type = 'button'; del.className = 'ghost danger-text'; del.textContent = 'Borrar';
+    del.addEventListener('click', () => {
+      if (!window.confirm('¿Borrar «' + c.title + '»?')) return;
+      post('conversations/' + c.id + '/delete').then(({ ok }) => {
+        if (ok && c.id === conversation) newChat();
+        loadConversations();
+      });
+    });
+    bar.append(rename, del);
+    row.after(bar);
+  }
+
+  function loadConversations() {
+    if (!connected) { convList.replaceChildren(); deleteAll.hidden = true; return Promise.resolve(); }
+    return fetch(base + '/coach/conversations', { credentials: 'same-origin' })
+      .then((res) => res.json())
+      .then((data) => {
+        const list = data.conversations || [];
+        deleteAll.hidden = list.length === 0;
+        const nodes = [];
+        let last = '';
+        list.forEach((c) => {
+          const g = group(c.updated_at);
+          if (g !== last) {
+            const h = document.createElement('h3');
+            h.textContent = g;
+            nodes.push(h);
+            last = g;
+          }
+          const row = document.createElement('div');
+          row.className = 'conv-row' + (c.id === conversation ? ' on' : '');
+          row.dataset.id = String(c.id);
+          const openBtn = document.createElement('button');
+          openBtn.type = 'button';
+          openBtn.className = 'conv-open';
+          openBtn.textContent = c.title;
+          openBtn.addEventListener('click', () => {
+            document.dispatchEvent(new CustomEvent('drawer:close'));
+            openConversation(c.id);
+          });
+          const more = document.createElement('button');
+          more.type = 'button';
+          more.className = 'conv-more';
+          more.textContent = '⋯';
+          more.setAttribute('aria-label', 'Opciones de «' + c.title + '»');
+          more.addEventListener('click', () => rowActions(row, c));
+          row.append(openBtn, more);
+          nodes.push(row);
+        });
+        convList.replaceChildren(...nodes);
+      })
+      .catch(() => {});
+  }
+
+  document.addEventListener('drawer:open', loadConversations);
+  $('chat-new').addEventListener('click', newChat);
+  $('drawer-new').addEventListener('click', () => {
+    document.dispatchEvent(new CustomEvent('drawer:close'));
+    newChat();
+  });
+  deleteAll.addEventListener('click', () => {
+    if (!window.confirm('¿Borrar todas tus conversaciones con el coach? Tus entrenos no se tocan.')) return;
+    post('conversations/delete-all').then(() => {
+      newChat();
+      loadConversations();
+    });
+  });
 
   // --- model and thinking ---------------------------------------------------
   // The list is the person's own ChatGPT models, read from their engine; it is

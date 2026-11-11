@@ -95,7 +95,10 @@
     drawer.hidden = !open;
     if (scrim) scrim.hidden = !open;
     if (menu) menu.setAttribute('aria-expanded', String(open));
+    if (open) document.dispatchEvent(new CustomEvent('drawer:open'));
   }
+  // The coach closes the drawer after a conversation is picked.
+  document.addEventListener('drawer:close', () => setDrawer(false));
   if (menu) menu.addEventListener('click', () => setDrawer(drawer.hidden));
   if (scrim) scrim.addEventListener('click', () => setDrawer(false));
 

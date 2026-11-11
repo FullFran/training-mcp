@@ -183,7 +183,7 @@ func TestComposerHasVoiceAndTheExtrasSlot(t *testing.T) {
 func TestServiceWorkerCachesTheChatShell(t *testing.T) {
 	h, _ := newServer(t)
 	body := get(t, h, base+"/sw.js").Body.String()
-	for _, want := range []string{"const VERSION = 'v10';", "BASE + '/static/shell.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'", "BASE + '/static/coach-attach.js'"} {
+	for _, want := range []string{"const VERSION = 'v11';", "BASE + '/static/shell.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'", "BASE + '/static/coach-attach.js'"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("service worker lacks %s", want)
 		}
@@ -295,5 +295,29 @@ func TestHomeHasTheModelPicker(t *testing.T) {
 	h, _ := newServer(t)
 	if off := get(t, h, base+"/").Body.String(); strings.Contains(off, `id="model-sheet"`) || strings.Contains(off, `id="model-open"`) {
 		t.Fatal("picker shown with the coach off")
+	}
+}
+
+// Conversations live in the drawer with a new-chat button in the top bar and
+// in the drawer, and «borrar todo» next to the account; the list itself is
+// filled from the person's own conversations, never written into the page.
+func TestHomeHasTheConversationList(t *testing.T) {
+	world := newCoachWorld(t, newFakeCoach())
+	body := get(t, world.as(1), base+"/").Body.String()
+	if bar := section(t, body, `class="bar chat-bar"`, "</header>"); !strings.Contains(bar, `id="chat-new"`) {
+		t.Fatalf("no new chat in the top bar: %s", bar)
+	}
+	drawer := section(t, body, `id="drawer"`, "</aside>")
+	for _, want := range []string{`id="drawer-new"`, `id="conversations"`, `id="conv-delete-all"`, "90 días"} {
+		if !strings.Contains(drawer, want) {
+			t.Fatalf("drawer lacks %s: %s", want, drawer)
+		}
+	}
+	if strings.Contains(drawer, "Pierna") {
+		t.Fatal("a conversation title was written into the page")
+	}
+	h, _ := newServer(t)
+	if off := get(t, h, base+"/").Body.String(); strings.Contains(off, `id="conversations"`) || strings.Contains(off, `id="chat-new"`) {
+		t.Fatal("conversations shown with the coach off")
 	}
 }
