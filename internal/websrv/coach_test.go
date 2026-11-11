@@ -25,6 +25,7 @@ type fakeCoach struct {
 	events  []engine.WorkoutEvent
 	fail    error
 	stream  chan engine.Event
+	images  []engine.Image // the photos of the last prompt
 }
 
 func newFakeCoach() *fakeCoach { return &fakeCoach{callers: map[int64]bool{}} }
@@ -61,8 +62,11 @@ func (f *fakeCoach) Subscribe(userID int64) (<-chan engine.Event, func()) {
 	return ch, func() {}
 }
 
-func (f *fakeCoach) Prompt(userID int64, text string) error {
+func (f *fakeCoach) Prompt(userID int64, text string, images ...engine.Image) error {
 	f.record("prompt:"+text, userID)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.images = images
 	return f.fail
 }
 

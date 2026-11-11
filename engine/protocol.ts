@@ -19,8 +19,42 @@ export const DEVICE_VERIFICATION_URI = 'https://auth.openai.com/codex/device';
 export const MCP_SERVER_NAME = 'training';
 export const MCP_TOOL_PREFIX = `mcp__${MCP_SERVER_NAME}__`;
 
-export const MAX_LINE_BYTES = 1_048_576;
+/**
+ * The longest line the host may write. A prompt with photos carries them in
+ * base64 (internal/engine/images.go: at most 6 MiB of photos per turn), so this
+ * is far above what the engine itself ever sends back (1 MiB on the host side).
+ */
+export const MAX_LINE_BYTES = 12 * 1_048_576;
 const MAX_SECRET_CHARS = 16_384;
+
+/** Photo limits, the host's (internal/engine/images.go), checked again here. */
+export const MAX_IMAGES = 4;
+const MAX_IMAGE_BASE64_CHARS = Math.ceil((2 * 1_048_576) / 3) * 4;
+const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+
+/** A photo as the model API takes it. */
+export interface PromptImage {
+  type: 'image';
+  data: string;
+  mimeType: string;
+}
+
+/** The photos of a prompt, or null when anything about them is off. */
+export function parseImages(value: unknown): PromptImage[] | null {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > MAX_IMAGES) return null;
+  const out: PromptImage[] = [];
+  for (const item of value) {
+    const image = item as { mimeType?: unknown; data?: unknown } | null;
+    if (typeof image !== 'object' || image === null) return null;
+    const { mimeType, data } = image;
+    if (typeof mimeType !== 'string' || !IMAGE_TYPES.has(mimeType)) return null;
+    if (typeof data !== 'string' || data.length === 0 || data.length > MAX_IMAGE_BASE64_CHARS || data.length % 4 !== 0 || !BASE64.test(data)) return null;
+    out.push({ type: 'image', data, mimeType });
+  }
+  return out;
+}
 
 /** A person's ChatGPT credential. The refresh token is single-use and rotates. */
 export interface StoredCredential {
@@ -46,8 +80,11 @@ export type ParentMessage =
   | { type: 'login.cancel' }
   | { type: 'refresh'; id: string; credential: StoredCredential }
   | { type: 'token'; id: string; access?: string; accountId?: string; expires?: number; error?: EngineErrorCode }
-  /** `context` is the host's lines for this turn; the person's text never comes before them. */
-  | { type: 'prompt'; text: string; context?: string }
+  /**
+   * `context` is the host's lines for this turn; the person's text never comes before them.
+   * `images` are the person's photos for this turn only, in base64.
+   */
+  | { type: 'prompt'; text: string; context?: string; images?: { mimeType: string; data: string }[] }
   | { type: 'abort' }
   | { type: 'shutdown' };
 
@@ -79,12 +116,15 @@ export class LineDecoder {
   private buffer = '';
 
   push(chunk: Buffer | string): unknown[] {
+    // A photo line arrives in many chunks: only the new part is searched for its end.
+    let from = this.buffer.length;
     this.buffer += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
     const out: unknown[] = [];
     let index: number;
-    while ((index = this.buffer.indexOf('\n')) >= 0) {
+    while ((index = this.buffer.indexOf('\n', from)) >= 0) {
       const line = this.buffer.slice(0, index);
       this.buffer = this.buffer.slice(index + 1);
+      from = 0;
       if (!line.trim()) continue;
       try { out.push(JSON.parse(line)); } catch { out.push(undefined); }
     }

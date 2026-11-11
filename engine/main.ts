@@ -20,8 +20,8 @@ import {
   type AgentSession,
 } from '@earendil-works/pi-coding-agent';
 import {
-  composePrompt, DEVICE_VERIFICATION_URI, encode, LineDecoder, MCP_SERVER_NAME, MCP_TOOL_PREFIX, parseCredential,
-  type ChildMessage, type EngineErrorCode, type ParentMessage,
+  composePrompt, DEVICE_VERIFICATION_URI, encode, LineDecoder, MCP_SERVER_NAME, MCP_TOOL_PREFIX, parseCredential, parseImages,
+  type ChildMessage, type EngineErrorCode, type ParentMessage, type PromptImage,
 } from './protocol.ts';
 
 const PROVIDER = 'openai-codex';
@@ -249,7 +249,7 @@ async function chooseModel(active: AgentSession): Promise<void> {
   modelChosen = true;
 }
 
-async function prompt(text: string): Promise<void> {
+async function prompt(text: string, images: PromptImage[]): Promise<void> {
   if (running) return send({ type: 'error', code: 'turn_in_progress' });
   if (!session) return send({ type: 'error', code: 'engine_unavailable' });
   running = true;
@@ -263,7 +263,8 @@ async function prompt(text: string): Promise<void> {
       return process.exit(1);
     }
     await chooseModel(active);
-    await active.prompt(text);
+    // Photos go to the model with this turn; Pi resizes them to the model's limits.
+    await active.prompt(text, images.length > 0 ? { images } : undefined);
     const last = active.messages.at(-1) as { role?: string; stopReason?: string; errorMessage?: string } | undefined;
     if (aborting || last?.stopReason === 'aborted') send({ type: 'done', aborted: true });
     else if (last?.role === 'assistant' && last.stopReason === 'error') send({ type: 'error', code: codeOf(last.errorMessage) });
@@ -291,8 +292,12 @@ function handle(message: ParentMessage): void {
       tokenWaiters.get(message.id)?.(message);
       tokenWaiters.delete(message.id);
       return;
-    case 'prompt':
-      return void prompt(composePrompt(message.context, message.text));
+    case 'prompt': {
+      const images = parseImages(message.images);
+      // The host checked the photos already; a line that fails here is not served.
+      if (images === null) return send({ type: 'error', code: 'provider_error' });
+      return void prompt(composePrompt(message.context, message.text), images);
+    }
     case 'abort':
       aborting = running;
       return void session?.then((active) => active.abort(), () => {});

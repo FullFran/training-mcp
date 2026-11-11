@@ -105,6 +105,9 @@ type parentMessage struct {
 	Error        ErrorCode   `json:"error,omitempty"`
 	Text         string      `json:"text,omitempty"`
 	Context      string      `json:"context,omitempty"`
+	// Images are the photos of a prompt, base64 in JSON. They make a prompt
+	// line far longer than anything the engine sends back.
+	Images []promptImage `json:"images,omitempty"`
 }
 
 // childMessage is a parsed, validated message from the engine.
