@@ -51,8 +51,38 @@ type Settings struct {
 	// MaxPendingEvents bounds the live workout events queued per person.
 	MaxPendingEvents int
 
+	// Preferences keeps each person's model and thinking choice. Without one,
+	// choices live in memory until the server stops.
+	Preferences PreferenceStore
+
 	Now    func() time.Time
 	Logger *log.Logger
+}
+
+// PreferenceStore keeps each person's model and thinking choice; empty strings
+// mean never chosen.
+type PreferenceStore interface {
+	CoachPreferences(ctx context.Context, userID int64) (model, thinking string, err error)
+	SetCoachPreferences(ctx context.Context, userID int64, model, thinking string) error
+}
+
+type memoryPreferences struct {
+	mu sync.Mutex
+	m  map[int64][2]string
+}
+
+func (p *memoryPreferences) CoachPreferences(_ context.Context, userID int64) (string, string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	v := p.m[userID]
+	return v[0], v[1], nil
+}
+
+func (p *memoryPreferences) SetCoachPreferences(_ context.Context, userID int64, model, thinking string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.m[userID] = [2]string{model, thinking}
+	return nil
 }
 
 func (s *Settings) defaults() {
@@ -84,6 +114,9 @@ func (s *Settings) defaults() {
 	}
 	if s.Now == nil {
 		s.Now = time.Now
+	}
+	if s.Preferences == nil {
+		s.Preferences = &memoryPreferences{m: map[int64][2]string{}}
 	}
 	if s.Logger == nil {
 		s.Logger = log.Default()
@@ -174,6 +207,11 @@ type person struct {
 	subs        map[int]chan Event
 	nextSub     int
 	events      []WorkoutEvent
+	// models is the list the person's engine reported; modelWait is closed when
+	// a requested list (or its failure, in modelErr) arrives.
+	models    *ModelList
+	modelWait chan struct{}
+	modelErr  ErrorCode
 }
 
 // Manager starts, feeds and stops engine processes: at most one per person,
@@ -356,9 +394,139 @@ func (m *Manager) Prompt(userID int64, text string, images ...Image) error {
 	} else {
 		text = guardText(text)
 	}
+	model, thinking := m.preferences(userID)
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.startTurn(m.personOf(userID), text, originUser, images)
+	return m.startTurn(m.personOf(userID), text, originUser, images, model, thinking)
+}
+
+// preferences reads the person's choice; any failure means the engine's default.
+func (m *Manager) preferences(userID int64) (string, string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	model, thinking, err := m.s.Preferences.CoachPreferences(ctx, userID)
+	if err != nil {
+		return "", ""
+	}
+	return model, thinking
+}
+
+// Models returns the models the person's ChatGPT login can use, as their own
+// engine reports them, and the current choice. The first call starts the
+// person's engine and waits for its list; later calls answer from memory.
+func (m *Manager) Models(userID int64) (ModelList, error) {
+	model, thinking := m.preferences(userID)
+	m.mu.Lock()
+	p := m.personOf(userID)
+	list := p.models
+	var wait chan struct{}
+	if list == nil {
+		var err error
+		if wait, err = m.requestModels(p); err != nil {
+			m.forget(p)
+			m.mu.Unlock()
+			return ModelList{}, err
+		}
+	}
+	m.mu.Unlock()
+	if wait != nil {
+		select {
+		case <-wait:
+		case <-time.After(m.s.ReplyTimeout):
+			return ModelList{}, fail(CodeEngineUnavailable)
+		}
+		m.mu.Lock()
+		list = p.models
+		code := p.modelErr
+		m.mu.Unlock()
+		if list == nil {
+			if code == "" {
+				code = CodeEngineUnavailable
+			}
+			return ModelList{}, fail(code)
+		}
+	}
+	out := ModelList{Models: append([]ModelInfo(nil), list.Models...), Model: list.Model, Thinking: list.Thinking}
+	// A stored choice the account no longer offers is not reported.
+	if mi := out.find(model); mi != nil && mi.takes(thinking) {
+		out.Model, out.Thinking = model, thinking
+	}
+	return out, nil
+}
+
+// SetPreferences keeps the person's choice of model and thinking level. Only a
+// model their own engine listed, with a level that model takes, is accepted:
+// a model outside the person's ChatGPT login can never be chosen here.
+func (m *Manager) SetPreferences(userID int64, model, thinking string) error {
+	list, err := m.Models(userID)
+	if err != nil {
+		return err
+	}
+	mi := list.find(model)
+	if mi == nil || !mi.takes(thinking) {
+		return fail(CodeBadRequest)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := m.s.Preferences.SetCoachPreferences(ctx, userID, model, thinking); err != nil {
+		return fail(CodeEngineUnavailable)
+	}
+	return nil
+}
+
+// requestModels asks the person's engine for its model list, once at a time.
+func (m *Manager) requestModels(p *person) (chan struct{}, error) {
+	if p.modelWait != nil {
+		return p.modelWait, nil
+	}
+	if err := m.connected(p); err != nil {
+		return nil, err
+	}
+	pr, err := m.startEngine(p)
+	if err != nil {
+		return nil, err
+	}
+	p.modelWait = make(chan struct{})
+	p.modelErr = ""
+	m.send(pr, parentMessage{Type: "models.get"})
+	m.touch(p, pr)
+	return p.modelWait, nil
+}
+
+// endModels wakes whoever waits for a model list.
+func (m *Manager) endModels(p *person, code ErrorCode) {
+	if p.modelWait == nil {
+		return
+	}
+	p.modelErr = code
+	close(p.modelWait)
+	p.modelWait = nil
+}
+
+// connected refuses a person without a usable stored credential.
+func (m *Manager) connected(p *person) error {
+	c, err := m.s.Vault.Read(p.id)
+	if err != nil {
+		p.reconnect = true
+		return fail(CodeReconnect)
+	}
+	if c == nil {
+		return fail(CodeNotConnected)
+	}
+	return nil
+}
+
+// startEngine returns the person's process, started with its MCP token.
+func (m *Manager) startEngine(p *person) (*proc, error) {
+	pr, err := m.ensureProc(p, true)
+	if err != nil {
+		return nil, err
+	}
+	if pr.token == "" {
+		pr.token = m.s.Tokens.Mint(p.id, m.s.MaxAge)
+		m.send(pr, parentMessage{Type: "start", MCPURL: m.s.MCPURL, MCPToken: pr.token, SystemPrompt: m.s.SystemPrompt})
+	}
+	return pr, nil
 }
 
 // Abort asks the running turn of this person to stop. False when there is none.
@@ -377,6 +545,7 @@ func (m *Manager) Abort(userID int64) bool {
 // host-written context at the start of the next turn. With a chat stream open
 // and no turn running, it also starts a short automatic reaction.
 func (m *Manager) Notify(userID int64, ev WorkoutEvent) {
+	model, thinking := m.preferences(userID)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.closed {
@@ -390,7 +559,7 @@ func (m *Manager) Notify(userID int64, ev WorkoutEvent) {
 	}
 	if len(p.subs) > 0 && (p.proc == nil || p.proc.turn == nil) {
 		// A refusal (not connected, busy) leaves the event queued for later.
-		_ = m.startTurn(p, reactionText, originEvent, nil)
+		_ = m.startTurn(p, reactionText, originEvent, nil, model, thinking)
 	}
 }
 
@@ -487,32 +656,23 @@ func (m *Manager) forget(p *person) {
 	}
 }
 
-func (m *Manager) startTurn(p *person, text, origin string, images []Image) error {
+func (m *Manager) startTurn(p *person, text, origin string, images []Image, model, thinking string) error {
 	if m.closed {
 		return fail(CodeEngineUnavailable)
 	}
 	if p.proc != nil && p.proc.turn != nil {
 		return fail(CodeTurnInProgress)
 	}
-	c, err := m.s.Vault.Read(p.id)
-	if err != nil {
-		p.reconnect = true
-		return fail(CodeReconnect)
-	}
-	if c == nil {
-		return fail(CodeNotConnected)
+	if err := m.connected(p); err != nil {
+		return err
 	}
 	// A process whose token would expire during this turn is replaced first.
 	if p.proc != nil && p.login == nil && p.proc.token != "" && m.s.Now().Sub(p.proc.startedAt) > m.s.MaxAge-m.s.TurnTimeout {
 		m.stop(p, "max_age", nil)
 	}
-	pr, err := m.ensureProc(p, true)
+	pr, err := m.startEngine(p)
 	if err != nil {
 		return err
-	}
-	if pr.token == "" {
-		pr.token = m.s.Tokens.Mint(p.id, m.s.MaxAge)
-		m.send(pr, parentMessage{Type: "start", MCPURL: m.s.MCPURL, MCPToken: pr.token, SystemPrompt: m.s.SystemPrompt})
 	}
 	t := &turnState{}
 	t.timeout = time.AfterFunc(m.s.TurnTimeout, func() {
@@ -525,7 +685,7 @@ func (m *Manager) startTurn(p *person, text, origin string, images []Image) erro
 	contextLines := composeContext(m.s.Now(), p.events)
 	p.events = nil
 	m.broadcast(p, Event{Name: "turn", Data: map[string]any{"origin": origin}})
-	m.send(pr, parentMessage{Type: "prompt", Text: text, Context: contextLines, Images: toPromptImages(images)})
+	m.send(pr, parentMessage{Type: "prompt", Text: text, Context: contextLines, Images: toPromptImages(images), Model: model, Thinking: thinking})
 	m.touch(p, pr)
 	return nil
 }
@@ -684,7 +844,7 @@ func (m *Manager) handle(p *person, pr *proc, msg childMessage) {
 			return
 		}
 		pr.toolsChecked = true
-	case "delta":
+	case "delta", "thinking":
 		t := pr.turn
 		if t == nil || t.limited || !pr.toolsChecked {
 			return
@@ -694,7 +854,17 @@ func (m *Manager) handle(p *person, pr *proc, msg childMessage) {
 			m.limitTurn(p, pr, t)
 			return
 		}
-		m.broadcast(p, Event{Name: "delta", Data: map[string]any{"text": msg.Text}})
+		m.broadcast(p, Event{Name: msg.Type, Data: map[string]any{"text": msg.Text}})
+	case "models":
+		if !pr.toolsChecked || p.proc != pr {
+			return
+		}
+		p.models = &ModelList{Models: msg.Models, Model: msg.Model, Thinking: msg.Thinking}
+		m.endModels(p, "")
+	case "models.failed":
+		if p.proc == pr {
+			m.endModels(p, msg.Code)
+		}
 	case "tool":
 		if !pr.toolsChecked || pr.turn == nil || pr.turn.limited {
 			return
@@ -958,6 +1128,7 @@ func (m *Manager) stop(p *person, reason string, only *proc) {
 	if pr.turn != nil {
 		m.endTurn(p, pr, "error", map[string]any{"code": string(CodeEngineUnavailable)})
 	}
+	m.endModels(p, CodeEngineUnavailable)
 	pr.stopped = true
 	if pr.idle != nil {
 		pr.idle.Stop()

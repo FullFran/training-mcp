@@ -117,10 +117,27 @@ func runFakeEngine(mode string) {
 			if ch != nil {
 				ch <- m
 			}
+		case "models.get":
+			go func() {
+				if reply := askToken("t-models"); reply["error"] != nil {
+					send(map[string]any{"type": "models.failed", "code": reply["error"]})
+					return
+				}
+				if mode == "modelsfail" {
+					send(map[string]any{"type": "models.failed", "code": "reconnect"})
+					return
+				}
+				send(map[string]any{"type": "models", "model": "gpt-a", "thinking": "medium", "models": []any{
+					map[string]any{"id": "gpt-a", "name": "GPT A", "thinking": []string{"off", "low", "medium", "high"}},
+					map[string]any{"id": "gpt-b", "name": "GPT B", "thinking": []string{"off"}},
+				}})
+			}()
 		case "prompt":
 			turn++
 			n := turn
 			text, _ := m["text"].(string)
+			// The fake proves which model and thinking level the turn asked for.
+			choice := fmt.Sprintf("MODEL<%v:%v>", orEmpty(m["model"]), orEmpty(m["thinking"]))
 			ctx, _ := m["context"].(string)
 			// The fake proves which photos it got: type, size and a digest, never the bytes.
 			photos := ""
@@ -166,7 +183,8 @@ func runFakeEngine(mode string) {
 				r := refreshes
 				tmu.Unlock()
 				send(map[string]any{"type": "delta", "text": fmt.Sprintf("refreshes=%d access=%v\n", r, replies[0]["access"] != nil)})
-				send(map[string]any{"type": "delta", "text": "CONTEXT<" + ctx + ">TEXT<" + text + ">IMAGES" + photos})
+				send(map[string]any{"type": "thinking", "text": "pensando en tu sesión"})
+				send(map[string]any{"type": "delta", "text": "CONTEXT<" + ctx + ">TEXT<" + text + ">IMAGES" + photos + choice})
 				send(map[string]any{"type": "done", "aborted": false})
 			}()
 		case "abort":
@@ -177,6 +195,13 @@ func runFakeEngine(mode string) {
 			return
 		}
 	}
+}
+
+func orEmpty(v any) string {
+	if v == nil {
+		return ""
+	}
+	return fmt.Sprint(v)
 }
 
 // --- helpers for the tests -------------------------------------------------

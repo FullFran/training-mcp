@@ -75,3 +75,26 @@ func TestLastSetAtIsTheLatestLoggedSet(t *testing.T) {
 		t.Fatalf("LastSetAt() = %d, %v, %v, want %d at %v", id, at, err, first.ID, want)
 	}
 }
+
+// The coach's model choice is unset until chosen, one per person, and an
+// unknown person is an error rather than a silent write.
+func TestCoachPreferencesAreUnsetUntilChosenAndPerUser(t *testing.T) {
+	ctx := context.Background()
+	st := openTwoUsers(t)
+	one, two := int64(1), int64(2)
+	if m, th, err := st.CoachPreferences(ctx, one); err != nil || m != "" || th != "" {
+		t.Fatalf("unset = %q %q %v", m, th, err)
+	}
+	if err := st.SetCoachPreferences(ctx, one, "gpt-a", "high"); err != nil {
+		t.Fatal(err)
+	}
+	if m, th, err := st.CoachPreferences(ctx, one); err != nil || m != "gpt-a" || th != "high" {
+		t.Fatalf("one = %q %q %v", m, th, err)
+	}
+	if m, th, _ := st.CoachPreferences(ctx, two); m != "" || th != "" {
+		t.Fatalf("two sees one's choice: %q %q", m, th)
+	}
+	if err := st.SetCoachPreferences(ctx, 999, "gpt-a", "high"); err == nil {
+		t.Fatal("unknown person accepted")
+	}
+}

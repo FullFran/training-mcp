@@ -21,7 +21,8 @@ import {
 } from '@earendil-works/pi-coding-agent';
 import {
   composePrompt, DEVICE_VERIFICATION_URI, encode, LineDecoder, MCP_SERVER_NAME, MCP_TOOL_PREFIX, parseCredential, parseImages,
-  type ChildMessage, type EngineErrorCode, type ParentMessage, type PromptImage,
+  pickModel, THINKING_LEVELS, thinkingLevels,
+  type ChildMessage, type EngineErrorCode, type ParentMessage, type PromptImage, type ThinkingLevel,
 } from './protocol.ts';
 
 const PROVIDER = 'openai-codex';
@@ -134,7 +135,7 @@ async function refresh(message: Extract<ParentMessage, { type: 'refresh' }>): Pr
 
 let runtime: ModelRuntime | undefined;
 let session: Promise<AgentSession> | undefined;
-let modelChosen = false;
+let catalog: Promise<Awaited<ReturnType<ModelRuntime['getAvailable']>>> | undefined;
 let running = false;
 let aborting = false;
 
@@ -203,6 +204,8 @@ async function createSession(start: Extract<ParentMessage, { type: 'start' }>): 
     if (!running) return;
     if (event.type === 'message_update' && event.assistantMessageEvent.type === 'text_delta') {
       send({ type: 'delta', text: event.assistantMessageEvent.delta });
+    } else if (event.type === 'message_update' && event.assistantMessageEvent.type === 'thinking_delta') {
+      send({ type: 'thinking', text: event.assistantMessageEvent.delta });
     } else if (event.type === 'tool_execution_start') {
       // A small number pairs the start and the end of one call; Pi's own call id stays here.
       nextCall = (nextCall % 100_000) + 1;
@@ -234,22 +237,55 @@ function isPendingProposal(result: unknown): boolean {
   return false;
 }
 
-/** The first visible model of the person's account, in the provider's own order. */
-async function chooseModel(active: AgentSession): Promise<void> {
-  if (modelChosen || !runtime) return;
-  const result = await runtime.refresh({ allowNetwork: true, providers: [PROVIDER], signal: AbortSignal.timeout(20_000) });
-  const failure = result.errors.get(PROVIDER);
-  if (failure) throw failure;
-  const available = await runtime.getAvailable();
-  // Only the person's own account may serve a request, whatever else Pi has registered.
-  if (available.some((model) => model.provider !== PROVIDER)) throw new Error('unexpected provider');
-  const first = available[0];
-  if (!first) throw new Reconnect('reconnect');
-  await active.setModel(first);
-  modelChosen = true;
+/**
+ * The models of the person's account, in the provider's own order, loaded once
+ * per process. Only the person's own account may serve a request, whatever else
+ * Pi has registered.
+ */
+function loadCatalog(): Promise<Awaited<ReturnType<ModelRuntime['getAvailable']>>> {
+  catalog ??= (async () => {
+    if (!runtime) throw new Error('no runtime');
+    const result = await runtime.refresh({ allowNetwork: true, providers: [PROVIDER], signal: AbortSignal.timeout(20_000) });
+    const failure = result.errors.get(PROVIDER);
+    if (failure) throw failure;
+    const available = await runtime.getAvailable();
+    if (available.some((model) => model.provider !== PROVIDER)) throw new Error('unexpected provider');
+    if (available.length === 0) throw new Reconnect('reconnect');
+    return available;
+  })();
+  catalog.catch(() => { catalog = undefined; });
+  return catalog;
 }
 
-async function prompt(text: string, images: PromptImage[]): Promise<void> {
+/**
+ * Applies the person's choice: their model when their account lists it (else
+ * the account's first), and their thinking level, which Pi clamps to what the
+ * model takes.
+ */
+async function applyChoice(active: AgentSession, model?: string, thinking?: string): Promise<void> {
+  const target = pickModel(await loadCatalog(), model);
+  if (!target) throw new Reconnect('reconnect');
+  if (active.model?.id !== target.id || active.model?.provider !== PROVIDER) await active.setModel(target);
+  if (thinking !== undefined && (THINKING_LEVELS as readonly string[]).includes(thinking)) active.setThinkingLevel(thinking as ThinkingLevel);
+}
+
+/** The person's models and the current choice, for the host's picker. */
+async function listModels(): Promise<void> {
+  try {
+    if (!session) return send({ type: 'models.failed', code: 'engine_unavailable' });
+    const active = await session;
+    const available = await loadCatalog();
+    if (active.model?.provider !== PROVIDER || !available.some((m) => m.id === active.model?.id)) await applyChoice(active);
+    const models = available.map((m) => ({ id: m.id, name: (m.name || m.id).slice(0, 80), thinking: thinkingLevels(m) }));
+    const current = models.find((m) => m.id === active.model?.id);
+    const level = active.thinkingLevel as ThinkingLevel;
+    send({ type: 'models', models, model: current?.id ?? '', thinking: current?.thinking.includes(level) ? level : '' });
+  } catch (error) {
+    send({ type: 'models.failed', code: codeOf(error) });
+  }
+}
+
+async function prompt(text: string, images: PromptImage[], model?: string, thinking?: string): Promise<void> {
   if (running) return send({ type: 'error', code: 'turn_in_progress' });
   if (!session) return send({ type: 'error', code: 'engine_unavailable' });
   running = true;
@@ -262,7 +298,7 @@ async function prompt(text: string, images: PromptImage[]): Promise<void> {
       send({ type: 'error', code: 'engine_unavailable' });
       return process.exit(1);
     }
-    await chooseModel(active);
+    await applyChoice(active, model, thinking);
     // Photos go to the model with this turn; Pi resizes them to the model's limits.
     await active.prompt(text, images.length > 0 ? { images } : undefined);
     const last = active.messages.at(-1) as { role?: string; stopReason?: string; errorMessage?: string } | undefined;
@@ -296,8 +332,10 @@ function handle(message: ParentMessage): void {
       const images = parseImages(message.images);
       // The host checked the photos already; a line that fails here is not served.
       if (images === null) return send({ type: 'error', code: 'provider_error' });
-      return void prompt(composePrompt(message.context, message.text), images);
+      return void prompt(composePrompt(message.context, message.text), images, message.model, message.thinking);
     }
+    case 'models.get':
+      return void listModels();
     case 'abort':
       aborting = running;
       return void session?.then((active) => active.abort(), () => {});

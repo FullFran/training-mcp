@@ -3,6 +3,7 @@ package websrv_test
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -26,6 +27,7 @@ type fakeCoach struct {
 	fail    error
 	stream  chan engine.Event
 	images  []engine.Image // the photos of the last prompt
+	chosen  [2]string      // the last model and thinking level set
 }
 
 func newFakeCoach() *fakeCoach { return &fakeCoach{callers: map[int64]bool{}} }
@@ -71,6 +73,25 @@ func (f *fakeCoach) Prompt(userID int64, text string, images ...engine.Image) er
 }
 
 func (f *fakeCoach) Abort(userID int64) bool { f.record("abort", userID); return false }
+
+func (f *fakeCoach) Models(userID int64) (engine.ModelList, error) {
+	f.record("models", userID)
+	if f.fail != nil {
+		return engine.ModelList{}, f.fail
+	}
+	return engine.ModelList{Models: []engine.ModelInfo{{ID: "gpt-a", Name: "GPT A", Thinking: []string{"off", "high"}}}, Model: "gpt-a", Thinking: "off"}, nil
+}
+
+func (f *fakeCoach) SetPreferences(userID int64, model, thinking string) error {
+	f.record("settings", userID)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if model != "gpt-a" {
+		return &engine.Error{Code: engine.CodeBadRequest}
+	}
+	f.chosen = [2]string{model, thinking}
+	return nil
+}
 
 func (f *fakeCoach) Notify(userID int64, ev engine.WorkoutEvent) {
 	f.record("notify", userID)
@@ -182,6 +203,12 @@ func TestEveryCoachRouteActsAsTheRequestsPerson(t *testing.T) {
 		"POST /coach/abort": func() *httptest.ResponseRecorder {
 			return coachRequest(t, world.as(2), "POST", "/coach/abort", "{}", true)
 		},
+		"GET /coach/models": func() *httptest.ResponseRecorder {
+			return coachRequest(t, world.as(2), "GET", "/coach/models", "", false)
+		},
+		"POST /coach/settings": func() *httptest.ResponseRecorder {
+			return coachRequest(t, world.as(2), "POST", "/coach/settings", `{"model":"gpt-a","thinking":"high"}`, true)
+		},
 	}
 	for _, p := range world.server.Routes() {
 		route := strings.TrimSpace(strings.Replace(p, base, "", 1))
@@ -207,7 +234,7 @@ func TestEveryCoachRouteActsAsTheRequestsPerson(t *testing.T) {
 func TestCoachWritesNeedTheCoachHeader(t *testing.T) {
 	coach := newFakeCoach()
 	world := newCoachWorld(t, coach)
-	for _, path := range []string{"/coach/login", "/coach/disconnect", "/coach/prompt", "/coach/abort"} {
+	for _, path := range []string{"/coach/login", "/coach/disconnect", "/coach/prompt", "/coach/abort", "/coach/settings"} {
 		if w := coachRequest(t, world.as(1), "POST", path, `{"text":"x"}`, false); w.Code != http.StatusForbidden {
 			t.Errorf("%s without the header: %d", path, w.Code)
 		}
@@ -312,5 +339,40 @@ func TestServiceWorkerNeverCachesTheCoach(t *testing.T) {
 	body := get(t, world.as(1), base+"/sw.js").Body.String()
 	if !strings.Contains(body, "url.pathname.startsWith(BASE + '/coach/')) return;") {
 		t.Fatal("service worker handles coach requests")
+	}
+}
+
+// The model list and the choice: the list as the person's engine reports it;
+// a choice outside it is refused with a fixed code and changes nothing.
+func TestCoachModelsAndSettings(t *testing.T) {
+	coach := newFakeCoach()
+	world := newCoachWorld(t, coach)
+	w := coachRequest(t, world.as(1), "GET", "/coach/models", "", false)
+	var list engine.ModelList
+	if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &list) != nil || len(list.Models) != 1 || list.Model != "gpt-a" {
+		t.Fatalf("models: %d %s", w.Code, w.Body)
+	}
+	if w := coachRequest(t, world.as(1), "POST", "/coach/settings", `{"model":"gpt-a","thinking":"high"}`, true); w.Code != http.StatusOK {
+		t.Fatalf("settings: %d %s", w.Code, w.Body)
+	}
+	if coach.chosen != [2]string{"gpt-a", "high"} {
+		t.Fatalf("chosen = %v", coach.chosen)
+	}
+	for body, want := range map[string]int{
+		`{"model":"other","thinking":"off"}`:           http.StatusBadRequest,
+		`{"model":"gpt-a","thinking":"off","extra":1}`: http.StatusBadRequest,
+		`not json`: http.StatusBadRequest,
+	} {
+		w := coachRequest(t, world.as(1), "POST", "/coach/settings", body, true)
+		if w.Code != want || !strings.Contains(w.Body.String(), `"bad_request"`) {
+			t.Errorf("%s: %d %s", body, w.Code, w.Body)
+		}
+	}
+	if coach.chosen != [2]string{"gpt-a", "high"} {
+		t.Fatalf("a refused choice changed it: %v", coach.chosen)
+	}
+	coach.fail = &engine.Error{Code: engine.CodeNotConnected}
+	if w := coachRequest(t, world.as(1), "GET", "/coach/models", "", false); w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "not_connected") {
+		t.Fatalf("models while not connected: %d %s", w.Code, w.Body)
 	}
 }

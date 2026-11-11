@@ -188,17 +188,23 @@
     const list = document.createElement('ol');
     list.setAttribute('aria-label', 'Lo que ha consultado el coach');
     steps.append(summary, list);
+    const think = document.createElement('details');
+    think.className = 'coach-think';
+    think.hidden = true;
+    const thinkTitle = document.createElement('summary');
+    const thought = document.createElement('p');
+    think.append(thinkTitle, thought);
     const body = document.createElement('div');
     body.className = 'coach-body';
     const live = document.createElement('p');
     live.className = 'coach-live';
     live.setAttribute('aria-hidden', 'true');
     live.textContent = 'Pensando…';
-    div.append(steps, body, live);
+    div.append(think, steps, body, live);
     log.appendChild(div);
     showEmpty();
     scroll();
-    return { el: div, steps, title, list, body, live, text: '', rows: new Map(), origin: div.dataset.origin };
+    return { el: div, steps, title, list, body, live, think, thinkTitle, thought, thinking: '', thinkStart: 0, thinkEnd: 0, text: '', rows: new Map(), origin: div.dataset.origin };
   }
 
   // The steps row says what is happening now, or what was done.
@@ -216,6 +222,14 @@
     else label = rows[0].textContent;
     if (rows.length > 1) label += ' · ' + rows.length + ' pasos';
     t.title.textContent = label;
+  }
+
+  // Reasoning: open while it streams, closed to «Pensó N s» once the answer starts.
+  function closeThinking(t) {
+    if (!t.thinkStart || t.thinkEnd) return;
+    t.thinkEnd = Date.now();
+    const secs = Math.max(1, Math.round((t.thinkEnd - t.thinkStart) / 1000));
+    t.thinkTitle.textContent = 'Pensó ' + secs + ' s';
   }
 
   function render(el, value) {
@@ -278,6 +292,7 @@
   function endTurn() {
     if (!turn) return;
     turn.live.remove();
+    closeThinking(turn);
     paintSteps(turn, false);
     if (!turn.text.trim() && !turn.list.children.length) turn.body.remove();
     const t = turn;
@@ -334,8 +349,20 @@
       turn = startTurn(data(ev).origin);
       setRunning(true);
     });
+    stream.addEventListener('thinking', (ev) => {
+      if (!turn) turn = startTurn('user');
+      if (!turn.thinkStart) {
+        turn.thinkStart = Date.now();
+        turn.think.hidden = false;
+        turn.thinkTitle.textContent = 'Pensando…';
+      }
+      turn.thinking += data(ev).text || '';
+      turn.thought.textContent = turn.thinking;
+      scroll();
+    });
     stream.addEventListener('delta', (ev) => {
       if (!turn) turn = startTurn('user');
+      closeThinking(turn);
       turn.text += data(ev).text || '';
       turn.live.textContent = 'Escribiendo…';
       render(turn.body, turn.text);
@@ -373,6 +400,8 @@
         if (again) again.label = 'Volver a pedirla';
         runCard(t.el, 'Detuviste la respuesta.', again, true);
       } else tools(t);
+      // The engine is up now: the model's name can show without starting one.
+      if (!models) loadModels(false);
     });
     stream.addEventListener('error', (ev) => {
       // A server event named "error" carries a code; a broken connection does not.
@@ -471,6 +500,9 @@
       // Only the conversation goes; the server's cards stay.
       log.querySelectorAll('.coach-msg, .coach-note, .run-card').forEach((el) => el.remove());
       turn = null;
+      models = null;
+      modelName.textContent = '';
+      chip.hidden = true;
       refresh();
     });
   });
@@ -513,6 +545,90 @@
   }
 
   stop.addEventListener('click', () => post('abort'));
+
+  // --- model and thinking ---------------------------------------------------
+  // The list is the person's own ChatGPT models, read from their engine; it is
+  // asked for when the picker opens or after a turn, never on page load, so an
+  // idle page starts no engine.
+  const LEVELS = { off: 'No', minimal: 'Mínimo', low: 'Bajo', medium: 'Medio', high: 'Alto', xhigh: 'Muy alto', max: 'Máximo' };
+  const sheetEl = $('model-sheet');
+  const sheetScrim = $('model-scrim');
+  const modelName = $('model-name');
+  const chip = $('thinking-chip');
+  const modelStatus = $('model-status');
+  let models = null;
+
+  function current() {
+    return models && models.models.find((m) => m.id === models.model);
+  }
+
+  function paintChoice() {
+    const m = current();
+    if (!m) return;
+    modelName.textContent = '· ' + m.name;
+    chip.hidden = m.thinking.length < 2;
+    chip.querySelector('span').textContent = 'Pensar: ' + (LEVELS[models.thinking] || 'auto');
+    const list = $('model-list');
+    list.replaceChildren(...models.models.map((x) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(x.id === models.model));
+      b.textContent = x.name;
+      b.addEventListener('click', () => choose(x.id, x.thinking.includes(models.thinking) ? models.thinking : x.thinking[Math.floor(x.thinking.length / 2)]));
+      return b;
+    }));
+    const levels = $('thinking-levels');
+    levels.replaceChildren(...m.thinking.map((l) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(l === models.thinking));
+      b.textContent = LEVELS[l] || l;
+      b.addEventListener('click', () => choose(m.id, l));
+      return b;
+    }));
+  }
+
+  function loadModels(showErrors) {
+    if (showErrors) modelStatus.textContent = 'Cargando tus modelos…';
+    return fetch(base + '/coach/models', { credentials: 'same-origin' })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) {
+          if (showErrors) modelStatus.textContent = MESSAGES[data.error] || MESSAGES.engine_unavailable;
+          return;
+        }
+        models = data;
+        modelStatus.textContent = '';
+        paintChoice();
+      })
+      .catch(() => { if (showErrors) modelStatus.textContent = 'Sin conexión.'; });
+  }
+
+  function choose(model, thinking) {
+    const before = models && { model: models.model, thinking: models.thinking };
+    models.model = model;
+    models.thinking = thinking;
+    paintChoice();
+    post('settings', { model, thinking }).then(({ ok, data }) => {
+      if (ok) return;
+      Object.assign(models, before);
+      paintChoice();
+      modelStatus.textContent = MESSAGES[data.error] || 'No se pudo guardar.';
+    });
+  }
+
+  function setSheet(open) {
+    sheetEl.hidden = !open;
+    sheetScrim.hidden = !open;
+    if (open) loadModels(!models);
+  }
+  $('model-open').addEventListener('click', () => { if (connected) setSheet(sheetEl.hidden); });
+  chip.addEventListener('click', () => setSheet(true));
+  $('model-close').addEventListener('click', () => setSheet(false));
+  sheetScrim.addEventListener('click', () => setSheet(false));
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !sheetEl.hidden) setSheet(false); });
 
   refresh();
 })();

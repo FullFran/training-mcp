@@ -23,6 +23,8 @@ type Coach interface {
 	Prompt(userID int64, text string, images ...engine.Image) error
 	Abort(userID int64) bool
 	Notify(userID int64, ev engine.WorkoutEvent)
+	Models(userID int64) (engine.ModelList, error)
+	SetPreferences(userID int64, model, thinking string) error
 }
 
 const (
@@ -50,6 +52,7 @@ var coachHTTPStatus = map[engine.ErrorCode]int{
 	engine.CodeProviderError:     http.StatusBadGateway,
 	engine.CodeLoginFailed:       http.StatusBadGateway,
 	engine.CodeTurnLimit:         http.StatusGatewayTimeout,
+	engine.CodeBadRequest:        http.StatusBadRequest,
 }
 
 func (s *Server) coachRoutes() {
@@ -63,6 +66,8 @@ func (s *Server) coachRoutes() {
 	s.handle("GET "+b+"/coach/stream", s.coachUser(s.coachStream))
 	s.handle("POST "+b+"/coach/prompt", s.coachWrite(s.coachPrompt))
 	s.handle("POST "+b+"/coach/abort", s.coachWrite(s.coachAbort))
+	s.handle("GET "+b+"/coach/models", s.coachUser(s.coachModels))
+	s.handle("POST "+b+"/coach/settings", s.coachWrite(s.coachSettings))
 }
 
 type coachHandler func(w http.ResponseWriter, r *http.Request, userID int64)
@@ -130,6 +135,37 @@ func (s *Server) coachDisconnect(w http.ResponseWriter, _ *http.Request, userID 
 		return
 	}
 	writeCoachJSON(w, http.StatusOK, map[string]string{"state": "disconnected"})
+}
+
+// coachModels lists the models the person's ChatGPT login can use, as their
+// own engine reports them, with the current choice.
+func (s *Server) coachModels(w http.ResponseWriter, _ *http.Request, userID int64) {
+	list, err := s.opts.Coach.Models(userID)
+	if err != nil {
+		coachError(w, err)
+		return
+	}
+	writeCoachJSON(w, http.StatusOK, list)
+}
+
+// coachSettings keeps the person's model and thinking level. The coach refuses
+// a model their engine did not list.
+func (s *Server) coachSettings(w http.ResponseWriter, r *http.Request, userID int64) {
+	var body struct {
+		Model    string `json:"model"`
+		Thinking string `json:"thinking"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&body); err != nil {
+		writeCoachJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_request"})
+		return
+	}
+	if err := s.opts.Coach.SetPreferences(userID, body.Model, body.Thinking); err != nil {
+		coachError(w, err)
+		return
+	}
+	writeCoachJSON(w, http.StatusOK, map[string]string{"model": body.Model, "thinking": body.Thinking})
 }
 
 func (s *Server) coachAbort(w http.ResponseWriter, _ *http.Request, userID int64) {

@@ -18,7 +18,8 @@
 {{$active := or .Progress .Session.Sets}}
 <header class="bar chat-bar">
   <button type="button" id="menu-open" class="icon-btn" aria-label="Menú" aria-controls="drawer" aria-expanded="false">☰</button>
-  <div class="chat-title"><strong>Coach</strong> <span class="muted">{{.Today}}</span></div>
+  {{if .CoachOn}}<button type="button" id="model-open" class="chat-title model-open" aria-haspopup="dialog" aria-controls="model-sheet"><strong>Coach</strong> <span id="model-name" class="muted">{{.Today}}</span> <span aria-hidden="true">▾</span></button>
+  {{else}}<div class="chat-title"><strong>Coach</strong> <span class="muted">{{.Today}}</span></div>{{end}}
   <a id="review-badge" class="icon-btn review-badge" href="{{.Base}}/review" data-panel aria-label="Revisar"{{if not .PendingCount}} hidden{{end}}>✅<span>{{.PendingCount}}</span></a>
 </header>
 
@@ -225,6 +226,7 @@
     <textarea id="coach-text" rows="1" maxlength="4000" placeholder="Pregunta a tu coach" aria-label="Mensaje para el coach"></textarea>
     <div class="composer-row">
       <div id="composer-extras" class="composer-extras"></div>
+      <button type="button" id="thinking-chip" class="chip-btn" aria-controls="model-sheet" hidden>💡 <span>Pensar</span></button>
       <span class="grow"></span>
       <!-- Dictation: tap to talk, it stops on silence or on a second tap. -->
       <button type="button" id="coach-mic" class="mic" aria-label="Dictar" aria-pressed="false" hidden>🎤</button>
@@ -240,6 +242,21 @@
 <script src="{{.Base}}/static/coach-attach.js" defer></script>
 <script src="{{.Base}}/static/coach.js" defer></script>
 {{end -}}
+
+{{if .CoachOn}}
+<!-- Model and thinking level, as ChatGPT's picker. The list is what the
+     person's own ChatGPT login offers, read from their engine. -->
+<div id="model-scrim" class="scrim" hidden></div>
+<section id="model-sheet" class="sheet" role="dialog" aria-label="Modelo" hidden>
+  <div class="sheet-head"><span class="grab" aria-hidden="true"></span><button type="button" id="model-close" class="ghost mini">Cerrar</button></div>
+  <h2>Modelo</h2>
+  <p id="model-status" class="muted" role="status"></p>
+  <div id="model-list" class="model-list" role="radiogroup" aria-label="Modelo"></div>
+  <h2>Pensar antes de responder</h2>
+  <div id="thinking-levels" class="segmented" role="radiogroup" aria-label="Pensar"></div>
+  <p class="muted">Se guarda para tus próximas conversaciones.</p>
+</section>
+{{end}}
 
 <!-- One panel at a time over the chat; closing it returns to the same chat. -->
 <section id="panel-sheet" class="panel-sheet" role="dialog" aria-label="Panel" hidden>

@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { LineDecoder, MAX_IMAGES, parseImages } from './protocol.ts';
+import { LineDecoder, MAX_IMAGES, parseImages, pickModel, thinkingLevels } from './protocol.ts';
 
 const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(16, 'j')]).toString('base64');
 
@@ -49,4 +49,18 @@ test('a multi-megabyte line arriving in small chunks decodes once', () => {
 
 test('a line over the limit is a protocol violation', () => {
   assert.throws(() => new LineDecoder().push('x'.repeat(13 * 1_048_576)));
+});
+
+test('thinking levels follow what the model declares', () => {
+  assert.deepEqual(thinkingLevels({ reasoning: false }), ['off']);
+  assert.deepEqual(thinkingLevels({ reasoning: true }), ['off', 'minimal', 'low', 'medium', 'high']);
+  assert.deepEqual(thinkingLevels({ reasoning: true, thinkingLevelMap: { minimal: null, xhigh: 'xhigh' } }), ['off', 'low', 'medium', 'high', 'xhigh']);
+});
+
+test('a chosen model is used only when the account lists it', () => {
+  const available = [{ id: 'gpt-a', provider: 'openai-codex' }, { id: 'gpt-b', provider: 'openai-codex' }];
+  assert.equal(pickModel(available, 'gpt-b')?.id, 'gpt-b');
+  assert.equal(pickModel(available, 'gpt-4o-elsewhere')?.id, 'gpt-a');
+  assert.equal(pickModel(available, undefined)?.id, 'gpt-a');
+  assert.equal(pickModel([], 'gpt-a'), undefined);
 });
