@@ -217,14 +217,14 @@ func TestServerToolsDescribeTheirInputsAndValidationContract(t *testing.T) {
 	}{
 		{
 			name:        "start_session",
-			description: "Start a training session on an optional date, optionally following a plan. Omit date to use the server's current local date.",
+			description: "Start a training session on an optional date, optionally following a plan. Omit date to use the server's current local date." + pendingNote,
 			properties: map[string]map[string]any{
 				"date": {"description": "Training date in exact YYYY-MM-DD format.", "pattern": `^\d{4}-\d{2}-\d{2}$`},
 			},
 		},
 		{
 			name:        "add_set",
-			description: "Add a set to an existing training session and return the set plus the session's recalculated total SI.",
+			description: "Add a set to an existing training session and return the set plus the session's recalculated total SI." + pendingNote,
 			required:    []string{"session_id", "exercise", "weight_kg", "reps", "rpe"},
 			properties: map[string]map[string]any{
 				"session_id": {"description": "Positive ID of the existing training session.", "minimum": float64(1)},
@@ -236,7 +236,7 @@ func TestServerToolsDescribeTheirInputsAndValidationContract(t *testing.T) {
 		},
 		{
 			name:        "update_set",
-			description: "Update one or more fields of an existing set. Omitted fields remain unchanged; RPE changes recalculate SI.",
+			description: "Update one or more fields of an existing set. Omitted fields remain unchanged; RPE changes recalculate SI." + pendingNote,
 			required:    []string{"set_id"},
 			minProps:    2,
 			properties: map[string]map[string]any{
@@ -249,7 +249,7 @@ func TestServerToolsDescribeTheirInputsAndValidationContract(t *testing.T) {
 		},
 		{
 			name:        "delete_set",
-			description: "Permanently delete an existing set and compact the remaining set positions to a dense sequence.",
+			description: "Permanently delete an existing set and compact the remaining set positions to a dense sequence." + pendingNote,
 			required:    []string{"set_id"},
 			properties: map[string]map[string]any{
 				"set_id": {"description": "Positive ID of the existing set to delete.", "minimum": float64(1)},
@@ -398,7 +398,8 @@ func only(service *training.Service) training.ServiceFor {
 	return func(context.Context) *training.Service { return service }
 }
 
-type testStore struct{}
+// testStore accepts every proposal at once and records nothing.
+type testStore struct{ acceptAllProposals }
 
 type errorStore struct{ testStore }
 
@@ -587,3 +588,30 @@ func (testStore) SetLandmarks(context.Context, training.Landmarks) error { retur
 func (testStore) AllLandmarks(context.Context) (map[string]training.Landmarks, error) {
 	return nil, nil
 }
+
+// acceptAllProposals is a ProposalStore with accept-all on and no memory.
+type acceptAllProposals struct{}
+
+func (acceptAllProposals) CreateProposal(_ context.Context, p training.Proposal) (training.Proposal, error) {
+	p.ID = 1
+	return p, nil
+}
+func (acceptAllProposals) GetProposal(context.Context, int64) (training.Proposal, error) {
+	return training.Proposal{}, training.ErrNotFound
+}
+func (acceptAllProposals) ListProposals(context.Context, training.ProposalFilter) ([]training.Proposal, error) {
+	return nil, nil
+}
+func (acceptAllProposals) ClaimProposal(context.Context, int64) error { return nil }
+func (acceptAllProposals) FinishProposal(_ context.Context, id int64, out training.ProposalOutcome) (training.Proposal, error) {
+	return training.Proposal{ID: id, Status: out.Status, DecidedBy: out.DecidedBy, Result: out.Result, Error: out.Error}, nil
+}
+func (acceptAllProposals) RejectProposal(context.Context, int64, time.Time) (training.Proposal, error) {
+	return training.Proposal{}, training.ErrNotFound
+}
+func (acceptAllProposals) Permissions(context.Context) (training.Permissions, error) {
+	return training.Permissions{AcceptAll: true}, nil
+}
+func (acceptAllProposals) SetAcceptAll(context.Context, bool) error             { return nil }
+func (acceptAllProposals) SetRule(context.Context, training.ApprovalRule) error { return nil }
+func (acceptAllProposals) ForgetRule(context.Context, string) error             { return nil }

@@ -22,6 +22,7 @@
     <span class="muted">{{.Today}}</span>
   </div>
   <div class="bar-actions">
+    <a class="ghost{{if .PendingCount}} attention{{end}}" href="{{.Base}}/review">Revisar{{if .PendingCount}} ({{.PendingCount}}){{end}}</a>
     <a class="ghost" href="{{.Base}}/plans">Rutinas</a>
     <a class="ghost" href="{{.Base}}/history">Historial</a>
   </div>

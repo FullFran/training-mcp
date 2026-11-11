@@ -5,6 +5,64 @@ model actually receives — they are extracted from `internal/mcpsrv/server.go`,
 so this page cannot drift from the surface it documents.
 
 
+## Every write is a proposal
+
+Agents read freely but never write directly. Each write tool records a
+**proposal** (who, when, action type, payload and, once answered, the result)
+and applies it only when a standing answer covers its action type. Every write
+result therefore carries two extra fields:
+
+- `status`: `accepted` when the change was applied (the other fields show it,
+  exactly as before), or `pending` when it waits for the person on `/review`.
+  A pending change is not applied yet: its other fields are empty and it is
+  validated only when accepted, so the agent must not report it as done.
+- `proposal_id`: the proposal that records the change.
+
+Read tools are unchanged: they record nothing and return no `status`.
+
+Answers are remembered per **action type**, never per tool name, so approving
+`set.log` covers `log_sets`, `log_set` and `add_set` alike, while removing a
+note (`exercise.note.remove`) is a different action from setting one
+(`exercise.note.set`). There is one plain confirmation for every action type,
+destructive ones included.
+
+| Answer | Meaning |
+|---|---|
+| once | Apply this proposal only. |
+| session | Accept this action type for the next 12 hours. The MCP server is stateless (no `Mcp-Session-Id`), so a session is one training day rather than a client connection. |
+| always | Accept this action type until the answer is forgotten on `/review`. |
+| accept-all | A per-account switch that accepts every proposal, including action types added later, like Claude Code's `--dangerously-skip-permissions`. Proposals are still recorded. Turning it off restores the remembered answers. |
+
+Defaults: every account that existed when migration 014 ran keeps accept-all
+on, so its agents behave as before plus the two fields. Accounts created later
+start asking for everything. Changes a person makes in the PWA apply directly
+and are not proposals.
+
+| Action type | Tools |
+|---|---|
+| `session.start` | `start_session` |
+| `session.delete` | `delete_session` |
+| `set.log` | `log_sets`, `log_set`, `add_set` |
+| `set.update` / `set.delete` | `update_set` / `delete_set` |
+| `plan.create` | `create_plan`, `save_session_as_plan` |
+| `plan.update` / `plan.delete` | `update_plan` / `delete_plan` |
+| `plan.exercise.set` / `.remove` / `.move` | `set_plan_exercise` / `remove_plan_exercise` / `move_plan_exercise` |
+| `session.exercise.set` / `.adjust` / `.swap` / `.remove` | `add_session_exercise` / `adjust_session_exercise` / `swap_session_exercise` / `remove_session_exercise` |
+| `exercise.note.set` / `exercise.note.remove` | `set_exercise_note` (an empty note removes it) |
+| `exercise.group.set` | `set_exercise_group` |
+| `feedback.record` | `record_feedback` |
+| `landmarks.set` | `set_volume_landmarks` |
+| `rest.set` | `set_rest_target` |
+
+A proposal is claimed before it is applied, so two answers cannot apply it
+twice. If the process stops between applying and recording the outcome, the
+proposal stays `applying` and shows in the history as such; check the data
+before proposing it again.
+
+Client handling (manual check, pending): ChatGPT and Claude must relay
+`pending` as "waiting for your approval in the app". Record the result of that
+check here once it has been done against production.
+
 ## Logging sets
 
 The everyday path. `log_sets` is the one to reach for: it needs no session id, its sets may differ, and repeating a call with the same `idempotency_key` stores nothing new, so a client that lost the response can safely retry.

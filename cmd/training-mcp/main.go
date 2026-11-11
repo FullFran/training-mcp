@@ -101,7 +101,7 @@ func runWithContext(ctx context.Context, args []string) error {
 
 	var web *httpsrv.WebUI
 	if cfg.WebBasePath != "" {
-		webServer, err := websrv.New(services.ForRequest, services.Snapshot, time.Now, cfg.WebBasePath)
+		webServer, err := websrv.NewWithOptions(services.ForRequest, services.Snapshot, time.Now, cfg.WebBasePath, websrv.Options{Export: true, Apply: mcpServer.Apply})
 		if err != nil {
 			return err
 		}
@@ -126,7 +126,7 @@ func runWithContext(ctx context.Context, args []string) error {
 			Keys: oauth, Resolve: services.ResolveUser(cfg.OAuthSubject, cfg.OAuthProvision), Logger: logger,
 		})
 		// The root never serves /export.db: it holds every user's data.
-		app, err := websrv.NewWithOptions(services.ForRequest, services.Snapshot, time.Now, "", websrv.Options{CSRFToken: login.CSRFToken})
+		app, err := websrv.NewWithOptions(services.ForRequest, services.Snapshot, time.Now, "", websrv.Options{CSRFToken: login.CSRFToken, Apply: mcpServer.Apply})
 		if err != nil {
 			return err
 		}

@@ -3,6 +3,8 @@ package websrv_test
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -11,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fullfran/training-mcp/internal/mcpsrv"
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
 	"github.com/fullfran/training-mcp/internal/training"
 	"github.com/fullfran/training-mcp/internal/websrv"
@@ -30,12 +33,15 @@ type webWorld struct {
 	owner, second http.Handler
 	set, session  string
 	plan          string
+	// proposal is the owner's pending proposal to create a plan named secretPlan+" 2".
+	proposal string
 }
 
 func webHandler(t *testing.T, services *training.Services, userID int64) http.Handler {
 	t.Helper()
 	service := services.ForUser(userID)
-	server, err := websrv.New(func(context.Context) *training.Service { return service }, services.Snapshot, webClock, base)
+	serviceFor := func(context.Context) *training.Service { return service }
+	server, err := websrv.NewWithOptions(serviceFor, services.Snapshot, webClock, base, websrv.Options{Export: true, Apply: mcpsrv.New(serviceFor).Apply})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,9 +87,26 @@ func newWebWorld(t *testing.T) webWorld {
 	if err = owner.SetExerciseGroup(ctx, secretExercise, "pecho"); err != nil {
 		t.Fatal(err)
 	}
+	// The owner asks before agent writes and has one waiting; the second user
+	// accepts everything, as the owner of an empty database does.
+	if err = owner.SetAcceptAll(ctx, false); err != nil {
+		t.Fatal(err)
+	}
+	if err = services.ForUser(2).SetAcceptAll(ctx, true); err != nil {
+		t.Fatal(err)
+	}
+	payload := []byte(`{"name":"` + secretPlan + ` 2","items":[{"exercise":"` + secretExercise + `","target_sets":1}]}`)
+	proposal, err := owner.Propose(ctx, training.ProposalInput{Tool: "create_plan", ActionType: "plan.create", Payload: payload},
+		func(context.Context) (json.RawMessage, error) { return nil, errors.New("not applied while pending") })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = store.ForUser(1).SetRule(ctx, training.ApprovalRule{ActionType: "set.log", Remember: training.RememberAlways}); err != nil {
+		t.Fatal(err)
+	}
 	return webWorld{
 		db: db, owner: webHandler(t, services, 1), second: webHandler(t, services, 2),
-		set: itoa(set.ID), session: itoa(session.ID), plan: itoa(plan.ID),
+		set: itoa(set.ID), session: itoa(session.ID), plan: itoa(plan.ID), proposal: itoa(proposal.ID),
 	}
 }
 
@@ -91,7 +114,8 @@ func dumpDatabase(t *testing.T, db *sql.DB) string {
 	t.Helper()
 	var out strings.Builder
 	for _, table := range []string{"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
-		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys"} {
+		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys",
+		"proposals", "approval_rules", "agent_permissions"} {
 		rows, err := db.Query(`SELECT * FROM ` + table + ` ORDER BY rowid`)
 		if err != nil {
 			t.Fatal(err)
@@ -149,7 +173,17 @@ var webRoutes = map[string]func(*testing.T){
 	"POST /plan/item": writeRoute("/plan/item", url.Values{"action": {"adopt"}, "exercise": {secretExercise}, "done": {"1"}},
 		`session_items i JOIN sessions se ON se.id=i.session_id WHERE se.user_id=2 AND i.exercise='`+secretExercise+`'`),
 
-	"POST /rest": testRestTargetBelongsToWhoSetsIt,
+	"POST /rest":  testRestTargetBelongsToWhoSetsIt,
+	"GET /review": pageRoute("/review", secretPlan+" 2"),
+	"POST /review/{id}/accept": idRoute(func(w webWorld) string { return w.proposal }, func(id string) (string, url.Values) {
+		return "/review/" + id + "/accept", url.Values{"remember": {"always"}}
+	}),
+	"POST /review/{id}/reject": idRoute(func(w webWorld) string { return w.proposal }, func(id string) (string, url.Values) {
+		return "/review/" + id + "/reject", url.Values{}
+	}),
+	"POST /review/accept-all": writeRoute("/review/accept-all", url.Values{"on": {"0"}},
+		`agent_permissions WHERE user_id=2 AND accept_all=0`),
+	"POST /review/forget": testForgettingTouchesOnlyTheUsersOwnRules,
 
 	"GET /manifest.webmanifest": sharedRoute("the same document for everyone"),
 	"GET /sw.js":                sharedRoute("the same document for everyone"),
@@ -187,6 +221,24 @@ func TestEveryWebRouteHasAnIsolationCase(t *testing.T) {
 	sort.Strings(covered)
 	if got, want := strings.Join(covered, "\n"), strings.Join(registered, "\n"); got != want {
 		t.Fatalf("isolation cases:\n%s\nregistered routes:\n%s", got, want)
+	}
+}
+
+func testForgettingTouchesOnlyTheUsersOwnRules(t *testing.T) {
+	world := newWebWorld(t)
+	before := dumpDatabase(t, world.db)
+	if w := post(t, world.second, base+"/review/forget", url.Values{"action_type": {"set.log"}}, true); w.Code != http.StatusOK {
+		t.Fatalf("status %d", w.Code)
+	}
+	if after := dumpDatabase(t, world.db); after != before {
+		t.Fatalf("rows changed:\nbefore\n%s\nafter\n%s", before, after)
+	}
+	if w := post(t, world.owner, base+"/review/forget", url.Values{"action_type": {"set.log"}}, true); w.Code != http.StatusOK {
+		t.Fatalf("owner status %d", w.Code)
+	}
+	var n int
+	if err := world.db.QueryRow(`SELECT COUNT(*) FROM approval_rules WHERE user_id=1`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("owner's rules = %d, %v", n, err)
 	}
 }
 
