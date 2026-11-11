@@ -220,6 +220,19 @@ func TestCoachEndToEnd(t *testing.T) {
 	if strings.Contains(s, "e2e-access") || strings.Contains(s, "tme_") {
 		t.Fatalf("a secret reached the browser:\n%s", s)
 	}
+	// Connectors: the production guard refuses internal addresses, and the
+	// engines' proxy door admits no other bearer.
+	for _, target := range []string{"https://127.0.0.1/mcp", "https://169.254.169.254/latest", "https://localhost:8080/mcp", "http://example.com/mcp"} {
+		if code, body := do("POST", "/app/coach/connectors", `{"url":"`+target+`","label":"x"}`); code != http.StatusBadRequest {
+			t.Fatalf("connector %s: %d %s", target, code, body)
+		}
+	}
+	if code, body := do("GET", "/app/coach/connectors/list", ""); code != http.StatusOK || !strings.Contains(body, `"connectors":[]`) {
+		t.Fatalf("connector list: %d %s", code, body)
+	}
+	if code, _ := do("POST", "/engine/connectors/notion/mcp", `{"jsonrpc":"2.0","id":1,"method":"initialize"}`); code != http.StatusUnauthorized {
+		t.Fatalf("proxy with a non-engine bearer: %d", code)
+	}
 	if code, _ := do("POST", "/app/coach/disconnect", "{}"); code != http.StatusOK {
 		t.Fatalf("disconnect: %d", code)
 	}
