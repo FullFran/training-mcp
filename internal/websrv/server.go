@@ -9,6 +9,7 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"math"
@@ -104,6 +105,13 @@ type pageData struct {
 	CSRF string
 	// CanExport shows the backup link where /export.db is served.
 	CanExport bool
+	// RestTarget is the person's rest between sets in seconds, shared with the
+	// agent. Rest and Next are the live state the agent also reads, so the
+	// phone's timer and the coach never disagree.
+	RestTarget int
+	Rest       training.Rest
+	Next       *training.PlanProgress
+	LastSetID  int64
 }
 
 // LastSet returns the final set of the session, used to power "repeat last set".
@@ -181,6 +189,24 @@ func NewWithOptions(service training.ServiceFor, snapshot func(context.Context, 
 				return 0
 			}
 		},
+		// rx is a prescription in one short line: "8-10 reps @8".
+		"rx": func(p training.PlanProgress) string {
+			var b strings.Builder
+			if p.RepMin > 0 {
+				b.WriteString(strconv.Itoa(p.RepMin))
+				if p.RepMax > p.RepMin {
+					b.WriteString("-" + strconv.Itoa(p.RepMax))
+				}
+				b.WriteString(" reps")
+			}
+			if p.TargetRPE > 0 {
+				if b.Len() > 0 {
+					b.WriteString(" ")
+				}
+				b.WriteString("@" + formatNumber(p.TargetRPE))
+			}
+			return b.String()
+		},
 		"pct": func(v, max float64) string {
 			if max <= 0 {
 				return "0"
@@ -239,6 +265,7 @@ func (s *Server) routes() {
 	s.handle("POST "+b+"/plan/item", s.adjustItem)
 	s.handle("POST "+b+"/feedback", s.recordFeedback)
 	s.handle("POST "+b+"/note", s.saveNote)
+	s.handle("POST "+b+"/rest", s.setRest)
 	s.handle("GET "+b+"/exercise-info", s.exerciseInfo)
 	s.handle("GET "+b+"/s/{id}", s.session)
 	s.handle("GET "+b+"/manifest.webmanifest", s.manifest)
@@ -342,6 +369,10 @@ func (s *Server) updateSet(w http.ResponseWriter, r *http.Request) {
 		} else {
 			message = "RPE inválido."
 		}
+	}
+	// Correcting the exercise moves the set to the right movement.
+	if v := strings.TrimSpace(r.PostFormValue("exercise")); v != "" {
+		patch.Exercise = &v
 	}
 	// Present but empty clears the technique back to a normal set.
 	if r.Form.Has("technique") {
@@ -598,14 +629,17 @@ func (s *Server) todayData(ctx context.Context, message string) (pageData, error
 	today := s.todayDate()
 	data := pageData{Base: s.base, Today: today, Error: message}
 
-	sessions, err := s.service(ctx).ListSessions(ctx, training.ListFilter{From: today, To: today, Limit: 1})
+	// The same reading the agent gets from live_workout.
+	live, err := s.service(ctx).LiveWorkout(ctx)
 	if err != nil {
 		return data, err
 	}
-	if len(sessions) > 0 {
-		if data.Session, err = s.service(ctx).GetSession(ctx, sessions[0].ID); err != nil {
-			return data, err
-		}
+	if live.Session != nil {
+		data.Session = *live.Session
+	}
+	data.Progress, data.Next, data.Rest, data.RestTarget = live.Progress, live.Next, live.Rest, live.Rest.TargetSeconds
+	if live.LastSet != nil {
+		data.LastSetID = live.LastSet.Set.ID
 	}
 	if data.Recent, err = s.service(ctx).RecentExercises(ctx, recentExerciseLimit); err != nil {
 		return data, err
@@ -613,10 +647,7 @@ func (s *Server) todayData(ctx context.Context, message string) (pageData, error
 	if data.Plans, err = s.service(ctx).ListPlans(ctx); err != nil {
 		return data, err
 	}
-	if data.Session.ID > 0 && data.Session.PlanID > 0 {
-		if data.Progress, err = s.service(ctx).SessionProgress(ctx, data.Session.ID); err != nil {
-			return data, err
-		}
+	if data.Session.PlanID > 0 {
 		// The routine's own notes, shown above its exercises.
 		if plan, err := s.service(ctx).GetPlan(ctx, data.Session.PlanID); err == nil {
 			data.PlanNotes = plan.Notes
@@ -807,6 +838,40 @@ func (s *Server) adjustItem(w http.ResponseWriter, r *http.Request) {
 		err = s.service(r.Context()).SetSessionItem(r.Context(), session.ID, training.PlanItem{Exercise: exercise, TargetSets: done})
 	case "remove":
 		err = s.service(r.Context()).RemoveSessionItem(r.Context(), session.ID, exercise)
+	case "add":
+		// A new exercise for today only, with its own prescription.
+		it := training.PlanItem{Exercise: exercise}
+		var bad bool
+		it.TargetSets, bad = formInt(r, "target_sets", bad)
+		it.RepMin, bad = formInt(r, "rep_min", bad)
+		it.RepMax, bad = formInt(r, "rep_max", bad)
+		it.TargetRPE, bad = formFloat(r, "target_rpe", bad)
+		if bad {
+			message = "Ajuste inválido."
+			break
+		}
+		err = s.service(r.Context()).SetSessionItem(r.Context(), session.ID, it)
+	case "rx":
+		// Rep range and RPE; the set count has its own buttons. Blank fields stay.
+		patch := training.SessionItemPatch{}
+		var bad bool
+		if r.PostFormValue("rep_min") != "" {
+			v, b := formInt(r, "rep_min", false)
+			patch.RepMin, bad = &v, bad || b
+		}
+		if r.PostFormValue("rep_max") != "" {
+			v, b := formInt(r, "rep_max", false)
+			patch.RepMax, bad = &v, bad || b
+		}
+		if r.PostFormValue("target_rpe") != "" {
+			v, b := formFloat(r, "target_rpe", false)
+			patch.TargetRPE, bad = &v, bad || b
+		}
+		if bad {
+			message = "Ajuste inválido."
+			break
+		}
+		err = s.service(r.Context()).AdjustSessionItem(r.Context(), session.ID, exercise, patch)
 	default:
 		message = "Acción desconocida."
 	}
@@ -820,6 +885,52 @@ func (s *Server) adjustItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.renderPanel(w, r, message)
+}
+
+// formInt reads an optional whole number; blank is zero. bad accumulates.
+func formInt(r *http.Request, name string, bad bool) (int, bool) {
+	v := strings.TrimSpace(r.PostFormValue(name))
+	if v == "" {
+		return 0, bad
+	}
+	n, err := strconv.Atoi(v)
+	return n, bad || err != nil
+}
+
+// formFloat reads an optional number; blank is zero. bad accumulates.
+func formFloat(r *http.Request, name string, bad bool) (float64, bool) {
+	v := strings.TrimSpace(r.PostFormValue(name))
+	if v == "" {
+		return 0, bad
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	return f, bad || err != nil
+}
+
+// setRest stores the rest target chosen with the timer's buttons. It answers in
+// JSON because the timer calls it in the background, never swapping the page.
+func (s *Server) setRest(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	seconds, err := strconv.Atoi(strings.TrimSpace(r.FormValue("seconds")))
+	if err == nil {
+		err = s.service(r.Context()).SetRestTarget(r.Context(), seconds)
+	}
+	switch {
+	case err == nil:
+	case errors.Is(err, training.ErrValidation), errors.Is(err, strconv.ErrSyntax), errors.Is(err, strconv.ErrRange):
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("rest must be %d to %d seconds", training.MinRestSeconds, training.MaxRestSeconds)})
+		return
+	default:
+		s.fail(w, err)
+		return
+	}
+	v, err := s.service(r.Context()).RestTarget(r.Context())
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]int{"rest_seconds": v})
 }
 
 // decorate builds the per-exercise blocks and the "last time / record" map. It

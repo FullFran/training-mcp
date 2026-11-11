@@ -222,12 +222,34 @@
   });
 
   // --- rest timer --------------------------------------------------------
+  // The target lives on the server, shared with the agent; localStorage only
+  // remembers it for a page served without one.
   const restBar = document.getElementById('rest');
   const restTime = document.getElementById('rest-time');
+  const restNext = document.getElementById('rest-next');
   const REST_KEY = 'rest-seconds';
-  let restDefault = parseInt(localStorage.getItem(REST_KEY) || '120', 10);
+  const served = parseInt(document.body.dataset.restTarget || '', 10);
+  let restDefault = served > 0 ? served : parseInt(localStorage.getItem(REST_KEY) || '120', 10);
+  localStorage.setItem(REST_KEY, String(restDefault));
   let remaining = 0;
   let ticker = null;
+  // Signed-in pages carry a CSRF token every write must echo.
+  const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+  const csrf = csrfMeta ? csrfMeta.content : '';
+
+  // What comes next, shown on the rest bar so one glance says what to load.
+  function paintNext() {
+    if (!restNext) return;
+    const panel = document.getElementById('panel');
+    const name = panel && panel.dataset.next;
+    restNext.hidden = !name;
+    if (!name) return;
+    restNext.textContent = 'Siguiente: ';
+    const strong = document.createElement('strong');
+    strong.textContent = name;
+    restNext.appendChild(strong);
+    if (panel.dataset.nextRx) restNext.appendChild(document.createTextNode(' · ' + panel.dataset.nextRx));
+  }
 
   function paint() {
     if (!restTime) return;
@@ -243,10 +265,12 @@
     restBar.hidden = true;
   }
 
-  function startRest() {
+  // elapsed is how long ago the last set was logged, by the server's clock.
+  function startRest(elapsed) {
     if (!restBar) return;
-    remaining = restDefault;
+    remaining = restDefault - (elapsed || 0);
     restBar.hidden = false;
+    paintNext();
     paint();
     clearInterval(ticker);
     ticker = setInterval(() => {
@@ -263,8 +287,17 @@
       if (adj) {
         const delta = parseInt(adj.dataset.delta, 10);
         // Adjusting mid-rest also becomes the new default for next time.
-        restDefault = Math.max(30, restDefault + delta);
+        restDefault = Math.min(900, Math.max(30, restDefault + delta));
         localStorage.setItem(REST_KEY, String(restDefault));
+        // Best effort: offline, the phone keeps its own copy until next time.
+        fetch(base + '/rest', {
+          method: 'POST',
+          headers: Object.assign(
+            { 'Content-Type': 'application/x-www-form-urlencoded' },
+            csrf ? { 'X-CSRF-Token': csrf } : {}
+          ),
+          body: 'seconds=' + restDefault
+        }).catch(() => {});
         remaining = Math.max(0, remaining + delta);
         paint();
         buzz(8);
@@ -290,11 +323,21 @@
       : null;
   }
 
+  // The rest only restarts when a newer set appears; editing the plan or
+  // deleting a set must not reset a rest already running.
+  const lastSetId = () => parseInt((document.getElementById('panel') || {dataset: {}}).dataset.lastSetId || '0', 10);
+  let seenSet = lastSetId();
+
   document.body.addEventListener('htmx:afterSwap', (event) => {
     if (event.target.id !== 'panel') return;
     syncRepeat();
+    paintNext();
     const failed = document.querySelector('#panel .alert');
     if (failed) { buzz(18); return; }
+    const newest = lastSetId();
+    const logged = newest > seenSet;
+    seenSet = newest;
+    if (!logged) return;
     const next = nextInSuperset((exercise.value || '').trim().toLowerCase());
     if (next) {
       // Same round: no rest, load the next movement instead.
@@ -306,10 +349,19 @@
         rpe: next.dataset.rpe !== '0' ? next.dataset.rpe : null
       });
     } else {
-      startRest();
+      startRest(parseInt(document.getElementById('panel').dataset.restElapsed || '0', 10));
     }
     buzz(18);
   });
+
+  // A reload mid-rest picks the timer up where it was.
+  (function resumeRest() {
+    const panel = document.getElementById('panel');
+    if (!panel) return;
+    const state = panel.dataset.restState;
+    const elapsed = parseInt(panel.dataset.restElapsed || '0', 10);
+    if ((state === 'resting' || state === 'ready') && elapsed < restDefault + 30) startRest(elapsed);
+  })();
 
   if (form) {
     // Keep focus out of the exercise field after submitting so the keyboard

@@ -391,10 +391,18 @@ button { font: inherit; cursor: pointer; }
   border-radius: 10px;
   background: transparent;
   color: var(--text);
-  font-size: 24px;
+  font-size: 32px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+.rest-next {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+.rest-next strong { color: var(--text); }
 .rest.done { border-color: var(--accent); }
 .rest.done .rest-time { color: var(--accent); }
 
@@ -474,6 +482,23 @@ button { font: inherit; cursor: pointer; }
   font-size: 14px;
 }
 .mini.danger { color: var(--danger); }
+.rx-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; }
+.rx-edit input, .add-item input[name="exercise"] {
+  min-height: 40px;
+  width: 4.5rem;
+  padding: 0 8px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #10131a;
+  color: var(--text);
+  font-size: 16px;
+}
+.add-item { margin: 0 0 12px; }
+.add-item summary { min-height: 40px; display: flex; align-items: center; color: var(--muted); }
+.add-item form { display: grid; gap: 8px; padding-top: 8px; }
+.add-item input[name="exercise"] { width: 100%; }
+/* Room for the fixed rest bar so it never covers the last set. */
+main { padding-bottom: 140px; }
 .plan.card { background: var(--card); }
 
 /* --- session feedback --------------------------------------------------- */
