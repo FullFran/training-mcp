@@ -53,7 +53,8 @@ func TestNextPlannedExercise(t *testing.T) {
 		{"keeps going with the unfinished exercise", "banca", plan, "banca", false},
 		{"moves to the first unfinished one", "sentadilla", plan, "banca", false},
 		{"next of the round without rest", "remo", plan, "fondos", true},
-		{"wraps around the round", "fondos", plan, "remo", true},
+		{"rests after the round, then starts the next one", "fondos", plan, "remo", false},
+		{"straight sets when the rest of the round is done", "remo", []PlanProgress{{Exercise: "remo", TargetSets: 3, Superset: "A"}, {Exercise: "fondos", TargetSets: 2, DoneSets: 2, Superset: "A"}}, "remo", false},
 		{"off-plan last set points at the plan", "gemelo", plan, "banca", false},
 		{"no set yet starts the plan", "", plan, "banca", false},
 		{"nothing left", "banca", []PlanProgress{{Exercise: "banca", TargetSets: 1, DoneSets: 1}, {Exercise: "curl", TargetSets: 1, Skipped: true}}, "", false},
@@ -165,5 +166,30 @@ func TestLiveWorkoutPointsAtThePlan(t *testing.T) {
 	}
 	if got.Rest.State != RestSuperset {
 		t.Fatalf("rest state = %q, want %q", got.Rest.State, RestSuperset)
+	}
+}
+
+func TestLiveWorkoutRestsAfterASupersetRound(t *testing.T) {
+	ctx := context.Background()
+	store := newMemoryStore()
+	svc := NewService(store, func() time.Time { return liveNow })
+	session, _ := store.Start(ctx, Session{Date: "2026-08-07"})
+	store.listResults = []SessionSummary{{ID: session.ID, Date: session.Date}}
+	set, _, _ := store.AddSet(ctx, AddSetInput{SessionID: session.ID, Exercise: "fondos", WeightKG: 0, Reps: 12, RPE: 8})
+	store.setTimes = map[int64]time.Time{set.ID: liveNow.Add(-20 * time.Second)}
+	store.progress = []PlanProgress{
+		{Exercise: "remo", TargetSets: 3, DoneSets: 1, Superset: "A"},
+		{Exercise: "fondos", TargetSets: 3, DoneSets: 1, Superset: "A"},
+	}
+
+	got, err := svc.LiveWorkout(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Next == nil || got.Next.Exercise != "remo" {
+		t.Fatalf("next = %+v, want remo", got.Next)
+	}
+	if got.Rest.State == RestSuperset {
+		t.Fatalf("rest state = %q after the last exercise of the round, want a rest", got.Rest.State)
 	}
 }

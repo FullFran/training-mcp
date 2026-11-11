@@ -123,8 +123,10 @@ func NextPlanned(progress []PlanProgress, last string) (*PlanProgress, bool) {
 		for step := 1; step < len(round); step++ {
 			i := round[(from+step)%len(round)]
 			if pending(progress[i]) {
+				// Wrapping past the end of the round starts a new round,
+				// which comes after a rest.
 				next := progress[i]
-				return &next, true
+				return &next, from+step < len(round)
 			}
 		}
 	}
