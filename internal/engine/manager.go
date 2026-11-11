@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -54,6 +55,13 @@ type Settings struct {
 	// Preferences keeps each person's model and thinking choice. Without one,
 	// choices live in memory until the server stops.
 	Preferences PreferenceStore
+	// Conversations keeps each person's chats. Without one, nothing is stored
+	// and a turn belongs to no conversation.
+	Conversations ConversationStore
+	// Retention is how long a conversation is kept after its last message.
+	Retention time.Duration
+	// PurgeEvery is how often conversations past their retention are deleted.
+	PurgeEvery time.Duration
 
 	Now    func() time.Time
 	Logger *log.Logger
@@ -115,6 +123,8 @@ func (s *Settings) defaults() {
 	if s.Now == nil {
 		s.Now = time.Now
 	}
+	set(&s.Retention, 90*24*time.Hour)
+	set(&s.PurgeEvery, time.Hour)
 	if s.Preferences == nil {
 		s.Preferences = &memoryPreferences{m: map[int64][2]string{}}
 	}
@@ -178,6 +188,23 @@ type turnState struct {
 	limited    bool
 	timeout    *time.Timer
 	abortTimer *time.Timer
+	// What is stored of the answer when the turn ends.
+	conv   int64
+	origin string
+	text   strings.Builder
+	steps  []string
+}
+
+// turnRequest is one turn to start.
+type turnRequest struct {
+	conv     int64
+	history  []ConversationMessage // stored messages, given to a fresh engine
+	text     string                // what the engine gets
+	origin   string
+	images   []Image
+	model    string
+	thinking string
+	record   *ConversationMessage // the person's message to store, if any
 }
 
 type proc struct {
@@ -187,14 +214,18 @@ type proc struct {
 	startedAt    time.Time
 	token        string
 	toolsChecked bool
-	idle         *time.Timer
-	turn         *turnState
-	refreshes    map[string]chan *Credential
-	stopped      bool
-	discard      bool
-	exited       bool
-	tornDown     bool
-	done         chan struct{}
+	// used is set once the process served a turn of conversation conv; its
+	// model context then belongs to that conversation.
+	used      bool
+	conv      int64
+	idle      *time.Timer
+	turn      *turnState
+	refreshes map[string]chan *Credential
+	stopped   bool
+	discard   bool
+	exited    bool
+	tornDown  bool
+	done      chan struct{}
 }
 
 type person struct {
@@ -212,6 +243,8 @@ type person struct {
 	models    *ModelList
 	modelWait chan struct{}
 	modelErr  ErrorCode
+	// conv is the conversation the person has open; reactions go there.
+	conv int64
 }
 
 // Manager starts, feeds and stops engine processes: at most one per person,
@@ -224,6 +257,10 @@ type Manager struct {
 	people map[int64]*person
 	alive  map[*proc]bool
 	closed bool
+	// writes stores conversation messages in order, off the lock.
+	writes       chan func(context.Context)
+	writesClosed bool
+	quit         chan struct{}
 }
 
 func NewManager(s Settings) (*Manager, error) {
@@ -231,8 +268,58 @@ func NewManager(s Settings) (*Manager, error) {
 		return nil, errors.New("engine: vault, tokens, command and MCP URL are required")
 	}
 	s.defaults()
-	return &Manager{s: s, people: map[int64]*person{}, alive: map[*proc]bool{}}, nil
+	m := &Manager{s: s, people: map[int64]*person{}, alive: map[*proc]bool{}, writes: make(chan func(context.Context), 256), quit: make(chan struct{})}
+	go m.writeLoop()
+	if s.Conversations != nil {
+		go m.purgeLoop()
+	}
+	return m, nil
 }
+
+// writeLoop runs stored-message writes one at a time, in the order the turns
+// produced them, so a reply is never stored before the message it answers.
+func (m *Manager) writeLoop() {
+	for w := range m.writes {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		w(ctx)
+		cancel()
+	}
+}
+
+// persist queues a write of a conversation message. Called with m.mu held.
+func (m *Manager) persist(userID, conv int64, msg ConversationMessage) {
+	st := m.s.Conversations
+	if st == nil || conv == 0 || m.writesClosed {
+		return
+	}
+	m.writes <- func(ctx context.Context) {
+		if err := st.AppendCoachMessage(ctx, userID, conv, msg); err != nil && !errors.Is(err, ErrNoConversation) {
+			m.log("store_failed", "append_message")
+		}
+	}
+}
+
+// purgeLoop deletes conversations past their retention when the coach starts
+// and every PurgeEvery after.
+func (m *Manager) purgeLoop() {
+	tick := time.NewTicker(m.s.PurgeEvery)
+	defer tick.Stop()
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		if _, err := m.s.Conversations.PurgeCoachConversations(ctx, m.cutoff()); err != nil {
+			m.log("store_failed", "purge")
+		}
+		cancel()
+		select {
+		case <-tick.C:
+		case <-m.quit:
+			return
+		}
+	}
+}
+
+// cutoff is the oldest last-message time a kept conversation can have.
+func (m *Manager) cutoff() time.Time { return m.s.Now().Add(-m.s.Retention) }
 
 // LiveCount is the number of processes holding a slot.
 func (m *Manager) LiveCount() int {
@@ -380,25 +467,212 @@ func (m *Manager) Subscribe(userID int64) (<-chan Event, func()) {
 	}
 }
 
-// Prompt starts one turn with the person's text and photos. Refusals are
-// returned before anything starts; after that, every outcome arrives on the open
-// streams. Photos go to this turn only and are kept nowhere.
-func (m *Manager) Prompt(userID int64, text string, images ...Image) error {
+// Prompt starts one turn with the person's text and photos, in conversation
+// conv (0 starts a new one, when conversations are kept). It returns the
+// conversation. Refusals are returned before anything starts; after that, every
+// outcome arrives on the open streams. Photos go to this turn only and are kept
+// nowhere: a stored message counts them.
+func (m *Manager) Prompt(userID, conv int64, text string, images ...Image) (int64, error) {
 	if utf8.RuneCountInString(text) > maxPromptChar || !utf8.ValidString(text) || !ValidImages(images) {
-		return fail(CodeProviderError)
+		return 0, fail(CodeProviderError)
 	}
+	stored := text
 	if text == "" {
 		if len(images) == 0 {
-			return fail(CodeProviderError)
+			return 0, fail(CodeProviderError)
 		}
 		text = photoOnlyText
 	} else {
 		text = guardText(text)
 	}
 	model, thinking := m.preferences(userID)
+	at := m.s.Now()
+	conv, history, created, err := m.prepareConversation(userID, conv, conversationTitle(stored))
+	if err != nil {
+		return 0, err
+	}
+	m.mu.Lock()
+	err = m.startTurn(m.personOf(userID), turnRequest{
+		conv: conv, history: history, text: text, origin: originUser, images: images, model: model, thinking: thinking,
+		record: &ConversationMessage{Role: "user", Origin: originUser, Text: stored, Photos: len(images), At: at},
+	})
+	m.mu.Unlock()
+	if err != nil {
+		if created {
+			m.dropConversation(userID, conv)
+		}
+		return 0, err
+	}
+	return conv, nil
+}
+
+// prepareConversation finds the person's conversation and its stored messages,
+// or creates one when conv is 0. Without a store, everything is conversation 0.
+func (m *Manager) prepareConversation(userID, conv int64, title string) (int64, []ConversationMessage, bool, error) {
+	st := m.s.Conversations
+	if st == nil {
+		if conv != 0 {
+			return 0, nil, false, fail(CodeNotFound)
+		}
+		return 0, nil, false, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if conv != 0 {
+		_, history, err := st.CoachConversation(ctx, userID, conv, m.cutoff())
+		return conv, history, false, storeError(err)
+	}
+	// No conversation is created for someone who cannot start a turn.
+	if c, err := m.s.Vault.Read(userID); err != nil || c == nil {
+		return 0, nil, false, nil
+	}
+	id, err := st.CreateCoachConversation(ctx, userID, title, m.s.Now())
+	return id, nil, err == nil, storeError(err)
+}
+
+func (m *Manager) dropConversation(userID, conv int64) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_ = m.s.Conversations.DeleteCoachConversation(ctx, userID, conv)
+}
+
+// storeError maps a store failure to a fixed code.
+func storeError(err error) error {
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, ErrNoConversation):
+		return fail(CodeNotFound)
+	default:
+		return fail(CodeEngineUnavailable)
+	}
+}
+
+const maxTitleRunes = 80
+
+// conversationTitle is the first line of the first message, cut short.
+func conversationTitle(text string) string {
+	line, _, _ := strings.Cut(strings.TrimSpace(text), "\n")
+	line = strings.TrimSpace(strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			return ' '
+		}
+		return r
+	}, line))
+	if line == "" {
+		return "Foto"
+	}
+	if r := []rune(line); len(r) > 60 {
+		line = strings.TrimSpace(string(r[:60])) + "…"
+	}
+	return line
+}
+
+// Conversations lists the person's kept conversations, newest first.
+func (m *Manager) Conversations(userID int64) ([]Conversation, error) {
+	st := m.s.Conversations
+	if st == nil {
+		return []Conversation{}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	list, err := st.CoachConversations(ctx, userID, m.cutoff())
+	if err != nil {
+		return nil, storeError(err)
+	}
+	return list, nil
+}
+
+// Conversation returns one of the person's conversations with its messages.
+func (m *Manager) Conversation(userID, conv int64) (Conversation, []ConversationMessage, error) {
+	st := m.s.Conversations
+	if st == nil {
+		return Conversation{}, nil, fail(CodeNotFound)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	c, msgs, err := st.CoachConversation(ctx, userID, conv, m.cutoff())
+	return c, msgs, storeError(err)
+}
+
+// OpenConversation makes conv the person's open conversation (0: a new one),
+// where reactions to logged sets go.
+func (m *Manager) OpenConversation(userID, conv int64) error {
+	if conv != 0 {
+		if _, _, err := m.Conversation(userID, conv); err != nil {
+			return err
+		}
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.startTurn(m.personOf(userID), text, originUser, images, model, thinking)
+	p := m.personOf(userID)
+	p.conv = conv
+	m.forget(p)
+	return nil
+}
+
+// RenameConversation gives one of the person's conversations a new title.
+func (m *Manager) RenameConversation(userID, conv int64, title string) error {
+	title = strings.TrimSpace(title)
+	if !validModelName(title) {
+		return fail(CodeBadRequest)
+	}
+	st := m.s.Conversations
+	if st == nil {
+		return fail(CodeNotFound)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return storeError(st.RenameCoachConversation(ctx, userID, conv, title))
+}
+
+// DeleteConversation deletes one of the person's conversations; an engine that
+// holds it in its context is stopped.
+func (m *Manager) DeleteConversation(userID, conv int64) error {
+	st := m.s.Conversations
+	if st == nil {
+		return fail(CodeNotFound)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := st.DeleteCoachConversation(ctx, userID, conv); err != nil {
+		return storeError(err)
+	}
+	m.forgetConversations(userID, func(c int64) bool { return c == conv })
+	return nil
+}
+
+// DeleteConversations deletes all of the person's conversations («borrar todo»).
+func (m *Manager) DeleteConversations(userID int64) error {
+	st := m.s.Conversations
+	if st == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := st.DeleteCoachConversations(ctx, userID); err != nil {
+		return storeError(err)
+	}
+	m.forgetConversations(userID, func(int64) bool { return true })
+	return nil
+}
+
+// forgetConversations closes deleted conversations in memory: the open one,
+// and an engine whose context holds one.
+func (m *Manager) forgetConversations(userID int64, deleted func(int64) bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	p := m.people[userID]
+	if p == nil {
+		return
+	}
+	if deleted(p.conv) {
+		p.conv = 0
+	}
+	if p.proc != nil && p.proc.used && deleted(p.proc.conv) {
+		m.stop(p, "conversation_deleted", nil)
+	}
+	m.forget(p)
 }
 
 // preferences reads the person's choice; any failure means the engine's default.
@@ -555,8 +829,8 @@ func (m *Manager) Abort(userID int64) bool {
 func (m *Manager) Notify(userID int64, ev WorkoutEvent) {
 	model, thinking := m.preferences(userID)
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	if m.closed {
+		m.mu.Unlock()
 		return
 	}
 	p := m.personOf(userID)
@@ -565,9 +839,28 @@ func (m *Manager) Notify(userID int64, ev WorkoutEvent) {
 	if over := len(p.events) - m.s.MaxPendingEvents; over > 0 {
 		p.events = append([]WorkoutEvent(nil), p.events[over:]...)
 	}
-	if len(p.subs) > 0 && (p.proc == nil || p.proc.turn == nil) {
+	canStart := func(p *person) bool { return len(p.subs) > 0 && (p.proc == nil || p.proc.turn == nil) }
+	if !canStart(p) {
+		m.mu.Unlock()
+		return
+	}
+	conv := p.conv
+	m.mu.Unlock()
+	// The reaction goes to the open conversation, or a new one.
+	conv, history, created, err := m.prepareConversation(userID, conv, "Entreno del "+m.s.Now().Format("02/01"))
+	if err != nil {
+		conv, history, created, err = m.prepareConversation(userID, 0, "Entreno del "+m.s.Now().Format("02/01"))
+	}
+	m.mu.Lock()
+	p = m.personOf(userID)
+	started := false
+	if err == nil && !m.closed && canStart(p) {
 		// A refusal (not connected, busy) leaves the event queued for later.
-		_ = m.startTurn(p, reactionText, originEvent, nil, model, thinking)
+		started = m.startTurn(p, turnRequest{conv: conv, history: history, text: reactionText, origin: originEvent, model: model, thinking: thinking}) == nil
+	}
+	m.mu.Unlock()
+	if created && !started {
+		m.dropConversation(userID, conv)
 	}
 }
 
@@ -585,6 +878,9 @@ func (m *Manager) PendingEvents(userID int64) int {
 // afterwards. It waits, bounded by ctx, for the processes to exit.
 func (m *Manager) Close(ctx context.Context) {
 	m.mu.Lock()
+	if !m.closed {
+		close(m.quit)
+	}
 	m.closed = true
 	for _, p := range m.people {
 		if p.login != nil {
@@ -599,6 +895,10 @@ func (m *Manager) Close(ctx context.Context) {
 	var waits []chan struct{}
 	for pr := range m.alive {
 		waits = append(waits, pr.done)
+	}
+	if !m.writesClosed {
+		m.writesClosed = true
+		close(m.writes)
 	}
 	m.mu.Unlock()
 	for _, d := range waits {
@@ -664,7 +964,7 @@ func (m *Manager) forget(p *person) {
 	}
 }
 
-func (m *Manager) startTurn(p *person, text, origin string, images []Image, model, thinking string) error {
+func (m *Manager) startTurn(p *person, r turnRequest) error {
 	if m.closed {
 		return fail(CodeEngineUnavailable)
 	}
@@ -678,11 +978,18 @@ func (m *Manager) startTurn(p *person, text, origin string, images []Image, mode
 	if p.proc != nil && p.login == nil && p.proc.token != "" && m.s.Now().Sub(p.proc.startedAt) > m.s.MaxAge-m.s.TurnTimeout {
 		m.stop(p, "max_age", nil)
 	}
+	// An engine holds the context of the conversation it served; another
+	// conversation gets a fresh one.
+	if p.proc != nil && p.proc.used && p.proc.conv != r.conv {
+		m.stop(p, "switch_conversation", nil)
+	}
 	pr, err := m.startEngine(p)
 	if err != nil {
 		return err
 	}
-	t := &turnState{}
+	fresh := !pr.used
+	pr.used, pr.conv, p.conv = true, r.conv, r.conv
+	t := &turnState{conv: r.conv, origin: r.origin}
 	t.timeout = time.AfterFunc(m.s.TurnTimeout, func() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
@@ -691,9 +998,15 @@ func (m *Manager) startTurn(p *person, text, origin string, images []Image, mode
 	pr.turn = t
 	m.dropStaleEvents(p)
 	contextLines := composeContext(m.s.Now(), p.events)
+	if fresh && len(r.history) > 0 {
+		contextLines = historyContext(r.history) + "\n" + contextLines
+	}
 	p.events = nil
-	m.broadcast(p, Event{Name: "turn", Data: map[string]any{"origin": origin}})
-	m.send(pr, parentMessage{Type: "prompt", Text: text, Context: contextLines, Images: toPromptImages(images), Model: model, Thinking: thinking})
+	if r.record != nil {
+		m.persist(p.id, r.conv, *r.record)
+	}
+	m.broadcast(p, Event{Name: "turn", Data: map[string]any{"origin": r.origin, "conversation": r.conv}})
+	m.send(pr, parentMessage{Type: "prompt", Text: r.text, Context: contextLines, Images: toPromptImages(r.images), Model: r.model, Thinking: r.thinking})
 	m.touch(p, pr)
 	return nil
 }
@@ -863,6 +1176,9 @@ func (m *Manager) handle(p *person, pr *proc, msg childMessage) {
 			m.limitTurn(p, pr, t)
 			return
 		}
+		if msg.Type == "delta" {
+			t.text.WriteString(msg.Text)
+		}
 		m.broadcast(p, Event{Name: msg.Type, Data: map[string]any{"text": msg.Text}})
 	case "models":
 		if !pr.toolsChecked || p.proc != pr {
@@ -881,6 +1197,15 @@ func (m *Manager) handle(p *person, pr *proc, msg childMessage) {
 		data := map[string]any{"name": strings.TrimPrefix(msg.Name, MCPToolPrefix), "phase": msg.Phase}
 		if msg.Phase == "end" {
 			data["ok"] = msg.OK
+			outcome := "ok"
+			if !msg.OK {
+				outcome = "error"
+			} else if msg.Pending {
+				outcome = "pending"
+			}
+			if len(pr.turn.steps) < 64 {
+				pr.turn.steps = append(pr.turn.steps, data["name"].(string)+":"+outcome)
+			}
 		}
 		if msg.Pending {
 			data["pending"] = true
@@ -1056,6 +1381,10 @@ func (m *Manager) endTurn(p *person, pr *proc, name string, data map[string]any)
 		m.broadcast(p, Event{Name: "error", Data: map[string]any{"code": string(CodeTurnLimit)}})
 	} else {
 		m.broadcast(p, Event{Name: name, Data: data})
+	}
+	// What the coach said, even cut short, is kept with its steps.
+	if t.text.Len() > 0 || len(t.steps) > 0 {
+		m.persist(p.id, t.conv, ConversationMessage{Role: "assistant", Origin: t.origin, Text: t.text.String(), Steps: t.steps, At: m.s.Now()})
 	}
 	m.touch(p, pr)
 }

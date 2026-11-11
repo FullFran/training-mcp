@@ -39,6 +39,9 @@ const (
 	// CodeBadRequest is the host's own refusal of a request it cannot serve as
 	// asked (a model the person's engine did not list). An engine never sends it.
 	CodeBadRequest ErrorCode = "bad_request"
+	// CodeNotFound is the host's answer for a conversation the person does not
+	// have (someone else's, deleted, or past its retention). Host-only too.
+	CodeNotFound ErrorCode = "not_found"
 )
 
 var knownCodes = map[ErrorCode]bool{

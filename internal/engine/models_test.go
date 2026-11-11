@@ -56,7 +56,7 @@ func TestPreferencesGoWithEveryTurn(t *testing.T) {
 	}
 	ch, closeSub := h.m.Subscribe(1)
 	defer closeSub()
-	if err := h.m.Prompt(1, "hola"); err != nil {
+	if err := prompt(h.m, 1, "hola"); err != nil {
 		t.Fatal(err)
 	}
 	if _, text := collect(t, ch); !strings.Contains(text, "MODEL<gpt-a:high>") {
@@ -65,7 +65,7 @@ func TestPreferencesGoWithEveryTurn(t *testing.T) {
 	// The other person's turns carry no choice of the first.
 	ch2, close2 := h.m.Subscribe(2)
 	defer close2()
-	if err := h.m.Prompt(2, "hola"); err != nil {
+	if err := prompt(h.m, 2, "hola"); err != nil {
 		t.Fatal(err)
 	}
 	if _, text := collect(t, ch2); !strings.Contains(text, "MODEL<:>") {
@@ -99,7 +99,7 @@ func TestThinkingStreamsApart(t *testing.T) {
 	h.connect(1)
 	ch, closeSub := h.m.Subscribe(1)
 	defer closeSub()
-	if err := h.m.Prompt(1, "hola"); err != nil {
+	if err := prompt(h.m, 1, "hola"); err != nil {
 		t.Fatal(err)
 	}
 	events, text := collect(t, ch)

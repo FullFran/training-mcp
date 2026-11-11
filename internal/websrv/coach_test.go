@@ -28,6 +28,9 @@ type fakeCoach struct {
 	stream  chan engine.Event
 	images  []engine.Image // the photos of the last prompt
 	chosen  [2]string      // the last model and thinking level set
+	conv    int64          // the conversation of the last prompt
+	opened  int64          // the last conversation opened
+	title   string         // the last title given
 }
 
 func newFakeCoach() *fakeCoach { return &fakeCoach{callers: map[int64]bool{}} }
@@ -64,12 +67,55 @@ func (f *fakeCoach) Subscribe(userID int64) (<-chan engine.Event, func()) {
 	return ch, func() {}
 }
 
-func (f *fakeCoach) Prompt(userID int64, text string, images ...engine.Image) error {
+func (f *fakeCoach) Prompt(userID, conv int64, text string, images ...engine.Image) (int64, error) {
 	f.record("prompt:"+text, userID)
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.images = images
-	return f.fail
+	f.conv = conv
+	if conv == 0 {
+		conv = 7
+	}
+	return conv, f.fail
+}
+
+func (f *fakeCoach) Conversations(userID int64) ([]engine.Conversation, error) {
+	f.record("conversations", userID)
+	return []engine.Conversation{{ID: 7, Title: "Pierna"}}, f.fail
+}
+
+func (f *fakeCoach) Conversation(userID, conv int64) (engine.Conversation, []engine.ConversationMessage, error) {
+	f.record("conversation", userID)
+	if conv != 7 {
+		return engine.Conversation{}, nil, &engine.Error{Code: engine.CodeNotFound}
+	}
+	return engine.Conversation{ID: 7, Title: "Pierna"}, []engine.ConversationMessage{{Role: "user", Text: "<b>hola</b>"}}, nil
+}
+
+func (f *fakeCoach) OpenConversation(userID, conv int64) error {
+	f.record("open", userID)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.opened = conv
+	return nil
+}
+
+func (f *fakeCoach) RenameConversation(userID, conv int64, title string) error {
+	f.record("rename", userID)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.title = title
+	return nil
+}
+
+func (f *fakeCoach) DeleteConversation(userID, conv int64) error {
+	f.record("delete", userID)
+	return nil
+}
+
+func (f *fakeCoach) DeleteConversations(userID int64) error {
+	f.record("delete-all", userID)
+	return nil
 }
 
 func (f *fakeCoach) Abort(userID int64) bool { f.record("abort", userID); return false }
@@ -209,6 +255,24 @@ func TestEveryCoachRouteActsAsTheRequestsPerson(t *testing.T) {
 		"POST /coach/settings": func() *httptest.ResponseRecorder {
 			return coachRequest(t, world.as(2), "POST", "/coach/settings", `{"model":"gpt-a","thinking":"high"}`, true)
 		},
+		"GET /coach/conversations": func() *httptest.ResponseRecorder {
+			return coachRequest(t, world.as(2), "GET", "/coach/conversations", "", false)
+		},
+		"GET /coach/conversations/{id}": func() *httptest.ResponseRecorder {
+			return coachRequest(t, world.as(2), "GET", "/coach/conversations/7", "", false)
+		},
+		"POST /coach/conversations/{id}/rename": func() *httptest.ResponseRecorder {
+			return coachRequest(t, world.as(2), "POST", "/coach/conversations/7/rename", `{"title":"Pierna"}`, true)
+		},
+		"POST /coach/conversations/{id}/delete": func() *httptest.ResponseRecorder {
+			return coachRequest(t, world.as(2), "POST", "/coach/conversations/7/delete", "{}", true)
+		},
+		"POST /coach/conversations/delete-all": func() *httptest.ResponseRecorder {
+			return coachRequest(t, world.as(2), "POST", "/coach/conversations/delete-all", "{}", true)
+		},
+		"POST /coach/open": func() *httptest.ResponseRecorder {
+			return coachRequest(t, world.as(2), "POST", "/coach/open", `{"conversation":7}`, true)
+		},
 	}
 	for _, p := range world.server.Routes() {
 		route := strings.TrimSpace(strings.Replace(p, base, "", 1))
@@ -234,7 +298,8 @@ func TestEveryCoachRouteActsAsTheRequestsPerson(t *testing.T) {
 func TestCoachWritesNeedTheCoachHeader(t *testing.T) {
 	coach := newFakeCoach()
 	world := newCoachWorld(t, coach)
-	for _, path := range []string{"/coach/login", "/coach/disconnect", "/coach/prompt", "/coach/abort", "/coach/settings"} {
+	for _, path := range []string{"/coach/login", "/coach/disconnect", "/coach/prompt", "/coach/abort", "/coach/settings",
+		"/coach/open", "/coach/conversations/7/rename", "/coach/conversations/7/delete", "/coach/conversations/delete-all"} {
 		if w := coachRequest(t, world.as(1), "POST", path, `{"text":"x"}`, false); w.Code != http.StatusForbidden {
 			t.Errorf("%s without the header: %d", path, w.Code)
 		}
@@ -374,5 +439,45 @@ func TestCoachModelsAndSettings(t *testing.T) {
 	coach.fail = &engine.Error{Code: engine.CodeNotConnected}
 	if w := coachRequest(t, world.as(1), "GET", "/coach/models", "", false); w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "not_connected") {
 		t.Fatalf("models while not connected: %d %s", w.Code, w.Body)
+	}
+}
+
+// Conversations: list, read (text as JSON, never HTML), continue, open, rename,
+// delete one, delete all. Unknown ids are 404 with a fixed code.
+func TestCoachConversationRoutes(t *testing.T) {
+	coach := newFakeCoach()
+	world := newCoachWorld(t, coach)
+	h := world.as(1)
+	if w := coachRequest(t, h, "GET", "/coach/conversations", "", false); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"title":"Pierna"`) {
+		t.Fatalf("list: %d %s", w.Code, w.Body)
+	}
+	w := coachRequest(t, h, "GET", "/coach/conversations/7", "", false)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `\u003cb\u003ehola`) || w.Header().Get("Content-Type") != "application/json" {
+		t.Fatalf("read: %d %s %s", w.Code, w.Header().Get("Content-Type"), w.Body)
+	}
+	if w := coachRequest(t, h, "GET", "/coach/conversations/8", "", false); w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), "not_found") {
+		t.Fatalf("unknown: %d %s", w.Code, w.Body)
+	}
+	for _, bad := range []string{"/coach/conversations/0", "/coach/conversations/-1", "/coach/conversations/x"} {
+		if w := coachRequest(t, h, "GET", bad, "", false); w.Code != http.StatusNotFound {
+			t.Errorf("%s: %d", bad, w.Code)
+		}
+	}
+	w = coachRequest(t, h, "POST", "/coach/prompt", `{"text":"sigo","conversation":7}`, true)
+	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), `"conversation":7`) || coach.conv != 7 {
+		t.Fatalf("continue: %d %s conv=%d", w.Code, w.Body, coach.conv)
+	}
+	w = coachRequest(t, h, "POST", "/coach/prompt", `{"text":"nueva"}`, true)
+	if w.Code != http.StatusAccepted || coach.conv != 0 || !strings.Contains(w.Body.String(), `"conversation":7`) {
+		t.Fatalf("new: %d %s", w.Code, w.Body)
+	}
+	if w := coachRequest(t, h, "POST", "/coach/open", `{"conversation":7}`, true); w.Code != http.StatusOK || coach.opened != 7 {
+		t.Fatalf("open: %d %s", w.Code, w.Body)
+	}
+	if w := coachRequest(t, h, "POST", "/coach/conversations/7/rename", `{"title":"Pierna A"}`, true); w.Code != http.StatusOK || coach.title != "Pierna A" {
+		t.Fatalf("rename: %d %s", w.Code, w.Body)
+	}
+	if w := coachRequest(t, h, "POST", "/coach/conversations/7/rename", `{"title":"x","extra":1}`, true); w.Code != http.StatusBadRequest {
+		t.Fatalf("rename with an unknown field: %d", w.Code)
 	}
 }

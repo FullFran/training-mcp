@@ -75,7 +75,7 @@ func TestPromptCarriesPhotosToTheEngine(t *testing.T) {
 	defer closeSub()
 	// Two photos as large as a turn allows: the line to the engine is megabytes.
 	a, b := jpegBytes(MaxImageBytes), pngBytes(MaxImageBytes)
-	if err := h.m.Prompt(1, "¿qué tal la técnica?", Image{"image/jpeg", a}, Image{"image/png", b}); err != nil {
+	if err := prompt(h.m, 1, "¿qué tal la técnica?", Image{"image/jpeg", a}, Image{"image/png", b}); err != nil {
 		t.Fatal(err)
 	}
 	events, text := collect(t, ch)
@@ -97,7 +97,7 @@ func TestPromptWithOnlyAPhoto(t *testing.T) {
 	ch, closeSub := h.m.Subscribe(1)
 	defer closeSub()
 	img := jpegBytes(50)
-	if err := h.m.Prompt(1, "", Image{"image/jpeg", img}); err != nil {
+	if err := prompt(h.m, 1, "", Image{"image/jpeg", img}); err != nil {
 		t.Fatal(err)
 	}
 	_, text := collect(t, ch)
@@ -114,15 +114,15 @@ func TestPromptRefusesBadPhotosBeforeAnyTurn(t *testing.T) {
 		"too large": {{"image/jpeg", jpegBytes(MaxImageBytes + 1)}},
 		"five":      {{"image/jpeg", jpegBytes(9)}, {"image/jpeg", jpegBytes(9)}, {"image/jpeg", jpegBytes(9)}, {"image/jpeg", jpegBytes(9)}, {"image/jpeg", jpegBytes(9)}},
 	} {
-		if err := h.m.Prompt(1, "mira", images...); codeOf(err) != CodeProviderError {
+		if err := prompt(h.m, 1, "mira", images...); codeOf(err) != CodeProviderError {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
-	if err := h.m.Prompt(1, ""); codeOf(err) != CodeProviderError {
+	if err := prompt(h.m, 1, ""); codeOf(err) != CodeProviderError {
 		t.Errorf("no text and no photo: %v", err)
 	}
 	// Nothing started: a good turn still goes through.
-	if err := h.m.Prompt(1, "hola"); err != nil {
+	if err := prompt(h.m, 1, "hola"); err != nil {
 		t.Fatalf("turn after refusals: %v", err)
 	}
 }
@@ -137,10 +137,10 @@ func TestPhotosStayWithTheirPerson(t *testing.T) {
 	ch2, close2 := h.m.Subscribe(2)
 	defer close2()
 	img := jpegBytes(80)
-	if err := h.m.Prompt(2, "mira", Image{"image/jpeg", img}); err != nil {
+	if err := prompt(h.m, 2, "mira", Image{"image/jpeg", img}); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.m.Prompt(1, "hola"); err != nil {
+	if err := prompt(h.m, 1, "hola"); err != nil {
 		t.Fatal(err)
 	}
 	_, text2 := collect(t, ch2)
