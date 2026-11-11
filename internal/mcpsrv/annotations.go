@@ -51,6 +51,9 @@ var toolBehaviors = map[string]toolBehavior{
 	"list_exercise_groups":  read("List exercise groups"),
 	"volume_by_muscle":      read("Get volume by muscle"),
 	"live_workout":          read("Get live workout"),
+	"memory_search":         read("Search memory"),
+	"memory_get":            read("Get memory"),
+	"memory_context":        read("Get memory context"),
 
 	"start_session":        additive("Start session"),
 	"add_set":              additive("Add set"),
@@ -76,6 +79,8 @@ var toolBehaviors = map[string]toolBehavior{
 	"set_volume_landmarks":    overwriting("Set volume landmarks"),
 	"set_exercise_group":      overwriting("Set exercise group"),
 	"set_rest_target":         overwriting("Set rest target"),
+	"memory_save":             overwriting("Save memory"),
+	"memory_forget":           overwriting("Forget memory"),
 }
 
 // addTool registers a tool with its declared behavior. A tool missing from

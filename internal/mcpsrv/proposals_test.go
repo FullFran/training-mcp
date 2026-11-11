@@ -25,6 +25,7 @@ var wantActionType = map[string]string{
 	"set_exercise_note": "exercise.note.set", "set_exercise_group": "exercise.group.set",
 	"record_feedback": "feedback.record", "set_volume_landmarks": "landmarks.set",
 	"set_rest_target": "rest.set",
+	"memory_save":     "memory", "memory_forget": "memory",
 }
 
 // Every tool that is not read-only proposes, and no read-only tool does.

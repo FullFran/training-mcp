@@ -641,6 +641,7 @@ func New(service training.ServiceFor) *Server {
 		v, err := service(ctx).VolumeByGroup(ctx, training.ListFilter{From: in.From, To: in.To})
 		return nil, VolumeOut{Volume: v}, toolError(err)
 	})
+	addMemoryTools(s, w, service)
 
 	// Stateless: the server keeps no per-client session state, so restarting the
 	// container no longer invalidates a live conversation. These tools are plain

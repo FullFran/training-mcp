@@ -22,7 +22,7 @@ const (
 )
 
 type toolIDs struct {
-	session, set, plan int64
+	session, set, plan, memory int64
 }
 
 // isolationCase says how one tool is called. Tools addressed by an id must answer
@@ -38,6 +38,13 @@ type isolationCase struct {
 func noArgs(toolIDs) map[string]any { return map[string]any{} }
 
 var isolationCases = map[string]isolationCase{
+	"memory_get":    {byID: true, args: func(id toolIDs) map[string]any { return map[string]any{"memory_id": id.memory} }},
+	"memory_forget": {byID: true, args: func(id toolIDs) map[string]any { return map[string]any{"memory_id": id.memory} }},
+	"memory_save": {count: `coach_memory WHERE user_id=2 AND topic_key='lesion/hombro' AND title='suya'`, args: func(toolIDs) map[string]any {
+		return map[string]any{"topic_key": "lesion/hombro", "title": "suya", "body": "suya"}
+	}},
+	"memory_search":  {args: func(toolIDs) map[string]any { return map[string]any{"query": "hombro"} }},
+	"memory_context": {args: noArgs},
 	"start_session": {byID: true, args: func(id toolIDs) map[string]any {
 		return map[string]any{"date": isolationDay, "plan_id": id.plan}
 	}},
@@ -189,6 +196,10 @@ func newIsolationWorld(t *testing.T) isolationWorld {
 	if _, err = owner.LogSets(ctx, training.LogSetsInput{Key: "clave", Exercise: isolationExercise, Sets: []training.LoggedSet{{WeightKG: 70, Reps: 10, RPE: 7}}}); err != nil {
 		t.Fatal(err)
 	}
+	memory, err := owner.SaveMemory(ctx, training.MemoryInput{TopicKey: "lesion/hombro", Type: "limitation", Title: "hombro", Body: "duele en press"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	// User 2 accepts every proposal, so each write tool reaches its data path. The
 	// pending path is isolated by TestPendingProposalsAreIsolatedBetweenUsers.
 	if err = services.ForUser(2).SetAcceptAll(ctx, true); err != nil {
@@ -202,14 +213,14 @@ func newIsolationWorld(t *testing.T) isolationWorld {
 		ownerService: owner,
 		owner:        mustConnect(t, ownerServer.Handler()),
 		second:       mustConnect(t, New(only(services.ForUser(2))).Handler()),
-		ids:          toolIDs{session: session.ID, set: set.ID, plan: plan.ID},
+		ids:          toolIDs{session: session.ID, set: set.ID, plan: plan.ID, memory: memory.ID},
 	}
 }
 
 func dumpTables(t *testing.T, db *sql.DB, where map[string]string) string {
 	t.Helper()
 	tables := []string{"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
-		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys"}
+		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys", "coach_memory"}
 	var out strings.Builder
 	for _, table := range tables {
 		rows, err := db.Query(`SELECT * FROM ` + table + ` ` + where[table] + ` ORDER BY rowid`)
@@ -248,6 +259,7 @@ var ownersRows = map[string]string{
 	"exercise_groups":  `WHERE user_id=1`,
 	"volume_landmarks": `WHERE user_id=1`,
 	"idempotency_keys": `WHERE user_id=1`,
+	"coach_memory":     `WHERE user_id=1`,
 }
 
 func answer(t *testing.T, result *mcp.CallToolResult) string {
@@ -260,7 +272,7 @@ func answer(t *testing.T, result *mcp.CallToolResult) string {
 }
 
 func TestEveryToolIsIsolatedBetweenUsers(t *testing.T) {
-	missing := toolIDs{session: missingToolID, set: missingToolID, plan: missingToolID}
+	missing := toolIDs{session: missingToolID, set: missingToolID, plan: missingToolID, memory: missingToolID}
 	for name, tc := range isolationCases {
 		t.Run(name, func(t *testing.T) {
 			world := newIsolationWorld(t)
