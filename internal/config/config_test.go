@@ -230,3 +230,75 @@ func TestLoadNeverPrintsTheWebClientSecret(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+const testCoachKey = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA="
+
+func TestLoadLeavesTheCoachOffByDefault(t *testing.T) {
+	t.Setenv("MCP_BEARER_TOKEN", "secret")
+	t.Setenv("WEB_BASE_PATH", "app")
+	t.Setenv("TRAINING_COACH", "")
+	t.Setenv("TRAINING_COACH_KEY", testCoachKey)
+	cfg, err := Load("")
+	if err != nil || cfg.Coach.Enabled || cfg.Coach.Key != nil {
+		t.Fatalf("coach = %+v, err %v", cfg.Coach, err)
+	}
+}
+
+func TestLoadReadsTheCoach(t *testing.T) {
+	t.Setenv("MCP_BEARER_TOKEN", "secret")
+	t.Setenv("WEB_BASE_PATH", "app")
+	t.Setenv("TRAINING_DB_PATH", "/data/training.db")
+	t.Setenv("TRAINING_COACH", "1")
+	t.Setenv("TRAINING_COACH_KEY", testCoachKey)
+	t.Setenv("TRAINING_COACH_MAX_PROCESSES", "")
+	t.Setenv("TRAINING_COACH_IDLE_SECONDS", "")
+	t.Setenv("TRAINING_COACH_NODE", "")
+	t.Setenv("TRAINING_COACH_ENGINE", "")
+	cfg, err := Load("127.0.0.1:9090")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := cfg.Coach
+	if !c.Enabled || len(c.Key) != 32 || c.MaxProcesses != 2 || c.IdleSeconds != 300 || c.Node != "node" || c.Engine != "/app/engine/main.ts" {
+		t.Fatalf("coach = %+v", c)
+	}
+	if c.DataDir != "/data/coach" || c.MCPURL != "http://127.0.0.1:9090/mcp" {
+		t.Fatalf("dir %q url %q", c.DataDir, c.MCPURL)
+	}
+	t.Setenv("TRAINING_COACH_MAX_PROCESSES", "5")
+	t.Setenv("TRAINING_COACH_IDLE_SECONDS", "60")
+	cfg, err = Load(":8080")
+	if err != nil || cfg.Coach.MaxProcesses != 5 || cfg.Coach.IdleSeconds != 60 || cfg.Coach.MCPURL != "http://127.0.0.1:8080/mcp" {
+		t.Fatalf("coach = %+v, err %v", cfg.Coach, err)
+	}
+}
+
+func TestLoadRefusesABrokenCoachConfiguration(t *testing.T) {
+	for name, env := range map[string]map[string]string{
+		"misspelled switch": {"TRAINING_COACH": "yes"},
+		"no key":            {"TRAINING_COACH_KEY": ""},
+		"short key":         {"TRAINING_COACH_KEY": "c2hvcnQ="},
+		"no web app":        {"WEB_BASE_PATH": ""},
+		"zero processes":    {"TRAINING_COACH_MAX_PROCESSES": "0"},
+		"bad idle":          {"TRAINING_COACH_IDLE_SECONDS": "soon"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("MCP_BEARER_TOKEN", "secret")
+			t.Setenv("WEB_BASE_PATH", "app")
+			t.Setenv("TRAINING_COACH", "1")
+			t.Setenv("TRAINING_COACH_KEY", testCoachKey)
+			t.Setenv("TRAINING_COACH_MAX_PROCESSES", "")
+			t.Setenv("TRAINING_COACH_IDLE_SECONDS", "")
+			for k, v := range env {
+				t.Setenv(k, v)
+			}
+			_, err := Load("")
+			if err == nil {
+				t.Fatal("accepted")
+			}
+			if strings.Contains(err.Error(), testCoachKey) {
+				t.Fatal("error quotes the key")
+			}
+		})
+	}
+}

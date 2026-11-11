@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/fullfran/training-mcp/internal/config"
+	"github.com/fullfran/training-mcp/internal/engine"
 	"github.com/fullfran/training-mcp/internal/httpsrv"
 	"github.com/fullfran/training-mcp/internal/mcpsrv"
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
@@ -99,9 +100,22 @@ func runWithContext(ctx context.Context, args []string) error {
 	logger := log.Default()
 	httpsrv.WarningIfDisabled(cfg.AuthDisabled, logger)
 
+	coach, engineTokens, err := startCoach(cfg.Coach, logger)
+	if err != nil {
+		return err
+	}
+	if coach != nil {
+		// Engine processes must not outlive the server, even when it stops on error.
+		defer func() {
+			closeCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			coach.Close(closeCtx)
+		}()
+	}
+
 	var web *httpsrv.WebUI
 	if cfg.WebBasePath != "" {
-		webServer, err := websrv.NewWithOptions(services.ForRequest, services.Snapshot, time.Now, cfg.WebBasePath, websrv.Options{Export: true, Apply: mcpServer.Apply})
+		webServer, err := websrv.NewWithOptions(services.ForRequest, services.Snapshot, time.Now, cfg.WebBasePath, websrv.Options{Export: true, Apply: mcpServer.Apply, Coach: coachFor(coach)})
 		if err != nil {
 			return err
 		}
@@ -126,19 +140,26 @@ func runWithContext(ctx context.Context, args []string) error {
 			Keys: oauth, Resolve: services.ResolveUser(cfg.OAuthSubject, cfg.OAuthProvision), Logger: logger,
 		})
 		// The root never serves /export.db: it holds every user's data.
-		app, err := websrv.NewWithOptions(services.ForRequest, services.Snapshot, time.Now, "", websrv.Options{CSRFToken: login.CSRFToken, Apply: mcpServer.Apply})
+		app, err := websrv.NewWithOptions(services.ForRequest, services.Snapshot, time.Now, "", websrv.Options{CSRFToken: login.CSRFToken, Apply: mcpServer.Apply, Coach: coachFor(coach)})
 		if err != nil {
 			return err
 		}
 		root = &httpsrv.RootWeb{Handler: app.Handler(), Login: login}
 		logger.Printf("web UI served at %s/ behind the provider's login", cfg.WebPublicURL)
 	}
-	handler := httpsrv.LogProtocol(logger, httpsrv.RoutesWithLogin(mcpServer.Handler(), cfg.AuthDisabled, cfg.Token, web, oauth, root))
+	handler := httpsrv.LogProtocol(logger, httpsrv.RoutesWithEngine(mcpServer.Handler(), cfg.AuthDisabled, cfg.Token, web, oauth, root, engineTokens))
 	httpServer := &http.Server{Addr: cfg.Addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
 	errCh := make(chan error, 1)
 	go func() { errCh <- httpServer.ListenAndServe() }()
 	select {
 	case <-ctx.Done():
+		// Open chat streams would hold Shutdown for its whole timeout; the engines
+		// go first, which ends every stream.
+		if coach != nil {
+			closeCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			coach.Close(closeCtx)
+			cancel()
+		}
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		return httpServer.Shutdown(shutdownCtx)
@@ -148,4 +169,35 @@ func runWithContext(ctx context.Context, args []string) error {
 		}
 		return err
 	}
+}
+
+// startCoach builds the in-app coach when it is enabled. Disabled, it returns
+// nils and nothing of the coach exists.
+func startCoach(c config.Coach, logger *log.Logger) (*engine.Manager, httpsrv.EngineTokens, error) {
+	if !c.Enabled {
+		return nil, nil, nil
+	}
+	vault, err := engine.NewVault(filepath.Join(c.DataDir, "credentials"), c.Key)
+	if err != nil {
+		return nil, nil, err
+	}
+	tokens := engine.NewTokens(nil)
+	manager, err := engine.NewManager(engine.Settings{
+		Vault: vault, Tokens: tokens, Command: engine.NodeCommand(c.Node, c.Engine),
+		MCPURL: c.MCPURL, SystemPrompt: engine.SystemPrompt,
+		MaxProcesses: c.MaxProcesses, Idle: time.Duration(c.IdleSeconds) * time.Second, Logger: logger,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	logger.Printf("coach enabled: up to %d engine processes", c.MaxProcesses)
+	return manager, tokens, nil
+}
+
+// coachFor keeps a nil manager a nil interface, so the app sees no coach.
+func coachFor(m *engine.Manager) websrv.Coach {
+	if m == nil {
+		return nil
+	}
+	return m
 }

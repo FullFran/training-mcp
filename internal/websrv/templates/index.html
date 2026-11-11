@@ -134,6 +134,36 @@
   <button type="button" class="rest-adj" data-delta="30">+30s</button>
 </div>
 
+{{if .CoachOn}}
+<!-- Coach chat. A bottom sheet over the workout, so logging stays one tap away. -->
+<button type="button" id="coach-open" class="coach-fab" aria-controls="coach" aria-expanded="false">Coach<span id="coach-dot" class="coach-dot" hidden></span></button>
+<section id="coach" class="coach" role="dialog" aria-label="Coach" hidden>
+  <header class="coach-head">
+    <strong>Coach</strong>
+    <span id="coach-state" class="muted"></span>
+    <button type="button" id="coach-close" class="ghost">Cerrar</button>
+  </header>
+  <div id="coach-connect" class="coach-connect" hidden>
+    <p>El coach usa tu propia cuenta de ChatGPT. Se conecta con un código en la web de OpenAI: tu contraseña nunca se escribe aquí.</p>
+    <button type="button" id="coach-login" class="primary">Conectar ChatGPT</button>
+    <div id="coach-code" hidden>
+      <p>Abre <a id="coach-uri" target="_blank" rel="noopener noreferrer"></a> e introduce este código:</p>
+      <p id="coach-usercode" class="coach-usercode"></p>
+      <p class="muted">Esperando a que lo apruebes en OpenAI…</p>
+    </div>
+  </div>
+  <div id="coach-log" class="coach-log" aria-live="polite"></div>
+  <form id="coach-form" class="coach-form" hidden>
+    <textarea id="coach-text" rows="2" maxlength="4000" placeholder="Pregunta a tu coach" aria-label="Mensaje para el coach"></textarea>
+    <button type="submit" id="coach-send" class="primary">Enviar</button>
+    <button type="button" id="coach-stop" class="ghost" hidden>Detener</button>
+  </form>
+  <footer class="coach-foot">
+    <button type="button" id="coach-disconnect" class="ghost" hidden>Desconectar ChatGPT</button>
+  </footer>
+</section>
+<script src="{{.Base}}/static/coach.js" defer></script>
+{{end -}}
 <script id="exercise-info" type="application/json">{{.InfoJSON}}</script>
 <script src="{{.Base}}/static/htmx.min.js" defer></script>
 <script src="{{.Base}}/static/app.js" defer></script>

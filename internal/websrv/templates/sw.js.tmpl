@@ -47,6 +47,8 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  // The coach's status and its live stream are never cached or replayed.
+  if (url.pathname.startsWith(BASE + '/coach/')) return;
 
   // Static assets are content-stable: serve from cache, refresh in background.
   if (url.pathname.startsWith(BASE + '/static/')) {
