@@ -123,7 +123,7 @@ func TestImportApplyRecordsTheHistoryOnceAndRemembersNames(t *testing.T) {
 	}
 	// The next preview starts from the name chosen this time.
 	next := upload(t, world.second, base+"/import/preview", nil, "workouts.csv", hevyExport)
-	if !strings.Contains(next.Body.String(), `value="press banca"`) || !strings.Contains(next.Body.String(), "3 ya importadas") {
+	if !strings.Contains(next.Body.String(), `value="press banca"`) || !strings.Contains(next.Body.String(), "3 ya importadas") || !strings.Contains(next.Body.String(), "ya se importó") {
 		t.Fatalf("next preview:\n%s", next.Body)
 	}
 }

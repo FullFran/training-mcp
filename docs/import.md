@@ -31,7 +31,7 @@ moment, and a tampered payload is just another file the same person uploaded.
 |---|---|
 | A workout (start time and title) | One session on that date, `started_at` set to the workout's start in the app's own clock |
 | Workout title, description or workout notes, per-exercise notes | The session's `notes`, shown on its page |
-| Exercise name | The chosen name; otherwise the name remembered from an earlier import; otherwise a name already in use that matches ignoring case and accents; otherwise the app's name in lower case, as a new exercise |
+| Exercise name (at most 120 bytes; a longer one is clipped and not remembered) | The chosen name; otherwise the name remembered from an earlier import; otherwise a name already in use that matches ignoring case and accents; otherwise the app's name in lower case, as a new exercise |
 | Weight in kg or lb | Kilograms, rounded to 0.01 (1 lb = 0.45359237 kg) |
 | Reps | Reps |
 | RPE 1 to 10 | RPE, as measured |
@@ -53,7 +53,8 @@ outside 1 to 10 is treated as missing.
   there is never imported again, even if the set it created was deleted later.
   Importing the same file twice therefore adds nothing, and a later export of
   the whole history adds only the new workouts.
-- The file's SHA-256 is stored with each import (`imports.content_hash`).
+- The file's SHA-256 is stored with each import (`imports.content_hash`); the
+  preview says when the very same file was imported before, and when.
 - A set the history already holds (same day, exercise, weight and reps), logged
   some other way, is not imported either. This covers history entered by hand
   before this feature, such as the 2025 Hevy backfill whose unrated sets were

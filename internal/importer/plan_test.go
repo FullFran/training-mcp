@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -194,5 +195,46 @@ func TestAnotherUsersHistoryAndNamesDoNotCount(t *testing.T) {
 	}
 	if p.Sets != 4 || p.AlreadyImported != 0 || p.InHistory != 0 || p.Names[0].Exercise != "bench press (barbell)" || p.Names[0].Remembered || len(p.Catalogue) != 0 {
 		t.Fatalf("second user's preview = %+v", p)
+	}
+}
+
+// The file's hash tells the preview the very same file was imported before.
+func TestPreviewSaysWhenTheSameFileWasImportedBefore(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	svc := w.services.ForUser(1)
+	if _, _, err := importer.Apply(ctx, svc, hevyFile(t), nil, "workouts.csv"); err != nil {
+		t.Fatal(err)
+	}
+	p, err := importer.Plan(ctx, svc, hevyFile(t), nil, "again.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.ImportedBefore == nil || p.ImportedBefore.FileName != "workouts.csv" {
+		t.Fatalf("imported before = %+v", p.ImportedBefore)
+	}
+	other, err := importer.Plan(ctx, w.services.ForUser(2), hevyFile(t), nil, "workouts.csv")
+	if err != nil || other.ImportedBefore != nil {
+		t.Fatalf("another user's preview = %+v, %v", other.ImportedBefore, err)
+	}
+}
+
+// A name longer than a name may be still imports: it is clipped, and not remembered.
+func TestAnOverlongExerciseNameStillImports(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	long := strings.Repeat("x", 140)
+	body := `"title","start_time","end_time","description","exercise_title","superset_id","exercise_notes","set_index","set_type","weight_kg","reps","distance_km","duration_seconds","rpe"` +
+		"\n\"Push\",\"22 Dec 2025, 08:00\",\"\",\"\",\"" + long + "\",,\"\",0,\"normal\",80,8,,,\n"
+	f, err := importer.Parse([]byte(body), importer.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, summary, err := importer.Apply(ctx, w.services.ForUser(1), f, nil, "long.csv")
+	if err != nil || summary.Sets != 1 {
+		t.Fatalf("summary = %+v, %v", summary, err)
+	}
+	if n := count(t, w.db, `SELECT COUNT(*) FROM import_exercise_map`); n != 0 {
+		t.Fatalf("remembered %d overlong names", n)
 	}
 }

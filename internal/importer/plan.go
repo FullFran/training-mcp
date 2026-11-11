@@ -50,6 +50,8 @@ type Preview struct {
 	Names    []NameChoice
 	// Catalogue is every name the person uses, offered when choosing.
 	Catalogue []string
+	// ImportedBefore is the earlier import of this very file, if there was one.
+	ImportedBefore *training.ImportSummary
 	// Record is what confirming would store.
 	Record training.ImportRecord
 }
@@ -68,6 +70,16 @@ func Plan(ctx context.Context, svc *training.Service, f File, chosen map[string]
 	remembered, err := svc.ImportMappings(ctx, f.Source)
 	if err != nil {
 		return Preview{}, err
+	}
+	earlier, err := svc.ListImports(ctx, 100)
+	if err != nil {
+		return Preview{}, err
+	}
+	for i := range earlier {
+		if earlier[i].ContentHash == f.Hash {
+			p.ImportedBefore = &earlier[i]
+			break
+		}
 	}
 	known := map[string]string{}
 	for _, name := range catalogue {
@@ -127,7 +139,14 @@ func Plan(ctx context.Context, svc *training.Service, f File, chosen map[string]
 		}
 	}
 
-	p.Record = training.ImportRecord{Source: f.Source, FileName: fileName, ContentHash: f.Hash, Mappings: resolved}
+	// A name too long to remember is still imported, clipped, just not remembered.
+	remember := map[string]string{}
+	for source, exercise := range resolved {
+		if len(source) <= maxNameLen {
+			remember[source] = exercise
+		}
+	}
+	p.Record = training.ImportRecord{Source: f.Source, FileName: fileName, ContentHash: f.Hash, Mappings: remember}
 	exercises := map[string]bool{}
 	for _, w := range f.Workouts {
 		out := training.ImportedWorkout{Date: w.Date, StartedAt: w.StartedAt, Notes: workoutNotes(w)}
