@@ -2,6 +2,8 @@ package engine
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -60,7 +62,7 @@ func runFakeEngine(mode string) {
 	}
 	send(map[string]any{"type": "ready", "piVersion": "fake-1.0"})
 	in := bufio.NewScanner(os.Stdin)
-	in.Buffer(make([]byte, 0, 1<<16), 1<<20)
+	in.Buffer(make([]byte, 0, 1<<16), 16<<20)
 	turn := 0
 	for in.Scan() {
 		var m map[string]any
@@ -120,6 +122,18 @@ func runFakeEngine(mode string) {
 			n := turn
 			text, _ := m["text"].(string)
 			ctx, _ := m["context"].(string)
+			// The fake proves which photos it got: type, size and a digest, never the bytes.
+			photos := ""
+			ims, _ := m["images"].([]any)
+			for _, raw := range ims {
+				im, _ := raw.(map[string]any)
+				data, err := base64.StdEncoding.DecodeString(fmt.Sprint(im["data"]))
+				if err != nil {
+					photos += "<undecodable>"
+					continue
+				}
+				photos += fmt.Sprintf("<%v:%d:%x>", im["mimeType"], len(data), sha256.Sum256(data))
+			}
 			go func() {
 				if mode == "hang" {
 					return
@@ -152,7 +166,7 @@ func runFakeEngine(mode string) {
 				r := refreshes
 				tmu.Unlock()
 				send(map[string]any{"type": "delta", "text": fmt.Sprintf("refreshes=%d access=%v\n", r, replies[0]["access"] != nil)})
-				send(map[string]any{"type": "delta", "text": "CONTEXT<" + ctx + ">TEXT<" + text + ">"})
+				send(map[string]any{"type": "delta", "text": "CONTEXT<" + ctx + ">TEXT<" + text + ">IMAGES" + photos})
 				send(map[string]any{"type": "done", "aborted": false})
 			}()
 		case "abort":

@@ -119,6 +119,7 @@ const (
 	originEvent   = "reaction"
 	reactionText  = "[training-mcp, set by the host] The person just logged the set above and is resting. React briefly, in their language, in one or two sentences: feedback on that set and what to do next. Use the tools only if you need data you do not have."
 	maxPromptChar = 4000
+	photoOnlyText = "(The person sent only the attached photo.)"
 )
 
 type refreshCall struct {
@@ -340,15 +341,24 @@ func (m *Manager) Subscribe(userID int64) (<-chan Event, func()) {
 	}
 }
 
-// Prompt starts one turn with the person's text. Refusals are returned before
-// anything starts; after that, every outcome arrives on the open streams.
-func (m *Manager) Prompt(userID int64, text string) error {
-	if text == "" || utf8.RuneCountInString(text) > maxPromptChar || !utf8.ValidString(text) {
+// Prompt starts one turn with the person's text and photos. Refusals are
+// returned before anything starts; after that, every outcome arrives on the open
+// streams. Photos go to this turn only and are kept nowhere.
+func (m *Manager) Prompt(userID int64, text string, images ...Image) error {
+	if utf8.RuneCountInString(text) > maxPromptChar || !utf8.ValidString(text) || !ValidImages(images) {
 		return fail(CodeProviderError)
+	}
+	if text == "" {
+		if len(images) == 0 {
+			return fail(CodeProviderError)
+		}
+		text = photoOnlyText
+	} else {
+		text = guardText(text)
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.startTurn(m.personOf(userID), guardText(text), originUser)
+	return m.startTurn(m.personOf(userID), text, originUser, images)
 }
 
 // Abort asks the running turn of this person to stop. False when there is none.
@@ -380,7 +390,7 @@ func (m *Manager) Notify(userID int64, ev WorkoutEvent) {
 	}
 	if len(p.subs) > 0 && (p.proc == nil || p.proc.turn == nil) {
 		// A refusal (not connected, busy) leaves the event queued for later.
-		_ = m.startTurn(p, reactionText, originEvent)
+		_ = m.startTurn(p, reactionText, originEvent, nil)
 	}
 }
 
@@ -477,7 +487,7 @@ func (m *Manager) forget(p *person) {
 	}
 }
 
-func (m *Manager) startTurn(p *person, text, origin string) error {
+func (m *Manager) startTurn(p *person, text, origin string, images []Image) error {
 	if m.closed {
 		return fail(CodeEngineUnavailable)
 	}
@@ -515,7 +525,7 @@ func (m *Manager) startTurn(p *person, text, origin string) error {
 	contextLines := composeContext(m.s.Now(), p.events)
 	p.events = nil
 	m.broadcast(p, Event{Name: "turn", Data: map[string]any{"origin": origin}})
-	m.send(pr, parentMessage{Type: "prompt", Text: text, Context: contextLines})
+	m.send(pr, parentMessage{Type: "prompt", Text: text, Context: contextLines, Images: toPromptImages(images)})
 	m.touch(p, pr)
 	return nil
 }

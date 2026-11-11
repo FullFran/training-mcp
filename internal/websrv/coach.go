@@ -20,13 +20,16 @@ type Coach interface {
 	StartLogin(userID int64) (engine.LoginInfo, error)
 	Disconnect(userID int64) error
 	Subscribe(userID int64) (<-chan engine.Event, func())
-	Prompt(userID int64, text string) error
+	Prompt(userID int64, text string, images ...engine.Image) error
 	Abort(userID int64) bool
 	Notify(userID int64, ev engine.WorkoutEvent)
 }
 
 const (
 	maxCoachPrompt = 4000
+	// maxCoachBody fits the photos of one turn in base64 plus the text.
+	maxCoachBody    = engine.MaxImagesBytes/3*4 + 64<<10
+	coachUploadTime = 60 * time.Second
 	// coachHeader must accompany every coach write. A cross-site form cannot set
 	// it, which matters on the secret mount, where there is no session token.
 	coachHeader    = "X-Coach"
@@ -134,21 +137,46 @@ func (s *Server) coachAbort(w http.ResponseWriter, _ *http.Request, userID int64
 }
 
 func (s *Server) coachPrompt(w http.ResponseWriter, r *http.Request, userID int64) {
+	// A turn with photos is a few megabytes; a slow sender gets a bounded time
+	// to finish it. The recorder in tests has no deadline to set.
+	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(coachUploadTime))
 	var body struct {
-		Text string `json:"text"`
+		Text   string `json:"text"`
+		Images []struct {
+			Type string `json:"type"`
+			Data []byte `json:"data"` // base64 in the request
+		} `json:"images"`
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 32<<10))
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxCoachBody))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&body); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeCoachJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "images_too_large"})
+			return
+		}
 		writeCoachJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_request"})
 		return
 	}
 	text := strings.TrimSpace(body.Text)
-	if text == "" || !utf8.ValidString(text) || utf8.RuneCountInString(text) > maxCoachPrompt {
+	if !utf8.ValidString(text) || utf8.RuneCountInString(text) > maxCoachPrompt || (text == "" && len(body.Images) == 0) {
 		writeCoachJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_request"})
 		return
 	}
-	if err := s.opts.Coach.Prompt(userID, text); err != nil {
+	images := make([]engine.Image, len(body.Images))
+	for i, im := range body.Images {
+		images[i] = engine.Image{MIME: im.Type, Data: im.Data}
+	}
+	if len(images) > engine.MaxImages {
+		writeCoachJSON(w, http.StatusBadRequest, map[string]string{"error": "too_many_images"})
+		return
+	}
+	if !engine.ValidImages(images) {
+		// Wrong type, bytes that are not that type, empty, or over a size limit.
+		writeCoachJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_image"})
+		return
+	}
+	if err := s.opts.Coach.Prompt(userID, text, images...); err != nil {
 		coachError(w, err)
 		return
 	}
