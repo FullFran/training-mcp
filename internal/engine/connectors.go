@@ -2,11 +2,13 @@ package engine
 
 import (
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -101,12 +103,75 @@ type connectorState struct {
 	reload    bool
 }
 
-// coachSession is the HCS-0005 session of one coach conversation: the same id
-// mcpsrv derives from the engine bearer for that engine's /mcp calls, so
-// connector approvals and training-data proposals share one session.
+// ConversationSession is the HCS-0005 session of one stored coach
+// conversation. Connector approvals and training-data proposals made in that
+// chat share it (mcpsrv resolves it through SessionOf), and it outlives the
+// engine process that served the chat. Conversation ids are never reused.
+func ConversationSession(conv int64) string {
+	return training.CoachSessionPrefix + "conversation-" + strconv.FormatInt(conv, 10)
+}
+
+// coachSession is the session of a coach turn outside any stored conversation:
+// one engine process, named by a hash of its bearer.
 func coachSession(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return training.CoachSessionPrefix + hex.EncodeToString(sum[:12])
+}
+
+// session is the HCS-0005 session the process's calls belong to: its stored
+// conversation once it served one, otherwise the process itself.
+func (pr *proc) session() string {
+	if pr.used && pr.conv > 0 {
+		return ConversationSession(pr.conv)
+	}
+	return pr.cs.session
+}
+
+// conversationAnswers are the always answers of one stored conversation.
+type conversationAnswers struct {
+	user, conv int64
+	answers    map[string]sessionAnswer
+	used       time.Time
+}
+
+// answers is the always-answer map of the process's session. Callers hold m.mu.
+func (m *Manager) answers(pr *proc, userID int64) map[string]sessionAnswer {
+	if !pr.used || pr.conv <= 0 {
+		return pr.cs.answers
+	}
+	a := m.convAnswers[pr.conv]
+	if a == nil || a.user != userID {
+		a = &conversationAnswers{user: userID, conv: pr.conv, answers: map[string]sessionAnswer{}}
+		m.convAnswers[pr.conv] = a
+	}
+	a.used = m.s.Now()
+	return a.answers
+}
+
+// dropConversationAnswers forgets the always answers of matching
+// conversations. Callers hold m.mu.
+func (m *Manager) dropConversationAnswers(match func(*conversationAnswers) bool) {
+	for id, a := range m.convAnswers {
+		if match(a) {
+			delete(m.convAnswers, id)
+		}
+	}
+}
+
+// SessionOf is the HCS-0005 session of a live engine bearer, for the /mcp
+// calls that engine makes. An unknown or ended bearer has none.
+func (m *Manager) SessionOf(token string) (string, bool) {
+	if token == "" {
+		return "", false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, p := range m.people {
+		if pr := p.proc; pr != nil && !pr.stopped && pr.token != "" && subtle.ConstantTimeCompare([]byte(pr.token), []byte(token)) == 1 {
+			return pr.session(), true
+		}
+	}
+	return "", false
 }
 
 func (m *Manager) newConnectorState(userID int64, token string) connectorState {
@@ -205,6 +270,9 @@ func (m *Manager) Reload(userID int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	p := m.people[userID]
+	// A changed connector list ends every session's always answers: the next
+	// call of any connector tool asks again.
+	m.dropConversationAnswers(func(a *conversationAnswers) bool { return a.user == userID })
 	if p == nil || p.proc == nil || p.proc.token == "" {
 		return
 	}
@@ -225,14 +293,14 @@ func (m *Manager) handleApproval(p *person, pr *proc, msg childMessage) {
 		m.send(pr, parentMessage{Type: "approval", ID: msg.ID, Decision: d})
 	}
 	server := serverOf(msg.Name, pr.cs.servers)
-	rec := decisionRecord{Entry: entryID(server), Permission: permissionID(msg.Name), Operation: msg.ID, Session: pr.cs.session, Channel: approvalChannel}
+	rec := decisionRecord{Entry: entryID(server), Permission: permissionID(msg.Name), Operation: msg.ID, Session: pr.session(), Channel: approvalChannel}
 	if server == "" || pr.turn == nil {
 		rec.Entry = "connector.unknown"
 		m.record(rec, "deny", "policy", "HCS-0005-R001", "")
 		reply(false)
 		return
 	}
-	if a, ok := pr.cs.answers[msg.Name]; ok {
+	if a, ok := m.answers(pr, p.id)[msg.Name]; ok {
 		rec.Channel = "grant-store"
 		if a.answer == AnswerRejectAlways {
 			m.record(rec, "deny", "denial", a.origin, "")
@@ -270,7 +338,7 @@ func (m *Manager) handleApproval(p *person, pr *proc, msg childMessage) {
 func (m *Manager) closeApproval(p *person, pr *proc, a *approval, outcome string) {
 	delete(pr.cs.approvals, a.hostID)
 	a.timer.Stop()
-	rec := decisionRecord{Entry: entryID(serverOf(a.tool, pr.cs.servers)), Permission: permissionID(a.tool), Operation: a.engineID, Session: pr.cs.session, Channel: approvalChannel}
+	rec := decisionRecord{Entry: entryID(serverOf(a.tool, pr.cs.servers)), Permission: permissionID(a.tool), Operation: a.engineID, Session: pr.session(), Channel: approvalChannel}
 	m.record(rec, outcome, "policy", "HCS-0005-R014", "")
 	m.send(pr, parentMessage{Type: "approval", ID: a.engineID, Decision: "deny"})
 	m.broadcast(p, Event{Name: "approval_closed", Data: map[string]any{"id": a.hostID}})
@@ -310,10 +378,10 @@ func (m *Manager) Answer(userID int64, id, answer string) error {
 	if allow {
 		outcome = "allow"
 	}
-	rec := decisionRecord{Entry: entryID(serverOf(a.tool, pr.cs.servers)), Permission: permissionID(a.tool), Operation: a.engineID, Session: pr.cs.session, Channel: approvalChannel}
+	rec := decisionRecord{Entry: entryID(serverOf(a.tool, pr.cs.servers)), Permission: permissionID(a.tool), Operation: a.engineID, Session: pr.session(), Channel: approvalChannel}
 	recordID := m.record(rec, outcome, "subject", subjectID(userID), answer)
 	if answer == AnswerAllowAlways || answer == AnswerRejectAlways {
-		pr.cs.answers[a.tool] = sessionAnswer{answer: answer, origin: recordID}
+		m.answers(pr, userID)[a.tool] = sessionAnswer{answer: answer, origin: recordID}
 	}
 	d := "deny"
 	if allow {
@@ -335,7 +403,7 @@ func (m *Manager) Authorize(userID int64, token, tool string) bool {
 		return false
 	}
 	pr := p.proc
-	if a, ok := pr.cs.answers[tool]; ok && a.answer == AnswerRejectAlways {
+	if a, ok := m.answers(pr, userID)[tool]; ok && a.answer == AnswerRejectAlways {
 		return false
 	}
 	now := m.s.Now()
@@ -360,7 +428,7 @@ func (m *Manager) Grants(userID int64) []Grant {
 		return nil
 	}
 	var out []Grant
-	for tool, a := range p.proc.cs.answers {
+	for tool, a := range m.answers(p.proc, userID) {
 		out = append(out, Grant{Tool: tool, Server: serverOf(tool, p.proc.cs.servers), Answer: a.answer})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Tool < out[j].Tool })
@@ -377,10 +445,11 @@ func (m *Manager) Revoke(userID int64, server string) {
 		return
 	}
 	pr := p.proc
-	for tool := range pr.cs.answers {
+	answers := m.answers(pr, userID)
+	for tool := range answers {
 		if serverOf(tool, pr.cs.servers) == server {
-			delete(pr.cs.answers, tool)
-			rec := decisionRecord{Entry: entryID(server), Permission: permissionID(tool), Session: pr.cs.session, Channel: approvalChannel}
+			delete(answers, tool)
+			rec := decisionRecord{Entry: entryID(server), Permission: permissionID(tool), Session: pr.session(), Channel: approvalChannel}
 			m.record(rec, "revoked", "subject", subjectID(userID), "")
 		}
 	}

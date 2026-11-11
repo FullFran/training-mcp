@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"github.com/fullfran/training-mcp/internal/engine"
 	"github.com/fullfran/training-mcp/internal/training"
@@ -35,6 +36,23 @@ type writes struct {
 	server  *mcp.Server
 	service training.ServiceFor
 	actions map[string]writeAction
+	// coachSessions resolves an engine bearer to its HCS-0005 session (the
+	// stored conversation it serves). Nil: the session is the bearer's hash.
+	coachSessions atomic.Pointer[CoachSessions]
+}
+
+// CoachSessions resolves a live engine bearer to the session of the coach
+// conversation it serves; false when the bearer is unknown.
+type CoachSessions func(token string) (string, bool)
+
+// SetCoachSessions makes coach proposals belong to the stored conversation
+// they were made in, the same session connector approvals use.
+func (s *Server) SetCoachSessions(f CoachSessions) {
+	if f == nil {
+		s.writes.coachSessions.Store(nil)
+		return
+	}
+	s.writes.coachSessions.Store(&f)
 }
 
 func addWrite[In, Out any, PO interface {
@@ -64,7 +82,7 @@ func addWriteBy[In, Out any, PO interface {
 	addTool(w.server, t, func(ctx context.Context, req *mcp.CallToolRequest, in In) (*mcp.CallToolResult, Out, error) {
 		var out Out
 		svc := w.service(ctx)
-		ctx = training.WithAgentSession(ctx, agentSession(req))
+		ctx = training.WithAgentSession(ctx, agentSession(req, w.coachSessions.Load()))
 		payload, err := json.Marshal(in)
 		if err != nil {
 			return nil, out, toolError(err)
@@ -95,18 +113,25 @@ func addWriteBy[In, Out any, PO interface {
 
 // agentSession is the session a tool call belongs to, for HCS-0005's
 // session-limited answers. The in-app coach's engine reaches /mcp with a bearer
-// minted for one engine process, which holds one chat conversation, so the
-// conversation's session is derived from that bearer (hashed, never stored as
-// is). Every other HTTP call comes from an external MCP client on a stateless
-// endpoint, which carries no session id, so all of them share the external
-// session that the 12-hour window ends. A call that did not come over HTTP has
-// no session, and no stored answer matches it.
-func agentSession(req *mcp.CallToolRequest) string {
+// minted for one engine process; the coach resolves it to the stored
+// conversation that process serves, so a chat keeps its answers across
+// processes. A bearer the coach cannot place (no stored conversation) is its
+// own session, derived from the bearer (hashed, never stored as is). Every
+// other HTTP call comes from an external MCP client on a stateless endpoint,
+// which carries no session id, so all of them share the external session that
+// the 12-hour window ends. A call that did not come over HTTP has no session,
+// and no stored answer matches it.
+func agentSession(req *mcp.CallToolRequest, sessions *CoachSessions) string {
 	if req == nil || req.Extra == nil || req.Extra.Header == nil {
 		return ""
 	}
 	bearer, ok := strings.CutPrefix(req.Extra.Header.Get("Authorization"), "Bearer ")
 	if bearer = strings.TrimSpace(bearer); ok && engine.LooksLikeToken(bearer) {
+		if sessions != nil {
+			if session, found := (*sessions)(bearer); found && strings.HasPrefix(session, training.CoachSessionPrefix) {
+				return session
+			}
+		}
 		sum := sha256.Sum256([]byte(bearer))
 		return training.CoachSessionPrefix + hex.EncodeToString(sum[:12])
 	}

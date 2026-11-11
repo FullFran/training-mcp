@@ -307,8 +307,54 @@ func TestProposalsCarryTheirChannelsSession(t *testing.T) {
 
 func TestACallNotMadeOverHTTPHasNoSession(t *testing.T) {
 	for _, req := range []*mcp.CallToolRequest{nil, {}, {Extra: &mcp.RequestExtra{}}} {
-		if got := agentSession(req); got != "" {
+		if got := agentSession(req, nil); got != "" {
 			t.Fatalf("agentSession(%+v) = %q", req, got)
 		}
+	}
+}
+
+// With stored coach conversations, the session is the conversation, not the
+// engine process: a reject_always holds for a later engine of the same chat
+// and for no other chat.
+func TestACoachProposalBelongsToItsStoredConversation(t *testing.T) {
+	ctx := context.Background()
+	world := newIsolationWorld(t)
+	_ = world.ownerService.SetAcceptAll(ctx, false)
+	chats := map[string]string{
+		"tme_first-process":  training.CoachSessionPrefix + "conversation-7",
+		"tme_second-process": training.CoachSessionPrefix + "conversation-7",
+		"tme_other-chat":     training.CoachSessionPrefix + "conversation-8",
+	}
+	world.ownerServer.SetCoachSessions(func(token string) (string, bool) {
+		s, ok := chats[token]
+		return s, ok
+	})
+	args := map[string]any{"exercise": isolationExercise, "note": "codos dentro"}
+	proposed := func(token string) (map[string]any, training.Proposal) {
+		t.Helper()
+		session := connectWithBearer(t, world.ownerServer.Handler(), token)
+		out := structured(t, call(t, session, "set_exercise_note", args))
+		p, err := world.ownerService.GetProposal(ctx, int64(out["proposal_id"].(float64)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out, p
+	}
+	_, first := proposed("tme_first-process")
+	if first.Session != chats["tme_first-process"] {
+		t.Fatalf("session = %q, want the stored conversation", first.Session)
+	}
+	if _, err := world.ownerService.RejectProposal(ctx, first.ID, training.AnswerRejectAlways); err != nil {
+		t.Fatal(err)
+	}
+	if out, p := proposed("tme_second-process"); out["status"] != "rejected" || p.DecidedBy != training.DecidedByDenial {
+		t.Fatalf("a later engine of the same chat = %v, %+v", out, p)
+	}
+	if out, _ := proposed("tme_other-chat"); out["status"] != "pending" {
+		t.Fatalf("the denial reached another chat: %v", out)
+	}
+	// A bearer the coach does not know keeps its process session.
+	if _, p := proposed("tme_unknown"); !strings.HasPrefix(p.Session, training.CoachSessionPrefix) || strings.Contains(p.Session, "conversation-") {
+		t.Fatalf("unknown bearer session = %q", p.Session)
 	}
 }

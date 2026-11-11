@@ -71,7 +71,7 @@ func TestConnectorServersLoadNextToTrainingTools(t *testing.T) {
 	h.connect(1)
 	ch, done := h.m.Subscribe(1)
 	defer done()
-	if err := h.m.Prompt(1, "hola"); err != nil {
+	if err := prompt(h.m, 1, "hola"); err != nil {
 		t.Fatal(err)
 	}
 	if events, _ := collect(t, ch); last(events).Name != "done" {
@@ -91,7 +91,7 @@ func TestAServerThatFailedToLoadIsReported(t *testing.T) {
 	h.connect(1)
 	ch, done := h.m.Subscribe(1)
 	defer done()
-	h.m.Prompt(1, "hola")
+	prompt(h.m, 1, "hola")
 	collect(t, ch)
 	loaded := h.m.Loaded(1)
 	if !loaded["notion"] || loaded["broken"] {
@@ -104,7 +104,7 @@ func TestToolsOfAServerTheHostDidNotGiveStopTheEngine(t *testing.T) {
 	h.connect(1)
 	ch, done := h.m.Subscribe(1)
 	defer done()
-	h.m.Prompt(1, "hola")
+	prompt(h.m, 1, "hola")
 	events, _ := collect(t, ch)
 	if ev := last(events); ev.Name != "error" || ev.Data["code"] != string(CodeEngineUnavailable) {
 		t.Fatalf("rogue tools = %v", events)
@@ -118,7 +118,7 @@ func approvalTurn(t *testing.T, h *harness, userID int64) (<-chan Event, func())
 	t.Helper()
 	h.connect(userID)
 	ch, done := h.m.Subscribe(userID)
-	if err := h.m.Prompt(userID, "busca en notion"); err != nil {
+	if err := prompt(h.m, userID, "busca en notion"); err != nil {
 		t.Fatal(err)
 	}
 	return ch, done
@@ -189,7 +189,7 @@ func TestAllowAlwaysIsASessionGrantTheHostCanRevoke(t *testing.T) {
 	if !strings.Contains(h.logs.String(), `"outcome":"revoked"`) {
 		t.Fatal("no revocation record")
 	}
-	h.m.Prompt(1, "otra vez")
+	prompt(h.m, 1, "otra vez")
 	ev = nextEvent(t, ch, "approval")
 	h.m.Answer(1, ev.Data["id"].(string), AnswerRejectAlways)
 	_, text = collect(t, ch)
@@ -211,7 +211,7 @@ func TestAlwaysAnswersDoNotOutliveTheSession(t *testing.T) {
 	if h.m.Authorize(1, old, "mcp__notion__search") {
 		t.Fatal("an old session's token still authorizes")
 	}
-	h.m.Prompt(1, "nueva sesión")
+	prompt(h.m, 1, "nueva sesión")
 	nextEvent(t, ch, "approval") // asked again
 }
 
@@ -236,7 +236,7 @@ func TestApprovalsFailClosed(t *testing.T) {
 		h, _ := connectorHarness(t, "approval", nil)
 		h.connect(1)
 		// A reaction or a prompt with no open stream: nobody can answer.
-		h.m.Prompt(1, "sin stream")
+		prompt(h.m, 1, "sin stream")
 		waitFor(t, "denied", func() bool { return strings.Count(h.logs.String(), `"outcome":"error"`) >= 2 })
 	})
 	t.Run("unknown answer", func(t *testing.T) {

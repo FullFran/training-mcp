@@ -106,6 +106,8 @@ func runWithContext(ctx context.Context, args []string) error {
 		return err
 	}
 	if coach != nil {
+		// A coach proposal belongs to the stored conversation it was made in.
+		mcpServer.SetCoachSessions(coach.SessionOf)
 		// Engine processes must not outlive the server, even when it stops on error.
 		defer func() {
 			closeCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -199,7 +201,7 @@ func startCoach(c config.Coach, publicURL string, store *sqlitestore.Store, logg
 	}
 	manager, err := engine.NewManager(engine.Settings{
 		Vault: vault, Tokens: tokens, Command: engine.NodeCommand(c.Node, c.Engine),
-		MCPURL: c.MCPURL, SystemPrompt: engine.SystemPrompt, Preferences: store,
+		MCPURL: c.MCPURL, SystemPrompt: engine.SystemPrompt, Preferences: store, Conversations: store,
 		MaxProcesses: c.MaxProcesses, Idle: time.Duration(c.IdleSeconds) * time.Second, Logger: logger,
 		Connectors: connectors,
 	})

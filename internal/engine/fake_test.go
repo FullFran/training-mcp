@@ -364,3 +364,9 @@ func collect(t *testing.T, ch <-chan Event) ([]Event, string) {
 }
 
 func last(events []Event) Event { return events[len(events)-1] }
+
+// prompt starts a turn outside any stored conversation.
+func prompt(m *Manager, userID int64, text string, images ...Image) error {
+	_, err := m.Prompt(userID, 0, text, images...)
+	return err
+}
