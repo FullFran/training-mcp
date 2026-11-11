@@ -23,6 +23,7 @@ const (
 	secretExercise = "press secreto"
 	secretPlan     = "rutina secreta"
 	secretNote     = "nota secreta"
+	secretMemory   = "memoria secreta"
 	missingWebID   = "999999"
 )
 
@@ -35,6 +36,7 @@ type webWorld struct {
 	plan          string
 	// proposal is the owner's pending proposal to create a plan named secretPlan+" 2".
 	proposal string
+	memory   string
 }
 
 func webHandler(t *testing.T, services *training.Services, userID int64) http.Handler {
@@ -104,9 +106,13 @@ func newWebWorld(t *testing.T) webWorld {
 	if err = store.ForUser(1).SetRule(ctx, training.ApprovalRule{ActionType: "set.log", Remember: training.RememberAlways}); err != nil {
 		t.Fatal(err)
 	}
+	memory, err := owner.SaveMemory(ctx, training.MemoryInput{TopicKey: "lesion/hombro", Type: "limitation", Title: secretMemory, Body: "duele en " + secretExercise})
+	if err != nil {
+		t.Fatal(err)
+	}
 	return webWorld{
 		db: db, owner: webHandler(t, services, 1), second: webHandler(t, services, 2),
-		set: itoa(set.ID), session: itoa(session.ID), plan: itoa(plan.ID), proposal: itoa(proposal.ID),
+		set: itoa(set.ID), session: itoa(session.ID), plan: itoa(plan.ID), proposal: itoa(proposal.ID), memory: itoa(memory.ID),
 	}
 }
 
@@ -115,7 +121,7 @@ func dumpDatabase(t *testing.T, db *sql.DB) string {
 	var out strings.Builder
 	for _, table := range []string{"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
 		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys",
-		"proposals", "approval_rules", "agent_permissions"} {
+		"proposals", "approval_rules", "agent_permissions", "coach_memory"} {
 		rows, err := db.Query(`SELECT * FROM ` + table + ` ORDER BY rowid`)
 		if err != nil {
 			t.Fatal(err)
@@ -184,6 +190,14 @@ var webRoutes = map[string]func(*testing.T){
 	"POST /review/accept-all": writeRoute("/review/accept-all", url.Values{"on": {"0"}},
 		`agent_permissions WHERE user_id=2 AND accept_all=0`),
 	"POST /review/forget": testForgettingTouchesOnlyTheUsersOwnRules,
+
+	"GET /memory": pageRoute("/memory", secretMemory),
+	"POST /memory/{id}/update": idRoute(func(w webWorld) string { return w.memory }, func(id string) (string, url.Values) {
+		return "/memory/" + id + "/update", url.Values{"title": {"robada"}, "body": {"robada"}, "type": {"note"}}
+	}),
+	"POST /memory/{id}/delete": idRoute(func(w webWorld) string { return w.memory }, func(id string) (string, url.Values) {
+		return "/memory/" + id + "/delete", url.Values{}
+	}),
 
 	"GET /manifest.webmanifest": sharedRoute("the same document for everyone"),
 	"GET /sw.js":                sharedRoute("the same document for everyone"),
@@ -272,7 +286,7 @@ func idRoute(pick func(webWorld) string, request func(id string) (string, url.Va
 		if foreignCode != missingCode || foreignBody != missingBody {
 			t.Fatalf("foreign id: %d\n%s\nmissing id: %d\n%s", foreignCode, foreignBody, missingCode, missingBody)
 		}
-		if strings.Contains(foreignBody, secretExercise) || strings.Contains(foreignBody, secretPlan) {
+		if strings.Contains(foreignBody, secretExercise) || strings.Contains(foreignBody, secretPlan) || strings.Contains(foreignBody, secretMemory) {
 			t.Fatalf("response carries the owner's data:\n%s", foreignBody)
 		}
 		if after := dumpDatabase(t, world.db); after != before {

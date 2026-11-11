@@ -1,0 +1,68 @@
+{{define "memory.html"}}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Memoria</title>
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="{{.Base}}/manifest.webmanifest">
+<link rel="icon" href="{{.Base}}/static/icon-192.png">
+<link rel="stylesheet" href="{{.Base}}/static/app.css">
+{{if .CSRF}}<meta name="csrf-token" content="{{.CSRF}}">
+{{end}}</head>
+<body data-base="{{.Base}}">
+
+<header class="bar">
+  <div><strong>Memoria</strong></div>
+  <div class="bar-actions">
+    <a class="ghost" href="{{.Base}}/review">Revisar</a>
+    <a class="ghost" href="{{.Base}}/">Hoy</a>
+  </div>
+</header>
+
+<main class="review memory">
+  {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
+  <p class="muted">Lo que el entrenador recuerda de ti. Los chats se borran a los 90 días; esto se queda hasta que tú lo borres.</p>
+
+  <form method="get" action="{{.Base}}/memory" class="card">
+    <label>Buscar <input type="search" name="q" value="{{.Memory.Query}}"></label>
+    <label>Tipo
+      <select name="type">
+        <option value="">Todos</option>{{range .Memory.Types}}
+        <option value="{{.Value}}"{{if eq .Value $.Memory.Type}} selected{{end}}>{{.Label}}</option>{{end}}
+      </select>
+    </label>
+    <button type="submit" class="ghost wide">Buscar</button>
+  </form>
+
+  {{range .Memory.Items}}
+  <article class="card proposal" id="memory-{{.ID}}">
+    <header><strong>{{.Title}}</strong> <span class="muted">{{.TypeLabel}}{{if .Pinned}} · fijado{{end}} · {{.When}}</span></header>
+    <p class="summary">{{.Body}}</p>
+    <details>
+      <summary>Editar</summary>
+      <form method="post" action="{{$.Base}}/memory/{{.ID}}/update">{{if $.CSRF}}
+        <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+        <label>Título <input name="title" value="{{.Title}}" maxlength="120" required></label>
+        <label>Texto <textarea name="body" rows="4" maxlength="4000" required>{{.Body}}</textarea></label>
+        <label>Tipo
+          <select name="type">{{$type := .Type}}{{range $.Memory.Types}}
+            <option value="{{.Value}}"{{if eq .Value $type}} selected{{end}}>{{.Label}}</option>{{end}}
+          </select>
+        </label>
+        <label><input type="checkbox" name="pinned" value="1"{{if .Pinned}} checked{{end}}> Fijar: siempre se lo recuerda al empezar</label>
+        <button type="submit" class="primary wide">Guardar</button>
+      </form>
+    </details>
+    <form method="post" action="{{$.Base}}/memory/{{.ID}}/delete">{{if $.CSRF}}
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+      <button type="submit" class="ghost wide risky">Borrar</button>
+    </form>
+  </article>
+  {{else}}
+  <p class="empty">No hay nada{{if or .Memory.Query .Memory.Type}} con ese filtro{{else}} todavía{{end}}.</p>
+  {{end}}
+</main>
+</body>
+</html>
+{{end}}
