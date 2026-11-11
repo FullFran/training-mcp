@@ -86,7 +86,7 @@ Without a choice, the model is the first one OpenAI lists for the account. Every
 
 ### Stored conversations
 
-What is stored, per person (migration 018, tables `coach_conversations` and `coach_messages`): the person's text, the coach's answer (even when cut short), its steps as tool name and outcome, whether it was a reaction to a set, and how many photos a message had. Never stored: photos, reasoning text, the host's context lines, tool arguments or results.
+What is stored, per person (migration 019, tables `coach_conversations` and `coach_messages`): the person's text, the coach's answer (even when cut short), its steps as tool name and outcome, whether it was a reaction to a set, and how many photos a message had. Never stored: photos, reasoning text, the host's context lines, tool arguments or results.
 
 The engine still keeps its model context in memory only. When a person opens another conversation, the server stops their engine and the next turn starts a fresh one, which gets that conversation's stored messages once, as host lines (`history person=` / `history coach=`, each text a JSON string, the newest 40 that fit in 24 KB). So after an idle stop or a restart the conversation continues with what was said, though not with the photos or the tools' raw results.
 
