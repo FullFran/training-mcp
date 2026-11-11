@@ -160,6 +160,8 @@ type memoryStore struct {
 	planCreated          Plan
 	plans                []Plan
 	progress             []PlanProgress
+	setTimes             map[int64]time.Time
+	restSeconds          int
 	itemSet              PlanItem
 	itemPatched          string
 	itemPatch            SessionItemPatch
@@ -434,6 +436,30 @@ func (m *memoryStore) GetPlan(_ context.Context, id int64) (Plan, error) {
 func (m *memoryStore) DeletePlan(context.Context, int64) error { return nil }
 func (m *memoryStore) SessionProgress(context.Context, int64) ([]PlanProgress, error) {
 	return m.progress, nil
+}
+
+// LastSetAt picks the set with the latest time in setTimes, mirroring the
+// store's created_at ordering.
+func (m *memoryStore) LastSetAt(_ context.Context, sessionID int64) (int64, time.Time, error) {
+	var id int64
+	var at time.Time
+	for sid, set := range m.sets {
+		if set.SessionID != sessionID {
+			continue
+		}
+		if t := m.setTimes[sid]; id == 0 || t.After(at) {
+			id, at = sid, t
+		}
+	}
+	if id == 0 {
+		return 0, time.Time{}, ErrNotFound
+	}
+	return id, at, nil
+}
+func (m *memoryStore) RestTarget(context.Context) (int, error) { return m.restSeconds, nil }
+func (m *memoryStore) SetRestTarget(_ context.Context, seconds int) error {
+	m.restSeconds = seconds
+	return nil
 }
 
 func TestServiceCreatePlanValidation(t *testing.T) {

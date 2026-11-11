@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	_ "modernc.org/sqlite"
 
@@ -1231,4 +1232,41 @@ func (s *userStore) total(ctx context.Context, id int64) (float64, error) {
 	var total float64
 	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(si),0) FROM sets WHERE session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?)`, id, s.userID).Scan(&total)
 	return training.NormalizeSI(total), err
+}
+
+// LastSetAt is the most recently logged set of one of the user's sessions. The
+// order is by created_at, which edits never touch, with the later id breaking a
+// tie within the same second.
+func (s *userStore) LastSetAt(ctx context.Context, sessionID int64) (int64, time.Time, error) {
+	var id int64
+	var created string
+	err := s.db.QueryRowContext(ctx, `SELECT st.id, st.created_at FROM sets st JOIN sessions se ON se.id=st.session_id
+WHERE st.session_id=? AND se.user_id=? ORDER BY st.created_at DESC, st.id DESC LIMIT 1`, sessionID, s.userID).Scan(&id, &created)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, time.Time{}, training.ErrNotFound
+	}
+	if err != nil {
+		return 0, time.Time{}, err
+	}
+	// CURRENT_TIMESTAMP is UTC in this exact layout.
+	at, err := time.ParseInLocation("2006-01-02 15:04:05", created, time.UTC)
+	if err != nil {
+		return 0, time.Time{}, fmt.Errorf("set %d created_at %q: %w", id, created, err)
+	}
+	return id, at, nil
+}
+
+// RestTarget is the user's chosen rest between sets in seconds, 0 if never chosen.
+func (s *userStore) RestTarget(ctx context.Context) (int, error) {
+	var v sql.NullInt64
+	err := s.db.QueryRowContext(ctx, `SELECT rest_seconds FROM users WHERE id=?`, s.userID).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	return int(v.Int64), err
+}
+
+func (s *userStore) SetRestTarget(ctx context.Context, seconds int) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET rest_seconds=? WHERE id=?`, seconds, s.userID)
+	return err
 }
