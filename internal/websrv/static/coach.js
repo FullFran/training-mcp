@@ -91,6 +91,16 @@
     set_exercise_group: ['Cambiando un grupo de ejercicios', 'Grupo de ejercicios cambiado'],
     set_volume_landmarks: ['Cambiando tus marcas de volumen', 'Marcas de volumen cambiadas'],
     record_feedback: ['Guardando tu valoración', 'Valoración guardada'],
+    performance_dropoff: ['Midiendo cuánto bajas de serie a serie', 'Medido cuánto bajas de serie a serie'],
+    memory_context: ['Recordando lo que sé de ti', 'Recordado lo que sé de ti'],
+    memory_search: ['Buscando en lo que recuerdo de ti', 'Buscado en lo que recuerdo de ti'],
+    memory_get: ['Consultando un recuerdo', 'Consultado un recuerdo'],
+    memory_save: ['Guardando un recuerdo', 'Recuerdo guardado'],
+    memory_forget: ['Olvidando un recuerdo', 'Recuerdo olvidado'],
+    memory_judge: ['Relacionando recuerdos', 'Recuerdos relacionados'],
+    memory_confirm: ['Confirmando un recuerdo', 'Recuerdo confirmado'],
+    memory_consolidate_preview: ['Viendo cómo unir recuerdos', 'Visto cómo unir recuerdos'],
+    memory_consolidate: ['Uniendo recuerdos', 'Recuerdos unidos'],
   };
   function words(name) {
     const w = WORDS[name];
