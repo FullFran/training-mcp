@@ -21,26 +21,28 @@ const (
 var userTables = []string{
 	"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
 	"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys",
-	"proposals", "answer_rules", "decision_records", "agent_permissions", "coach_memory",
+	"proposals", "answer_rules", "decision_records", "agent_permissions", "coach_memory", "coach_memory_revisions", "coach_memory_relations",
 }
 
 // ownedRows selects one user's rows from each table, children through their parent.
 var ownedRows = map[string]string{
-	"sessions":          `SELECT * FROM sessions WHERE user_id=? ORDER BY rowid`,
-	"plans":             `SELECT * FROM plans WHERE user_id=? ORDER BY rowid`,
-	"sets":              `SELECT * FROM sets WHERE session_id IN (SELECT id FROM sessions WHERE user_id=?) ORDER BY rowid`,
-	"session_items":     `SELECT * FROM session_items WHERE session_id IN (SELECT id FROM sessions WHERE user_id=?) ORDER BY rowid`,
-	"session_feedback":  `SELECT * FROM session_feedback WHERE session_id IN (SELECT id FROM sessions WHERE user_id=?) ORDER BY rowid`,
-	"plan_items":        `SELECT * FROM plan_items WHERE plan_id IN (SELECT id FROM plans WHERE user_id=?) ORDER BY rowid`,
-	"exercise_notes":    `SELECT * FROM exercise_notes WHERE user_id=? ORDER BY rowid`,
-	"exercise_groups":   `SELECT * FROM exercise_groups WHERE user_id=? ORDER BY rowid`,
-	"volume_landmarks":  `SELECT * FROM volume_landmarks WHERE user_id=? ORDER BY rowid`,
-	"idempotency_keys":  `SELECT * FROM idempotency_keys WHERE user_id=? ORDER BY rowid`,
-	"proposals":         `SELECT * FROM proposals WHERE user_id=? ORDER BY rowid`,
-	"answer_rules":      `SELECT * FROM answer_rules WHERE user_id=? ORDER BY rowid`,
-	"decision_records":  `SELECT * FROM decision_records WHERE user_id=? ORDER BY rowid`,
-	"agent_permissions": `SELECT * FROM agent_permissions WHERE user_id=? ORDER BY rowid`,
-	"coach_memory":      `SELECT * FROM coach_memory WHERE user_id=? ORDER BY rowid`,
+	"sessions":               `SELECT * FROM sessions WHERE user_id=? ORDER BY rowid`,
+	"plans":                  `SELECT * FROM plans WHERE user_id=? ORDER BY rowid`,
+	"sets":                   `SELECT * FROM sets WHERE session_id IN (SELECT id FROM sessions WHERE user_id=?) ORDER BY rowid`,
+	"session_items":          `SELECT * FROM session_items WHERE session_id IN (SELECT id FROM sessions WHERE user_id=?) ORDER BY rowid`,
+	"session_feedback":       `SELECT * FROM session_feedback WHERE session_id IN (SELECT id FROM sessions WHERE user_id=?) ORDER BY rowid`,
+	"plan_items":             `SELECT * FROM plan_items WHERE plan_id IN (SELECT id FROM plans WHERE user_id=?) ORDER BY rowid`,
+	"exercise_notes":         `SELECT * FROM exercise_notes WHERE user_id=? ORDER BY rowid`,
+	"exercise_groups":        `SELECT * FROM exercise_groups WHERE user_id=? ORDER BY rowid`,
+	"volume_landmarks":       `SELECT * FROM volume_landmarks WHERE user_id=? ORDER BY rowid`,
+	"idempotency_keys":       `SELECT * FROM idempotency_keys WHERE user_id=? ORDER BY rowid`,
+	"proposals":              `SELECT * FROM proposals WHERE user_id=? ORDER BY rowid`,
+	"answer_rules":           `SELECT * FROM answer_rules WHERE user_id=? ORDER BY rowid`,
+	"decision_records":       `SELECT * FROM decision_records WHERE user_id=? ORDER BY rowid`,
+	"agent_permissions":      `SELECT * FROM agent_permissions WHERE user_id=? ORDER BY rowid`,
+	"coach_memory":           `SELECT * FROM coach_memory WHERE user_id=? ORDER BY rowid`,
+	"coach_memory_revisions": `SELECT * FROM coach_memory_revisions WHERE memory_id IN (SELECT id FROM coach_memory WHERE user_id=?) ORDER BY rowid`,
+	"coach_memory_relations": `SELECT * FROM coach_memory_relations WHERE user_id=? ORDER BY rowid`,
 }
 
 func openTwoUsers(t *testing.T) *Store {
@@ -110,6 +112,9 @@ type seeded struct {
 	// proposal is pending; claimed is being applied; rule is a stored grant.
 	proposal, claimed, rule int64
 	memory                  int64
+	// sibling is a second fact like memory; relation is pending between them,
+	// conflict is a judged conflict with a third.
+	sibling, relation, conflict int64
 }
 
 // seedUser gives a user a row of every kind, using the same names for whoever calls it.
@@ -178,12 +183,23 @@ func seedUser(t *testing.T, user training.UserStore, group string) seeded {
 	if err = user.SetAcceptAll(ctx, true); err != nil {
 		t.Fatal(err)
 	}
-	memory, err := user.SaveMemory(ctx, training.Memory{TopicKey: "lesion/hombro", Type: training.MemoryLimitation, Title: "hombro de " + group,
-		Body: "duele en press de " + group, SourceChatID: "chat-1", CreatedAt: time.Unix(0, 0), UpdatedAt: time.Unix(0, 0)}, nil)
-	if err != nil {
+	fact := func(key, title, body string) training.MemorySaved {
+		saved, err := user.SaveMemory(ctx, training.Memory{TopicKey: key, Type: training.MemoryLimitation, Title: title, Body: body,
+			SourceChatID: "chat-1", ReviewAfter: time.Unix(10, 0), CreatedAt: time.Unix(0, 0), UpdatedAt: time.Unix(0, 0)}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return saved
+	}
+	memory := fact("lesion/hombro", "hombro de "+group, "duele")
+	fact("lesion/hombro", "hombro de "+group, "duele en press de "+group)
+	sibling := fact("lesion/hombro-2", "hombro de "+group+" otra vez", "sigue")
+	third := fact("lesion/hombro-3", "hombro de "+group+" tercera", "mejor")
+	if _, err = user.JudgeMemory(ctx, third.Candidates[0].RelationID, training.RelationConflictsWith, "opuestos", time.Unix(1, 0)); err != nil {
 		t.Fatal(err)
 	}
-	return seeded{session: session.ID, set: set.ID, plan: plan.ID, proposal: pending.ID, claimed: claimed.ID, rule: rule, memory: memory.ID}
+	return seeded{session: session.ID, set: set.ID, plan: plan.ID, proposal: pending.ID, claimed: claimed.ID, rule: rule,
+		memory: memory.Memory.ID, sibling: sibling.Memory.ID, relation: sibling.Candidates[0].RelationID, conflict: third.Candidates[0].RelationID}
 }
 
 // idCases are the data methods addressed by an id. Each runs with an id that may
@@ -289,10 +305,32 @@ var idCases = map[string]func(context.Context, training.UserStore, seeded) (any,
 	"DeleteMemory": func(c context.Context, u training.UserStore, id seeded) (any, error) {
 		return u.DeleteMemory(c, id.memory)
 	},
+	"MemoryHistory": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return u.MemoryHistory(c, id.memory)
+	},
+	"ConfirmMemory": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return u.ConfirmMemory(c, id.memory, time.Unix(99, 0))
+	},
+	"ForgetMemory": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return u.ForgetMemory(c, id.memory, training.MemoryForgotten, time.Unix(99, 0))
+	},
+	"JudgeMemory": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return u.JudgeMemory(c, id.relation, training.RelationSupersedes, "", time.Unix(99, 0))
+	},
+	"ResolveMemoryConflict": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return nil, u.ResolveMemoryConflict(c, id.conflict, training.KeepNew, time.Unix(99, 0))
+	},
+	"ConsolidateMemory": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return u.ConsolidateMemory(c, training.MemoryConsolidation{Sources: map[int64]int{id.memory: 2, id.sibling: 1},
+			Survivor: training.Memory{TopicKey: "fusion", Type: training.MemoryNote, Title: "fusion", Body: "fusion", CreatedAt: time.Unix(99, 0), UpdatedAt: time.Unix(99, 0)},
+			At:       time.Unix(99, 0)})
+	},
+	// Deleting everything as someone else must leave every row of the owner.
+	"DeleteAllMemory": func(c context.Context, u training.UserStore, _ seeded) (any, error) { return u.DeleteAllMemory(c) },
 }
 
 func TestAnotherUsersIDBehavesExactlyLikeAMissingOne(t *testing.T) {
-	missing := seeded{session: missingID, set: missingID, plan: missingID, proposal: missingID, claimed: missingID, rule: missingID, memory: missingID}
+	missing := seeded{session: missingID, set: missingID, plan: missingID, proposal: missingID, claimed: missingID, rule: missingID, memory: missingID, sibling: missingID, relation: missingID, conflict: missingID}
 	for name, run := range idCases {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
@@ -350,8 +388,20 @@ var readCases = map[string]func(context.Context, training.UserStore) (any, error
 			return nil, err
 		}
 		found, err := u.ListMemory(c, training.MemoryQuery{Text: "hombro press", Limit: 50})
-		return []any{listed, found}, err
+		if err != nil {
+			return nil, err
+		}
+		out := []any{listed, found}
+		for _, view := range training.MemoryViews {
+			got, err := u.ListMemory(c, training.MemoryQuery{View: view, Limit: 50, Now: time.Unix(50, 0)})
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, got)
+		}
+		return out, nil
 	},
+	"ListMemoryConflicts": func(c context.Context, u training.UserStore) (any, error) { return u.ListMemoryConflicts(c) },
 	"ListProposals": func(c context.Context, u training.UserStore) (any, error) {
 		pending, err := u.ListProposals(c, training.ProposalFilter{Pending: true, Limit: 50})
 		if err != nil {

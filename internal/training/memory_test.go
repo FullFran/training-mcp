@@ -20,16 +20,22 @@ type memoryFake struct {
 	deletedID int64
 }
 
-func (m *memoryFake) SaveMemory(_ context.Context, in Memory, pinned *bool) (Memory, error) {
+func (m *memoryFake) SaveMemory(_ context.Context, in Memory, pinned *bool) (MemorySaved, error) {
 	m.saved, m.pinned = in, pinned
 	in.ID = 7
-	return in, nil
+	return MemorySaved{Memory: in}, nil
 }
-func (m *memoryFake) GetMemory(context.Context, int64) (Memory, error) { return Memory{}, ErrNotFound }
+func (m *memoryFake) GetMemory(_ context.Context, id int64) (Memory, error) {
+	return Memory{ID: id, Type: MemoryNote}, nil
+}
 func (m *memoryFake) ListMemory(_ context.Context, q MemoryQuery) ([]Memory, error) {
+	if q.View == MemoryViewDue {
+		return nil, nil
+	}
 	m.query = q
 	return m.listed, nil
 }
+func (m *memoryFake) ListMemoryConflicts(context.Context) ([]MemoryConflict, error) { return nil, nil }
 func (m *memoryFake) UpdateMemory(_ context.Context, id int64, p MemoryPatch) (Memory, error) {
 	m.patchID, m.patch = id, p
 	return Memory{ID: id}, nil
@@ -48,7 +54,7 @@ func TestSaveMemoryNormalisesAndStamps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.ID != 7 || fake.saved.TopicKey != "lesion/hombro-derecho" || fake.saved.Title != "Hombro" || fake.saved.Body != "Duele en press militar" {
+	if got.Memory.ID != 7 || fake.saved.TopicKey != "lesion/hombro-derecho" || fake.saved.Title != "Hombro" || fake.saved.Body != "Duele en press militar" {
 		t.Fatalf("saved %#v", fake.saved)
 	}
 	if !fake.saved.CreatedAt.Equal(memoryClock()) || !fake.saved.UpdatedAt.Equal(memoryClock()) {
@@ -119,8 +125,8 @@ func TestMemoryContextIsCompact(t *testing.T) {
 	if fake.query.Limit != memoryContextSize || fake.query.Text != "" {
 		t.Fatalf("query %#v", fake.query)
 	}
-	if n := len([]rune(got[0].Body)); n != memoryContextBody+1 || !strings.HasSuffix(got[0].Body, "…") {
-		t.Fatalf("body has %d runes: %q", n, got[0].Body)
+	if n := len([]rune(got.Memories[0].Body)); n != memoryContextBody+1 || !strings.HasSuffix(got.Memories[0].Body, "…") {
+		t.Fatalf("body has %d runes: %q", n, got.Memories[0].Body)
 	}
 }
 
