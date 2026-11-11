@@ -73,11 +73,11 @@ func (s *userStore) GetMemory(ctx context.Context, id int64) (training.Memory, e
 	return scanMemory(s.db.QueryRowContext(ctx, `SELECT `+memoryColumns+` FROM coach_memory m WHERE m.id=? AND m.user_id=?`, id, s.userID))
 }
 
-// ftsQuery turns free text into a query of words only: every run of letters and
-// digits becomes a quoted prefix term, and all of them must match. Nothing the
+// ftsQuery turns free text into a query of words only: every run of letters,
+// digits and combining marks becomes a quoted prefix term, and all of them must match. Nothing the
 // caller types can be read as FTS syntax (operators, columns, quotes).
 func ftsQuery(text string) string {
-	words := strings.FieldsFunc(text, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
+	words := strings.FieldsFunc(text, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) && !unicode.Is(unicode.Mn, r) })
 	for i, w := range words {
 		words[i] = `"` + w + `"*`
 	}

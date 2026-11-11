@@ -204,3 +204,14 @@ func TestSnapshotCarriesMemoryAndItsIndex(t *testing.T) {
 		t.Fatalf("restored search = %v, %v", titles(got), err)
 	}
 }
+
+// A decomposed accent (e + U+0301) is part of its word, as a composed one is.
+func TestSearchKeepsCombiningAccentsInTheWord(t *testing.T) {
+	ctx := context.Background()
+	u := openTwoUsers(t).ForUser(1)
+	saveMemory(t, u, "k", "Lesión", "rodilla", 0)
+	got, err := u.ListMemory(ctx, training.MemoryQuery{Text: "lesión", Limit: 10})
+	if err != nil || len(got) != 1 {
+		t.Fatalf("decomposed accent found %v, %v", titles(got), err)
+	}
+}
