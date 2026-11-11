@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -45,27 +46,39 @@ func TestRunWithContextDrainsOnCancellation(t *testing.T) {
 }
 
 func TestRunHandlesInterruptAndTerminateSignalsAtCompositionSeam(t *testing.T) {
-	for _, signal := range []os.Signal{os.Interrupt, syscall.SIGTERM} {
-		t.Run(signal.String(), func(t *testing.T) {
+	for _, sig := range []os.Signal{os.Interrupt, syscall.SIGTERM} {
+		t.Run(sig.String(), func(t *testing.T) {
 			t.Setenv("MCP_BEARER_TOKEN", "test-token")
 			t.Setenv("TRAINING_DB_PATH", t.TempDir()+"/training.db")
+			// Nothing tells the test when the server starts listening for the
+			// signal, so it is sent until the server stops. Catching it here as
+			// well keeps one sent too early from killing the test binary.
+			caught := make(chan os.Signal, 1)
+			signal.Notify(caught, sig)
+			defer signal.Stop(caught)
 			done := make(chan error, 1)
-			go func() { done <- runWithSignals([]string{"--addr", "127.0.0.1:0"}, signal) }()
-			time.Sleep(20 * time.Millisecond)
+			go func() { done <- runWithSignals([]string{"--addr", "127.0.0.1:0"}, sig) }()
 			process, err := os.FindProcess(os.Getpid())
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := process.Signal(signal); err != nil {
-				t.Fatal(err)
-			}
-			select {
-			case err := <-done:
-				if err != nil {
-					t.Fatalf("signal shutdown: %v", err)
+			again := time.NewTicker(50 * time.Millisecond)
+			defer again.Stop()
+			timeout := time.After(serveTimeout)
+			for {
+				if err := process.Signal(sig); err != nil {
+					t.Fatal(err)
 				}
-			case <-time.After(time.Second):
-				t.Fatal("signal did not stop server")
+				select {
+				case err := <-done:
+					if err != nil {
+						t.Fatalf("signal shutdown: %v", err)
+					}
+					return
+				case <-again.C:
+				case <-timeout:
+					t.Fatal("signal did not stop server")
+				}
 			}
 		})
 	}
@@ -240,14 +253,6 @@ func TestHealthcheckCLIInvocation(t *testing.T) {
 // TestWebLoginSettingsServeTheAppAtTheRoot boots the real composition with the
 // web login configured and checks the root asks for a login at the provider.
 func TestWebLoginSettingsServeTheAppAtTheRoot(t *testing.T) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	addr := l.Addr().String()
-	l.Close()
-	t.Setenv("MCP_BEARER_TOKEN", "test-token")
-	t.Setenv("MCP_AUTH_DISABLED", "")
 	t.Setenv("WEB_BASE_PATH", "")
 	t.Setenv("MCP_OAUTH_PROVISION", "")
 	t.Setenv("TRAINING_DB_PATH", t.TempDir()+"/training.db")
@@ -256,23 +261,9 @@ func TestWebLoginSettingsServeTheAppAtTheRoot(t *testing.T) {
 	t.Setenv("MCP_OAUTH_SUBJECT", "user_owner")
 	t.Setenv("WEB_OAUTH_CLIENT_ID", "web-client")
 	t.Setenv("WEB_OAUTH_CLIENT_SECRET", "web-secret")
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() { done <- runWithContext(ctx, []string{"--addr", addr}) }()
-	defer func() {
-		cancel()
-		if err := <-done; err != nil {
-			t.Errorf("server: %v", err)
-		}
-	}()
+	base, _ := startServer(t)
 	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	var resp *http.Response
-	for i := 0; i < 100; i++ {
-		if resp, err = client.Get("http://" + addr + "/"); err == nil {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	resp, err := client.Get(base + "/")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +271,7 @@ func TestWebLoginSettingsServeTheAppAtTheRoot(t *testing.T) {
 	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/login" {
 		t.Fatalf("GET /: status %d, location %q", resp.StatusCode, resp.Header.Get("Location"))
 	}
-	resp, err = client.Get("http://" + addr + "/login")
+	resp, err = client.Get(base + "/login")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,42 +286,19 @@ func TestWebLoginSettingsServeTheAppAtTheRoot(t *testing.T) {
 // TestSecretMountAcceptsAgentProposals boots the real composition and walks one
 // agent write from pending to applied through the review page.
 func TestSecretMountAcceptsAgentProposals(t *testing.T) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	addr := l.Addr().String()
-	l.Close()
-	t.Setenv("MCP_BEARER_TOKEN", "test-token")
-	t.Setenv("MCP_AUTH_DISABLED", "")
 	t.Setenv("WEB_BASE_PATH", "/s3cr3t-path-for-tests")
 	t.Setenv("MCP_OAUTH_ISSUER", "")
 	t.Setenv("WEB_OAUTH_CLIENT_ID", "")
 	t.Setenv("TRAINING_DB_PATH", t.TempDir()+"/training.db")
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() { done <- runWithContext(ctx, []string{"--addr", addr}) }()
-	defer func() {
-		cancel()
-		if err := <-done; err != nil {
-			t.Errorf("server: %v", err)
-		}
-	}()
-	root := "http://" + addr
+	root, token := startServer(t)
 	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	send := func(method, path, contentType, body string) (int, string) {
 		t.Helper()
-		var resp *http.Response
-		for i := 0; i < 100; i++ {
-			req, _ := http.NewRequest(method, root+path, strings.NewReader(body))
-			req.Header.Set("Authorization", "Bearer test-token")
-			req.Header.Set("Content-Type", contentType)
-			req.Header.Set("Accept", "application/json, text/event-stream")
-			if resp, err = client.Do(req); err == nil {
-				break
-			}
-			time.Sleep(20 * time.Millisecond)
-		}
+		req, _ := http.NewRequest(method, root+path, strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", contentType)
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		resp, err := client.Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}

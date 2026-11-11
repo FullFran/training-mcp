@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -86,16 +85,8 @@ func fakeNodeEngine() {
 }
 
 func TestCoachEndToEnd(t *testing.T) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	addr := l.Addr().String()
-	l.Close()
 	dataDir := t.TempDir()
 	key := make([]byte, 32)
-	t.Setenv("MCP_BEARER_TOKEN", "test-token")
-	t.Setenv("MCP_AUTH_DISABLED", "")
 	t.Setenv("MCP_OAUTH_ISSUER", "")
 	t.Setenv("MCP_OAUTH_RESOURCE", "")
 	t.Setenv("MCP_OAUTH_SUBJECT", "")
@@ -111,25 +102,11 @@ func TestCoachEndToEnd(t *testing.T) {
 	t.Setenv("TRAINING_COACH_MAX_PROCESSES", "")
 	t.Setenv("TRAINING_COACH_IDLE_SECONDS", "")
 
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() { done <- runWithContext(ctx, []string{"--addr", addr}) }()
-	defer func() {
-		cancel()
-		select {
-		case err := <-done:
-			if err != nil {
-				t.Errorf("server: %v", err)
-			}
-		case <-time.After(20 * time.Second):
-			t.Error("server did not stop")
-		}
-	}()
-	base := "http://" + addr
+	base, token := startServer(t)
 	do := func(method, path, body string) (int, string) {
 		t.Helper()
 		req, _ := http.NewRequest(method, base+path, strings.NewReader(body))
-		req.Header.Set("Authorization", "Bearer test-token")
+		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json, text/event-stream")
 		req.Header.Set("X-Coach", "1")
@@ -140,12 +117,6 @@ func TestCoachEndToEnd(t *testing.T) {
 		defer res.Body.Close()
 		b, _ := io.ReadAll(res.Body)
 		return res.StatusCode, string(b)
-	}
-	for i := 0; i < 100; i++ {
-		if code, _ := do("GET", "/health", ""); code == http.StatusOK {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
 	}
 	plan := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_plan","arguments":{"name":"Plan e2e","items":[{"exercise":"banca","target_sets":1}]}}}`
 	if code, body := do("POST", "/mcp", plan); code != http.StatusOK {
@@ -177,8 +148,8 @@ func TestCoachEndToEnd(t *testing.T) {
 	}
 
 	req, _ := http.NewRequest("GET", base+"/app/coach/stream", nil)
-	req.Header.Set("Authorization", "Bearer test-token")
-	streamCtx, stopStream := context.WithCancel(ctx)
+	req.Header.Set("Authorization", "Bearer "+token)
+	streamCtx, stopStream := context.WithCancel(t.Context())
 	defer stopStream()
 	res, err := http.DefaultClient.Do(req.WithContext(streamCtx))
 	if err != nil {
@@ -242,29 +213,13 @@ func TestCoachEndToEnd(t *testing.T) {
 }
 
 func TestCoachOffLeavesTheAppUnchanged(t *testing.T) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	addr := l.Addr().String()
-	l.Close()
-	t.Setenv("MCP_BEARER_TOKEN", "test-token")
 	t.Setenv("WEB_BASE_PATH", "app")
 	t.Setenv("TRAINING_DB_PATH", t.TempDir()+"/training.db")
 	t.Setenv("TRAINING_COACH", "")
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() { done <- runWithContext(ctx, []string{"--addr", addr}) }()
-	defer func() { cancel(); <-done }()
-	var res *http.Response
-	for i := 0; i < 100; i++ {
-		req, _ := http.NewRequest("GET", "http://"+addr+"/app/coach/status", nil)
-		req.Header.Set("Authorization", "Bearer test-token")
-		if res, err = http.DefaultClient.Do(req); err == nil {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	base, token := startServer(t)
+	req, _ := http.NewRequest("GET", base+"/app/coach/status", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}

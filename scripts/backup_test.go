@@ -45,7 +45,10 @@ func newSandbox(t *testing.T) *sandbox {
 	s.tool("crontab", `if [ "$1" = -l ]; then cat "$HOME/crontab"; else cat >"$HOME/crontab"; fi`)
 	s.tool("notify-send", `echo "$@" >>"$HOME/notified"`)
 	s.tool("sqlite3", `case "$2" in *integrity_check*) echo ok ;; *) echo 7 ;; esac`)
-	s.tool("curl", `echo called >>"$HOME/curl-calls"; while [ $# -gt 1 ]; do [ "$1" = -o ] && out="$2"; shift; done; printf 'SQLite format 3 fresh' >"$out"`)
+	// curl -K - reads its whole config from stdin before anything else. A fake
+	// that leaves it unread lets the script's printf write into a closed pipe,
+	// and under pipefail the SIGPIPE fails the backup (exit 141).
+	s.tool("curl", `cat >/dev/null; echo called >>"$HOME/curl-calls"; while [ $# -gt 1 ]; do [ "$1" = -o ] && out="$2"; shift; done; printf 'SQLite format 3 fresh' >"$out"`)
 	return s
 }
 
@@ -118,8 +121,8 @@ func TestBackupFindsItsToolsUnderCronPath(t *testing.T) {
 
 func TestFailedBackupKeepsThePreviousCopyAndNotifies(t *testing.T) {
 	for name, curl := range map[string]string{
-		"download fails": `exit 22`,
-		"not a database": `while [ $# -gt 1 ]; do [ "$1" = -o ] && out="$2"; shift; done; printf 'garbage' >"$out"`,
+		"download fails": `cat >/dev/null; exit 22`,
+		"not a database": `cat >/dev/null; while [ $# -gt 1 ]; do [ "$1" = -o ] && out="$2"; shift; done; printf 'garbage' >"$out"`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			s := newSandbox(t)
