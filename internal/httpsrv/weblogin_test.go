@@ -365,7 +365,7 @@ func TestLoginGivesASecureSessionCookie(t *testing.T) {
 		t.Fatalf("session max-age = %d", session.MaxAge)
 	}
 	w := f.do(http.MethodGet, "/", nil, []*http.Cookie{session}, nil)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "<strong>Hoy</strong>") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `id="coach-log"`) {
 		t.Fatalf("app page: status %d", w.Code)
 	}
 }

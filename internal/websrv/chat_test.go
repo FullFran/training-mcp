@@ -67,7 +67,7 @@ func TestWorkoutCardCollapsesWithoutAWorkout(t *testing.T) {
 
 	post(t, h, base+"/sets", setForm("banca", "80", "8", "8"), true)
 	body := get(t, h, base+"/").Body.String()
-	card := section(t, body, `id="workout"`, "</section>\n\n<main")
+	card := section(t, body, `id="workout"`, "</footer>")
 	if strings.Contains(card, `class="workout idle"`) {
 		t.Fatal("workout card stays collapsed with a set logged")
 	}
@@ -183,7 +183,7 @@ func TestComposerHasVoiceAndTheExtrasSlot(t *testing.T) {
 func TestServiceWorkerCachesTheChatShell(t *testing.T) {
 	h, _ := newServer(t)
 	body := get(t, h, base+"/sw.js").Body.String()
-	for _, want := range []string{"const VERSION = 'v8';", "BASE + '/static/shell.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'", "BASE + '/static/coach-attach.js'"} {
+	for _, want := range []string{"const VERSION = 'v9';", "BASE + '/static/shell.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'", "BASE + '/static/coach-attach.js'"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("service worker lacks %s", want)
 		}
@@ -222,5 +222,54 @@ func TestUnknownProposalsKeepTheirFields(t *testing.T) {
 		if !strings.Contains(body, "<dt>widget</dt><dd>azul</dd>") {
 			t.Fatalf("%s lacks the fields of an unknown proposal", path)
 		}
+	}
+}
+
+// The home reads like ChatGPT: a top bar with the menu, the panels and the
+// account settings in a drawer, the conversation, and at the bottom the
+// workout bar above the message box, which has one send/stop place.
+func TestHomeIsAChatGPTStyleShell(t *testing.T) {
+	world := newCoachWorld(t, newFakeCoach())
+	h := world.as(1)
+	post(t, h, base+"/sets", setForm("banca", "80", "8", "8"), true)
+	body := get(t, h, base+"/").Body.String()
+
+	if bar := section(t, body, `class="bar chat-bar"`, "</header>"); !strings.Contains(bar, `id="menu-open"`) || !strings.Contains(bar, `aria-controls="drawer"`) {
+		t.Fatalf("top bar has no menu button: %s", bar)
+	}
+	drawer := section(t, body, `id="drawer"`, "</aside>")
+	for _, want := range []string{`class="panel-links"`, `id="review-link"`, `id="coach-state"`, `id="coach-autosend"`, `id="coach-disconnect"`} {
+		if !strings.Contains(drawer, want) {
+			t.Fatalf("drawer lacks %s: %s", want, drawer)
+		}
+	}
+	composer := section(t, body, `id="coach-form"`, "</form>")
+	for _, want := range []string{`id="coach-send"`, `id="coach-stop"`, `id="coach-mic"`, `id="composer-extras"`} {
+		if !strings.Contains(composer, want) {
+			t.Fatalf("composer lacks %s: %s", want, composer)
+		}
+	}
+	for _, unwanted := range []string{`id="coach-disconnect"`, `id="coach-autosend"`, `id="coach-state"`} {
+		if strings.Contains(composer, unwanted) {
+			t.Fatalf("settings %s still crowd the composer", unwanted)
+		}
+	}
+	// Bottom dock: the conversation first, then the workout bar, then the message box.
+	chat, workout, form := strings.Index(body, `id="coach-log"`), strings.Index(body, `id="workout"`), strings.Index(body, `id="coach-form"`)
+	if !(chat < workout && workout < form) || !strings.Contains(section(t, body, `class="dock"`, "</footer>"), `id="workout"`) {
+		t.Fatalf("want chat, then workout, then composer in the dock: %d %d %d", chat, workout, form)
+	}
+	if sheet := section(t, body, `id="wk-more"`, `id="entry"`); !strings.Contains(sheet, `class="wk-sheet"`) || !strings.Contains(sheet, `data-close-sheet`) {
+		t.Fatalf("the entry form is not a closable sheet: %s", sheet)
+	}
+	// Empty chat: suggestions written by the server, never by the model.
+	empty := section(t, body, `id="chat-empty"`, `id="chat-end"`)
+	for _, want := range []string{`data-suggest="¿Cómo voy hoy?"`, `data-suggest="¿Cómo voy esta semana?"`} {
+		if !strings.Contains(empty, want) {
+			t.Fatalf("empty chat lacks %s: %s", want, empty)
+		}
+	}
+	if !strings.Contains(body, `id="chat-jump"`) {
+		t.Fatal("no jump-to-latest button")
 	}
 }

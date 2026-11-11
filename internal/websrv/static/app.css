@@ -685,82 +685,10 @@ main { padding-bottom: 140px; }
 .rules, .answered { list-style: none; padding: 0; margin: 0; }
 .rules li, .answered li { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--line); }
 
-/* Coach chat, docked under the conversation on the home screen. */
-.coach-connect p { margin: 10px 0; }
-.coach-usercode {
-  font-size: 1.8rem;
-  font-weight: 700;
-  letter-spacing: .12em;
-  text-align: center;
-  user-select: all;
-}
-.coach-log {
-  flex: 1;
-  min-height: 120px;
-  overflow-y: auto;
-  padding: 8px 0;
-  overscroll-behavior: contain;
-}
-.coach-msg { margin: 8px 0; padding: 10px 12px; border-radius: 12px; max-width: 88%; }
-.coach-body { overflow-wrap: anywhere; }
-.coach-body p, .coach-body ul, .coach-body ol, .coach-body pre { margin: 0; }
-.coach-body > * + * { margin-top: 8px; }
-.coach-body ul, .coach-body ol { padding-left: 20px; }
-.coach-body code { font: .9em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--line); padding: 1px 4px; border-radius: 4px; }
-.coach-body pre { overflow-x: auto; padding: 8px; background: var(--line); border-radius: 8px; }
-.coach-body pre code { padding: 0; background: none; }
-.coach-me .coach-body { white-space: pre-wrap; }
-.coach-msg small { display: block; color: var(--muted); margin-bottom: 4px; }
-.coach-me { margin-left: auto; background: var(--accent); color: var(--accent-ink); }
-.coach-coach { background: var(--bg); border: 1px solid var(--line); }
-.coach-note { margin: 4px 0; font-size: .85rem; color: var(--muted); }
-.coach-error { color: var(--danger); }
-.coach-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
-.coach-form textarea {
-  flex: 1;
-  min-width: 0;
-  font: inherit;
-  min-height: var(--tap);
-  padding: 10px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: var(--bg);
-  color: var(--text);
-  resize: none;
-}
-.coach-form #coach-send { min-height: var(--tap); padding: 0 16px; font-size: 16px; }
-.coach-form #coach-stop { flex-basis: 100%; }
-.composer-extras { display: flex; gap: 8px; }
-.composer-extras:empty { display: none; }
-/* The mic sits by the send button, big enough to hit with a thumb mid-set. */
-.mic {
-  flex: none;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  border: 2px solid var(--accent);
-  background: var(--card);
-  color: var(--text);
-  font-size: 26px;
-}
-.mic.on {
-  border-color: var(--danger);
-  background: var(--danger);
-  animation: mic-pulse 1.2s ease-in-out infinite;
-}
-@keyframes mic-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, .55); }
-  50% { box-shadow: 0 0 0 10px rgba(248, 113, 113, 0); }
-}
-@media (prefers-reduced-motion: reduce) { .mic.on { animation: none; } }
-.listening { flex-basis: 100%; order: -1; margin: 0; color: var(--danger); font-size: 14px; font-weight: 600; }
-.autosend { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); min-height: 32px; }
-.autosend input { width: 20px; height: 20px; }
-.coach-pending { color: var(--accent); }
-
-/* --- chat-first home ------------------------------------------------------
-   Header with the panel buttons, the pinned workout, the conversation filling
-   the rest and the composer at the bottom, like a messaging app. */
+/* --- chat home, ChatGPT-style ----------------------------------------------
+   Top bar with the menu, the conversation filling the screen, and a dock at
+   the bottom: the workout bar above the message box. Panels and settings live
+   in the drawer. */
 .chat-home {
   display: flex;
   flex-direction: column;
@@ -769,56 +697,159 @@ main { padding-bottom: 140px; }
   overflow: hidden;
   padding-bottom: 0;
 }
-.chat-home > .bar { position: static; flex: none; flex-wrap: wrap; row-gap: 6px; }
-.panel-links { display: flex; gap: 6px; overflow-x: auto; max-width: 100%; }
-.panel-links a { white-space: nowrap; min-height: 40px; padding: 0 12px; }
-
-.workout {
-  flex: none;
-  width: calc(100% - 24px);
-  max-width: 616px;
-  max-height: 62vh;
-  max-height: 62dvh;
-  overflow-y: auto;
-  margin: 8px auto 0;
-  padding: 10px 12px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-}
-.wk-bar { display: flex; align-items: center; gap: 10px; }
-.wk-now { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.wk-log { flex: none; min-height: var(--tap); padding: 0 16px; font-size: 16px; }
-.workout.idle .wk-now { color: var(--muted); font-size: 14px; }
-.workout .rest {
+.chat-home > .chat-bar {
   position: static;
-  margin-top: 8px;
-  box-shadow: none;
-}
-.wk-more > summary {
-  min-height: 40px;
-  display: flex;
+  flex: none;
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
   align-items: center;
-  color: var(--muted);
-  font-size: 14px;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 0;
+  background: transparent;
 }
-.wk-more[open] > summary { margin-bottom: 8px; }
+.chat-title { text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-title strong { font-size: 17px; }
+.chat-title .muted { font-size: 13px; margin-left: 4px; }
+.icon-btn {
+  width: 44px; height: 44px;
+  display: inline-grid; place-items: center;
+  border: 0; border-radius: 12px;
+  background: none; color: var(--text);
+  font-size: 20px; text-decoration: none;
+}
+.icon-btn:active { background: var(--card); }
+.review-badge { position: relative; font-size: 18px; }
+.review-badge span {
+  position: absolute; top: 4px; right: 2px;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent); color: var(--accent-ink);
+  font-size: 11px; font-weight: 800; line-height: 18px;
+}
 
+/* Drawer: panels as tiles, the account at the bottom. */
+.scrim { position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, .55); }
+.drawer {
+  position: fixed; top: 0; bottom: 0; left: 0; z-index: 31;
+  width: min(84vw, 340px);
+  display: flex; flex-direction: column; gap: 12px;
+  padding: calc(14px + env(safe-area-inset-top)) 12px calc(14px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+}
+.drawer[hidden], .scrim[hidden] { display: none; }
+.panel-links { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.panel-links a {
+  min-height: 48px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--card); color: var(--text);
+  text-decoration: none; font-size: 15px; white-space: nowrap;
+}
+.panel-links a.attention { border-color: var(--accent); }
+.account { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+.account p { margin: 0; font-size: 14px; }
+
+/* The conversation. The person's words in a bubble on the right; the coach's
+   without a bubble, like ChatGPT. */
 .chat-home main.chat {
+  position: relative;
   flex: 1;
   min-height: 0;
   width: 100%;
-  max-width: 640px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 0 12px;
   display: flex;
   flex-direction: column;
 }
-.chat .coach-log { min-height: 0; }
-.chat-card {
+.coach-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 16px 16px;
+  overscroll-behavior: contain;
+}
+.coach-msg { margin: 14px 0; }
+.coach-me { display: flex; flex-direction: column; align-items: flex-end; }
+.coach-me .coach-body {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 20px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  white-space: pre-wrap;
+}
+.coach-msg small { display: block; color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+.coach-body { overflow-wrap: anywhere; line-height: 1.5; }
+.coach-body p, .coach-body ul, .coach-body ol, .coach-body pre { margin: 0; }
+.coach-body > * + * { margin-top: 10px; }
+.coach-body ul, .coach-body ol { padding-left: 22px; }
+.coach-body code { font: .9em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--line); padding: 1px 4px; border-radius: 4px; }
+.coach-body pre { overflow-x: auto; padding: 8px; background: var(--line); border-radius: 8px; }
+.coach-body pre code { padding: 0; background: none; }
+
+/* One steps row above each answer: what the coach looked at, in words. */
+.coach-steps { margin: 0 0 6px; color: var(--muted); font-size: 14px; }
+.coach-steps > summary {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 32px;
+  list-style: none; cursor: pointer;
+}
+.coach-steps > summary::-webkit-details-marker { display: none; }
+.coach-steps > summary::after { content: "›"; transition: transform .15s; }
+.coach-steps[open] > summary::after { transform: rotate(90deg); }
+.coach-steps ol { margin: 2px 0 6px; padding-left: 16px; list-style: none; display: grid; gap: 4px; }
+.coach-steps li::before { content: "✓ "; color: var(--accent); }
+.coach-steps li.running::before { content: "• "; }
+.coach-steps li.error::before { content: "✕ "; color: var(--danger); }
+.coach-steps li.waiting::before { content: "⏳ "; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+.coach-steps.live .dot { animation: pulse 1s ease-in-out infinite; }
+.coach-steps.problem .dot { background: var(--danger); }
+@keyframes pulse { 50% { opacity: .3; } }
+.coach-live {
+  margin: 4px 0 0;
+  font-size: 15px;
+  color: var(--muted);
+  background: linear-gradient(90deg, var(--muted) 35%, var(--text) 50%, var(--muted) 65%) 0 0 / 300% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 1.6s linear infinite;
+}
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.coach-tools { display: flex; gap: 4px; margin-top: 6px; }
+.coach-tools button {
+  min-height: 32px; padding: 0 8px;
+  border: 0; border-radius: 8px;
+  background: none; color: var(--muted); font-size: 13px;
+}
+.coach-tools button:active { background: var(--card); }
+.coach-note { margin: 6px 0; font-size: 14px; color: var(--muted); }
+.coach-error { color: var(--danger); }
+.coach-pending { color: var(--accent); }
+.run-card {
   margin: 8px 0;
   padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--danger);
   border-radius: 12px;
+  background: var(--card);
+  display: grid; gap: 8px;
+}
+.run-card.stopped { border-left-color: var(--muted); }
+.run-card p { margin: 0; }
+.run-card strong { display: block; }
+.run-card .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.run-card button { min-height: 40px; }
+
+/* Server cards in the conversation: plan of the day, proposals, sets. */
+.chat-card {
+  margin: 10px 0;
+  padding: 12px 14px;
+  border-radius: 16px;
   border: 1px solid var(--line);
   background: var(--card);
   display: grid;
@@ -837,20 +868,173 @@ main { padding-bottom: 140px; }
 .card-actions { display: flex; gap: 8px; }
 .card-actions form { flex: 1; display: grid; }
 .card-actions .primary { min-height: 48px; font-size: 16px; }
-.set-card { display: block; border-color: var(--accent); }
+/* A set the person logged: a quiet line in the timeline. */
+.set-card { display: block; padding: 4px 2px; border: 0; background: none; color: var(--muted); font-size: 14px; }
+.set-card strong { color: var(--text); font-weight: 600; }
 
-.coach-dock {
+/* Empty chat: a greeting and suggestions built by the server. */
+.chat-empty { padding: 8vh 4px 8px; text-align: center; }
+.chat-empty[hidden] { display: none; }
+.chat-empty h2 { margin: 0 0 18px; font-size: 24px; }
+.suggestions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: left; }
+.suggestions button {
+  min-height: 56px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 14px;
+  background: var(--card); color: var(--text);
+  font-size: 14px; text-align: left;
+}
+.chat-jump {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--card); color: var(--text);
+  font-size: 18px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
+}
+.chat-jump[hidden] { display: none; }
+
+/* --- the dock: workout bar above the message box ------------------------- */
+.dock {
   flex: none;
   width: 100%;
-  max-width: 640px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 6px 12px calc(8px + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--line);
+  padding: 0 10px calc(10px + env(safe-area-inset-bottom));
+  display: grid;
+  gap: 8px;
 }
-.chat-status { display: flex; align-items: center; gap: 8px; }
-.chat-status .muted { flex: 1; font-size: 13px; }
-.chat-status .mini { min-height: 32px; font-size: 13px; }
+.workout {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 8px 8px 8px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+.wk-bar { display: contents; }
+.wk-now { grid-column: 1; margin: 0; min-width: 0; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wk-log { grid-column: 2; grid-row: 1 / span 2; min-height: 48px; padding: 0 14px; font-size: 15px; font-weight: 700; white-space: nowrap; }
+.workout.idle { grid-template-columns: 1fr auto; padding: 4px 8px 4px 14px; }
+.workout.idle .wk-now { color: var(--muted); font-size: 14px; }
+.wk-more { grid-column: 1; }
+.wk-more > summary {
+  display: inline-flex; align-items: center;
+  min-height: 28px;
+  color: var(--muted); font-size: 13px;
+  list-style: none; cursor: pointer;
+}
+.wk-more > summary::-webkit-details-marker { display: none; }
+.wk-more > summary::after { content: " ›"; margin-left: 4px; }
+.workout.idle .wk-more { grid-column: 2; grid-row: 1; }
+/* The rest timer, one line inside the bar. */
+.workout .rest {
+  grid-column: 1 / -1;
+  position: static;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+.workout .rest[hidden] { display: none; }
+.workout .rest-next { grid-column: 1 / -1; margin: 0; text-align: left; font-size: 13px; }
+.workout .rest-adj { min-height: 36px; padding: 0 10px; font-size: 13px; }
+.workout .rest-time { font-size: 24px; min-height: 36px; padding: 0; color: var(--accent); }
 
+/* The entry form as a bottom sheet over everything. */
+.wk-sheet, .sheet-scrim { display: none; }
+.wk-more[open] .sheet-scrim { display: block; position: fixed; inset: 0; z-index: 35; background: rgba(0, 0, 0, .55); }
+.wk-more[open] .wk-sheet {
+  display: block;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 36;
+  max-height: 88vh; max-height: 88dvh;
+  overflow-y: auto;
+  padding: 6px 12px calc(16px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+  border-radius: 22px 22px 0 0;
+}
+.sheet-head { position: relative; display: flex; justify-content: flex-end; align-items: center; min-height: 40px; }
+.grab { position: absolute; left: 50%; top: 6px; transform: translateX(-50%); width: 40px; height: 5px; border-radius: 3px; background: var(--line); }
+
+/* The message box: a rounded pill with its buttons on one row. */
+.coach { display: grid; gap: 8px; }
+.coach-connect p { margin: 10px 0; }
+.coach-usercode {
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-align: center;
+  user-select: all;
+}
+.coach-form {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  background: var(--card);
+}
+.coach-form[hidden] { display: none; }
+.coach-form textarea {
+  width: 100%;
+  min-height: 40px;
+  max-height: 30vh;
+  padding: 6px 8px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  resize: none;
+  outline: none;
+}
+.composer-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.composer-row .grow { flex: 1; }
+.composer-extras { display: flex; gap: 6px; }
+.composer-extras:empty { display: none; }
+.send {
+  width: 40px; height: 40px;
+  display: inline-grid; place-items: center;
+  border: 0; border-radius: 50%;
+  background: var(--text); color: var(--bg);
+  font-size: 18px; font-weight: 800;
+}
+.send:disabled { opacity: .4; }
+.send[hidden] { display: none; }
+/* The mic: one thumb mid-set. */
+.mic {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font-size: 18px;
+}
+.mic.on {
+  border-color: var(--danger);
+  background: var(--danger);
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, .55); }
+  50% { box-shadow: 0 0 0 10px rgba(248, 113, 113, 0); }
+}
+.listening { margin: 0 8px; color: var(--danger); font-size: 14px; font-weight: 600; }
+.autosend { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); min-height: 40px; }
+.autosend input { width: 20px; height: 20px; }
+@media (prefers-reduced-motion: reduce) {
+  .mic.on, .coach-live, .coach-steps.live .dot { animation: none; }
+}
+
+/* Panels open over the chat in a frame. */
 .panel-sheet {
   position: fixed;
   inset: 0;
@@ -861,3 +1045,7 @@ main { padding-bottom: 140px; }
 }
 .panel-sheet .bar { justify-content: flex-start; }
 .panel-sheet iframe { flex: 1; width: 100%; border: 0; background: var(--bg); }
+/* Inside the frame the sheet already says where you are and how to go back. */
+.in-panel body > .bar > div:first-child { display: none; }
+.in-panel body > .bar .bar-actions a[href$="/"] { display: none; }
+.in-panel body > .bar { justify-content: flex-end; }
