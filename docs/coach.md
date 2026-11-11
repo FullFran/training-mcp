@@ -84,7 +84,7 @@ Without a choice, the model is the first one OpenAI lists for the account. Every
 
 ## Connectors: a person's own remote MCP servers
 
-Issue [#70](https://github.com/FullFran/training-mcp/issues/70). With the coach on, **Conectores** (next to **Desconectar** in the chat, or `/coach/connectors`) lets each person add remote MCP servers, such as Notion's, to their own coach. Nobody else sees them, and nobody else's coach uses them.
+Issue [#70](https://github.com/FullFran/training-mcp/issues/70). With the coach on, **🔌 Conectores** (in the menu, or `/coach/connectors`) lets each person add remote MCP servers, such as Notion's, to their own coach. Nobody else sees them, and nobody else's coach uses them.
 
 1. **Add** an `https` URL and a name. The name becomes the server's namespace for the model: tools of a server named `notion` are `mcp__notion__<tool>`. Lowercase letters and digits, up to 24, unique per person, never `training`. Up to 10 servers per person.
 2. **Connect**. The server is probed with an `initialize` and no credential:
