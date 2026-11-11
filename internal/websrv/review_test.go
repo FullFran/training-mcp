@@ -234,11 +234,12 @@ func TestReviewRejectsBadInput(t *testing.T) {
 	f := newReviewFixture(t)
 	p := f.propose(t, "pierna pesada")
 	for path, form := range map[string]url.Values{
-		"/review/" + itoa(p.ID) + "/accept": {"answer": {"reject_once"}},
-		"/review/" + itoa(p.ID) + "/reject": {"answer": {"allow_always"}},
-		"/review/abc/accept":                {"answer": {"allow_once"}},
-		"/review/accept-all":                {"on": {"maybe"}},
-		"/review/forget":                    {"rule_id": {"abc"}},
+		"/review/" + itoa(p.ID) + "/accept":     {"answer": {"reject_once"}},
+		"/review/" + itoa(p.ID) + "/reject":     {"answer": {"allow_always"}},
+		"/review/abc/accept":                    {"answer": {"allow_once"}},
+		"/review/accept-all":                    {"on": {"maybe"}},
+		"/review/forget":                        {"rule_id": {"abc"}},
+		"/review/" + itoa(p.ID) + "/accept?old": {"remember": {"always"}},
 	} {
 		w := post(t, f.handler, path, form, false)
 		if w.Code != http.StatusBadRequest {

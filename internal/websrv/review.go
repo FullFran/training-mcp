@@ -256,6 +256,11 @@ func (s *Server) acceptProposal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	answer := r.PostFormValue("answer")
+	// A page cached before the four answers posts the old field; refuse it
+	// rather than read "always" as once.
+	if old := r.PostFormValue("remember"); old != "" && old != "once" {
+		answer = "remember:" + old
+	}
 	switch answer {
 	case "", training.AnswerAllowOnce, training.AnswerAllowAlways:
 	default:
