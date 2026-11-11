@@ -2,7 +2,7 @@
 
 Status: experimental, **off by default**. Issue [#48](https://github.com/FullFran/training-mcp/issues/48).
 
-A signed-in person opens **Coach** on the workout screen, connects their own ChatGPT account with a device code, and talks with a coach that runs on the server. The coach uses training-mcp's MCP tools as that person and has no other tool. When they log a set with the chat open, the coach gets that set and reacts on its own.
+The app's home is a chat with the coach. A signed-in person connects their own ChatGPT account there with a device code and talks with a coach that runs on the server. The coach uses training-mcp's MCP tools as that person and has no other tool. When they log a set, the coach gets that set and reacts on its own.
 
 Connecting ChatGPT or Claude to `/mcp` yourself (option A) keeps working alongside it.
 
@@ -67,11 +67,14 @@ Credentials are stored in `coach/credentials/` next to the database (`/data/coac
 
 ## What a person sees
 
-1. The workout screen has a **Coach** button. It opens a bottom sheet over the workout; logging stays where it was.
-2. Not connected, the sheet asks them to connect ChatGPT, then shows a code and a link to `https://auth.openai.com/codex/device`. They sign in there and type the code. Nothing travels from their browser to the server in this step; the server polls OpenAI.
-3. Connected, they type and the answer streams in. Each tool call shows as a step (`Consultando list plans…`). The coach's writes go through the same proposals and permissions as any MCP client of that person: a write that waits for approval shows **Cambio propuesto, pendiente de tu aprobación** with a link to `/review`.
-4. Once the chat has been opened on that page, logging a set starts a short reaction from the coach (feedback on the set and what to do next); with the sheet closed, a dot on the button says there is something new. Without an open chat, the set waits and arrives with the next message.
-5. **Desconectar ChatGPT** deletes the stored credential, stops their engine process and revokes its token.
+1. The home screen is the chat: the conversation fills the screen and the message box is at the bottom. Above the chat, the live workout is pinned: the exercise loaded now, a button that logs it with the pre-filled weight, reps and RPE in one tap, and the rest timer. With no workout today it collapses to one line. It is the same entry form, panel and timer as before, so it works without ChatGPT and from the cached page offline (a set still needs the network to be stored).
+2. Buttons in the header open **Historial**, **Rutinas**, **Revisar** and **Progreso** as panels over the chat. **← Chat**, or the panel's own **Hoy** link, closes the panel and returns to the same conversation; a change made in a panel refreshes the workout and the cards.
+3. Cards in the chat come from the server, never from the model: the plan of the day (or a picker to start one), each proposal waiting for an answer with **Aceptar** and **Rechazar** (the same CSRF-protected `/review` endpoints; accepting there means "only this time", the other choices stay on `/review`), and each set logged from the workout card.
+4. Not connected, the chat offers to connect ChatGPT, then shows a code and a link to `https://auth.openai.com/codex/device`. They sign in there and type the code. Nothing travels from their browser to the server in this step; the server polls OpenAI. The workout card and the panels work the same while not connected, or with the coach off.
+5. Connected, they type or dictate and the answer streams in. Each tool call shows as a step (`Consultando list plans…`). The coach's writes go through the same proposals and permissions as any MCP client of that person: a write that waits for approval shows **Cambio propuesto, pendiente de tu aprobación** and its card, with accept and reject, appears in the chat.
+6. Logging a set starts a short reaction from the coach (feedback on the set and what to do next). The stream stays open while the home is open.
+7. Voice uses the browser only, with no provider and no tokens: the 🎤 button dictates into the message box with the browser's speech recognition (hidden where the browser has none), and **Leer respuestas** reads each finished reply aloud with speech synthesis. The choice is kept per device.
+8. **Desconectar** deletes the stored credential, stops their engine process and revokes its token.
 
 The model is the first one OpenAI lists for the account. The conversation lives in the engine process only: it is lost when the process stops (idle, disconnect, restart) and is never written to disk.
 
@@ -140,14 +143,14 @@ Tests run against a fake engine process (the Go test binary speaking the protoco
 Use a test account's data only.
 
 1. Set `TRAINING_COACH=1` and `TRAINING_COACH_KEY`, deploy, and confirm `GET /health` still answers.
-2. Open the app on a phone, signed in, and press **Coach**. The sheet says ChatGPT is not connected and that the password is never typed here. Press **Conectar ChatGPT**: a code and the OpenAI link appear.
-3. Approve at OpenAI. Within a few seconds the sheet shows the message box. On the server, `ls -l /data/coach/credentials/` shows one file with mode `-rw-------` and no readable token inside.
+2. Open the app on a phone, signed in. The chat says ChatGPT is not connected and that the password is never typed here. Press **Conectar ChatGPT**: a code and the OpenAI link appear.
+3. Approve at OpenAI. Within a few seconds the chat shows the message box. On the server, `ls -l /data/coach/credentials/` shows one file with mode `-rw-------` and no readable token inside.
 4. Ask "¿qué rutinas tengo?". The answer streams and a step shows the tool call.
-5. Log a set with the sheet open: the coach reacts to it within seconds. Close the sheet and log another: the dot appears on **Coach**.
+5. Log a set with the workout card's one-tap button: a card for the set appears and the coach reacts to it within seconds. Open **Historial**, go back with **← Chat**: the conversation is still there. Dictate with 🎤 and turn on **Leer respuestas** on a phone whose browser supports them.
 6. Start a long answer and press **Detener**: it stops, and the next message works.
 7. Wait past `TRAINING_COACH_IDLE_SECONDS` and send again: it answers, with the earlier conversation gone. `docker logs` shows `engine.process` stop and start lines and no token, code or message text.
 8. After more than an hour, send again: the turn still works (a refresh happened) and the credential file has a new modification time.
-9. Press **Desconectar ChatGPT**: the file is gone and the sheet asks to connect again.
-10. From another account with no connection, confirm the sheet asks to connect and shows nothing of the first account.
+9. Press **Desconectar**: the file is gone and the chat asks to connect again.
+10. From another account with no connection, confirm the chat asks to connect and shows nothing of the first account.
 
-If step 3, 4 or 8 fails, the sheet shows a fixed message only. Run the engine by hand to see the real error; it is deliberately not logged.
+If step 3, 4 or 8 fails, the chat shows a fixed message only. Run the engine by hand to see the real error; it is deliberately not logged.

@@ -14,135 +14,183 @@
 <link rel="stylesheet" href="{{.Base}}/static/app.css">
 {{if .CSRF}}<meta name="csrf-token" content="{{.CSRF}}">
 {{end}}</head>
-<body data-base="{{.Base}}" data-rest-target="{{.RestTarget}}"{{if .CSRF}} hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'{{end}}>
-
-<header class="bar">
+<body class="chat-home" data-base="{{.Base}}" data-rest-target="{{.RestTarget}}"{{if .CSRF}} hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'{{end}}>
+{{$active := or .Progress .Session.Sets}}
+<header class="bar chat-bar">
   <div>
     <strong>Hoy</strong>
     <span class="muted">{{.Today}}</span>
   </div>
-  <div class="bar-actions">
-    <a class="ghost{{if .PendingCount}} attention{{end}}" href="{{.Base}}/review">Revisar{{if .PendingCount}} ({{.PendingCount}}){{end}}</a>
-    <a class="ghost" href="{{.Base}}/plans">Rutinas</a>
-    <a class="ghost" href="{{.Base}}/history">Historial</a>
-  </div>
+  <!-- Panels open over the chat and come back to it; without JavaScript they
+       are plain pages with a link home. -->
+  <nav class="panel-links" aria-label="Paneles">
+    <a class="ghost" href="{{.Base}}/history" data-panel>Historial</a>
+    <a class="ghost" href="{{.Base}}/plans" data-panel>Rutinas</a>
+    <a id="review-link" class="ghost{{if .PendingCount}} attention{{end}}" href="{{.Base}}/review" data-panel>Revisar{{if .PendingCount}} ({{.PendingCount}}){{end}}</a>
+    <a class="ghost" href="{{.Base}}/history#progreso" data-panel>Progreso</a>
+  </nav>
 </header>
 
-<main>
-  {{if not .Progress}}{{if .Plans}}
-  <form class="card plan-pick" method="post" action="{{.Base}}/plan">{{if .CSRF}}
-    <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
-    <label class="field">
-      <span>Entrenar con un plan</span>
-      <select name="plan_id">
-        {{range .Plans}}<option value="{{.ID}}">{{.Name}} · {{.TotalSets}} series</option>{{end}}
-      </select>
-    </label>
-    <button type="submit" class="ghost wide">Empezar este plan</button>
-  </form>
-  {{end}}{{end}}
+<!-- The live workout, pinned above the chat. It is the same entry form, panel
+     and rest timer as ever, so logging works offline of the model; the bar on
+     top logs the pre-filled set in one tap. -->
+<section id="workout" class="workout{{if not $active}} idle{{end}}" aria-label="Entreno">
+  <div class="wk-bar">
+    <p id="wk-now" class="wk-now">{{with .Next}}<strong>{{.Exercise}}</strong> · {{rx .}}{{else}}{{if $active}}Entreno en marcha{{else}}Sin entreno activo{{end}}{{end}}</p>
+    <button type="button" id="wk-log" class="primary wk-log" hidden>Registrar</button>
+  </div>
+  <!-- Rest timer. Counts from the last logged set, as the agent sees it, so it
+       survives a reload; tapping the time dismisses it. The ±30 s buttons change
+       the person's rest target, shared with the agent. -->
+  <div id="rest" class="rest" hidden>
+    <p id="rest-next" class="rest-next" hidden></p>
+    <button type="button" class="rest-adj" data-delta="-30">−30s</button>
+    <button type="button" id="rest-time" class="rest-time">0:00</button>
+    <button type="button" class="rest-adj" data-delta="30">+30s</button>
+  </div>
+  <details id="wk-more" class="wk-more">
+    <summary>{{if $active}}Ver el entreno y ajustar{{else}}Registrar una serie{{end}}</summary>
+    <form id="entry" class="card"
+          hx-post="{{.Base}}/sets"
+          hx-target="#panel"
+          hx-swap="outerHTML"
+          autocomplete="off">
 
-  <form id="entry" class="card"
-        hx-post="{{.Base}}/sets"
-        hx-target="#panel"
-        hx-swap="outerHTML"
-        autocomplete="off">
-
-    {{if .Recent}}
-    <div class="chips" aria-label="Ejercicios recientes">
-      {{range .Recent}}
-      <button type="button" class="chip"
-              data-exercise="{{.Exercise}}"
-              data-weight="{{num .WeightKG}}"
-              data-reps="{{.Reps}}"
-              data-rpe="{{if not .RPEImputed}}{{num .RPE}}{{end}}">{{.Exercise}}</button>
-      {{end}}
-    </div>
-    {{end}}
-
-    <label class="field">
-      <span>Ejercicio</span>
-      <input id="exercise" name="exercise" type="text" required list="catalogue"
-             enterkeyhint="done" autocapitalize="none" spellcheck="false"
-             placeholder="press inclinado mancuernas">
-    </label>
-    <datalist id="catalogue">
-      {{range .Catalogue}}<option value="{{.}}"></option>{{end}}
-    </datalist>
-
-    <p id="previous" class="previous" hidden></p>
-
-    <div class="row">
-      <div class="stepper" data-target="weight" data-step="2.5" data-min="0.5">
-        <span class="label">Peso (kg)</span>
-        <div class="controls">
-          <button type="button" class="pad" data-delta="-1" aria-label="Bajar peso">−</button>
-          <input id="weight" name="weight_kg" type="number" inputmode="decimal"
-                 step="0.5" min="0.5" value="20" required>
-          <button type="button" class="pad" data-delta="1" aria-label="Subir peso">+</button>
-        </div>
-      </div>
-
-      <div class="stepper" data-target="reps" data-step="1" data-min="1">
-        <span class="label">Reps</span>
-        <div class="controls">
-          <button type="button" class="pad" data-delta="-1" aria-label="Bajar reps">−</button>
-          <input id="reps" name="reps" type="number" inputmode="numeric"
-                 step="1" min="1" value="8" required>
-          <button type="button" class="pad" data-delta="1" aria-label="Subir reps">+</button>
-        </div>
-      </div>
-    </div>
-
-    <fieldset class="rpe">
-      <legend>RPE</legend>
-      <div class="pills">
-        {{range $v := rpeScale}}
-        <input type="radio" name="rpe" id="rpe-{{$v}}" value="{{$v}}" {{if eq $v "8"}}checked{{end}}>
-        <label for="rpe-{{$v}}">{{$v}}</label>
+      {{if .Recent}}
+      <div class="chips" aria-label="Ejercicios recientes">
+        {{range .Recent}}
+        <button type="button" class="chip"
+                data-exercise="{{.Exercise}}"
+                data-weight="{{num .WeightKG}}"
+                data-reps="{{.Reps}}"
+                data-rpe="{{if not .RPEImputed}}{{num .RPE}}{{end}}">{{.Exercise}}</button>
         {{end}}
       </div>
-    </fieldset>
+      {{end}}
 
-    <details class="tech">
-      <summary>Técnica y nota <span class="muted">(opcional)</span></summary>
-      <input id="technique" name="technique" type="text" list="techniques"
-             autocapitalize="none" spellcheck="false" placeholder="drop set, rest-pause…">
-      <datalist id="techniques">
-        {{range techniques}}<option value="{{.}}"></option>{{end}}
+      <label class="field">
+        <span>Ejercicio</span>
+        <input id="exercise" name="exercise" type="text" required list="catalogue"
+               enterkeyhint="done" autocapitalize="none" spellcheck="false"
+               placeholder="press inclinado mancuernas">
+      </label>
+      <datalist id="catalogue">
+        {{range .Catalogue}}<option value="{{.}}"></option>{{end}}
       </datalist>
-      <div class="note-edit">
-        <input id="note" type="text" maxlength="280" placeholder="montaje: asiento 4, agarre ancho…">
-        <button type="button" id="save-note" class="mini">Guardar nota</button>
+
+      <p id="previous" class="previous" hidden></p>
+
+      <div class="row">
+        <div class="stepper" data-target="weight" data-step="2.5" data-min="0.5">
+          <span class="label">Peso (kg)</span>
+          <div class="controls">
+            <button type="button" class="pad" data-delta="-1" aria-label="Bajar peso">−</button>
+            <input id="weight" name="weight_kg" type="number" inputmode="decimal"
+                   step="0.5" min="0.5" value="20" required>
+            <button type="button" class="pad" data-delta="1" aria-label="Subir peso">+</button>
+          </div>
+        </div>
+
+        <div class="stepper" data-target="reps" data-step="1" data-min="1">
+          <span class="label">Reps</span>
+          <div class="controls">
+            <button type="button" class="pad" data-delta="-1" aria-label="Bajar reps">−</button>
+            <input id="reps" name="reps" type="number" inputmode="numeric"
+                   step="1" min="1" value="8" required>
+            <button type="button" class="pad" data-delta="1" aria-label="Subir reps">+</button>
+          </div>
+        </div>
       </div>
-    </details>
 
-    <button type="submit" class="primary">Añadir serie</button>
-    <button type="button" id="repeat" class="ghost wide" hidden>Repetir última</button>
-  </form>
+      <fieldset class="rpe">
+        <legend>RPE</legend>
+        <div class="pills">
+          {{range $v := rpeScale}}
+          <input type="radio" name="rpe" id="rpe-{{$v}}" value="{{$v}}" {{if eq $v "8"}}checked{{end}}>
+          <label for="rpe-{{$v}}">{{$v}}</label>
+          {{end}}
+        </div>
+      </fieldset>
 
-  {{template "panel.html" .}}
+      <details class="tech">
+        <summary>Técnica y nota <span class="muted">(opcional)</span></summary>
+        <input id="technique" name="technique" type="text" list="techniques"
+               autocapitalize="none" spellcheck="false" placeholder="drop set, rest-pause…">
+        <datalist id="techniques">
+          {{range techniques}}<option value="{{.}}"></option>{{end}}
+        </datalist>
+        <div class="note-edit">
+          <input id="note" type="text" maxlength="280" placeholder="montaje: asiento 4, agarre ancho…">
+          <button type="button" id="save-note" class="mini">Guardar nota</button>
+        </div>
+      </details>
+
+      <button type="submit" class="primary">Añadir serie</button>
+      <button type="button" id="repeat" class="ghost wide" hidden>Repetir última</button>
+    </form>
+
+    {{template "panel.html" .}}
+  </details>
+</section>
+
+<main id="chat" class="chat">
+  <div id="coach-log" class="coach-log" aria-live="polite">
+    <!-- Deterministic cards, rendered here and never by the model. -->
+    <div id="chat-cards">
+      {{if .Progress}}
+      <article class="chat-card plan-today" aria-label="Plan de hoy">
+        <header><strong>{{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Plan de hoy{{end}}</strong> <span class="muted">{{doneCount .Progress}}/{{len .Progress}}</span></header>
+        <ol>
+          {{range .Progress}}
+          <li class="{{if .Skipped}}skipped{{else if .Done}}ok{{end}}">{{.Exercise}} <span class="muted">{{.DoneSets}}{{if .TargetSets}}/{{.TargetSets}}{{end}}{{if .RepMin}} · {{rx .}}{{end}}</span></li>
+          {{end}}
+        </ol>
+      </article>
+      {{else if .Plans}}
+      <form class="chat-card plan-pick" method="post" action="{{.Base}}/plan">{{if .CSRF}}
+        <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
+        <label class="field">
+          <span>Entrenar con un plan</span>
+          <select name="plan_id">
+            {{range .Plans}}<option value="{{.ID}}">{{.Name}} · {{.TotalSets}} series</option>{{end}}
+          </select>
+        </label>
+        <button type="submit" class="ghost wide">Empezar este plan</button>
+      </form>
+      {{end}}
+      {{range .Review.Pending}}
+      <article class="chat-card proposal-card" data-proposal="{{.ID}}">
+        <header><strong>{{.Label}}</strong> <span class="muted">{{.When}} · pendiente</span></header>
+        <dl>{{range .Fields}}
+          <dt>{{.Name}}</dt><dd>{{.Value}}</dd>{{end}}
+        </dl>
+        <div class="card-actions">
+          <form method="post" action="{{$.Base}}/review/{{.ID}}/accept">{{if $.CSRF}}
+            <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+            <input type="hidden" name="remember" value="once">
+            <button type="submit" class="primary">Aceptar</button>
+          </form>
+          <form method="post" action="{{$.Base}}/review/{{.ID}}/reject">{{if $.CSRF}}
+            <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+            <button type="submit" class="ghost">Rechazar</button>
+          </form>
+        </div>
+      </article>
+      {{end}}
+    </div>
+    <span id="chat-end"></span>
+    {{if not .CoachOn}}<p class="coach-note">El coach no está activado aquí. El entreno y los paneles funcionan igual.</p>{{end}}
+  </div>
 </main>
 
-<!-- Rest timer. Counts from the last logged set, as the agent sees it, so it
-     survives a reload; tapping the time dismisses it. The ±30 s buttons change
-     the person's rest target, shared with the agent. -->
-<div id="rest" class="rest" hidden>
-  <p id="rest-next" class="rest-next" hidden></p>
-  <button type="button" class="rest-adj" data-delta="-30">−30s</button>
-  <button type="button" id="rest-time" class="rest-time">0:00</button>
-  <button type="button" class="rest-adj" data-delta="30">+30s</button>
-</div>
-
 {{if .CoachOn}}
-<!-- Coach chat. A bottom sheet over the workout, so logging stays one tap away. -->
-<button type="button" id="coach-open" class="coach-fab" aria-controls="coach" aria-expanded="false">Coach<span id="coach-dot" class="coach-dot" hidden></span></button>
-<section id="coach" class="coach" role="dialog" aria-label="Coach" hidden>
-  <header class="coach-head">
-    <strong>Coach</strong>
+<!-- Coach chat. Connect ChatGPT once, then talk or dictate. -->
+<section id="coach" class="coach-dock" aria-label="Coach">
+  <div class="chat-status">
     <span id="coach-state" class="muted"></span>
-    <button type="button" id="coach-close" class="ghost">Cerrar</button>
-  </header>
+    <button type="button" id="coach-speak" class="ghost mini" aria-pressed="false" hidden>🔈 Leer respuestas</button>
+    <button type="button" id="coach-disconnect" class="ghost mini" hidden>Desconectar</button>
+  </div>
   <div id="coach-connect" class="coach-connect" hidden>
     <p>El coach usa tu propia cuenta de ChatGPT. Se conecta con un código en la web de OpenAI: tu contraseña nunca se escribe aquí.</p>
     <button type="button" id="coach-login" class="primary">Conectar ChatGPT</button>
@@ -152,21 +200,30 @@
       <p class="muted">Esperando a que lo apruebes en OpenAI…</p>
     </div>
   </div>
-  <div id="coach-log" class="coach-log" aria-live="polite"></div>
   <form id="coach-form" class="coach-form" hidden>
-    <textarea id="coach-text" rows="2" maxlength="4000" placeholder="Pregunta a tu coach" aria-label="Mensaje para el coach"></textarea>
+    <div id="composer-extras" class="composer-extras"></div>
+    <button type="button" id="coach-mic" class="ghost mic" aria-label="Dictar" aria-pressed="false" hidden>🎤</button>
+    <textarea id="coach-text" rows="1" maxlength="4000" placeholder="Pregunta a tu coach" aria-label="Mensaje para el coach"></textarea>
     <button type="submit" id="coach-send" class="primary">Enviar</button>
     <button type="button" id="coach-stop" class="ghost" hidden>Detener</button>
   </form>
-  <footer class="coach-foot">
-    <button type="button" id="coach-disconnect" class="ghost" hidden>Desconectar ChatGPT</button>
-  </footer>
 </section>
 <script src="{{.Base}}/static/coach.js" defer></script>
 {{end -}}
+
+<!-- One panel at a time over the chat; closing it returns to the same chat. -->
+<section id="panel-sheet" class="panel-sheet" role="dialog" aria-label="Panel" hidden>
+  <header class="bar">
+    <button type="button" id="panel-back" class="ghost">← Chat</button>
+    <strong id="panel-title"></strong>
+  </header>
+  <iframe id="panel-frame" title="Panel"></iframe>
+</section>
+
 <script id="exercise-info" type="application/json">{{.InfoJSON}}</script>
 <script src="{{.Base}}/static/htmx.min.js" defer></script>
 <script src="{{.Base}}/static/app.js" defer></script>
+<script src="{{.Base}}/static/shell.js" defer></script>
 </body>
 </html>
 {{end}}

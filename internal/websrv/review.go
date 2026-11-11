@@ -280,11 +280,17 @@ func (s *Server) forgetRule(w http.ResponseWriter, r *http.Request) {
 	s.reviewDone(w, r)
 }
 
-// pendingCount is how many proposals wait, for the link to the review page.
-func (s *Server) pendingCount(r *http.Request) int {
+// pendingProposals are the proposals waiting for an answer, shown as cards in
+// the chat and counted on the link to the review page. A failed read shows
+// none rather than failing the home: the review page still lists them.
+func (s *Server) pendingProposals(r *http.Request) []ProposalView {
 	pending, err := s.service(r.Context()).ListProposals(r.Context(), training.ProposalFilter{Pending: true, Limit: 100})
 	if err != nil {
-		return 0
+		return nil
 	}
-	return len(pending)
+	views := make([]ProposalView, 0, len(pending))
+	for _, p := range pending {
+		views = append(views, s.proposalView(p))
+	}
+	return views
 }

@@ -159,6 +159,12 @@ shared with the MCP tools and cannot drift apart.
   `WEB_OAUTH_CLIENT_ID` and `WEB_OAUTH_CLIENT_SECRET`, at the root to whoever
   signs in with the OAuth provider, each seeing only their own data. Neither
   set means not served at all. The database export is only on the secret prefix.
+- The home is a chat with the coach (when `TRAINING_COACH=1`, see
+  [docs/coach.md](docs/coach.md)) with the live workout pinned above it:
+  current exercise, one-tap log with pre-filled values and the rest timer.
+  Header buttons open history, plans, review and progress as panels that
+  return to the same chat; the plan of the day, pending proposals (accept or
+  reject) and logged sets appear as cards rendered by the server.
 - `/review` lists the agent's pending proposals with what each would change,
   accepts (once, 12 hours, always) or rejects them, shows the answer history
   and holds the accept-all switch. The person's own changes in the app apply

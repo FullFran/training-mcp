@@ -316,7 +316,8 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	data.PendingCount = s.pendingCount(r)
+	data.Review.Pending = s.pendingProposals(r)
+	data.PendingCount = len(data.Review.Pending)
 	s.render(w, r, "index.html", data)
 }
 

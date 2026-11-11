@@ -138,7 +138,7 @@ func TestCoachOffServesNothingNew(t *testing.T) {
 	if w := get(t, server.Handler(), base+"/coach/status"); w.Code != http.StatusNotFound {
 		t.Fatalf("status with the coach off: %d", w.Code)
 	}
-	if w := get(t, server.Handler(), base+"/"); strings.Contains(w.Body.String(), "coach-open") || strings.Contains(w.Body.String(), "coach.js") {
+	if w := get(t, server.Handler(), base+"/"); strings.Contains(w.Body.String(), `id="coach-form"`) || strings.Contains(w.Body.String(), "coach.js") {
 		t.Fatal("today page shows the coach with the coach off")
 	}
 }
@@ -146,7 +146,7 @@ func TestCoachOffServesNothingNew(t *testing.T) {
 func TestCoachOnShowsTheChat(t *testing.T) {
 	world := newCoachWorld(t, newFakeCoach())
 	body := get(t, world.as(1), base+"/").Body.String()
-	if !strings.Contains(body, `id="coach-open"`) || !strings.Contains(body, base+"/static/coach.js") {
+	if !strings.Contains(body, `id="coach-form"`) || !strings.Contains(body, base+"/static/coach.js") {
 		t.Fatal("today page has no coach")
 	}
 	if w := get(t, world.as(1), base+"/static/coach.js"); w.Code != http.StatusOK {

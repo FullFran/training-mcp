@@ -15,6 +15,9 @@
 
 * { box-sizing: border-box; }
 
+/* hidden always wins over a component's own display. */
+[hidden] { display: none !important; }
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {
@@ -682,48 +685,7 @@ main { padding-bottom: 140px; }
 .rules, .answered { list-style: none; padding: 0; margin: 0; }
 .rules li, .answered li { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--line); }
 
-/* Coach chat: a floating button above the rest bar and a bottom sheet. */
-.coach-fab {
-  position: fixed;
-  right: 12px;
-  bottom: calc(120px + env(safe-area-inset-bottom));
-  z-index: 25;
-  min-height: var(--tap);
-  padding: 0 18px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--card);
-  color: var(--text);
-  font-weight: 600;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, .38);
-}
-.coach-dot {
-  display: inline-block;
-  width: 9px; height: 9px;
-  margin-left: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  vertical-align: middle;
-}
-.coach-dot[hidden] { display: none; }
-.coach {
-  position: fixed;
-  left: 0; right: 0; bottom: 0;
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  max-height: 82vh;
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
-  border-radius: 18px 18px 0 0;
-  background: var(--card);
-  border: 1px solid var(--line);
-  box-shadow: 0 -8px 28px rgba(0, 0, 0, .38);
-}
-.coach[hidden] { display: none; }
-.coach-head { display: flex; align-items: center; gap: 10px; }
-.coach-head .muted { flex: 1; font-size: .85rem; }
+/* Coach chat, docked under the conversation on the home screen. */
 .coach-connect p { margin: 10px 0; }
 .coach-usercode {
   font-size: 1.8rem;
@@ -746,8 +708,10 @@ main { padding-bottom: 140px; }
 .coach-coach { background: var(--bg); border: 1px solid var(--line); }
 .coach-note { margin: 4px 0; font-size: .85rem; color: var(--muted); }
 .coach-error { color: var(--danger); }
-.coach-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
+.coach-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
 .coach-form textarea {
+  flex: 1;
+  min-width: 0;
   font: inherit;
   min-height: var(--tap);
   padding: 10px;
@@ -757,6 +721,112 @@ main { padding-bottom: 140px; }
   color: var(--text);
   resize: none;
 }
-.coach-form #coach-stop { grid-column: 1 / -1; }
-.coach-foot { text-align: right; }
+.coach-form #coach-send { min-height: var(--tap); padding: 0 16px; font-size: 16px; }
+.coach-form #coach-stop { flex-basis: 100%; }
+.composer-extras { display: flex; gap: 8px; }
+.composer-extras:empty { display: none; }
+.mic { min-height: var(--tap); font-size: 20px; }
+.mic.on { border-color: var(--danger); color: var(--danger); }
 .coach-pending { color: var(--accent); }
+
+/* --- chat-first home ------------------------------------------------------
+   Header with the panel buttons, the pinned workout, the conversation filling
+   the rest and the composer at the bottom, like a messaging app. */
+.chat-home {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+.chat-home > .bar { position: static; flex: none; flex-wrap: wrap; row-gap: 6px; }
+.panel-links { display: flex; gap: 6px; overflow-x: auto; max-width: 100%; }
+.panel-links a { white-space: nowrap; min-height: 40px; padding: 0 12px; }
+
+.workout {
+  flex: none;
+  width: calc(100% - 24px);
+  max-width: 616px;
+  max-height: 62vh;
+  max-height: 62dvh;
+  overflow-y: auto;
+  margin: 8px auto 0;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.wk-bar { display: flex; align-items: center; gap: 10px; }
+.wk-now { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.wk-log { flex: none; min-height: var(--tap); padding: 0 16px; font-size: 16px; }
+.workout.idle .wk-now { color: var(--muted); font-size: 14px; }
+.workout .rest {
+  position: static;
+  margin-top: 8px;
+  box-shadow: none;
+}
+.wk-more > summary {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+.wk-more[open] > summary { margin-bottom: 8px; }
+
+.chat-home main.chat {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0 12px;
+  display: flex;
+  flex-direction: column;
+}
+.chat .coach-log { min-height: 0; }
+.chat-card {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  display: grid;
+  gap: 8px;
+}
+.chat-card header { display: flex; justify-content: space-between; gap: 8px; }
+.chat-card ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.chat-card li.ok { color: var(--muted); }
+.chat-card li.ok::marker { content: "✓ "; color: var(--accent); }
+.chat-card li.skipped { color: var(--muted); text-decoration: line-through; }
+.proposal-card dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 15px; }
+.proposal-card dt { color: var(--muted); }
+.proposal-card dd { margin: 0; overflow-wrap: anywhere; }
+.card-actions { display: flex; gap: 8px; }
+.card-actions form { flex: 1; display: grid; }
+.card-actions .primary { min-height: 48px; font-size: 16px; }
+.set-card { display: block; border-color: var(--accent); }
+
+.coach-dock {
+  flex: none;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 6px 12px calc(8px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+}
+.chat-status { display: flex; align-items: center; gap: 8px; }
+.chat-status .muted { flex: 1; font-size: 13px; }
+.chat-status .mini { min-height: 32px; font-size: 13px; }
+
+.panel-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.panel-sheet .bar { justify-content: flex-start; }
+.panel-sheet iframe { flex: 1; width: 100%; border: 0; background: var(--bg); }

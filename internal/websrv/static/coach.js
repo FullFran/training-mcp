@@ -1,16 +1,16 @@
-// Coach chat. The sheet talks to /coach/*: connect ChatGPT with a device code,
-// then chat. Once the chat has been opened on this page, its stream stays open,
-// so the coach's reaction to a logged set arrives even with the sheet closed.
-// Every text from the model is inserted as text, never as HTML.
+// Coach chat, the home screen. It talks to /coach/*: connect ChatGPT with a
+// device code, then chat. The stream stays open while the page is, so the
+// coach's reaction to a logged set arrives on its own. Every text from the
+// model is inserted as text, never as HTML.
+//
+// Voice is the browser's own: speech recognition dictates into the composer
+// and speech synthesis reads replies aloud. No provider, no tokens.
 (function () {
   'use strict';
 
   const base = document.body.dataset.base || '';
   const $ = (id) => document.getElementById(id);
-  const sheet = $('coach');
-  if (!sheet) return;
-  const fab = $('coach-open');
-  const dot = $('coach-dot');
+  if (!$('coach')) return;
   const stateLabel = $('coach-state');
   const connect = $('coach-connect');
   const codeBox = $('coach-code');
@@ -20,6 +20,8 @@
   const send = $('coach-send');
   const stop = $('coach-stop');
   const disconnect = $('coach-disconnect');
+  const mic = $('coach-mic');
+  const speak = $('coach-speak');
 
   const MESSAGES = {
     model_busy: 'El modelo está saturado. Prueba en un momento.',
@@ -39,6 +41,9 @@
   let poll = null;
   let current = null; // the answer being written
   let running = false;
+  let said = ''; // the answer being written, kept for reading aloud
+
+  const scroll = () => { log.scrollTop = log.scrollHeight; };
 
   function headers() {
     const h = { 'Content-Type': 'application/json', 'X-Coach': '1' };
@@ -59,20 +64,23 @@
     p.className = 'coach-note' + (kind ? ' coach-' + kind : '');
     p.textContent = message;
     log.appendChild(p);
-    log.scrollTop = log.scrollHeight;
+    scroll();
   }
 
-  // A write the coach asked for waits for the person's approval in /review.
+  // A write the coach asked for waits for the person's approval: the shell
+  // brings its card, with accept and reject, into the chat.
   function pendingNote() {
     const p = document.createElement('p');
     p.className = 'coach-note coach-pending';
     p.append('Cambio propuesto, pendiente de tu aprobación. ');
     const a = document.createElement('a');
     a.href = base + '/review';
+    a.dataset.panel = '';
     a.textContent = 'Revisar';
     p.appendChild(a);
     log.appendChild(p);
-    log.scrollTop = log.scrollHeight;
+    scroll();
+    document.dispatchEvent(new CustomEvent('coach:proposal'));
   }
 
   function bubble(who, label) {
@@ -86,7 +94,7 @@
     const body = document.createElement('p');
     div.appendChild(body);
     log.appendChild(div);
-    log.scrollTop = log.scrollHeight;
+    scroll();
     return body;
   }
 
@@ -136,13 +144,15 @@
     stream.addEventListener('turn', (ev) => {
       const d = data(ev);
       current = bubble('coach', d.origin === 'reaction' ? 'Sobre tu última serie' : '');
+      said = '';
       setRunning(true);
-      if (sheet.hidden) dot.hidden = false;
     });
     stream.addEventListener('delta', (ev) => {
       if (!current) current = bubble('coach');
-      current.textContent += data(ev).text || '';
-      log.scrollTop = log.scrollHeight;
+      const piece = data(ev).text || '';
+      current.textContent += piece;
+      said += piece;
+      scroll();
     });
     stream.addEventListener('tool', (ev) => {
       const d = data(ev);
@@ -152,6 +162,8 @@
     });
     stream.addEventListener('done', (ev) => {
       if (data(ev).aborted) note('Detenido.');
+      else readAloud(said);
+      said = '';
       current = null;
       setRunning(false);
     });
@@ -167,21 +179,64 @@
     });
   }
 
-  function open() {
-    sheet.hidden = false;
-    fab.setAttribute('aria-expanded', 'true');
-    dot.hidden = true;
-    refresh();
+  // --- voice ----------------------------------------------------------------
+  // Read-aloud is a per-device choice; it only speaks finished replies.
+  const SPEAK_KEY = 'coach-speak';
+  const canSpeak = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+  let speaking = canSpeak && localStorage.getItem(SPEAK_KEY) === '1';
+
+  function paintSpeak() {
+    speak.hidden = !canSpeak;
+    speak.setAttribute('aria-pressed', String(speaking));
+    speak.textContent = speaking ? '🔊 Leyendo respuestas' : '🔈 Leer respuestas';
   }
 
-  function close() {
-    sheet.hidden = true;
-    fab.setAttribute('aria-expanded', 'false');
-    clearTimeout(poll);
+  function readAloud(textToRead) {
+    if (!speaking || !textToRead.trim()) return;
+    const u = new SpeechSynthesisUtterance(textToRead);
+    u.lang = document.documentElement.lang || 'es';
+    window.speechSynthesis.speak(u);
   }
 
-  fab.addEventListener('click', () => (sheet.hidden ? open() : close()));
-  $('coach-close').addEventListener('click', close);
+  speak.addEventListener('click', () => {
+    speaking = !speaking;
+    localStorage.setItem(SPEAK_KEY, speaking ? '1' : '0');
+    if (!speaking) window.speechSynthesis.cancel();
+    paintSpeak();
+  });
+  paintSpeak();
+
+  // Dictation appends to whatever is already typed; the person still sends.
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let listening = null;
+  if (Recognition) {
+    mic.hidden = false;
+    mic.addEventListener('click', () => {
+      if (listening) { listening.stop(); return; }
+      const rec = new Recognition();
+      rec.lang = document.documentElement.lang === 'es' ? 'es-ES' : (document.documentElement.lang || 'es-ES');
+      rec.interimResults = true;
+      const before = text.value ? text.value.replace(/\s*$/, ' ') : '';
+      rec.onresult = (ev) => {
+        let heard = '';
+        for (let i = 0; i < ev.results.length; i++) heard += ev.results[i][0].transcript;
+        text.value = before + heard;
+      };
+      rec.onerror = (ev) => {
+        if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') note('Sin permiso para usar el micrófono.', 'error');
+      };
+      rec.onend = () => {
+        listening = null;
+        mic.classList.remove('on');
+        mic.setAttribute('aria-pressed', 'false');
+        text.focus();
+      };
+      listening = rec;
+      mic.classList.add('on');
+      mic.setAttribute('aria-pressed', 'true');
+      try { rec.start(); } catch (e) { rec.onend(); }
+    });
+  }
 
   $('coach-login').addEventListener('click', () => {
     post('login').then(({ ok, data }) => {
@@ -194,7 +249,8 @@
     if (!window.confirm('¿Desconectar tu cuenta de ChatGPT del coach?')) return;
     post('disconnect').then(() => {
       if (stream) { stream.close(); stream = null; }
-      log.textContent = '';
+      // Only the conversation goes; the server's cards stay.
+      log.querySelectorAll('.coach-msg, .coach-note').forEach((el) => el.remove());
       refresh();
     });
   });
@@ -222,4 +278,6 @@
   });
 
   stop.addEventListener('click', () => post('abort'));
+
+  refresh();
 })();
