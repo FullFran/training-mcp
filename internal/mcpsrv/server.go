@@ -267,6 +267,13 @@ type HistoryInput struct {
 type HistoryOut struct {
 	History training.ExerciseHistory `json:"history"`
 }
+type PerformanceInput struct {
+	SessionID int64  `json:"session_id" jsonschema:"Positive id of the session to analyse."`
+	Exercise  string `json:"exercise,omitempty" jsonschema:"Optional exercise name, trimmed and lowercased; omit to analyse every exercise of the session."`
+}
+type PerformanceOut struct {
+	Analyses []training.DropOffAnalysis `json:"analyses"`
+}
 type WeeklyOut struct {
 	Weeks []training.WeeklyVolume `json:"weeks"`
 }
@@ -615,6 +622,15 @@ func New(service training.ServiceFor) *Server {
 		v, err := service(ctx).ExerciseHistory(ctx, in.Exercise, in.Limit)
 		return nil, HistoryOut{History: v}, toolError(err)
 	})
+	perfSchema := mustInputSchema[PerformanceInput]()
+	setPositiveID(perfSchema.Properties["session_id"])
+	addTool(s, &mcp.Tool{Name: "performance_dropoff", Description: "Apparent per-set performance drop within one session, per exercise, computed deterministically from load, reps and stated RPE with named estimators (epley_v1, rir_epley_v1, brzycki_v1). Lists which sets were comparable and why others were excluded (technique, no load, probable warm-up), the reference set, each model's drop and confidence, and abstains with fewer than two comparable sets. An unstated RPE never feeds the RIR model. A device-free proxy: not velocity, force or fatigue, and it changes nothing.", InputSchema: perfSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in PerformanceInput) (*mcp.CallToolResult, PerformanceOut, error) {
+		v, err := service(ctx).PerformanceDropOff(ctx, in.SessionID, in.Exercise)
+		if v == nil {
+			v = []training.DropOffAnalysis{}
+		}
+		return nil, PerformanceOut{Analyses: v}, toolError(err)
+	})
 	weeklySchema := mustInputSchema[VolumeInput]()
 	weeklySchema.Properties["from"].Pattern = `^\d{4}-\d{2}-\d{2}$`
 	weeklySchema.Properties["to"].Pattern = `^\d{4}-\d{2}-\d{2}$`
@@ -663,7 +679,7 @@ func (s *Server) ToolNames() []string {
 		"remove_session_exercise", "save_session_as_plan",
 		"record_feedback", "volume_recommendation",
 		"set_volume_landmarks", "list_volume_landmarks",
-		"set_exercise_note", "list_exercise_notes", "suggest_load"}
+		"set_exercise_note", "list_exercise_notes", "suggest_load", "performance_dropoff"}
 }
 
 // noteAction tells setting a note from removing one: an empty note deletes it.

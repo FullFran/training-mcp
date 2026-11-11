@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"time"
 )
@@ -713,6 +714,45 @@ func (s *Service) ExerciseHistory(ctx context.Context, exercise string, limit in
 		out.Sets = []ExerciseSet{}
 	}
 	return out, err
+}
+
+// PerformanceDropOff analyses the apparent per-set performance drop of one
+// session: one analysis per exercise, in the order the exercises were first
+// logged, or only the named exercise. It reads and never writes. An exercise
+// with no sets in the session gets an analysis that abstains, not an error, so
+// the caller learns why there is no number.
+func (s *Service) PerformanceDropOff(ctx context.Context, sessionID int64, exercise string) ([]DropOffAnalysis, error) {
+	if sessionID <= 0 {
+		return nil, ErrValidation
+	}
+	exercise = strings.ToLower(strings.TrimSpace(exercise))
+	sess, err := s.store.GetSession(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	sets := append([]Set(nil), sess.Sets...)
+	sort.SliceStable(sets, func(i, j int) bool { return sets[i].Position < sets[j].Position })
+	var order []string
+	byExercise := map[string][]Set{}
+	for _, st := range sets {
+		if exercise != "" && st.Exercise != exercise {
+			continue
+		}
+		if _, seen := byExercise[st.Exercise]; !seen {
+			order = append(order, st.Exercise)
+		}
+		byExercise[st.Exercise] = append(byExercise[st.Exercise], st)
+	}
+	if exercise != "" && len(order) == 0 {
+		order = []string{exercise}
+	}
+	out := make([]DropOffAnalysis, 0, len(order))
+	for _, name := range order {
+		a := AnalyzeDropOff(name, byExercise[name])
+		a.SessionID, a.Date = sess.ID, sess.Date
+		out = append(out, a)
+	}
+	return out, nil
 }
 
 // WeeklyVolume returns SI per muscle group bucketed by training week.

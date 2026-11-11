@@ -349,10 +349,19 @@ func TestEpley1RM(t *testing.T) {
 		reps   int
 		want   float64
 	}{
-		{"single rep returns the weight", 100, 1, 103.3},
+		// A single is the lifted weight: Epley's 1.0333x is a formula artefact,
+		// not a heavier lift than the one recorded.
+		{"single rep returns the weight", 100, 1, 100},
+		{"two reps", 100, 2, 106.7},
 		{"five reps", 100, 5, 116.7},
+		{"six reps", 100, 6, 120},
+		{"ten reps", 100, 10, 133.3},
+		{"high reps keep the formula", 100, 20, 166.7},
+		{"rounds to one decimal", 58.97, 10, 78.6},
 		{"non positive weight is zero", 0, 5, 0},
+		{"negative weight is zero", -10, 5, 0},
 		{"non positive reps is zero", 100, 0, 0},
+		{"negative reps is zero", 100, -3, 0},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := Epley1RM(tt.weight, tt.reps); got != tt.want {

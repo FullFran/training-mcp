@@ -421,12 +421,19 @@ func SuggestLoad(last *ExerciseSet, repMin, repMax int, targetRPE float64) LoadS
 	return out
 }
 
-// Epley1RM estimates a one-rep max from a set. It is descriptive only and is
-// never stored: SI remains the single recorded intensity metric. Reps of 1
-// return the weight unchanged.
+// Epley1RM estimates a one-rep max from a set with the Epley formula,
+// w*(1+reps/30), rounded to 0.1 kg. A single returns the lifted weight
+// unchanged: the formula would add 3.3%, which is an artefact, not a heavier
+// lift. It is descriptive only and is never stored: SI remains the single
+// recorded intensity metric. Non-positive weight or reps return 0. It is the
+// estimator EstimatorEpley; the best-set query in the store ranks sets the
+// same way, so the two must change together.
 func Epley1RM(weightKG float64, reps int) float64 {
 	if weightKG <= 0 || reps <= 0 {
 		return 0
+	}
+	if reps == 1 {
+		return math.Round(weightKG*10) / 10
 	}
 	return math.Round(weightKG*(1+float64(reps)/30)*10) / 10
 }

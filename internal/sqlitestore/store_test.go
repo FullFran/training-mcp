@@ -310,6 +310,41 @@ func TestStoreExerciseHistoryOrdersNewestFirstAndFindsTheRecord(t *testing.T) {
 	}
 }
 
+// A single counts as the lifted weight, so the record is ranked the same way the
+// estimate is shown: 104x1 is 104, below 95x3 at 104.5, although the raw
+// Epley formula would have put the single at 107.5.
+func TestStoreExerciseHistoryRanksASingleAtItsLiftedWeight(t *testing.T) {
+	store, err := Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	s, _ := store.ForUser(1).Start(ctx, training.Session{Date: "2026-07-01"})
+	for _, in := range []training.AddSetInput{
+		{SessionID: s.ID, Exercise: "banca", WeightKG: 104, Reps: 1, RPE: 10},
+		{SessionID: s.ID, Exercise: "banca", WeightKG: 95, Reps: 3, RPE: 9},
+	} {
+		if _, _, err := store.ForUser(1).AddSet(ctx, in); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := store.ForUser(1).ExerciseHistory(ctx, "banca", 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Best == nil || got.Best.WeightKG != 95 || got.Best.Est1RM != 104.5 {
+		t.Fatalf("best = %#v, want the 95x3 set at 104.5", got.Best)
+	}
+	if got.Sets[1].Reps != 1 || got.Sets[1].Est1RM != 104 {
+		t.Fatalf("single est 1RM = %#v, want 104", got.Sets[1])
+	}
+	// Another user's history is empty, not this one.
+	other, err := store.ForUser(2).ExerciseHistory(ctx, "banca", 50)
+	if err != nil || len(other.Sets) != 0 || other.Best != nil {
+		t.Fatalf("user 2 history = %#v, err=%v", other, err)
+	}
+}
+
 func TestStoreWeeklyVolumeBucketsByMondayOfTheTrainingWeek(t *testing.T) {
 	store, err := Open(t.TempDir() + "/training.db")
 	if err != nil {

@@ -1145,13 +1145,14 @@ ORDER BY se.date DESC, st.position DESC LIMIT ?`, s.userID, exercise, limit)
 	if err = rows.Err(); err != nil {
 		return out, err
 	}
-	// The record is computed over the whole history, not just the page returned.
+	// The record is computed over the whole history, not just the page returned,
+	// ranked as training.Epley1RM ranks it: a single counts as its lifted weight.
 	var best training.ExerciseSet
 	err = s.db.QueryRowContext(ctx, `
 SELECT st.id,st.session_id,se.date,st.weight_kg,st.reps,st.rpe,st.rpe_imputed,st.si,st.technique,st.superset
 FROM sets st JOIN sessions se ON se.id=st.session_id
 WHERE se.user_id=? AND st.exercise=? AND st.technique=''
-ORDER BY st.weight_kg*(1+CAST(st.reps AS REAL)/30) DESC, se.date DESC LIMIT 1`, s.userID, exercise).
+ORDER BY CASE WHEN st.reps=1 THEN st.weight_kg ELSE st.weight_kg*(1+CAST(st.reps AS REAL)/30) END DESC, se.date DESC LIMIT 1`, s.userID, exercise).
 		Scan(&best.SetID, &best.SessionID, &best.Date, &best.WeightKG, &best.Reps, &best.RPE, &best.RPEImputed, &best.SI, &best.Technique, &best.Superset)
 	if errors.Is(err, sql.ErrNoRows) {
 		return out, nil
