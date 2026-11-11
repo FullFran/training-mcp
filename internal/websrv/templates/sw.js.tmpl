@@ -4,10 +4,18 @@
 // pages are cached opportunistically so a lost connection still shows the last
 // known session. Writes are NOT queued offline — a set only counts once the
 // server has stored it, and a silent queue would let you believe otherwise.
-const VERSION = 'v1';
+//
+// At the root, several people may sign in on one device. Every signed-in page
+// names its session's cache partition in X-Cache-Partition ("<id>-<expiry>"), and
+// only that partition is ever read offline: a new session drops the others, an
+// expired one is dropped before reading, and the logged-out page (X-Cache-Clear)
+// drops them all. The secret mount sends no partition and keeps the old cache.
+const VERSION = 'v2';
 const SHELL = 'shell-' + VERSION;
 const PAGES = 'pages-' + VERSION;
 const BASE = '{{.Base}}';
+const USER_PAGES = 'user-pages-';
+const PARTITION = /^[A-Za-z0-9_]+-(\d+)$/;
 
 const SHELL_ASSETS = [
   BASE + '/static/app.css',
@@ -27,7 +35,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(
-        keys.filter((k) => k !== SHELL && k !== PAGES).map((k) => caches.delete(k))
+        keys.filter((k) => k !== SHELL && k !== PAGES && !k.startsWith(USER_PAGES)).map((k) => caches.delete(k))
       ))
       .then(() => self.clients.claim())
   );
@@ -56,10 +64,52 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(request)
       .then((res) => {
-        const copy = res.clone();
-        caches.open(PAGES).then((cache) => cache.put(request, copy));
+        event.waitUntil(remember(request, res.clone()));
         return res;
       })
-      .catch(() => caches.match(request))
+      .catch(() => offlineCopy(request))
   );
 });
+
+// dropUserPages deletes every signed-in partition except keep.
+function dropUserPages(keep) {
+  return caches.keys().then((keys) => Promise.all(
+    keys.filter((k) => k.startsWith(USER_PAGES) && k !== keep).map((k) => caches.delete(k))
+  ));
+}
+
+function remember(request, res) {
+  if (res.headers.get('X-Cache-Clear')) return dropUserPages(null);
+  // An error is never worth showing offline in place of the last good page.
+  if (!res.ok) return Promise.resolve();
+  const partition = res.headers.get('X-Cache-Partition');
+  if (partition === null) {
+    return caches.open(PAGES).then((cache) => cache.put(request, res));
+  }
+  if (!PARTITION.test(partition)) return Promise.resolve();
+  const name = USER_PAGES + partition;
+  return caches.open(name)
+    .then((cache) => cache.put(request, res))
+    .then(() => dropUserPages(name));
+}
+
+// livePartition returns the one signed-in partition still valid, dropping any
+// whose session has ended.
+function livePartition() {
+  const now = Date.now() / 1000;
+  return caches.keys().then((keys) => {
+    const owned = keys.filter((k) => k.startsWith(USER_PAGES));
+    const live = owned.filter((k) => {
+      const m = PARTITION.exec(k.slice(USER_PAGES.length));
+      return m && Number(m[1]) > now;
+    });
+    const keep = live.length === 1 ? live[0] : null;
+    return Promise.all(owned.filter((k) => k !== keep).map((k) => caches.delete(k))).then(() => keep);
+  });
+}
+
+function offlineCopy(request) {
+  return livePartition().then((name) => name
+    ? caches.open(name).then((cache) => cache.match(request))
+    : caches.match(request, { cacheName: PAGES }));
+}

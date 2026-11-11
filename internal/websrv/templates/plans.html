@@ -8,8 +8,9 @@
 <link rel="manifest" href="{{.Base}}/manifest.webmanifest">
 <link rel="icon" href="{{.Base}}/static/icon-192.png">
 <link rel="stylesheet" href="{{.Base}}/static/app.css">
-</head>
-<body data-base="{{.Base}}">
+{{if .CSRF}}<meta name="csrf-token" content="{{.CSRF}}">
+{{end}}</head>
+<body data-base="{{.Base}}"{{if .CSRF}} hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'{{end}}>
 
 <header class="bar">
   <div><strong>Rutinas</strong></div>

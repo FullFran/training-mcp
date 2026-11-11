@@ -79,6 +79,13 @@ func Routes(mcp http.Handler, authDisabled bool, token string, web *WebUI) http.
 // RoutesWithOAuth also accepts access tokens on /mcp when oauth is set. The web UI
 // stays behind the static token: these tokens are issued for the MCP resource.
 func RoutesWithOAuth(mcp http.Handler, authDisabled bool, token string, web *WebUI, oauth *OAuth) http.Handler {
+	return RoutesWithLogin(mcp, authDisabled, token, web, oauth, nil)
+}
+
+// RoutesWithLogin also serves the app at the root when root is set, to whoever
+// signs in with the provider, as their own user. Every route above keeps its own
+// guard: a browser session opens neither /mcp nor the secret mount.
+func RoutesWithLogin(mcp http.Handler, authDisabled bool, token string, web *WebUI, oauth *OAuth, root *RootWeb) http.Handler {
 	mux := http.NewServeMux()
 	if oauth != nil && !authDisabled {
 		mux.Handle("/mcp", MaxBody(oauth.guard(token, mcp)))
@@ -95,6 +102,9 @@ func RoutesWithOAuth(mcp http.Handler, authDisabled bool, token string, web *Web
 		guarded := MaxBody(Bearer(token, authDisabled, asOwner(web.Handler)))
 		mux.Handle(web.BasePath, guarded)
 		mux.Handle(web.BasePath+"/", guarded)
+	}
+	if root != nil && root.Handler != nil && root.Login != nil {
+		mux.Handle("/", MaxBody(root.Login.Wrap(root.Handler)))
 	}
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
