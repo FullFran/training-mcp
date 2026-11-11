@@ -132,12 +132,13 @@ func TestServiceWorkerKeepsEachUsersPagesApart(t *testing.T) {
 		return *p
 	}
 	want := map[string]string{
-		"switchUser":  "B today",
-		"logout":      "<nothing>",
-		"expired":     "<nothing>",
-		"errors":      "A today",
-		"malformed":   "<nothing>",
-		"secretMount": "owner today",
+		"switchUser":       "B today",
+		"logout":           "<nothing>",
+		"expired":          "<nothing>",
+		"errors":           "A today",
+		"malformed":        "<nothing>",
+		"secretMount":      "owner today",
+		"secretBesideRoot": "owner today",
 	}
 	for name, today := range want {
 		if str(got[name].Today) != today {

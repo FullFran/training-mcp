@@ -133,6 +133,13 @@ const scenarios = {
     sw.offline();
     return { today: await sw.get('/'), caches: await sw.caches.keys() };
   },
+  // The owner signed in at the root keeps the secret mount's offline copy.
+  async secretBesideRoot(sw) {
+    await sw.get('/app/', { body: 'owner today' });
+    await sw.get('/', as(`aaaa-${future()}`, 'A today'));
+    sw.offline();
+    return { today: await sw.get('/app/') };
+  },
   // The secret mount sends no partition and keeps its old offline copy.
   async secretMount(sw) {
     await sw.get('/app/', { body: 'owner today' });

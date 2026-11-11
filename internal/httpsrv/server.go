@@ -105,6 +105,10 @@ func RoutesWithLogin(mcp http.Handler, authDisabled bool, token string, web *Web
 	}
 	if root != nil && root.Handler != nil && root.Login != nil {
 		mux.Handle("/", MaxBody(root.Login.Wrap(root.Handler)))
+		// Discovery probes and paths under /mcp keep answering 404, as they did
+		// before the root served anything.
+		mux.Handle("/.well-known/", http.NotFoundHandler())
+		mux.Handle("/mcp/", http.NotFoundHandler())
 	}
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

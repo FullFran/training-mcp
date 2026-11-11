@@ -108,8 +108,11 @@ function livePartition() {
   });
 }
 
+// offlineCopy reads the live partition first. Signed-in pages are only ever
+// filed there, so falling back to PAGES serves the secret mount's pages, which
+// share this origin's caches, and never another session's.
 function offlineCopy(request) {
-  return livePartition().then((name) => name
-    ? caches.open(name).then((cache) => cache.match(request))
-    : caches.match(request, { cacheName: PAGES }));
+  return livePartition()
+    .then((name) => name ? caches.open(name).then((cache) => cache.match(request)) : undefined)
+    .then((hit) => hit || caches.match(request, { cacheName: PAGES }));
 }

@@ -675,6 +675,16 @@ func mergeHeaders(a, b map[string]string) map[string]string {
 	return out
 }
 
+// Clients probe these for OAuth and MCP discovery; a login page is no answer.
+func TestDiscoveryPathsStayMissingBesideTheLogin(t *testing.T) {
+	f := newLoginFixture(t, false)
+	for _, path := range []string{"/.well-known/oauth-authorization-server", "/.well-known/openid-configuration", "/mcp/", "/mcp/x"} {
+		if w := f.do(http.MethodGet, path, nil, nil, nil); w.Code != http.StatusNotFound {
+			t.Errorf("%s: status %d", path, w.Code)
+		}
+	}
+}
+
 func TestRoutesWithoutTheLoginKeepUnknownPathsMissing(t *testing.T) {
 	handler := Routes(http.NotFoundHandler(), false, staticToken, nil)
 	w := httptest.NewRecorder()
