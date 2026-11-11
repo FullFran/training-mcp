@@ -35,6 +35,7 @@ var actionLabels = map[string]string{
 	"exercise.group.set":      "Asignar grupo muscular",
 	"feedback.record":         "Valorar grupo muscular",
 	"landmarks.set":           "Fijar MEV/MRV",
+	"rest.set":                "Cambiar descanso objetivo",
 }
 
 func actionLabel(actionType string) string {

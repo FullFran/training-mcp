@@ -250,6 +250,7 @@ type RestTargetInput struct {
 }
 type RestTargetOut struct {
 	RestSeconds int `json:"rest_seconds"`
+	ProposalRef
 }
 type NotesOut struct {
 	Notes []training.ExerciseNote `json:"notes"`
@@ -483,12 +484,12 @@ func New(service training.ServiceFor) *Server {
 	restSchema := mustInputSchema[RestTargetInput]()
 	restSchema.Properties["rest_seconds"].Minimum = jsonschema.Ptr(float64(training.MinRestSeconds))
 	restSchema.Properties["rest_seconds"].Maximum = jsonschema.Ptr(float64(training.MaxRestSeconds))
-	addTool(s, &mcp.Tool{Name: "set_rest_target", Description: "Set the person's target rest between sets, in seconds. The phone's rest timer and live_workout use it. Until set it is 120 seconds.", InputSchema: restSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in RestTargetInput) (*mcp.CallToolResult, RestTargetOut, error) {
-		if err := service(ctx).SetRestTarget(ctx, in.RestSeconds); err != nil {
-			return nil, RestTargetOut{}, toolError(err)
+	addWrite(w, &mcp.Tool{Name: "set_rest_target", Description: "Set the person's target rest between sets, in seconds. The phone's rest timer and live_workout use it. Until set it is 120 seconds.", InputSchema: restSchema}, "rest.set", func(ctx context.Context, svc *training.Service, in RestTargetInput) (RestTargetOut, error) {
+		if err := svc.SetRestTarget(ctx, in.RestSeconds); err != nil {
+			return RestTargetOut{}, err
 		}
-		v, err := service(ctx).RestTarget(ctx)
-		return nil, RestTargetOut{RestSeconds: v}, toolError(err)
+		v, err := svc.RestTarget(ctx)
+		return RestTargetOut{RestSeconds: v}, err
 	})
 
 	setItemSchema := mustInputSchema[SessionItemInput]()
