@@ -26,6 +26,8 @@ type LoggedSet struct {
 	RPE        float64 `json:"rpe"`
 	RPEImputed bool    `json:"rpe_imputed,omitempty"`
 	Technique  string  `json:"technique,omitempty"`
+	// Category is SetWarmup or SetWorking; empty means working.
+	Category string `json:"category,omitempty"`
 }
 
 // LogSetsInput asks to record a batch of sets of one exercise into today's
@@ -83,7 +85,18 @@ type Set struct {
 	// Superset labels the round this set belonged to. Stamped from the
 	// session's plan, so logging never has to state it.
 	Superset string `json:"superset,omitempty"`
+	// Category is SetWorking or SetWarmup. A warm-up set is kept and shown but
+	// never counts: its SI is zero and it is left out of set counts, volume,
+	// planned-versus-done progress, best set, e1RM and every estimate.
+	Category string `json:"category"`
 }
+
+// Set categories. Working is the default; a warm-up only prepares for the
+// working sets.
+const (
+	SetWorking = "working"
+	SetWarmup  = "warmup"
+)
 
 // Techniques are the intensity methods offered as suggestions. The field is not
 // restricted to them — reality invents more — but suggesting a known list is
@@ -117,6 +130,8 @@ type AddSetInput struct {
 	RPEImputed bool
 	Technique  string
 	Superset   string
+	// Category is SetWarmup or SetWorking; empty means working.
+	Category string
 }
 type SetPatch struct {
 	Exercise  *string
@@ -124,6 +139,7 @@ type SetPatch struct {
 	Reps      *int
 	RPE       *float64
 	Technique *string
+	Category  *string
 }
 type ListFilter struct {
 	Limit    int
@@ -441,7 +457,9 @@ func Epley1RM(weightKG float64, reps int) float64 {
 // ExerciseSet is one recorded set carrying the date it was performed, so an
 // exercise's progression can be read without walking every session.
 type ExerciseSet struct {
-	Technique string  `json:"technique,omitempty"`
+	Technique string `json:"technique,omitempty"`
+	// Category is SetWorking or SetWarmup; a warm-up carries no est_1rm.
+	Category  string  `json:"category"`
 	Superset  string  `json:"superset,omitempty"`
 	SetID     int64   `json:"set_id"`
 	SessionID int64   `json:"session_id"`
@@ -500,5 +518,5 @@ type ExerciseMemory struct {
 type Clock func() time.Time
 
 func (p SetPatch) Empty() bool {
-	return p.Exercise == nil && p.WeightKG == nil && p.Reps == nil && p.RPE == nil && p.Technique == nil
+	return p.Exercise == nil && p.WeightKG == nil && p.Reps == nil && p.RPE == nil && p.Technique == nil && p.Category == nil
 }
