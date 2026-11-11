@@ -24,7 +24,6 @@ const (
 
 // skipLabels name why rows were not imported, in the order the page lists them.
 var skipLabels = []MemoryOption{
-	{importer.SkipWarmup, "Calentamientos"},
 	{importer.SkipNoLoad, "Sin peso o sin reps (cardio, peso corporal, tiempo)"},
 	{importer.SkipNotASet, "Filas que no son series (descansos, notas)"},
 	{importer.SkipUnreadable, "Filas ilegibles"},

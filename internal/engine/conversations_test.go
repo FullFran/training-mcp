@@ -213,7 +213,7 @@ func TestReactionsGoToTheOpenConversation(t *testing.T) {
 	}
 	ch, closeSub := h.m.Subscribe(1)
 	defer closeSub()
-	h.m.Notify(1, SetLogged(time.Now(), "banca", 80, 8, 8, ""))
+	h.m.Notify(1, SetLogged(time.Now(), "banca", 80, 8, 8, "", ""))
 	events, _ := collect(t, ch)
 	if events[0].Data["conversation"] != a || events[0].Data["origin"] != "reaction" {
 		t.Fatalf("reaction turn = %+v", events[0])

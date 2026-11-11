@@ -34,6 +34,8 @@ type ImportedSet struct {
 	RPE        float64
 	RPEImputed bool
 	Technique  string
+	// Category is SetWarmup or SetWorking; empty means working.
+	Category string
 }
 
 // ImportedWorkout becomes one session.
@@ -72,6 +74,7 @@ type DaySet struct {
 	Exercise string
 	WeightKG float64
 	Reps     int
+	Category string
 }
 
 // ImportStore keeps one user's imports.
@@ -158,8 +161,10 @@ func (s *Service) ApplyImport(ctx context.Context, in ImportRecord) (ImportSumma
 		for j := range w.Sets {
 			set := &w.Sets[j]
 			set.Exercise = strings.ToLower(strings.TrimSpace(set.Exercise))
-			set.Technique = normalizeTechnique(set.Technique)
-			if set.Key == "" || len(set.Key) > maxImportKeyLen || len(set.Exercise) > maxImportNameLen ||
+			category, technique, ok := setCategory(set.Category, set.Technique)
+			set.Category, set.Technique = category, technique
+			set.WeightKG = RoundWeight(set.WeightKG)
+			if !ok || set.Key == "" || len(set.Key) > maxImportKeyLen || len(set.Exercise) > maxImportNameLen ||
 				len(set.Technique) > maxTechniqueLen || !validSetFields(set.Exercise, set.WeightKG, set.Reps, set.RPE) {
 				return ImportSummary{}, ErrValidation
 			}

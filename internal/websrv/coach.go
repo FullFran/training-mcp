@@ -393,5 +393,5 @@ func (s *Server) notifySetLogged(r *http.Request, set training.Set) {
 	if !ok {
 		return
 	}
-	s.opts.Coach.Notify(userID, engine.SetLogged(s.clock(), set.Exercise, set.WeightKG, set.Reps, set.RPE, set.Technique))
+	s.opts.Coach.Notify(userID, engine.SetLogged(s.clock(), set.Exercise, set.WeightKG, set.Reps, set.RPE, set.Technique, set.Category))
 }

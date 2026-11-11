@@ -69,14 +69,14 @@ func TestPreviewOfANewHistoryCountsWhatWouldBeImported(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Sessions != 2 || p.Sets != 4 || p.Imputed != 1 || p.Exercises != 2 || p.Unmapped != 2 || p.AlreadyImported != 0 || p.InHistory != 0 {
+	if p.Sessions != 2 || p.Sets != 5 || p.Warmups != 1 || p.Imputed != 1 || p.Exercises != 2 || p.Unmapped != 2 || p.AlreadyImported != 0 || p.InHistory != 0 {
 		t.Fatalf("preview = %+v", p)
 	}
 	if p.From != "2025-12-20" || p.To != "2025-12-22" {
 		t.Fatalf("range = %s..%s", p.From, p.To)
 	}
 	want := []importer.NameChoice{
-		{Source: "Bench Press (Barbell)", Exercise: "bench press (barbell)", Sets: 3},
+		{Source: "Bench Press (Barbell)", Exercise: "bench press (barbell)", Sets: 4},
 		{Source: "Squat (Barbell)", Exercise: "squat (barbell)", Sets: 1},
 	}
 	if !reflect.DeepEqual(p.Names, want) {
@@ -97,7 +97,7 @@ func TestApplyImportsOnceAndASecondTimeAddsNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if summary.Sessions != 2 || summary.Sets != 4 || summary.Imputed != 1 || p.Sets != 4 {
+	if summary.Sessions != 2 || summary.Sets != 5 || summary.Imputed != 1 || p.Sets != 5 {
 		t.Fatalf("summary = %+v, preview = %+v", summary, p)
 	}
 	if n := count(t, w.db, `SELECT COUNT(*) FROM sets WHERE exercise='press banca' AND rpe_imputed=1 AND rpe=8 AND weight_kg=80 AND reps=7`); n != 1 {
@@ -111,7 +111,7 @@ func TestApplyImportsOnceAndASecondTimeAddsNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if again.Sets != 0 || again.Sessions != 0 || again.AlreadyImported != 4 {
+	if again.Sets != 0 || again.Sessions != 0 || again.AlreadyImported != 5 {
 		t.Fatalf("second preview = %+v", again)
 	}
 	// The remembered name comes back without being chosen again.
@@ -122,7 +122,7 @@ func TestApplyImportsOnceAndASecondTimeAddsNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if second != (training.ImportSummary{}) || count(t, w.db, `SELECT COUNT(*) FROM sets`) != 4 || count(t, w.db, `SELECT COUNT(*) FROM imports`) != 1 {
+	if second != (training.ImportSummary{}) || count(t, w.db, `SELECT COUNT(*) FROM sets`) != 5 || count(t, w.db, `SELECT COUNT(*) FROM imports`) != 1 {
 		t.Fatalf("second import = %+v", second)
 	}
 }
@@ -144,7 +144,7 @@ func TestSetsAlreadyInTheHistoryAreNotImportedAgain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.InHistory != 1 || p.Sets != 3 || p.Sessions != 1 || p.Unmapped != 1 {
+	if p.InHistory != 1 || p.Sets != 4 || p.Sessions != 1 || p.Unmapped != 1 {
 		t.Fatalf("preview = %+v", p)
 	}
 	if _, _, err = importer.Apply(ctx, svc, hevyFile(t), map[string]string{"Squat (Barbell)": "Sentadilla"}, "workouts.csv"); err != nil {
@@ -170,7 +170,7 @@ func TestNamesMatchTheCatalogueAndSuggestCloseOnes(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []importer.NameChoice{
-		{Source: "Bench Press (Barbell)", Exercise: "bench press (barbell)", Suggestion: "bench press", Sets: 3},
+		{Source: "Bench Press (Barbell)", Exercise: "bench press (barbell)", Suggestion: "bench press", Sets: 4},
 		{Source: "Squat (Barbell)", Exercise: "squat (barbell)", Known: true, Sets: 1},
 	}
 	if !reflect.DeepEqual(p.Names, want) || p.Unmapped != 1 {
@@ -193,8 +193,15 @@ func TestAnotherUsersHistoryAndNamesDoNotCount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Sets != 4 || p.AlreadyImported != 0 || p.InHistory != 0 || p.Names[0].Exercise != "bench press (barbell)" || p.Names[0].Remembered || len(p.Catalogue) != 0 {
+	if p.Sets != 5 || p.AlreadyImported != 0 || p.InHistory != 0 || p.Names[0].Exercise != "bench press (barbell)" || p.Names[0].Remembered || len(p.Catalogue) != 0 {
 		t.Fatalf("second user's preview = %+v", p)
+	}
+	// The same workouts get the second user's own sessions, never the owner's.
+	if _, summary, err := importer.Apply(ctx, w.services.ForUser(2), hevyFile(t), nil, "workouts.csv"); err != nil || summary.Sessions != 2 || summary.Sets != 5 {
+		t.Fatalf("second user's import = %+v, %v", summary, err)
+	}
+	if n := count(t, w.db, `SELECT COUNT(*) FROM sets st JOIN sessions se ON se.id=st.session_id WHERE se.user_id=1`); n != 5 {
+		t.Fatalf("owner's sets = %d", n)
 	}
 }
 
@@ -236,5 +243,128 @@ func TestAnOverlongExerciseNameStillImports(t *testing.T) {
 	}
 	if n := count(t, w.db, `SELECT COUNT(*) FROM import_exercise_map`); n != 0 {
 		t.Fatalf("remembered %d overlong names", n)
+	}
+}
+
+// withoutWarmups is the file as the importer read it while it skipped warm-up
+// rows: the same working sets with the same keys.
+func withoutWarmups(f importer.File) importer.File {
+	out := f
+	out.Workouts = nil
+	for _, w := range f.Workouts {
+		kept := w
+		kept.Sets = nil
+		for _, s := range w.Sets {
+			if s.Category != training.SetWarmup {
+				kept.Sets = append(kept.Sets, s)
+			}
+		}
+		out.Workouts = append(out.Workouts, kept)
+	}
+	return out
+}
+
+// Warm-ups are imported as warm-ups. A file imported while warm-ups were
+// skipped, imported again, gains only its warm-ups, and only once.
+func TestReimportingAddsOnlyTheWarmupsOnce(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	svc := w.services.ForUser(1)
+	chosen := map[string]string{"Bench Press (Barbell)": "Press banca"}
+	if _, first, err := importer.Apply(ctx, svc, withoutWarmups(hevyFile(t)), chosen, "workouts.csv"); err != nil || first.Sets != 4 {
+		t.Fatalf("first import = %+v, %v", first, err)
+	}
+	p, second, err := importer.Apply(ctx, svc, hevyFile(t), nil, "workouts.csv")
+	if err != nil || second.Sets != 1 || second.Sessions != 0 || second.Imputed != 0 || p.AlreadyImported != 4 {
+		t.Fatalf("second import = %+v, preview %+v, %v", second, p, err)
+	}
+	if n := count(t, w.db, `SELECT COUNT(*) FROM sets WHERE exercise='press banca' AND category='warmup' AND weight_kg=40 AND reps=10 AND si=0`); n != 1 {
+		t.Fatalf("warm-up rows = %d", n)
+	}
+	// It joined the session its working sets are in.
+	if n := count(t, w.db, `SELECT COUNT(DISTINCT session_id) FROM sets WHERE exercise='press banca'`); n != 1 {
+		t.Fatalf("bench sessions = %d", n)
+	}
+	if _, third, err := importer.Apply(ctx, svc, hevyFile(t), nil, "workouts.csv"); err != nil || third.Sets != 0 {
+		t.Fatalf("third import = %+v, %v", third, err)
+	}
+	if n := count(t, w.db, `SELECT COUNT(*) FROM sets`); n != 5 {
+		t.Fatalf("sets = %d", n)
+	}
+}
+
+// A set already in the history hides an imported one only when both are of
+// the same category: a hand-logged working 40x10 is not the file's warm-up.
+func TestHistoryMatchesSetsOfTheSameCategoryOnly(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	svc := w.services.ForUser(1)
+	session, err := svc.StartSession(ctx, "2025-12-22")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = svc.AddSet(ctx, training.AddSetInput{SessionID: session.ID, Exercise: "press banca", WeightKG: 40, Reps: 10, RPE: 8}); err != nil {
+		t.Fatal(err)
+	}
+	chosen := map[string]string{"Bench Press (Barbell)": "Press banca"}
+	p, err := importer.Plan(ctx, svc, hevyFile(t), chosen, "workouts.csv")
+	if err != nil || p.InHistory != 0 || p.Sets != 5 {
+		t.Fatalf("working set hid the warm-up: %+v, %v", p, err)
+	}
+	if _, _, err = svc.AddSet(ctx, training.AddSetInput{SessionID: session.ID, Exercise: "press banca", WeightKG: 40, Reps: 10, RPE: 6, Category: training.SetWarmup}); err != nil {
+		t.Fatal(err)
+	}
+	if p, err = importer.Plan(ctx, svc, hevyFile(t), chosen, "workouts.csv"); err != nil || p.InHistory != 1 || p.Sets != 4 {
+		t.Fatalf("logged warm-up did not hide the file's warm-up: %+v, %v", p, err)
+	}
+}
+
+// Two workouts starting at the same second are two sessions, as they were
+// before warm-ups were imported.
+func TestWorkoutsSharingAStartStaySeparateSessions(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	data := []byte(`"title","start_time","end_time","description","exercise_title","superset_id","exercise_notes","set_index","set_type","weight_kg","reps","distance_km","duration_seconds","rpe"
+"Upper","7 Mar 2024, 18:05","7 Mar 2024, 19:00","","Bench Press (Barbell)",,"",0,"normal",80,8,,,8
+"Lower","7 Mar 2024, 18:05","7 Mar 2024, 19:00","","Squat (Barbell)",,"",0,"warmup",60,5,,,
+"Lower","7 Mar 2024, 18:05","7 Mar 2024, 19:00","","Squat (Barbell)",,"",1,"normal",100,5,,,8
+`)
+	f, err := importer.Parse(data, importer.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := w.services.ForUser(1)
+	if _, s, err := importer.Apply(ctx, svc, withoutWarmups(f), nil, "twin.csv"); err != nil || s.Sessions != 2 {
+		t.Fatalf("first import = %+v, %v", s, err)
+	}
+	// The re-imported warm-up joins its own workout, not the other one.
+	p, s, err := importer.Apply(ctx, svc, f, nil, "twin.csv")
+	if err != nil || s.Sets != 1 || s.Sessions != 0 || p.Sessions != 0 {
+		t.Fatalf("re-import = %+v, preview %+v, %v", s, p, err)
+	}
+	if n := count(t, w.db, `SELECT COUNT(DISTINCT session_id) FROM sets WHERE exercise='squat (barbell)'`); n != 1 {
+		t.Fatalf("squat sessions = %d", n)
+	}
+	if n := count(t, w.db, `SELECT COUNT(DISTINCT session_id) FROM sets`); n != 2 {
+		t.Fatalf("sessions holding sets = %d", n)
+	}
+}
+
+// A working set new to an already imported workout still gets a session of
+// its own, as before: only warm-ups join the earlier session.
+func TestANewWorkingSetOfAnImportedWorkoutKeepsItsOwnSession(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	svc := w.services.ForUser(1)
+	f := hevyFile(t)
+	full := f
+	trimmed := f
+	trimmed.Workouts = append([]importer.Workout(nil), f.Workouts...)
+	trimmed.Workouts[1].Sets = f.Workouts[1].Sets[:len(f.Workouts[1].Sets)-1]
+	if _, _, err := importer.Apply(ctx, svc, trimmed, nil, "a.csv"); err != nil {
+		t.Fatal(err)
+	}
+	if _, s, err := importer.Apply(ctx, svc, full, nil, "b.csv"); err != nil || s.Sets != 1 || s.Sessions != 1 {
+		t.Fatalf("second import = %+v, %v", s, err)
 	}
 }

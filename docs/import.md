@@ -37,9 +37,9 @@ moment, and a tampered payload is just another file the same person uploaded.
 | RPE 1 to 10 | RPE, as measured |
 | No RPE | RPE 8 with `rpe_imputed` set, exactly like a set logged without one ([SI formula](si-formula.md)): one plain SI unit, shown as `@?`, never read as a measurement |
 | Drop set (Hevy `dropset`, Strong `D`) | Technique `drop set` |
+| Warm-up (Hevy `warmup`, Strong `W`) | A set with category `warmup`: recorded and shown, but it never counts (SI 0, left out of set counts, volume, progress, records and estimates). Its missing RPE is not reported as imputed, and the preview says how many of the new sets are warm-ups |
 
-Left out, and counted in the preview: warm-up sets (Hevy `warmup`, Strong
-`W`), rows without weight or reps (cardio, timed holds, bodyweight sets, which
+Left out, and counted in the preview: rows without weight or reps (cardio, timed holds, bodyweight sets, which
 the app cannot record as sets yet), Strong's `Rest Timer` and `Note` rows, and
 rows whose date or numbers cannot be read. Neither app exports RIR; an RPE
 outside 1 to 10 is treated as missing.
@@ -49,13 +49,18 @@ outside 1 to 10 is treated as missing.
 - Every set gets a natural key: the app, the workout's start, its title, the
   exercise as the app named it, and the set's order within that exercise in
   that workout. Warm-ups count in that order, so changing what is skipped never
-  renumbers a set. `imported_sets` keeps the keys per user; a set whose key is
+  renumbers a set: working sets kept the keys they had while warm-ups were
+  skipped, and a file imported then gains only its warm-ups, once, in the
+  session an earlier import created for that workout (same start and notes).
+  Only warm-ups join an earlier session: a new working set of a workout already
+  imported still gets a session of its own, and workouts sharing a start time
+  stay separate. The preview counts only the sessions that will be created. `imported_sets` keeps the keys per user; a set whose key is
   there is never imported again, even if the set it created was deleted later.
   Importing the same file twice therefore adds nothing, and a later export of
   the whole history adds only the new workouts.
 - The file's SHA-256 is stored with each import (`imports.content_hash`); the
   preview says when the very same file was imported before, and when.
-- A set the history already holds (same day, exercise, weight and reps), logged
+- A set the history already holds (same day, exercise, weight, reps and category), logged
   some other way, is not imported either. This covers history entered by hand
   before this feature, such as the 2025 Hevy backfill whose unrated sets were
   marked imputed by migrations 011 and 012. Sets from earlier imports use up

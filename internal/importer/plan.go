@@ -37,8 +37,9 @@ type NameChoice struct {
 type Preview struct {
 	Source, Hash, FileName string
 	// Sessions, Sets and Exercises count only what is new; Imputed counts the new
-	// sets whose RPE was not stated and will be stored as a placeholder.
-	Sessions, Sets, Imputed, Exercises int
+	// working sets whose RPE was not stated and will be stored as a placeholder;
+	// Warmups counts the new sets that are warm-ups, already within Sets.
+	Sessions, Sets, Imputed, Exercises, Warmups int
 	// Unmapped counts names that would be recorded as new exercises.
 	Unmapped int
 	// AlreadyImported are sets an earlier import recorded; InHistory are sets
@@ -135,7 +136,7 @@ func Plan(ctx context.Context, svc *training.Service, f File, chosen map[string]
 			return Preview{}, err
 		}
 		for _, d := range existing {
-			history[setID(d.Date, d.Exercise, d.WeightKG, d.Reps)]++
+			history[setID(d.Date, d.Exercise, d.WeightKG, d.Reps, d.Category == training.SetWarmup)]++
 		}
 	}
 
@@ -150,9 +151,12 @@ func Plan(ctx context.Context, svc *training.Service, f File, chosen map[string]
 	exercises := map[string]bool{}
 	for _, w := range f.Workouts {
 		out := training.ImportedWorkout{Date: w.Date, StartedAt: w.StartedAt, Notes: workoutNotes(w)}
+		// A new warm-up of a workout an earlier import recorded joins that
+		// session, so the workout needs a new one only for a new working set.
+		earlier, working := false, false
 		for _, s := range w.Sets {
 			exercise := resolved[s.Exercise]
-			id := setID(w.Date, exercise, s.WeightKG, s.Reps)
+			id := setID(w.Date, exercise, s.WeightKG, s.Reps, s.Category == training.SetWarmup)
 			// A set an earlier import recorded is in the history too: it uses up its
 			// match there, so it cannot hide a genuinely new set just like it.
 			matched := history[id] > 0
@@ -162,22 +166,33 @@ func Plan(ctx context.Context, svc *training.Service, f File, chosen map[string]
 			switch {
 			case imported[s.Key]:
 				p.AlreadyImported++
+				earlier = true
 				continue
 			case matched:
 				p.InHistory++
 				continue
 			}
-			set := training.ImportedSet{Key: s.Key, Exercise: exercise, WeightKG: s.WeightKG, Reps: s.Reps, RPE: s.RPE, Technique: s.Technique}
+			set := training.ImportedSet{Key: s.Key, Exercise: exercise, WeightKG: s.WeightKG, Reps: s.Reps, RPE: s.RPE, Technique: s.Technique, Category: s.Category}
 			if set.RPE == 0 {
 				set.RPE, set.RPEImputed = training.ImputedRPE, true
-				p.Imputed++
+				// A warm-up counts nothing, so its missing RPE is not worth a warning.
+				if set.Category != training.SetWarmup {
+					p.Imputed++
+				}
+			}
+			if set.Category == training.SetWarmup {
+				p.Warmups++
+			} else {
+				working = true
 			}
 			out.Sets = append(out.Sets, set)
 			exercises[exercise] = true
 		}
 		if len(out.Sets) > 0 {
 			p.Record.Workouts = append(p.Record.Workouts, out)
-			p.Sessions++
+			if working || !earlier {
+				p.Sessions++
+			}
 			p.Sets += len(out.Sets)
 		}
 	}
@@ -209,8 +224,13 @@ func workoutNotes(w Workout) string {
 }
 
 // setID is what makes two recorded sets the same set: day, exercise, load and reps.
-func setID(date, exercise string, weight float64, reps int) string {
-	return date + "\x00" + exercise + "\x00" + strconv.FormatFloat(math.Round(weight*100)/100, 'f', 2, 64) + "\x00" + strconv.Itoa(reps)
+func setID(date, exercise string, weight float64, reps int, warmup bool) string {
+	id := date + "\x00" + exercise + "\x00" + strconv.FormatFloat(math.Round(weight*100)/100, 'f', 2, 64) + "\x00" + strconv.Itoa(reps)
+	// A warm-up and a working set of the same load are different sets.
+	if warmup {
+		id += "\x00warmup"
+	}
+	return id
 }
 
 // clip cuts v to at most n bytes without splitting a character.

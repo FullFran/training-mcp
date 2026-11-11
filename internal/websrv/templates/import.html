@@ -31,7 +31,7 @@
     <input type="hidden" name="file_name" value="{{$.Import.FileName}}">
     <input type="hidden" name="unit" value="{{$.Import.Unit}}">
     <header><strong>Vista previa</strong> <span class="muted">{{if eq .Source "hevy"}}Hevy{{else}}Strong{{end}} · {{$.Import.FileName}}{{if .From}} · {{.From}} a {{.To}}{{end}}</span></header>
-    <p class="summary">{{countOf .Sessions "sesión nueva" "sesiones nuevas"}} · {{countOf .Sets "serie" "series"}} · {{countOf .Exercises "ejercicio" "ejercicios"}} · {{.Imputed}} sin RPE</p>
+    <p class="summary">{{countOf .Sessions "sesión nueva" "sesiones nuevas"}} · {{countOf .Sets "serie" "series"}}{{if .Warmups}} ({{.Warmups}} de calentamiento){{end}} · {{countOf .Exercises "ejercicio" "ejercicios"}} · {{.Imputed}} sin RPE</p>
     {{with .ImportedBefore}}<p class="alert" role="status">Este mismo archivo ya se importó el {{.CreatedAt.Format "2006-01-02"}} ({{.FileName}}). Volver a importarlo no añade lo que ya está.</p>{{end}}
     {{if .Imputed}}<p class="muted">Las series sin RPE se guardan con RPE 8 marcado como imputado: cuentan una unidad de SI y nunca se leen como medida.</p>{{end}}
     {{if or .AlreadyImported .InHistory}}<p class="muted">No se importan: {{if .AlreadyImported}}{{countOf .AlreadyImported "ya importada" "ya importadas"}}{{end}}{{if and .AlreadyImported .InHistory}} · {{end}}{{if .InHistory}}{{countOf .InHistory "ya en tu historial" "ya en tu historial"}} (mismo día, ejercicio, peso y reps){{end}}.</p>{{end}}
