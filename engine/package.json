@@ -1,0 +1,14 @@
+{
+  "name": "training-mcp-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The in-app coach's engine process: one person, one conversation, on the Pi SDK. Started by training-mcp over stdin and stdout; see docs/coach.md.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "1.5.2",
+    "@earendil-works/pi-coding-agent": "1.5.2"
+  }
+}

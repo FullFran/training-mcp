@@ -1,0 +1,2 @@
+# Installed inside the image by its own stage, never copied from a checkout.
+engine/node_modules
