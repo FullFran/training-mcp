@@ -36,6 +36,10 @@ func TestProposalSummaryPerTool(t *testing.T) {
 		{"memory_save", `{"type":"limitation","title":"Hombro","body":"Duele en press militar"}`, "Recordar (limitación) «Hombro»: Duele en press militar"},
 		{"memory_save", `{"title":"Agarre","body":"Prefiere agarre neutro"}`, "Recordar (nota) «Agarre»: Prefiere agarre neutro"},
 		{"memory_forget", `{"memory_id":4}`, "Olvidar el recuerdo 4"},
+		{"memory_judge", `{"relation_id":3,"relation":"supersedes","reason":"ya se recuperó"}`, "Relación 3: sustituye al anterior (ya se recuperó)"},
+		{"memory_judge", `{"relation_id":3,"relation":"conflicts_with"}`, "Relación 3: se contradicen"},
+		{"memory_confirm", `{"memory_id":4}`, "Confirmar que el recuerdo 4 sigue vigente"},
+		{"memory_consolidate", `{"memory_ids":[1,2],"title":"Hombro","body":"Duele en press","fingerprint":"f"}`, "Fusionar los recuerdos 1, 2 en «Hombro»: Duele en press"},
 	}
 	for _, c := range cases {
 		if got := proposalSummary(c.tool, []byte(c.payload)); got != c.want {

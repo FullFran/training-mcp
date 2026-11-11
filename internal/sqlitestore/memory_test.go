@@ -18,7 +18,7 @@ func saveMemory(t *testing.T, u training.UserStore, key, title, body string, min
 	if err != nil {
 		t.Fatal(err)
 	}
-	return m
+	return m.Memory
 }
 
 func titles(ms []training.Memory) []string {
@@ -37,11 +37,12 @@ func TestSavingTheSameTopicKeyUpdatesTheFact(t *testing.T) {
 	if _, err := u.UpdateMemory(ctx, first.ID, training.MemoryPatch{Pinned: &pinned, UpdatedAt: memoryAt(1)}); err != nil {
 		t.Fatal(err)
 	}
-	second, err := u.SaveMemory(ctx, training.Memory{TopicKey: "lesion/hombro", Type: training.MemoryLimitation, Title: "Hombro derecho",
+	saved, err := u.SaveMemory(ctx, training.Memory{TopicKey: "lesion/hombro", Type: training.MemoryLimitation, Title: "Hombro derecho",
 		Body: "Ya no duele", SourceChatID: "chat-9", CreatedAt: memoryAt(5), UpdatedAt: memoryAt(5)}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	second := saved.Memory
 	if second.ID != first.ID || second.Title != "Hombro derecho" || second.Body != "Ya no duele" || second.Type != training.MemoryLimitation {
 		t.Fatalf("second save = %#v", second)
 	}

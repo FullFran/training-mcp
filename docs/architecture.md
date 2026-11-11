@@ -114,6 +114,11 @@ topic key) and `coach_memory_fts`, an FTS5 index with external content kept in
 step by triggers. The index holds no user id; every search joins back to
 `coach_memory` and filters by user there. Search text is reduced to quoted
 prefix words, so nothing a person or agent types is read as FTS syntax.
+Migration 020 adds the lifecycle: revision count, review date, supersession
+and soft delete on `coach_memory`, its earlier texts in `coach_memory_revisions`
+and the coach's judgements between similar facts in `coach_memory_relations`.
+Both go with a fact deleted for good (foreign keys cascade). Saves, edits,
+judgements and merges run in one transaction each.
 
 `sqlitestore` carries the highest coverage floor in CI (70% statements) because
 it is the layer that touches the data: a bug in a driving adapter shows up as a

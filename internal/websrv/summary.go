@@ -7,6 +7,16 @@ import (
 	"strings"
 )
 
+// relationLabels say in the app's language how two facts relate.
+var relationLabels = map[string]string{
+	"supersedes":     "sustituye al anterior",
+	"conflicts_with": "se contradicen",
+	"related":        "están relacionados",
+	"compatible":     "son compatibles",
+	"scoped":         "cada uno vale en su contexto",
+	"not_conflict":   "no se contradicen",
+}
+
 // proposalSummary says in one sentence what a proposal of a write tool would
 // do, built from its payload only, so it is the same every time and costs no
 // model. The payload shapes mirror the MCP tools' inputs. An unknown tool or a
@@ -379,6 +389,40 @@ var summaries = map[string]func(json.RawMessage) string{
 		MemoryID int64 `json:"memory_id"`
 	}) string {
 		return fmt.Sprintf("Olvidar el recuerdo %d", in.MemoryID)
+	}),
+	"memory_judge": summary(func(in struct {
+		RelationID int64  `json:"relation_id"`
+		Relation   string `json:"relation"`
+		Reason     string `json:"reason"`
+	}) string {
+		label, ok := relationLabels[in.Relation]
+		if !ok {
+			return ""
+		}
+		out := fmt.Sprintf("Relación %d: %s", in.RelationID, label)
+		if in.Reason != "" {
+			out += " (" + in.Reason + ")"
+		}
+		return out
+	}),
+	"memory_confirm": summary(func(in struct {
+		MemoryID int64 `json:"memory_id"`
+	}) string {
+		return fmt.Sprintf("Confirmar que el recuerdo %d sigue vigente", in.MemoryID)
+	}),
+	"memory_consolidate": summary(func(in struct {
+		MemoryIDs []int64 `json:"memory_ids"`
+		Title     string  `json:"title"`
+		Body      string  `json:"body"`
+	}) string {
+		if len(in.MemoryIDs) < 2 || in.Title == "" || in.Body == "" {
+			return ""
+		}
+		ids := make([]string, len(in.MemoryIDs))
+		for i, id := range in.MemoryIDs {
+			ids[i] = strconv.FormatInt(id, 10)
+		}
+		return fmt.Sprintf("Fusionar los recuerdos %s en «%s»: %s", strings.Join(ids, ", "), in.Title, in.Body)
 	}),
 	"set_rest_target": summary(func(in struct {
 		RestSeconds int `json:"rest_seconds"`

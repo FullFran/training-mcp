@@ -701,7 +701,8 @@ func toolError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, training.ErrValidation) || errors.Is(err, training.ErrNotFound) || errors.Is(err, training.ErrIdempotencyConflict) {
+	if errors.Is(err, training.ErrValidation) || errors.Is(err, training.ErrNotFound) || errors.Is(err, training.ErrIdempotencyConflict) ||
+		errors.Is(err, training.ErrStale) || errors.Is(err, training.ErrNotPending) {
 		return err
 	}
 	return fmt.Errorf("internal tool error")

@@ -66,11 +66,13 @@ func migrate(db *sql.DB) error {
 		return err
 	}
 
-	for _, name := range mustMigrationNames() {
-		version, err := strconv.Atoi(strings.SplitN(strings.TrimPrefix(name, "migrations/"), "_", 2)[0])
-		if err != nil {
-			return fmt.Errorf("migration %q has no numeric version prefix", name)
-		}
+	names := mustMigrationNames()
+	versions, err := migrationVersions(names)
+	if err != nil {
+		return err
+	}
+	for i, name := range names {
+		version := versions[i]
 		if applied[version] {
 			continue
 		}
@@ -97,6 +99,26 @@ func migrate(db *sql.DB) error {
 		}
 	}
 	return nil
+}
+
+// migrationVersions reads each migration's number. Versions are recorded by
+// number, so two files sharing one would leave one silently unapplied: that
+// is refused before anything runs.
+func migrationVersions(names []string) ([]int, error) {
+	versions := make([]int, len(names))
+	seen := map[int]string{}
+	for i, name := range names {
+		version, err := strconv.Atoi(strings.SplitN(strings.TrimPrefix(name, "migrations/"), "_", 2)[0])
+		if err != nil {
+			return nil, fmt.Errorf("migration %q has no numeric version prefix", name)
+		}
+		if other, dup := seen[version]; dup {
+			return nil, fmt.Errorf("migrations %q and %q share version %d", other, name, version)
+		}
+		seen[version] = name
+		versions[i] = version
+	}
+	return versions, nil
 }
 
 func mustMigrationNames() []string {

@@ -128,6 +128,7 @@ and OQ-0005-7).
 | `landmarks.set` | `set_volume_landmarks` |
 | `rest.set` | `set_rest_target` |
 | `memory.save` / `memory.forget` | `memory_save` / `memory_forget` |
+| `memory.judge` / `memory.confirm` / `memory.consolidate` | `memory_judge` / `memory_confirm` / `memory_consolidate` |
 
 A proposal is claimed before it is applied, so two answers cannot apply it
 twice. If the process stops between applying and recording the outcome, the
@@ -233,19 +234,43 @@ Durable facts about the person that outlive chats. Chats are deleted after 90
 days; memory stays until the person deletes it in the app (`/memory`, linked
 from the review page). Each fact has a type (`preference`, `limitation`,
 `goal`, `equipment`, `worked`, `note`), a title, a body, dates and a **topic
-key** that names it: saving the same key again updates the fact instead of
-adding a duplicate. Storage and search are SQLite FTS5, deterministic and
-without a model. Saving and forgetting are separate action types
-(`memory.save`, `memory.forget`), so letting the coach remember without asking
-never lets it delete memory without asking.
+key** that names it. Storage, search, candidates, review dates and merges are
+deterministic SQLite (FTS5); the coach spends tokens only on judgement. Every
+memory write is its own action type, so letting the coach remember without
+asking never lets it forget, retire or merge facts without asking.
 
 | Tool | What it does |
 |---|---|
-| `memory_save` | Save a fact, or update the one with the same `topic_key`. Without a key, one is derived from the type and title. `pinned` puts it first in `memory_context`; omitted, the stored value is kept. A proposal. |
-| `memory_forget` | Delete a fact by `memory_id`. A proposal. |
-| `memory_search` | Find facts by words (every word must match as a prefix, accents ignored), optionally of one type; with no words it lists them, pinned first then most recently updated. Bodies are whole. |
-| `memory_get` | One fact by `memory_id`, whole. |
-| `memory_context` | What to know at the start of a chat: up to 20 facts, pinned first then most recent, bodies cut to 280 characters. |
+| `memory_save` | Save a fact, or update the one with the same `topic_key`. Changed text keeps the previous version as a revision; the same text again only restarts the review cycle. Saving a forgotten or superseded key brings the fact back. The result lists `candidates`, similar active facts not judged yet, and `judgment_required`. A proposal. |
+| `memory_judge` | Record how a saved fact relates to one candidate: `supersedes`, `conflicts_with`, `related`, `compatible`, `scoped` or `not_conflict`. Each relation is judged once. A proposal. |
+| `memory_confirm` | The person confirmed a fact still holds: restart its review cycle. A proposal. |
+| `memory_forget` | Forget a fact: it leaves context and search but is kept, for the person to see or delete for good. A proposal. |
+| `memory_consolidate_preview` | What merging 2 to 10 facts into one would do, with a `fingerprint`. Writes nothing. |
+| `memory_consolidate` | Merge exactly as previewed, with the preview's `fingerprint`. The sources are forgotten, pointing to the survivor. A fact changed since the preview refuses it. A proposal. |
+| `memory_search` | Find facts by words (every word must match as a prefix, accents ignored), optionally of one type, in a `view`: `active` (default), `due` or `superseded`. With no words it lists them. Forgotten facts are never returned. |
+| `memory_get` | One fact by `memory_id`, whole, with its earlier versions. |
+| `memory_context` | What to know at the start of a chat: up to 20 active facts, pinned first then most recent, bodies cut to 280 characters; `due`, up to 5 facts to check with the person now; and `conflicts`, how many conflicts wait in the app. |
+
+### How memory evolves
+
+- **Revisions.** A topic key keeps one row and a revision count; each earlier
+  text is kept, numbered from 1.
+- **Conflict surfacing.** Saving looks for active facts sharing a word of three
+  or more letters with the title, common Spanish and English stopwords aside
+  (at most 5), and returns them as candidates.
+  `supersedes` retires the old fact from context and search at once.
+  `conflicts_with` keeps both and lists them in the app's Conflicts view,
+  where the person keeps the newer, the older or both.
+- **Review cycle.** Saving, editing or confirming sets the next review date by
+  type: limitation 14 days, goal 30, worked 60, note 90, equipment and
+  preference 180. `memory_context` lists the facts past it, so the coach asks
+  ("¿sigue molestando el hombro?") and confirms, updates or forgets them. The
+  app lists them under "Por revisar".
+- **Forget.** The coach only forgets softly. Deleting for good, one fact or
+  everything (typing «borrar»), is the person's, in the app.
+- **Consolidate.** Preview, then confirm with the fingerprint. The survivor may
+  take one source's key, which then stays as that fact's new revision; never
+  the key of another active fact.
 
 No memory tool takes a user id: whose memory it is comes only from the
 authenticated request. A `user_id` sent as an argument is never read.

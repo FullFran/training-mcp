@@ -364,7 +364,7 @@ func (s *Service) applyProposal(ctx context.Context, id int64, decidedBy string,
 // publicError is what may be stored and shown about a failed apply: the
 // domain's own messages, never an internal one.
 func publicError(err error) string {
-	for _, known := range []error{ErrValidation, ErrNotFound, ErrIdempotencyConflict} {
+	for _, known := range []error{ErrValidation, ErrNotFound, ErrIdempotencyConflict, ErrStale, ErrNotPending} {
 		if errors.Is(err, known) {
 			return known.Error()
 		}
