@@ -16,6 +16,7 @@
   <div><strong>Historial</strong></div>
   <div class="bar-actions">
     <a class="ghost" href="{{.Base}}/plans">Rutinas</a>
+    <a class="ghost" href="{{.Base}}/import">Importar</a>
 {{if .CanExport}}    <a class="ghost" href="{{.Base}}/export.db" download>Backup</a>
 {{end}}{{if .CSRF}}    <form method="post" action="{{.Base}}/logout">
       <input type="hidden" name="csrf_token" value="{{.CSRF}}">

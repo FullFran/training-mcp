@@ -194,3 +194,18 @@ func TestParseCountsUnreadableRows(t *testing.T) {
 		t.Fatalf("file = %+v", f)
 	}
 }
+
+// Hevy writes dates in the app's language; Spanish month names read like English ones.
+func TestParseHevyReadsSpanishDates(t *testing.T) {
+	body := `"title","start_time","end_time","description","exercise_title","superset_id","exercise_notes","set_index","set_type","weight_kg","reps","distance_km","duration_seconds","rpe"
+"Pierna","22 dic 2025, 8:05","22 dic 2025, 9:00","","Sentadilla",,"",0,"normal",100,5,,,
+"Pierna","3 ene. 2026, 18:00","3 ene. 2026, 19:00","","Sentadilla",,"",0,"normal",100,5,,,
+`
+	f, err := Parse([]byte(body), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Workouts) != 2 || f.Workouts[0].StartedAt != "2025-12-22 08:05:00" || f.Workouts[1].StartedAt != "2026-01-03 18:00:00" {
+		t.Fatalf("workouts = %+v", f.Workouts)
+	}
+}
