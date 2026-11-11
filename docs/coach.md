@@ -37,10 +37,10 @@ The Go server never loads Node code. With the coach off, nothing in `engine/` is
 
 ### Why this protocol and not ACP
 
-The host speaks RE;write's engine protocol (one JSON object per line over the engine's stdin and stdout), not the Agent Client Protocol that haga-harness's `pi-sidecar` uses. For a Go host this is the simpler of the two:
+The host speaks RE;write's engine protocol (one JSON object per line over the engine's stdin and stdout), not the Agent Client Protocol that a private harness's Pi sidecar uses. For a Go host this is the simpler of the two:
 
 - It is a dozen flat message types that a Go struct and `encoding/json` parse directly; ACP is JSON-RPC 2.0 with requests, responses, notifications, session and permission methods, which needs a client library or a hand-written JSON-RPC layer.
-- It already carries what the security boundaries need: the host-held credential (`token.get`), the single refresher (`refresh`), and the device login (`login.start`, `login.code`). ACP has no standard method for these; they would be extension methods (haga-harness carries the credential that way).
+- It already carries what the security boundaries need: the host-held credential (`token.get`), the single refresher (`refresh`), and the device login (`login.start`, `login.code`). ACP has no standard method for these; they would be extension methods (a private harness carries the credential that way).
 - The ChatGPT-style picker and reasoning needed three more flat messages (`models.get`, `models`, `thinking`) and two optional fields on `prompt`. ACP stays a later option, for when another agent should run the coach (decided 2026-11-11).
 - ACP's permission requests and file-system callbacks exist for a coding agent; here they would be dead surface, since the engine has no tools besides `/mcp`.
 
