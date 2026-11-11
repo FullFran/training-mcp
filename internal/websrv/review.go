@@ -237,6 +237,8 @@ func (s *Server) reviewFailed(w http.ResponseWriter, r *http.Request, err error)
 		s.renderReview(w, r, http.StatusConflict, "Esa propuesta ya estaba respondida.")
 	case errors.Is(err, training.ErrValidation):
 		s.renderReview(w, r, http.StatusBadRequest, "No se pudo responder: los datos de la propuesta no son válidos o no tiene una sesión que recordar.")
+	case errors.Is(err, training.ErrStale):
+		s.renderReview(w, r, http.StatusConflict, "No se pudo aplicar: los recuerdos cambiaron desde la vista previa. Pide al entrenador que la repita.")
 	case errors.Is(err, training.ErrIdempotencyConflict):
 		s.renderReview(w, r, http.StatusConflict, "No se pudo aplicar: esas series ya se registraron con otros datos.")
 	default:

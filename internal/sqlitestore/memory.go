@@ -346,14 +346,42 @@ func (s *userStore) ConfirmMemory(ctx context.Context, id int64, reviewAfter tim
 		WHERE id=? AND user_id=? AND deleted_at='' RETURNING `+memoryReturning, formatMemoryTime(reviewAfter), id, s.userID))
 }
 
-func (s *userStore) ForgetMemory(ctx context.Context, id int64, reason string, at time.Time) (training.Memory, error) {
-	return scanMemory(s.db.QueryRowContext(ctx, `UPDATE coach_memory SET deleted_at=?, forget_reason=?
-		WHERE id=? AND user_id=? AND deleted_at='' RETURNING `+memoryReturning, formatMemoryTime(at), reason, id, s.userID))
+// releaseSuperseded gives back the facts the given fact had replaced, once it
+// is forgotten or deleted: nobody meant to retire them for good.
+func (s *userStore) releaseSuperseded(ctx context.Context, q querier, id int64) error {
+	_, err := q.ExecContext(ctx, `UPDATE coach_memory SET superseded_by=NULL WHERE user_id=? AND superseded_by=?`, s.userID, id)
+	return err
 }
 
-// DeleteMemory removes the fact for good; its history and relations go with it.
+func (s *userStore) ForgetMemory(ctx context.Context, id int64, reason string, at time.Time) (training.Memory, error) {
+	var out training.Memory
+	err := s.withTx(ctx, func(tx *sql.Tx) error {
+		var err error
+		if out, err = scanMemory(tx.QueryRowContext(ctx, `UPDATE coach_memory SET deleted_at=?, forget_reason=?
+			WHERE id=? AND user_id=? AND deleted_at='' RETURNING `+memoryReturning, formatMemoryTime(at), reason, id, s.userID)); err != nil {
+			return err
+		}
+		return s.releaseSuperseded(ctx, tx, id)
+	})
+	return out, err
+}
+
+// DeleteMemory removes the fact for good; its history and relations go with it,
+// the facts it replaced come back, and facts merged into it keep no pointer to it.
 func (s *userStore) DeleteMemory(ctx context.Context, id int64) (training.Memory, error) {
-	return scanMemory(s.db.QueryRowContext(ctx, `DELETE FROM coach_memory WHERE id=? AND user_id=? RETURNING `+memoryReturning, id, s.userID))
+	var out training.Memory
+	err := s.withTx(ctx, func(tx *sql.Tx) error {
+		var err error
+		if out, err = scanMemory(tx.QueryRowContext(ctx, `DELETE FROM coach_memory WHERE id=? AND user_id=? RETURNING `+memoryReturning, id, s.userID)); err != nil {
+			return err
+		}
+		if err = s.releaseSuperseded(ctx, tx, id); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `UPDATE coach_memory SET consolidated_into=NULL WHERE user_id=? AND consolidated_into=?`, s.userID, id)
+		return err
+	})
+	return out, err
 }
 
 func (s *userStore) DeleteAllMemory(ctx context.Context) (int, error) {
@@ -418,7 +446,10 @@ func (s *userStore) JudgeMemory(ctx context.Context, id int64, relation, reason 
 		if out, err = r.relation(); err != nil || relation != training.RelationSupersedes {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE coach_memory SET superseded_by=? WHERE id=? AND user_id=? AND deleted_at=''`, out.MemoryID, out.CandidateID, s.userID)
+		// Only a fact that is not forgotten can retire another.
+		_, err = tx.ExecContext(ctx, `UPDATE coach_memory SET superseded_by=? WHERE id=? AND user_id=? AND deleted_at=''
+			AND EXISTS (SELECT 1 FROM coach_memory WHERE id=? AND user_id=? AND deleted_at='')`,
+			out.MemoryID, out.CandidateID, s.userID, out.MemoryID, s.userID)
 		return err
 	})
 	return out, err
@@ -529,6 +560,11 @@ func (s *userStore) ConsolidateMemory(ctx context.Context, c training.MemoryCons
 			}
 			if _, err := tx.ExecContext(ctx, `UPDATE coach_memory SET deleted_at=?, forget_reason=?, consolidated_into=? WHERE id=? AND user_id=?`,
 				formatMemoryTime(c.At), training.MemoryConsolidated, survivor.ID, id, s.userID); err != nil {
+				return err
+			}
+			// What a source replaced stays replaced, now by the survivor.
+			if _, err := tx.ExecContext(ctx, `UPDATE coach_memory SET superseded_by=? WHERE user_id=? AND superseded_by=? AND id<>?`,
+				survivor.ID, s.userID, id, survivor.ID); err != nil {
 				return err
 			}
 		}

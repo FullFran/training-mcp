@@ -342,3 +342,99 @@ func TestMigrationGivesExistingFactsAReviewDate(t *testing.T) {
 		t.Fatalf("backfilled review date is not 14 days after the update: %v", got)
 	}
 }
+
+// supersededPair saves A, then B superseding it.
+func supersededPair(t *testing.T, u training.UserStore) (old, newer training.Memory) {
+	t.Helper()
+	old = save(t, u, training.Memory{TopicKey: "a", Title: "Hombro lesionado", Body: "no press"}).Memory
+	saved := save(t, u, training.Memory{TopicKey: "b", Title: "Hombro recuperado", Body: "press ligero"})
+	if _, err := u.JudgeMemory(context.Background(), saved.Candidates[0].RelationID, training.RelationSupersedes, "", memoryAt(1)); err != nil {
+		t.Fatal(err)
+	}
+	return old, saved.Memory
+}
+
+// Removing the fact that replaced another gives the older one back: nobody
+// meant to retire it for good.
+func TestRemovingTheReplacingFactBringsTheOldOneBack(t *testing.T) {
+	ctx := context.Background()
+	for name, remove := range map[string]func(training.UserStore, int64) error{
+		"deleted": func(u training.UserStore, id int64) error { _, err := u.DeleteMemory(ctx, id); return err },
+		"forgotten": func(u training.UserStore, id int64) error {
+			_, err := u.ForgetMemory(ctx, id, training.MemoryForgotten, memoryAt(2))
+			return err
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			u := openTwoUsers(t).ForUser(1)
+			old, newer := supersededPair(t, u)
+			if err := remove(u, newer.ID); err != nil {
+				t.Fatal(err)
+			}
+			got, err := u.GetMemory(ctx, old.ID)
+			if err != nil || got.SupersededBy != 0 {
+				t.Fatalf("old fact = %#v, %v", got, err)
+			}
+			if active := listView(t, u, training.MemoryViewActive, memoryAt(0)); len(active) != 1 || active[0] != "Hombro lesionado" {
+				t.Fatalf("active = %v", active)
+			}
+		})
+	}
+}
+
+// A fact forgotten before its relation is judged cannot retire anything.
+func TestAForgottenFactSupersedesNothing(t *testing.T) {
+	ctx := context.Background()
+	u := openTwoUsers(t).ForUser(1)
+	save(t, u, training.Memory{TopicKey: "a", Title: "Hombro lesionado", Body: "no press"})
+	saved := save(t, u, training.Memory{TopicKey: "b", Title: "Hombro recuperado", Body: "press ligero"})
+	if _, err := u.ForgetMemory(ctx, saved.Memory.ID, training.MemoryForgotten, memoryAt(1)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := u.JudgeMemory(ctx, saved.Candidates[0].RelationID, training.RelationSupersedes, "", memoryAt(2)); err != nil {
+		t.Fatal(err)
+	}
+	if active := listView(t, u, training.MemoryViewActive, memoryAt(0)); len(active) != 1 || active[0] != "Hombro lesionado" {
+		t.Fatalf("active = %v", active)
+	}
+}
+
+// Merging the replacing fact passes the replacement on to the survivor.
+func TestConsolidatingTheReplacingFactKeepsTheOldOneReplaced(t *testing.T) {
+	ctx := context.Background()
+	u := openTwoUsers(t).ForUser(1)
+	old, newer := supersededPair(t, u)
+	other := save(t, u, training.Memory{TopicKey: "c", Title: "Press ligero", Body: "con mancuernas"}).Memory
+	survivor, err := u.ConsolidateMemory(ctx, training.MemoryConsolidation{
+		Sources:  map[int64]int{newer.ID: 1, other.ID: 1},
+		Survivor: training.Memory{TopicKey: "s", Type: training.MemoryNote, Title: "Hombro bien", Body: "press ligero con mancuernas", CreatedAt: memoryAt(3), UpdatedAt: memoryAt(3)},
+		At:       memoryAt(3),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := u.GetMemory(ctx, old.ID)
+	if err != nil || got.SupersededBy != survivor.ID {
+		t.Fatalf("old fact = %#v, %v", got, err)
+	}
+}
+
+// Deleting a merge's survivor for good leaves no pointer to a missing fact.
+func TestDeletingASurvivorClearsItsSourcesPointer(t *testing.T) {
+	ctx := context.Background()
+	u := openTwoUsers(t).ForUser(1)
+	a := save(t, u, training.Memory{TopicKey: "a", Title: "Hombro", Body: "uno"}).Memory
+	b := save(t, u, training.Memory{TopicKey: "b", Title: "Rodilla", Body: "dos"}).Memory
+	survivor, err := u.ConsolidateMemory(ctx, training.MemoryConsolidation{Sources: map[int64]int{a.ID: 1, b.ID: 1},
+		Survivor: training.Memory{TopicKey: "s", Type: training.MemoryNote, Title: "S", Body: "s", CreatedAt: memoryAt(3), UpdatedAt: memoryAt(3)}, At: memoryAt(3)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = u.DeleteMemory(ctx, survivor.ID); err != nil {
+		t.Fatal(err)
+	}
+	forgotten, err := u.ListMemory(ctx, training.MemoryQuery{View: training.MemoryViewForgotten, Limit: 10})
+	if err != nil || len(forgotten) != 2 || forgotten[0].ConsolidatedInto != 0 || forgotten[1].ConsolidatedInto != 0 {
+		t.Fatalf("forgotten = %#v, %v", forgotten, err)
+	}
+}

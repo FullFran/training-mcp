@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fullfran/training-mcp/internal/mcpsrv"
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
 	"github.com/fullfran/training-mcp/internal/training"
 	"github.com/fullfran/training-mcp/internal/websrv"
@@ -246,5 +247,46 @@ func TestDeletingEverythingNeedsTheConfirmationWord(t *testing.T) {
 		if left, _ := svc.SearchMemory(ctx, training.MemoryQuery{View: view}); len(left) != 0 {
 			t.Fatalf("%s left: %v", view, left)
 		}
+	}
+}
+
+// Accepting a merge whose facts changed since its preview is refused with a
+// message, not an error page, and merges nothing.
+func TestAcceptingAStaleMergeExplainsWhy(t *testing.T) {
+	ctx := context.Background()
+	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	svc := training.NewServices(store, webClock).ForUser(1)
+	if err = svc.SetAcceptAll(ctx, false); err != nil {
+		t.Fatal(err)
+	}
+	serviceFor := func(context.Context) *training.Service { return svc }
+	tools := mcpsrv.New(serviceFor)
+	server, err := websrv.NewWithOptions(serviceFor, nil, webClock, base, websrv.Options{Apply: tools.Apply})
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved := saveAll(t, svc, training.MemoryInput{TopicKey: "a", Title: "Hombro", Body: "uno"}, training.MemoryInput{TopicKey: "b", Title: "Rodilla", Body: "dos"})
+	in := training.ConsolidationInput{MemoryIDs: []int64{saved[0].Memory.ID, saved[1].Memory.ID}, Title: "Todo", Body: "uno y dos"}
+	plan, err := svc.PreviewConsolidation(ctx, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := []byte(`{"memory_ids":[` + itoa(saved[0].Memory.ID) + `,` + itoa(saved[1].Memory.ID) + `],"title":"Todo","body":"uno y dos","fingerprint":"` + plan.Fingerprint + `"}`)
+	p, err := svc.Propose(ctx, training.ProposalInput{Tool: "memory_consolidate", ActionType: "memory.consolidate", Payload: payload}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	saveAll(t, svc, training.MemoryInput{TopicKey: "a", Title: "Hombro", Body: "cambiado"})
+
+	w := post(t, server.Handler(), base+"/review/"+itoa(p.ID)+"/accept", url.Values{"remember": {"once"}}, true)
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "cambiaron") {
+		t.Fatalf("status %d:\n%s", w.Code, w.Body)
+	}
+	if active, _ := svc.SearchMemory(ctx, training.MemoryQuery{}); len(active) != 2 {
+		t.Fatalf("a stale merge merged: %v", active)
 	}
 }
