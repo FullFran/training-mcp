@@ -222,3 +222,28 @@ func TestProxyStreamsGetAndDeletes(t *testing.T) {
 	}
 	_, _ = io.Copy(io.Discard, w.Body)
 }
+
+// A body the remote could read differently from the host never passes: keys
+// differing only in case, and duplicate keys, are refused.
+func TestProxyRefusesAmbiguousJSON(t *testing.T) {
+	px := newProxyFixture(t)
+	px.connectOAuth(px.f, px.a)
+	px.allow(px.a, px.tokA, "mcp__notion__search")
+	for _, body := range []string{
+		`{"jsonrpc":"2.0","id":1,"method":"tools/call","METHOD":"ping","params":{"name":"create-page"}}`,
+		`{"jsonrpc":"2.0","id":1,"Method":"ping","method":"tools/call","params":{"name":"create-page"}}`,
+		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create-page","NAME":"search"}}`,
+		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create-page","name":"search"}}`,
+		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search"},"Params":{"name":"create-page"}}`,
+		`{"jsonrpc":"2.0","id":1,"method":"ping","method":"tools/call","params":{"name":"create-page"}}`,
+	} {
+		if w := px.post(px.tokA, "notion", body, nil); !strings.Contains(w.Body.String(), "permission_denied") {
+			t.Errorf("forwarded: %s", body)
+		}
+	}
+	px.f.mu.Lock()
+	defer px.f.mu.Unlock()
+	if len(px.f.calls) != 0 {
+		t.Fatalf("calls reached the server: %v", px.f.calls)
+	}
+}

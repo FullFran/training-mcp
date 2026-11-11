@@ -156,30 +156,67 @@ func (p *Proxy) forward(ctx context.Context, r *http.Request, userID int64, slug
 }
 
 // deniedCall reports whether a POST is a tools/call the host did not allow.
-// A batch is refused outright: MCP 2025-06-18 has none, and one would hide
-// calls from this check.
+// The host must read the body exactly as the remote will, so anything a
+// stricter or looser parser could read differently is refused: a batch (MCP
+// 2025-06-18 has none), invalid JSON, and an object with a key repeated or
+// repeated in another case (encoding/json would match "METHOD" to method).
 func (p *Proxy) deniedCall(body []byte, userID int64, token, slug string) (bool, json.RawMessage) {
-	trimmed := bytes.TrimSpace(body)
-	if len(trimmed) > 0 && trimmed[0] == '[' {
+	msg, ok := strictObject(bytes.TrimSpace(body))
+	if !ok {
 		return true, nil
 	}
-	var msg struct {
-		ID     json.RawMessage `json:"id"`
-		Method string          `json:"method"`
-		Params struct {
-			Name string `json:"name"`
-		} `json:"params"`
+	id := msg["id"]
+	var method string
+	if raw, ok := msg["method"]; ok && json.Unmarshal(raw, &method) != nil {
+		return true, id
 	}
-	if err := json.Unmarshal(trimmed, &msg); err != nil {
-		return true, nil
-	}
-	if msg.Method != "tools/call" {
+	if method != "tools/call" {
 		return false, nil
 	}
-	if msg.Params.Name == "" || !p.Authorize(userID, token, PiToolName(slug, msg.Params.Name)) {
-		return true, msg.ID
+	params, ok := strictObject(msg["params"])
+	if !ok {
+		return true, id
+	}
+	var name string
+	if json.Unmarshal(params["name"], &name) != nil || name == "" || !p.Authorize(userID, token, PiToolName(slug, name)) {
+		return true, id
 	}
 	return false, nil
+}
+
+// strictObject decodes one JSON object whose keys are unique even ignoring
+// case, and nothing after it.
+func strictObject(raw []byte) (map[string]json.RawMessage, bool) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	if t, err := dec.Token(); err != nil || t != json.Delim('{') {
+		return nil, false
+	}
+	out := map[string]json.RawMessage{}
+	seen := map[string]bool{}
+	for dec.More() {
+		t, err := dec.Token()
+		if err != nil {
+			return nil, false
+		}
+		key, ok := t.(string)
+		folded := strings.ToLower(key)
+		if !ok || seen[folded] {
+			return nil, false
+		}
+		seen[folded] = true
+		var v json.RawMessage
+		if err := dec.Decode(&v); err != nil {
+			return nil, false
+		}
+		out[key] = v
+	}
+	if t, err := dec.Token(); err != nil || t != json.Delim('}') {
+		return nil, false
+	}
+	if _, err := dec.Token(); err != io.EOF {
+		return nil, false
+	}
+	return out, true
 }
 
 func writeRPCError(w http.ResponseWriter, id json.RawMessage) {

@@ -398,7 +398,9 @@ func (s *Service) lock(userID, id int64) func() {
 	return l.Unlock
 }
 
-// Disconnect forgets the person's tokens for a server and keeps its record.
+// Disconnect forgets the person's OAuth tokens for a server and keeps its
+// record, its OAuth client registration and a static token, so Connect works
+// again without retyping it; Remove deletes them all.
 func (s *Service) Disconnect(ctx context.Context, userID, id int64) error {
 	c, err := s.Store.Connector(ctx, userID, id)
 	if err != nil {
