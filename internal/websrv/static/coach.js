@@ -37,6 +37,9 @@
     engine_unavailable: 'El coach no está disponible ahora mismo.',
     login_failed: 'No se pudo conectar ChatGPT.',
     bad_request: 'Mensaje vacío o demasiado largo.',
+    too_many_images: 'Como mucho 4 fotos por mensaje.',
+    bad_image: 'Esa foto no se puede enviar (formato o tamaño).',
+    images_too_large: 'Las fotos pesan demasiado para un mensaje.',
   };
 
   let stream = null;
@@ -261,12 +264,19 @@
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
     const value = text.value.trim();
-    if (!value || running) return;
+    // Photos come from coach-attach.js when it is on the page.
+    const attach = window.coachAttach;
+    if (running || (attach && attach.busy())) return;
+    const images = attach ? attach.take() : [];
+    if (!value && !images.length) return;
     openStream();
-    bubble('me').textContent = value;
+    const mine = bubble('me');
+    mine.textContent = value;
+    if (images.length) attach.show(mine.parentNode, images);
     text.value = '';
-    post('prompt', { text: value }).then(({ ok, data }) => {
+    post('prompt', images.length ? { text: value, images } : { text: value }).then(({ ok, data }) => {
       if (!ok) {
+        if (images.length) attach.restore(images);
         note(MESSAGES[data.error] || MESSAGES.provider_error, 'error');
         if (data.error === 'reconnect' || data.error === 'not_connected') refresh();
       }

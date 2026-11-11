@@ -102,3 +102,14 @@ func TestCoachPhotosNeedTheCoachHeader(t *testing.T) {
 		t.Fatalf("coach reached: %v", coach.calls)
 	}
 }
+
+func TestCoachPageMountsThePhotoButton(t *testing.T) {
+	world := newCoachWorld(t, newFakeCoach())
+	body := get(t, world.as(1), base+"/").Body.String()
+	if !strings.Contains(body, `id="composer-extras"`) || !strings.Contains(body, base+"/static/coach-attach.js") {
+		t.Fatal("chat has no photo slot or script")
+	}
+	if w := get(t, world.as(1), base+"/static/coach-attach.js"); w.Code != http.StatusOK {
+		t.Fatalf("coach-attach.js: %d", w.Code)
+	}
+}
