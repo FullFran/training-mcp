@@ -53,7 +53,7 @@ and are not proposals.
 | `feedback.record` | `record_feedback` |
 | `landmarks.set` | `set_volume_landmarks` |
 | `rest.set` | `set_rest_target` |
-| `memory` | `memory_save`, `memory_forget` |
+| `memory.save` / `memory.forget` | `memory_save` / `memory_forget` |
 
 A proposal is claimed before it is applied, so two answers cannot apply it
 twice. If the process stops between applying and recording the outcome, the
@@ -161,8 +161,9 @@ from the review page). Each fact has a type (`preference`, `limitation`,
 `goal`, `equipment`, `worked`, `note`), a title, a body, dates and a **topic
 key** that names it: saving the same key again updates the fact instead of
 adding a duplicate. Storage and search are SQLite FTS5, deterministic and
-without a model. Both writes share the action type `memory`, so a person can
-answer "always" once and let the coach remember and forget without asking.
+without a model. Saving and forgetting are separate action types
+(`memory.save`, `memory.forget`), so letting the coach remember without asking
+never lets it delete memory without asking.
 
 | Tool | What it does |
 |---|---|

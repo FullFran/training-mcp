@@ -49,7 +49,7 @@ func (w memoryWorld) count(t *testing.T, where string) int {
 	return n
 }
 
-func TestMemorySaveIsAProposalOfTypeMemoryUntilAccepted(t *testing.T) {
+func TestMemorySaveIsAProposalOfItsOwnTypeUntilAccepted(t *testing.T) {
 	ctx := context.Background()
 	world := newMemoryWorld(t)
 	session := mustConnect(t, world.server.Handler())
@@ -61,11 +61,11 @@ func TestMemorySaveIsAProposalOfTypeMemoryUntilAccepted(t *testing.T) {
 	}
 	svc := world.services.ForUser(1)
 	p, err := svc.GetProposal(ctx, int64(out["proposal_id"].(float64)))
-	if err != nil || p.ActionType != "memory" || p.Tool != "memory_save" {
+	if err != nil || p.ActionType != "memory.save" || p.Tool != "memory_save" {
 		t.Fatalf("proposal = %#v, %v", p, err)
 	}
 
-	// Accepting it with "always" stores it and lets later memory writes through.
+	// Accepting it with "always" stores it and lets later saves through.
 	if _, err = svc.AcceptProposal(ctx, p.ID, training.RememberAlways, world.server.Apply); err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestMemoryForgetIsAProposalAndDeletesOnlyWhenAccepted(t *testing.T) {
 		t.Fatalf("out = %v", out)
 	}
 	p, err := svc.GetProposal(ctx, int64(out["proposal_id"].(float64)))
-	if err != nil || p.ActionType != "memory" {
+	if err != nil || p.ActionType != "memory.forget" {
 		t.Fatalf("proposal = %#v, %v", p, err)
 	}
 	if _, err = svc.AcceptProposal(ctx, p.ID, training.RememberOnce, world.server.Apply); err != nil {
@@ -182,5 +182,32 @@ func TestMemorySaveRejectsAnUnknownType(t *testing.T) {
 	session := mustConnect(t, world.server.Handler())
 	if result := call(t, session, "memory_save", map[string]any{"type": "secret", "title": "t", "body": "b"}); !result.IsError {
 		t.Fatalf("unknown type accepted: %s", answer(t, result))
+	}
+}
+
+// "Always" on saving never lets the coach forget without asking: the two writes
+// are separate action types.
+func TestAlwaysOnSavingDoesNotCoverForgetting(t *testing.T) {
+	ctx := context.Background()
+	world := newMemoryWorld(t)
+	svc := world.services.ForUser(1)
+	session := mustConnect(t, world.server.Handler())
+
+	saved := structured(t, call(t, session, "memory_save", map[string]any{"title": "Rodilla", "body": "dolor"}))
+	if _, err := svc.AcceptProposal(ctx, int64(saved["proposal_id"].(float64)), training.RememberAlways, world.server.Apply); err != nil {
+		t.Fatal(err)
+	}
+	m, err := svc.SearchMemory(ctx, training.MemoryQuery{Text: "rodilla"})
+	if err != nil || len(m) != 1 {
+		t.Fatalf("saved = %v, %v", m, err)
+	}
+
+	out := structured(t, call(t, session, "memory_forget", map[string]any{"memory_id": m[0].ID}))
+	if out["status"] != "pending" || world.count(t, "1") != 1 {
+		t.Fatalf("forget after always-save = %v, rows = %d", out, world.count(t, "1"))
+	}
+	p, err := svc.GetProposal(ctx, int64(out["proposal_id"].(float64)))
+	if err != nil || p.ActionType != "memory.forget" {
+		t.Fatalf("forget proposal = %#v, %v", p, err)
 	}
 }

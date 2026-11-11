@@ -8,9 +8,12 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// memoryAction is the action type of every memory write, so a person can let
-// the coach remember (and forget) without asking each time.
-const memoryAction = "memory"
+// Saving and forgetting are separate action types, so letting the coach
+// remember without asking never lets it delete memory without asking.
+const (
+	memorySaveAction   = "memory.save"
+	memoryForgetAction = "memory.forget"
+)
 
 // No memory input has a user id: whose memory it is comes only from the
 // authenticated request, through the service the tool is given.
@@ -57,13 +60,13 @@ func addMemoryTools(s *mcp.Server, w *writes, service training.ServiceFor) {
 	saveSchema.Properties["topic_key"].MaxLength = jsonschema.Ptr(120)
 	saveSchema.Properties["type"].Enum = memoryTypeEnum()
 	setNonNullableType(saveSchema.Properties["pinned"], "boolean")
-	addWrite(w, &mcp.Tool{Name: "memory_save", Description: "Remember a durable fact about the person for future chats: a preference, an injury or limitation, a goal, their equipment, or what worked. Chats are deleted after 90 days; memory is kept until the person deletes it. Save only what will still matter later, never the chat itself.", InputSchema: saveSchema}, memoryAction, func(ctx context.Context, svc *training.Service, in MemorySaveInput) (MemoryWriteOut, error) {
+	addWrite(w, &mcp.Tool{Name: "memory_save", Description: "Remember a durable fact about the person for future chats: a preference, an injury or limitation, a goal, their equipment, or what worked. Chats are deleted after 90 days; memory is kept until the person deletes it. Save only what will still matter later, never the chat itself.", InputSchema: saveSchema}, memorySaveAction, func(ctx context.Context, svc *training.Service, in MemorySaveInput) (MemoryWriteOut, error) {
 		m, err := svc.SaveMemory(ctx, training.MemoryInput{TopicKey: in.TopicKey, Type: in.Type, Title: in.Title, Body: in.Body, Pinned: in.Pinned})
 		return MemoryWriteOut{Memory: m}, err
 	})
 	forgetSchema := mustInputSchema[MemoryIDInput]()
 	setPositiveID(forgetSchema.Properties["memory_id"])
-	addWrite(w, &mcp.Tool{Name: "memory_forget", Description: "Delete a remembered fact for good, e.g. when it is wrong or no longer true. To correct a fact, prefer memory_save with its topic_key.", InputSchema: forgetSchema}, memoryAction, func(ctx context.Context, svc *training.Service, in MemoryIDInput) (MemoryWriteOut, error) {
+	addWrite(w, &mcp.Tool{Name: "memory_forget", Description: "Delete a remembered fact for good, e.g. when it is wrong or no longer true. To correct a fact, prefer memory_save with its topic_key.", InputSchema: forgetSchema}, memoryForgetAction, func(ctx context.Context, svc *training.Service, in MemoryIDInput) (MemoryWriteOut, error) {
 		m, err := svc.DeleteMemory(ctx, in.MemoryID)
 		return MemoryWriteOut{Memory: m}, err
 	})
