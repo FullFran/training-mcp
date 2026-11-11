@@ -6,7 +6,10 @@
  * environment: it asks the host for the current access token when the model
  * runtime needs one, and the host alone decides when to refresh. It has no shell
  * and no file tools; its only tools are training-mcp's MCP tools, reached on
- * loopback with a short-lived token that acts as this one person.
+ * loopback with a short-lived token that acts as this one person, and the tools
+ * of the remote MCP servers the person connected, reached through the host's
+ * proxy on loopback with the same token. Every connector tool call waits for
+ * the host's decision (createApprovalGate in protocol.ts).
  *
  * Re-implemented from RE;write's embedded engine (engine/main.ts there).
  */
@@ -20,15 +23,17 @@ import {
   type AgentSession,
 } from '@earendil-works/pi-coding-agent';
 import {
-  composePrompt, DEVICE_VERIFICATION_URI, encode, LineDecoder, MCP_SERVER_NAME, MCP_TOOL_PREFIX, parseCredential, parseImages,
-  pickModel, THINKING_LEVELS, thinkingLevels,
-  type ChildMessage, type EngineErrorCode, type ParentMessage, type PromptImage, type ThinkingLevel,
+  composePrompt, connectorOf, createApprovalGate, DEVICE_VERIFICATION_URI, encode, LineDecoder, MCP_SERVER_NAME, MCP_TOOL_PREFIX, parseCredential, parseImages,
+  parseServers, pickModel, THINKING_LEVELS, thinkingLevels,
+  type ApprovalGate, type ChildMessage, type EngineErrorCode, type ParentMessage, type PromptImage, type ThinkingLevel,
 } from './protocol.ts';
 
 const PROVIDER = 'openai-codex';
 /** Pi asks for five minutes of validity; the host hands out at least ten. */
 const TOKEN_REUSE_MARGIN_MS = 6 * 60_000;
 const MCP_CONNECT_WAIT_MS = 15_000;
+/** How long, after training-mcp's tools, the session waits for the connectors' tools. */
+const CONNECTOR_WAIT_MS = 8_000;
 
 // stdout carries the protocol and nothing else.
 const writeLine = process.stdout.write.bind(process.stdout);
@@ -138,8 +143,17 @@ let session: Promise<AgentSession> | undefined;
 let catalog: Promise<Awaited<ReturnType<ModelRuntime['getAvailable']>>> | undefined;
 let running = false;
 let aborting = false;
+let gate: ApprovalGate | undefined;
 
 async function createSession(start: Extract<ParentMessage, { type: 'start' }>): Promise<AgentSession> {
+  const connectors = parseServers(start.servers, start.mcpUrl);
+  if (connectors === null) {
+    send({ type: 'session', tools: [] });
+    throw new Error('bad servers');
+  }
+  const names = new Set(connectors.map((server) => server.name));
+  const approvals = createApprovalGate(send, names);
+  gate = approvals;
   // No network here: the model catalog is refreshed on the first prompt.
   runtime = await ModelRuntime.create({ credentials, modelsPath: null, allowModelNetwork: true, refreshOnCreate: false });
   const settingsManager = SettingsManager.inMemory({ transport: 'sse' });
@@ -153,15 +167,25 @@ async function createSession(start: Extract<ParentMessage, { type: 'start' }>): 
     noContextFiles: true,
     systemPromptOverride: () => start.systemPrompt,
     appendSystemPromptOverride: () => [],
-    extensionFactories: [createMcpExtension({
-      // The one server, given here and never read from an mcp.json. `direct` declares its
+    extensionFactories: [(pi) => {
+      // Before any tool runs: connector tools wait for the host's decision.
+      pi.on('tool_call', (event) => approvals.check(event));
+    }, createMcpExtension({
+      // The servers given here and never read from an mcp.json. `direct` declares their
       // tools to the model; the default exposure would switch on a script tool instead.
+      // Connectors go through the host's proxy with this same token: the proxy adds
+      // the person's own credential for the remote server, which never comes here.
       loadConfig: () => ({
-        servers: [{
-          name: MCP_SERVER_NAME,
+        servers: [MCP_SERVER_NAME, ...names].map((name) => ({
+          name,
           source: 'host',
-          config: { type: 'http', url: start.mcpUrl, headers: { Authorization: `Bearer ${start.mcpToken}` }, exposure: 'direct' },
-        }],
+          config: {
+            type: 'http' as const,
+            url: name === MCP_SERVER_NAME ? start.mcpUrl : connectors.find((server) => server.name === name)!.url,
+            headers: { Authorization: `Bearer ${start.mcpToken}` },
+            exposure: 'direct' as const,
+          },
+        })),
         autoEnableCodemode: false,
         errors: [],
       }),
@@ -191,9 +215,16 @@ async function createSession(start: Extract<ParentMessage, { type: 'start' }>): 
     await new Promise((resolve) => setTimeout(resolve, 100));
     tools = created.session.getActiveToolNames();
   }
-  // Fail closed, here and again in the host: training-mcp's MCP tools and nothing else.
+  // Then each connector, briefly: one that does not load is reported missing (HCS-0008-R014).
+  const connectorDeadline = Math.min(deadline, Date.now() + CONNECTOR_WAIT_MS);
+  const loaded = () => new Set(tools.map((name) => connectorOf(name, names)).filter((name) => name !== undefined));
+  while (loaded().size < names.size && Date.now() < connectorDeadline) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    tools = created.session.getActiveToolNames();
+  }
+  // Fail closed, here and again in the host: training-mcp's tools, the connectors' tools, nothing else.
   send({ type: 'session', tools });
-  if (tools.length === 0 || tools.some((name) => !name.startsWith(MCP_TOOL_PREFIX))) {
+  if (!tools.some((name) => name.startsWith(MCP_TOOL_PREFIX)) || tools.some((name) => !name.startsWith(MCP_TOOL_PREFIX) && connectorOf(name, names) === undefined)) {
     created.session.dispose();
     throw new Error('unexpected tools');
   }
@@ -324,6 +355,8 @@ function handle(message: ParentMessage): void {
       return loginAbort?.abort();
     case 'refresh':
       return void refresh(message);
+    case 'approval':
+      return gate?.resolve(message.id, message.decision);
     case 'token':
       tokenWaiters.get(message.id)?.(message);
       tokenWaiters.delete(message.id);
