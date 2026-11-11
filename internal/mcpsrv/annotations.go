@@ -43,6 +43,7 @@ var toolBehaviors = map[string]toolBehavior{
 	"get_plan":                   read("Get plan"),
 	"session_progress":           read("Get session progress"),
 	"suggest_load":               read("Suggest next weight"),
+	"performance_dropoff":        read("Analyse set drop-off"),
 	"list_exercise_notes":        read("List exercise notes"),
 	"list_volume_landmarks":      read("List volume landmarks"),
 	"volume_recommendation":      read("Recommend weekly volume"),

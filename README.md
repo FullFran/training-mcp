@@ -92,7 +92,7 @@ Full write-up: **[docs/architecture.md](docs/architecture.md)**.
 | **`Clock` as a function type** | One method, so `time.Now` satisfies it directly. No mock framework in the repo — tests pass a closure. |
 | **Prescription copying** | Starting a session from a plan copies it. Editing a template never rewrites history; adjusting today never edits the template. |
 | **Totals recalculated, never incremented** | A deleted or edited set cannot leave a session total wrong. |
-| **Advisory, never automatic** | `suggest_load` and `volume_recommendation` explain themselves and decline when they lack evidence. Neither ever edits a plan. |
+| **Advisory, never automatic** | `suggest_load`, `volume_recommendation` and `performance_dropoff` explain themselves and decline when they lack evidence. None ever edits a plan. |
 | **Config absence removes surface** | Unset `WEB_BASE_PATH` means the PWA is not mounted at all, rather than served on a default path. |
 
 ## Development checks
