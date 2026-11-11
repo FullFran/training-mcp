@@ -24,7 +24,7 @@ Route evidence: one unit at a time, each depends on the previous one's markup; n
 
 ## Log
 
-- L1 (2026-11-11, owner, verbatim): «oye, podemos conectar por acp todo paa que se vea muy bien igual que hagaharness no? ahora esta rarete... el diseño es poco intuitivo y usable inspirate en como alvaro hace las cosas»
+- L1 (2026-11-11, owner, verbatim): «oye, podemos conectar por acp todo paa que se vea muy bien igual que [a private harness] no? ahora esta rarete... el diseño es poco intuitivo y usable inspirate en como alvaro hace las cosas»
 - L2 (2026-11-11, owner, verbatim): «le falta mucho esto xD hay que dejarlo que sea como chat gpt + añadir series + cronometro lo que es la gui. que haya historial de chats y esas cosas y que se pueda cambiar modelo y thinking y demas igual que en chat gpt! con la misma interfaz pero con nuestro color!!!»
 - L3 (2026-11-11, coordinator relaying the owner): ACP later; chat history auto-deleted after N days; S1 → S2 → S3 → S4, one PR each; verifier on S2 and S3.
 - L4 (2026-11-11, owner, verbatim): «yo diria 90 dias... porque en la practica deja de importar y lo que importa es la memoria de entrenamiento». A separate coach memory is a later feature.
