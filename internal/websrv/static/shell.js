@@ -234,8 +234,11 @@
 
   // Accept and reject post to the review endpoints with the session's token,
   // then the card says what happened. A refused answer shows the reason.
-  log.addEventListener('submit', (event) => {
+  // Choosing a plan, from the chat or from Entrenar's start, refreshes in place
+  // and lands on the training screen.
+  document.addEventListener('submit', (event) => {
     const form = event.target;
+    if (!form.closest('#coach-log, #train')) return;
     const proposal = form.closest('.proposal-card');
     const pick = form.classList.contains('plan-pick');
     if (!proposal && !pick) return;
@@ -253,7 +256,11 @@
     })
       .then((res) => res.text())
       .then((html) => {
-        if (pick) { apply(html); return; } // the plan redirects to a fresh home
+        if (pick) { // the plan redirects to a fresh training screen
+          apply(html);
+          document.dispatchEvent(new CustomEvent('mode:go', { detail: 'train' }));
+          return;
+        }
         const doc = new DOMParser().parseFromString(html, 'text/html');
         const alert = doc.querySelector('.alert');
         const verdict = document.createElement('p');
@@ -268,6 +275,9 @@
         form.querySelectorAll('button').forEach((b) => { b.disabled = false; });
       });
   });
+
+  // The chat was out of sight (the home, or Entrenar under the overlay).
+  document.addEventListener('coach:shown', scroll);
 
   scroll();
 })();

@@ -124,6 +124,15 @@ type pageData struct {
 	CoachOn bool
 	// ConnectorsOn links the connectors panel and shows connector approvals.
 	ConnectorsOn bool
+	// Mode is the screen the home opens on: "home" (the choice), "train"
+	// (Entrenar) or "plan" (Planificar), from ?modo=. The page holds all three
+	// and switches between them in place.
+	Mode string
+	// Cards are today's exercises on the training screen, each with its set
+	// table pre-filled.
+	Cards []TrainCard
+	// Records are today's sets that match their exercise's best estimated 1RM.
+	Records map[int64]bool
 }
 
 // LastSet returns the session's final working set, used to power "repeat last
@@ -152,6 +161,32 @@ func (p pageData) WorkingSetCount() int {
 // be badged. Compared with a small tolerance because both sides are rounded.
 func (b ExerciseBlock) IsRecord(s training.Set) bool {
 	return b.BestE1RM > 0 && math.Abs(training.Epley1RM(s.WeightKG, s.Reps)-b.BestE1RM) < 0.05
+}
+
+// WorkingCount is how many of the block's sets count; warm-ups do not.
+func (b ExerciseBlock) WorkingCount() int {
+	n := 0
+	for _, set := range b.Sets {
+		if set.Category != training.SetWarmup {
+			n++
+		}
+	}
+	return n
+}
+
+// Top is the block's best working set by estimated 1RM, the line the finish
+// summary shows for each exercise. Nil for a block with only warm-ups.
+func (b ExerciseBlock) Top() *training.Set {
+	var top *training.Set
+	for i := range b.Sets {
+		if b.Sets[i].Category == training.SetWarmup {
+			continue
+		}
+		if top == nil || training.Epley1RM(b.Sets[i].WeightKG, b.Sets[i].Reps) > training.Epley1RM(top.WeightKG, top.Reps) {
+			top = &b.Sets[i]
+		}
+	}
+	return top
 }
 
 // Options are what differs between the two places the app is mounted.
@@ -202,7 +237,11 @@ func NewWithOptions(service training.ServiceFor, snapshot func(context.Context, 
 				return f.Recovery
 			}
 		},
-		"add":     func(a, b int) int { return a + b },
+		"add": func(a, b int) int { return a + b },
+		// rowData hands one row still to log to the set-row template.
+		"rowData": func(base, exercise string, row PendingRow) setRowData {
+			return setRowData{Base: base, Exercise: exercise, Row: row}
+		},
 		"countOf": countOf,
 		"doneCount": func(items []training.PlanProgress) int {
 			n := 0
@@ -366,6 +405,7 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
+	data.Mode = modeFromQuery(r.URL.Query().Get("modo"))
 	data.Review.Pending = s.pendingProposals(r)
 	data.Review.Answers = answerLabels
 	data.PendingCount = len(data.Review.Pending)
@@ -513,7 +553,7 @@ func (s *Server) renderPanel(w http.ResponseWriter, r *http.Request, message str
 		return
 	}
 	if r.Header.Get("HX-Request") == "" {
-		http.Redirect(w, r, s.base+"/", http.StatusSeeOther)
+		http.Redirect(w, r, s.trainURL(), http.StatusSeeOther)
 		return
 	}
 	s.render(w, r, "panel.html", data)
@@ -747,6 +787,17 @@ func (s *Server) todayData(ctx context.Context, message string) (pageData, error
 	if err = s.decorate(ctx, &data); err != nil {
 		return data, err
 	}
+	if data.Cards, err = s.trainCards(ctx, data); err != nil {
+		return data, err
+	}
+	data.Records = map[int64]bool{}
+	for _, b := range data.Blocks {
+		for _, set := range b.Sets {
+			if b.IsRecord(set) {
+				data.Records[set.ID] = true
+			}
+		}
+	}
 	if data.Session.ID > 0 {
 		seen := map[string]bool{}
 		for _, b := range data.Blocks {
@@ -843,7 +894,7 @@ func (s *Server) choosePlan(w http.ResponseWriter, r *http.Request) {
 	}
 	planID, err := strconv.ParseInt(strings.TrimSpace(r.PostFormValue("plan_id")), 10, 64)
 	if err != nil || planID <= 0 {
-		http.Redirect(w, r, s.base+"/", http.StatusSeeOther)
+		http.Redirect(w, r, s.trainURL(), http.StatusSeeOther)
 		return
 	}
 	// Before anything else: a plan that cannot be started must not cost the day's
@@ -884,7 +935,7 @@ func (s *Server) choosePlan(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			}
-			http.Redirect(w, r, s.base+"/", http.StatusSeeOther)
+			http.Redirect(w, r, s.trainURL(), http.StatusSeeOther)
 			return
 		}
 	}
@@ -892,7 +943,7 @@ func (s *Server) choosePlan(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	http.Redirect(w, r, s.base+"/", http.StatusSeeOther)
+	http.Redirect(w, r, s.trainURL(), http.StatusSeeOther)
 }
 
 // adjustItem applies one in-session change: more or fewer sets, skip, swap for
@@ -1205,3 +1256,18 @@ func formatNumber(v float64) string {
 	}
 	return strconv.FormatFloat(v, 'f', -1, 64)
 }
+
+// modeFromQuery maps ?modo= to the screen the home opens on.
+func modeFromQuery(v string) string {
+	switch v {
+	case "entrenar":
+		return "train"
+	case "planificar":
+		return "plan"
+	default:
+		return "home"
+	}
+}
+
+// trainURL is the training screen, where a write without JavaScript lands.
+func (s *Server) trainURL() string { return s.base + "/?modo=entrenar" }

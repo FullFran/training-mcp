@@ -186,15 +186,15 @@ func TestDeleteMissingSetReportsInsteadOfFailing(t *testing.T) {
 }
 
 // Without htmx the browser performs a normal form post, so it must be redirected
-// rather than shown a bare fragment.
+// rather than shown a bare fragment: back to the training screen it came from.
 func TestNonHtmxPostRedirectsToTheAppRoot(t *testing.T) {
 	h, _ := newServer(t)
 	w := post(t, h, base+"/sets", setForm("squat", "100", "5", "8"), false)
 	if w.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want 303", w.Code)
 	}
-	if got := w.Header().Get("Location"); got != base+"/" {
-		t.Fatalf("Location = %q, want %q", got, base+"/")
+	if got := w.Header().Get("Location"); got != base+"/?modo=entrenar" {
+		t.Fatalf("Location = %q, want %q", got, base+"/?modo=entrenar")
 	}
 }
 
@@ -302,9 +302,9 @@ func TestPanelGroupsSetsByExerciseAndBadgesRecords(t *testing.T) {
 	post(t, h, base+"/sets", setForm("remo", "60", "8", "8"), true)
 
 	body := get(t, h, base+"/").Body.String()
-	// Two exercises means two blocks, not six flat rows.
-	if n := strings.Count(body, `class="block"`); n != 2 {
-		t.Fatalf("expected 2 exercise blocks, got %d", n)
+	// Two exercises means two cards, not six flat rows.
+	if n := strings.Count(body, `class="ex-card`); n != 2 {
+		t.Fatalf("expected 2 exercise cards, got %d", n)
 	}
 	if !strings.Contains(body, "2 ejercicios") {
 		t.Fatalf("panel should report the exercise count: %q", body)
@@ -335,8 +335,15 @@ func blockFor(t *testing.T, body, exercise string) string {
 	if i < 0 {
 		t.Fatalf("no block for %q", exercise)
 	}
+	// A past session's block ends its article; today's card ends its details.
 	rest := body[i:]
-	if end := strings.Index(rest, "</article>"); end >= 0 {
+	end := -1
+	for _, closing := range []string{"</article>", "</details>"} {
+		if e := strings.Index(rest, closing); e >= 0 && (end < 0 || e < end) {
+			end = e
+		}
+	}
+	if end >= 0 {
 		return rest[:end]
 	}
 	return rest

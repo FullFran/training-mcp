@@ -14,10 +14,41 @@
 <link rel="stylesheet" href="{{.Base}}/static/app.css">
 {{if .CSRF}}<meta name="csrf-token" content="{{.CSRF}}">
 {{end}}</head>
-<body class="chat-home" data-base="{{.Base}}" data-rest-target="{{.RestTarget}}"{{if .CSRF}} hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'{{end}}>
+<body class="chat-home" data-mode="{{.Mode}}" data-base="{{.Base}}" data-rest-target="{{.RestTarget}}"{{if .CSRF}} hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'{{end}}>
 {{$active := or .Progress .Session.Sets}}
+<!-- The first screen: train now, or plan and analyse. Plain links, so they
+     work without JavaScript; modes.js switches in place and keeps the URL. -->
+<section id="home" class="home" aria-label="Inicio">
+  <header class="home-head"><strong>Entreno</strong> <span class="muted">{{.Today}}</span></header>
+  <h1>¿Qué hacemos hoy?</h1>
+  <a id="go-train" class="mode-card mode-train" href="{{.Base}}/?modo=entrenar" data-mode-go="train">
+    <span class="mode-icon" aria-hidden="true">🏋️</span>
+    <strong>Entrenar</strong>
+    <span class="mode-sub">{{if .Progress}}{{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Plan de hoy{{end}} · {{doneCount .Progress}}/{{len .Progress}} ejercicios{{else if .Session.Sets}}{{.WorkingSetCount}} serie{{if ne .WorkingSetCount 1}}s{{end}} hoy{{else}}Elige un plan o entrena libre{{end}}</span>
+  </a>
+  <a id="go-plan" class="mode-card mode-plan" href="{{.Base}}/?modo=planificar" data-mode-go="plan">
+    <span class="mode-icon" aria-hidden="true">🗂️</span>
+    <strong>Planificar</strong>
+    <span class="mode-sub">Rutinas, progreso, historial y el coach</span>
+  </a>
+  {{if .PendingCount}}<a class="home-review" href="{{.Base}}/review" data-panel>✅ {{.PendingCount}} propuesta{{if ne .PendingCount 1}}s{{end}} por revisar</a>{{end}}
+</section>
+
+<!-- Entrenar: the list of today's exercises; the entry form is a sheet and the
+     coach an overlay, so neither ever moves this screen. -->
+<header class="bar train-bar">
+  <a class="ghost back" href="{{.Base}}/" data-mode-go="home" aria-label="Volver al inicio">‹ Inicio</a>
+  <strong>Entrenar</strong>
+  <button type="button" id="finish-open" class="ghost finish-open" aria-controls="finish">Terminar</button>
+</header>
+<main id="train" class="train">
+  {{template "panel.html" .}}
+</main>
 <header class="bar chat-bar">
-  <button type="button" id="menu-open" class="icon-btn" aria-label="Menú" aria-controls="drawer" aria-expanded="false">☰</button>
+  <div class="bar-start">
+    <a class="icon-btn" href="{{.Base}}/" data-mode-go="home" aria-label="Volver al inicio">‹</a>
+    <button type="button" id="menu-open" class="icon-btn" aria-label="Menú" aria-controls="drawer" aria-expanded="false">☰</button>
+  </div>
   {{if .CoachOn}}<button type="button" id="model-open" class="chat-title model-open" aria-haspopup="dialog" aria-controls="model-sheet"><strong>Coach</strong> <span id="model-name" class="muted">{{.Today}}</span> <span aria-hidden="true">▾</span></button>
   {{else}}<div class="chat-title"><strong>Coach</strong> <span class="muted">{{.Today}}</span></div>{{end}}
   <div class="bar-end">
@@ -50,6 +81,16 @@
   </section>
 </aside>
 
+<!-- The coach: the whole screen in Planificar, an overlay over the workout in
+     Entrenar. One chat, so cards and the stream are the same in both. -->
+<div id="coach-scrim" class="scrim coach-scrim" hidden></div>
+<section id="coach-sheet" class="coach-sheet" aria-label="Coach">
+<div class="coach-sheet-head">
+  <span class="grab" aria-hidden="true"></span>
+  <strong>Coach</strong>
+  <span id="coach-rest" class="coach-rest" hidden></span>
+  <button type="button" id="coach-close" class="ghost mini">Volver al entreno</button>
+</div>
 <main id="chat" class="chat">
   <div id="coach-log" class="coach-log" aria-live="polite">
     <!-- Deterministic cards, rendered here and never by the model. -->
@@ -111,11 +152,38 @@
   </div>
   <button type="button" id="chat-jump" class="chat-jump" aria-label="Ir al final" hidden>↓</button>
 </main>
+{{if .CoachOn}}
+<!-- Coach chat. Connect ChatGPT once, then talk or dictate. -->
+<section id="coach" class="coach" aria-label="Coach">
+  <div id="coach-connect" class="coach-connect" hidden>
+    <p>El coach usa tu propia cuenta de ChatGPT. Se conecta con un código en la web de OpenAI: tu contraseña nunca se escribe aquí.</p>
+    <button type="button" id="coach-login" class="primary">Conectar ChatGPT</button>
+    <div id="coach-code" hidden>
+      <p>Abre <a id="coach-uri" target="_blank" rel="noopener noreferrer"></a> e introduce este código:</p>
+      <p id="coach-usercode" class="coach-usercode"></p>
+      <p class="muted">Esperando a que lo apruebes en OpenAI…</p>
+    </div>
+  </div>
+  <form id="coach-form" class="coach-form" hidden>
+    <p id="coach-listening" class="listening" role="status" hidden>Escuchando… habla y toca 🎤 para terminar</p>
+    <textarea id="coach-text" rows="1" maxlength="4000" placeholder="Pregunta a tu coach" aria-label="Mensaje para el coach"></textarea>
+    <div class="composer-row">
+      <div id="composer-extras" class="composer-extras"></div>
+      <button type="button" id="thinking-chip" class="chip-btn" aria-controls="model-sheet" hidden>💡 <span>Pensar</span></button>
+      <span class="grow"></span>
+      <!-- Dictation: tap to talk, it stops on silence or on a second tap. -->
+      <button type="button" id="coach-mic" class="mic" aria-label="Dictar" aria-pressed="false" hidden>🎤</button>
+      <button type="submit" id="coach-send" class="send" aria-label="Enviar">↑</button>
+      <button type="button" id="coach-stop" class="send" aria-label="Detener" hidden>■</button>
+    </div>
+  </form>
+</section>
+{{end}}
+</section>
 
 <footer class="dock">
-<!-- The live workout, pinned above the message box. It is the same entry form,
-     panel and rest timer as ever, so logging works offline of the model; the bar
-     logs the pre-filled set in one tap and «Ajustar» opens the form as a sheet. -->
+<!-- Entrenar's dock: what comes next with the one-tap log, the rest timer, and
+     the entry form as a sheet. Logging works offline and without the model. -->
 <section id="workout" class="workout{{if not $active}} idle{{end}}" aria-label="Entreno">
   <div class="wk-bar">
     <p id="wk-now" class="wk-now">{{with .Next}}<strong>{{.Exercise}}</strong> · {{rx .}}{{else}}{{if $active}}Entreno en marcha{{else}}Sin entreno activo{{end}}{{end}}</p>
@@ -218,38 +286,16 @@
       <button type="submit" class="primary">Añadir serie</button>
       <button type="button" id="repeat" class="ghost wide" hidden>Repetir última</button>
     </form>
-
-    {{template "panel.html" .}}
     </div>
   </details>
 </section>
-
 {{if .CoachOn}}
-<!-- Coach chat. Connect ChatGPT once, then talk or dictate. -->
-<section id="coach" class="coach" aria-label="Coach">
-  <div id="coach-connect" class="coach-connect" hidden>
-    <p>El coach usa tu propia cuenta de ChatGPT. Se conecta con un código en la web de OpenAI: tu contraseña nunca se escribe aquí.</p>
-    <button type="button" id="coach-login" class="primary">Conectar ChatGPT</button>
-    <div id="coach-code" hidden>
-      <p>Abre <a id="coach-uri" target="_blank" rel="noopener noreferrer"></a> e introduce este código:</p>
-      <p id="coach-usercode" class="coach-usercode"></p>
-      <p class="muted">Esperando a que lo apruebes en OpenAI…</p>
-    </div>
-  </div>
-  <form id="coach-form" class="coach-form" hidden>
-    <p id="coach-listening" class="listening" role="status" hidden>Escuchando… habla y toca 🎤 para terminar</p>
-    <textarea id="coach-text" rows="1" maxlength="4000" placeholder="Pregunta a tu coach" aria-label="Mensaje para el coach"></textarea>
-    <div class="composer-row">
-      <div id="composer-extras" class="composer-extras"></div>
-      <button type="button" id="thinking-chip" class="chip-btn" aria-controls="model-sheet" hidden>💡 <span>Pensar</span></button>
-      <span class="grow"></span>
-      <!-- Dictation: tap to talk, it stops on silence or on a second tap. -->
-      <button type="button" id="coach-mic" class="mic" aria-label="Dictar" aria-pressed="false" hidden>🎤</button>
-      <button type="submit" id="coach-send" class="send" aria-label="Enviar">↑</button>
-      <button type="button" id="coach-stop" class="send" aria-label="Detener" hidden>■</button>
-    </div>
-  </form>
-</section>
+<!-- Asking the coach mid-workout: the chat opens over this screen and closes
+     back to the same point. -->
+<div id="chat-launch" class="chat-launch">
+  <button type="button" id="launch-open" class="launch-open" aria-controls="coach-sheet">Pregunta a tu coach</button>
+  <button type="button" id="launch-mic" class="mic" aria-controls="coach-sheet" aria-label="Dictar al coach">🎤</button>
+</div>
 {{end}}
 </footer>
 {{if .CoachOn}}
@@ -287,6 +333,7 @@
 <script src="{{.Base}}/static/htmx.min.js" defer></script>
 <script src="{{.Base}}/static/app.js" defer></script>
 <script src="{{.Base}}/static/shell.js" defer></script>
+<script src="{{.Base}}/static/modes.js" defer></script>
 </body>
 </html>
 {{end}}

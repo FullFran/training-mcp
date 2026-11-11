@@ -139,6 +139,7 @@ func TestServiceWorkerKeepsEachUsersPagesApart(t *testing.T) {
 		"malformed":        "<nothing>",
 		"secretMount":      "owner today",
 		"secretBesideRoot": "owner today",
+		"modeQuery":        "A today",
 	}
 	for name, today := range want {
 		if str(got[name].Today) != today {

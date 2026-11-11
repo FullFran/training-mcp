@@ -1140,3 +1140,260 @@ main { padding-bottom: 140px; }
 .conv-actions button { flex: 1; min-height: 40px; }
 .danger-text { color: var(--danger); }
 .small { font-size: 12px; margin: 0; }
+
+/* --- modes: the choice, Entrenar and Planificar -----------------------------
+   One page holds the three; body[data-mode] shows one. The coach sheet is the
+   whole screen in Planificar and an overlay over the workout in Entrenar. */
+body:not([data-mode="home"]) .home,
+body:not([data-mode="train"]) .train-bar,
+body:not([data-mode="train"]) .train,
+body:not([data-mode="train"]) .dock,
+body:not([data-mode="plan"]) .chat-bar,
+body[data-mode="home"] .coach-sheet,
+body[data-mode="train"]:not(.coach-open) .coach-sheet,
+body:not([data-mode="train"]) .coach-sheet-head { display: none; }
+
+.home {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: calc(16px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+}
+.home-head { display: flex; align-items: baseline; gap: 8px; }
+.home-head strong { font-size: 18px; }
+.home h1 { margin: 0 0 8px; font-size: 28px; }
+.mode-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 14px;
+  min-height: 132px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--card);
+  color: var(--text);
+  text-decoration: none;
+}
+.mode-card:active { transform: scale(.99); }
+.mode-card.mode-train { border-color: var(--accent); }
+.mode-icon { grid-row: 1 / span 2; font-size: 40px; }
+.mode-card strong { font-size: 26px; align-self: end; }
+.mode-sub { color: var(--muted); font-size: 15px; align-self: start; }
+.home-review { min-height: 48px; display: flex; align-items: center; justify-content: center; color: var(--accent); text-decoration: none; }
+
+/* Entrenar: a bar with the way home and Terminar, the list, then the dock. */
+.chat-home > .train-bar {
+  position: static;
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  padding: calc(6px + env(safe-area-inset-top)) 8px 6px;
+}
+.train-bar .back { justify-self: start; display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px; text-decoration: none; border: 0; }
+.train-bar .finish-open { justify-self: end; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--accent); background: none; color: var(--accent); font-weight: 700; }
+body:has(#train-start) .finish-open { visibility: hidden; }
+.chat-home main.train {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 10px 12px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.train-start { display: grid; gap: 10px; }
+.train-start h2 { margin: 6px 0; font-size: 22px; }
+.train-start form { display: grid; }
+.start-btn {
+  display: grid;
+  gap: 4px;
+  min-height: 72px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+}
+.start-btn strong { font-size: 18px; }
+.start-plan .start-btn { border-color: var(--accent); }
+.start-btn.free { border-style: dashed; }
+
+/* The chat bar at the bottom of Entrenar. */
+.chat-launch { display: flex; gap: 8px; align-items: center; }
+.launch-open {
+  flex: 1;
+  min-height: 48px;
+  padding: 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--card);
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+}
+.chat-launch .mic { width: 48px; height: 48px; flex: none; }
+
+/* Planificar: the coach sheet is the screen, chat over composer. */
+.coach-sheet {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.coach-sheet > .coach {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 10px calc(10px + env(safe-area-inset-bottom));
+}
+/* Entrenar: the same sheet over the lower part of the workout, so the exercise
+   in hand stays in sight above it. */
+body.coach-open .coach-sheet {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 34;
+  height: 64vh; height: 64dvh;
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, .4);
+}
+.coach-scrim { z-index: 33; background: rgba(0, 0, 0, .35); }
+.coach-sheet-head {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 10px 12px 0 16px;
+}
+.coach-sheet-head .grab { top: 6px; }
+.coach-sheet-head strong { font-size: 17px; }
+.coach-sheet-head #coach-close { margin-left: auto; min-height: 40px; }
+.coach-rest { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); }
+.coach-rest.done { color: var(--text); }
+
+/* Finishing: the summary as a sheet, everything behind it dimmed. */
+.finish {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 37;
+  max-height: 88vh; max-height: 88dvh;
+  overflow-y: auto;
+  padding: 6px 16px calc(18px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .55);
+}
+.finish h2 { margin: 4px 0 8px; font-size: 22px; }
+.finish-totals { margin: 0 0 10px; font-size: 16px; }
+.finish-list { margin: 0 0 12px; padding: 0; list-style: none; display: grid; gap: 6px; }
+.finish-list li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.finish .primary.wide { width: 100%; min-height: 52px; margin-top: 12px; font-size: 17px; }
+
+/* --- Entrenar: one card per exercise with its set table ---------------------
+   Columns Serie | Anterior | kg | Reps | RPE | check; rows 52px; a done row
+   turns green, the live row is the only one at full strength. */
+.train-plan { display: grid; gap: 10px; }
+.train-plan .planned { gap: 10px; }
+.train-plan .planned > li.ex-card { display: block; padding: 0; border-radius: 16px; background: var(--card); }
+.train-plan .planned > li.ex-card.extra { opacity: 1; }
+.train-plan .planned > li.in-ss { border-left: 4px solid #60a5fa; }
+.train-plan .planned > li.in-ss + li.in-ss { margin-top: -6px; border-top-left-radius: 4px; }
+.ex-head {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 60px;
+  padding: 8px 14px;
+  list-style: none;
+  cursor: pointer;
+}
+.ex-head::-webkit-details-marker { display: none; }
+.train-plan .ex { font-size: 17px; font-weight: 600; }
+.train-plan .count { font-size: 16px; }
+.ex-card .ss { background: #60a5fa; }
+.ex-body { padding: 0 8px 10px; display: grid; gap: 8px; }
+.train-plan .set-table { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.train-plan .set-table > li,
+.set-row .row-form {
+  display: grid;
+  grid-template-columns: 2.2rem minmax(4.4rem, 1fr) 4rem 3.2rem 3.2rem 3rem;
+  align-items: center;
+  gap: 4px;
+  min-height: 52px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+}
+.train-plan .set-table > li.pending,
+.train-plan .set-table > li.added { display: block; padding: 0; }
+.train-plan .set-table > li.head > span:nth-child(n+3) { text-align: center; }
+.train-plan .set-table > li.head { min-height: 24px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.set-row .set-n { text-align: center; font-weight: 700; color: var(--muted); }
+.set-row .prev { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.set-row input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+.set-row input::-webkit-outer-spin-button, .set-row input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.set-row .check {
+  width: 100%; min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 20px; font-weight: 800;
+}
+.set-row.live .check { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.set-row.pending:not(.live) .row-form { opacity: .7; }
+.train-plan .set-table > li.done { background: rgba(74, 222, 128, .14); }
+.set-row.done .v { grid-column: 3 / span 3; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+.set-row.done .set-n { color: var(--accent); }
+.set-row.done .edit { min-height: 44px; border: 0; background: none; color: var(--muted); font-size: 18px; }
+.set-row .row-tags { grid-column: 1 / -1; padding: 0 0 6px 2.6rem; font-size: 12px; }
+.set-row .edit-form { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 8px; }
+.set-row .edit-form input { flex: 1 1 4rem; }
+.set-row .edit-form .del { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--danger); background: none; color: var(--danger); }
+.ex-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ex-tools .add-row { flex: 1 1 100%; min-height: 44px; font-size: 15px; }
+.ex-tools .mini { min-height: 40px; }
+.ex-tools .item-actions { flex-basis: 100%; }
+/* The rows are the one-tap log here, so the dock only shows the rest while it
+   runs; the bar's quick log and its sheet would duplicate them. */
+body[data-mode="train"]:has(.ex-card) .wk-log,
+body[data-mode="train"]:has(.ex-card) .wk-now,
+body[data-mode="train"]:has(.ex-card) .wk-more,
+body[data-mode="train"]:has(.ex-card) .workout:has(> .rest[hidden]) { display: none; }
+.chat-bar .bar-start { display: flex; align-items: center; }
+/* Warm-ups in the set table: an amber W in the number column, dimmed values. */
+.type-toggle { min-height: 44px; padding: 0; border: 0; border-radius: 10px; background: none; color: inherit; font: inherit; }
+.set-row.warmup .set-n { color: #e0af68; }
+.set-row.pending.warmup .type-toggle { background: #3b2f12; }
+.set-row.done .warmup-tag { justify-self: center; min-width: 26px; min-height: 26px; font-size: 14px; }
+.train-plan .set-table > li.done.warmup { background: rgba(224, 175, 104, .12); }
+.train-plan .set-table > li.done.warmup .v { opacity: .7; }

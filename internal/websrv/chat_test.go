@@ -71,10 +71,14 @@ func TestWorkoutCardCollapsesWithoutAWorkout(t *testing.T) {
 	if strings.Contains(card, `class="workout idle"`) {
 		t.Fatal("workout card stays collapsed with a set logged")
 	}
-	for _, want := range []string{`id="wk-log"`, `id="rest"`, `id="entry"`, `id="panel"`, "80 kg × 8"} {
+	for _, want := range []string{`id="wk-log"`, `id="rest"`, `id="entry"`} {
 		if !strings.Contains(card, want) {
 			t.Fatalf("workout card lacks %s", want)
 		}
+	}
+	// The logged set shows on the training screen above the dock.
+	if train := section(t, body, `id="train"`, "</main>"); !strings.Contains(train, `id="panel"`) || !strings.Contains(train, "80 kg × 8") {
+		t.Fatalf("training screen lacks the set: %s", train)
 	}
 }
 
@@ -183,7 +187,7 @@ func TestComposerHasVoiceAndTheExtrasSlot(t *testing.T) {
 func TestServiceWorkerCachesTheChatShell(t *testing.T) {
 	h, _ := newServer(t)
 	body := get(t, h, base+"/sw.js").Body.String()
-	for _, want := range []string{"const VERSION = 'v12';", "BASE + '/static/shell.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'", "BASE + '/static/coach-attach.js'"} {
+	for _, want := range []string{"const VERSION = 'v13';", "BASE + '/static/shell.js'", "BASE + '/static/modes.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'", "BASE + '/static/coach-attach.js'"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("service worker lacks %s", want)
 		}
@@ -254,10 +258,12 @@ func TestHomeIsAChatGPTStyleShell(t *testing.T) {
 			t.Fatalf("settings %s still crowd the composer", unwanted)
 		}
 	}
-	// Bottom dock: the conversation first, then the workout bar, then the message box.
-	chat, workout, form := strings.Index(body, `id="coach-log"`), strings.Index(body, `id="workout"`), strings.Index(body, `id="coach-form"`)
-	if !(chat < workout && workout < form) || !strings.Contains(section(t, body, `class="dock"`, "</footer>"), `id="workout"`) {
-		t.Fatalf("want chat, then workout, then composer in the dock: %d %d %d", chat, workout, form)
+	// The coach sheet holds the conversation and then the message box; the
+	// workout bar is Entrenar's dock, outside it.
+	sheet := section(t, body, `id="coach-sheet"`, `class="dock"`)
+	chat, form := strings.Index(sheet, `id="coach-log"`), strings.Index(sheet, `id="coach-form"`)
+	if chat < 0 || form < chat || strings.Contains(sheet, `id="workout"`) || !strings.Contains(section(t, body, `class="dock"`, "</footer>"), `id="workout"`) {
+		t.Fatalf("want chat then composer in the coach sheet, workout in the dock: %d %d", chat, form)
 	}
 	if sheet := section(t, body, `id="wk-more"`, `id="entry"`); !strings.Contains(sheet, `class="wk-sheet"`) || !strings.Contains(sheet, `data-close-sheet`) {
 		t.Fatalf("the entry form is not a closable sheet: %s", sheet)

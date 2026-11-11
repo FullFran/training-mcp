@@ -28,7 +28,8 @@
   function fill(data) {
     if (!data || !data.exercise) return;
     exercise.value = data.exercise;
-    if (data.weight) weight.value = data.weight;
+    // Stored weights can carry float noise (65.77089365): two decimals at most.
+    if (data.weight) weight.value = num(data.weight);
     if (data.reps) reps.value = data.reps;
     if (data.rpe) setRPE(data.rpe);
     showPrevious();
@@ -269,12 +270,63 @@
   // of the target rep range and the target RPE, plus last time's weight, which
   // the plan deliberately does not prescribe.
   document.addEventListener('click', (event) => {
-    const item = event.target.closest('.planned li');
+    const item = event.target.closest('.planned > li');
     if (!item) return;
-    if (event.target.closest('.more, .item-actions')) return;
+    if (event.target.closest('.more, .item-actions, .ex-body')) return;
     fillPlanned(item);
     buzz(8);
     document.getElementById('entry').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  // «+ Añadir serie» adds a row to a card's table, with the values of the row
+  // before it (the previous set is the best guess for the next one).
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest('.add-row');
+    if (!btn) return;
+    const table = btn.closest('.ex-body').querySelector('.set-table');
+    const tpl = table.querySelector('template.row-tpl');
+    if (!tpl) return;
+    const li = tpl.content.firstElementChild.cloneNode(true);
+    const n = table.querySelectorAll('.set-row.done, .set-row.pending, .set-row.added').length + 1;
+    li.querySelector('.set-n').textContent = String(n);
+    li.querySelectorAll('[aria-label]').forEach((el) => {
+      el.setAttribute('aria-label', el.getAttribute('aria-label').replace(/\d+$/, String(n)));
+    });
+    const kind = li.querySelector('.type-toggle');
+    if (kind) {
+      kind.dataset.n = String(n);
+      kind.setAttribute('aria-label', 'Serie ' + n + ': tocar para marcar calentamiento');
+    }
+    const before = Array.from(table.querySelectorAll('.set-row.pending, .set-row.added')).pop();
+    if (before) {
+      ['weight_kg', 'reps', 'rpe'].forEach((name) => {
+        const from = before.querySelector('input[name="' + name + '"]');
+        const to = li.querySelector('input[name="' + name + '"]');
+        if (from && to && from.value) to.value = from.value;
+      });
+    }
+    table.insertBefore(li, tpl);
+    if (window.htmx) window.htmx.process(li);
+    buzz(8);
+  });
+
+  // Tapping a row's number marks it as a warm-up (W) and back; a warm-up is
+  // logged with category=warmup and never counts.
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest('.type-toggle');
+    if (!btn) return;
+    const row = btn.closest('.set-row');
+    const input = row && row.querySelector('input[name="category"]');
+    if (!input) return;
+    const warm = input.value !== 'warmup';
+    input.value = warm ? 'warmup' : '';
+    row.classList.toggle('warmup', warm);
+    btn.querySelector('.set-n').textContent = warm ? 'W' : btn.dataset.n;
+    btn.setAttribute('aria-pressed', String(warm));
+    btn.setAttribute('aria-label', warm
+      ? 'Calentamiento: tocar para serie normal'
+      : 'Serie ' + btn.dataset.n + ': tocar para marcar calentamiento');
+    buzz(8);
   });
 
   // --- inline edit -------------------------------------------------------
@@ -297,7 +349,8 @@
       `<input name="technique" type="text" list="techniques" placeholder="técnica" value="${li.dataset.technique || ''}" aria-label="Técnica">` +
       `<input type="hidden" name="category" value="working">` +
       `<label class="warmup-toggle"><input type="checkbox" name="category" value="warmup"${li.dataset.category === 'warmup' ? ' checked' : ''}> W</label>` +
-      `<button type="submit" class="ok">Guardar</button>`;
+      `<button type="submit" class="ok">Guardar</button>` +
+      `<button type="button" class="del" hx-post="${base}/sets/${li.dataset.setId}/delete" hx-target="#panel" hx-swap="outerHTML" hx-confirm="¿Borrar esta serie?" aria-label="Borrar serie">✕</button>`;
     li.appendChild(f);
     if (window.htmx) window.htmx.process(f);
     f.querySelector('input').focus();
@@ -436,22 +489,34 @@
       exercise: panel.dataset.lastExercise, weight: panel.dataset.lastWeight,
       reps: panel.dataset.lastReps, rpe: panel.dataset.lastRpe
     } }));
-    const justLogged = (exercise.value || '').trim().toLowerCase();
+    // The set the server stored last is the one just logged, from a card's row
+    // or from the entry form.
+    const justLogged = (panel.dataset.lastExercise || exercise.value || '').trim().toLowerCase();
     const next = nextInSuperset(justLogged);
+    let focus = justLogged;
     if (next) {
       // Load the next movement of the superset; rest only once the round is done.
       fillPlanned(next.item);
+      focus = next.item.dataset.exercise;
     } else {
       // An exercise whose sets are all done hands over to the next one planned.
       const doneItem = plannedItem(justLogged);
       const upcoming = panel.dataset.next && plannedItem(panel.dataset.next);
-      if (doneItem && doneItem.classList.contains('ok') && upcoming && upcoming !== doneItem) fillPlanned(upcoming);
+      if (doneItem && doneItem.classList.contains('ok') && upcoming && upcoming !== doneItem) {
+        fillPlanned(upcoming);
+        focus = upcoming.dataset.exercise;
+      }
     }
+    // The training screen opens the card of the exercise that comes next.
+    document.dispatchEvent(new CustomEvent('workout:focus', { detail: focus }));
     if (!next || next.newRound) {
       startRest(parseInt(document.getElementById('panel').dataset.restElapsed || '0', 10));
     }
     buzz(18);
   });
+
+  // Finishing the workout ends any rest still counting.
+  document.addEventListener('workout:finish', () => { if (restBar) stopRest(); });
 
   // A reload mid-rest picks the timer up where it was.
   (function resumeRest() {

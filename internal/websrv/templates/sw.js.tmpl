@@ -10,7 +10,7 @@
 // only that partition is ever read offline: a new session drops the others, an
 // expired one is dropped before reading, and the logged-out page (X-Cache-Clear)
 // drops them all. The secret mount sends no partition and keeps the old cache.
-const VERSION = 'v12';
+const VERSION = 'v13';
 const SHELL = 'shell-' + VERSION;
 const PAGES = 'pages-' + VERSION;
 const BASE = '{{.Base}}';
@@ -24,6 +24,7 @@ const SHELL_ASSETS = [
   BASE + '/static/markdown.js',
   BASE + '/static/coach-attach.js',
   BASE + '/static/shell.js',
+  BASE + '/static/modes.js',
   BASE + '/static/htmx.min.js',
   BASE + '/static/icon-192.png',
   BASE + '/static/icon-512.png'
@@ -84,18 +85,25 @@ function dropUserPages(keep) {
   ));
 }
 
+// pageKey files the home under one key for every ?modo=: it is one page that
+// switches screens itself, so a reload offline on any screen finds it.
+function pageKey(request) {
+  const url = new URL(request.url);
+  return url.pathname === BASE + '/' ? url.origin + url.pathname : request;
+}
+
 function remember(request, res) {
   if (res.headers.get('X-Cache-Clear')) return dropUserPages(null);
   // An error is never worth showing offline in place of the last good page.
   if (!res.ok) return Promise.resolve();
   const partition = res.headers.get('X-Cache-Partition');
   if (partition === null) {
-    return caches.open(PAGES).then((cache) => cache.put(request, res));
+    return caches.open(PAGES).then((cache) => cache.put(pageKey(request), res));
   }
   if (!PARTITION.test(partition)) return Promise.resolve();
   const name = USER_PAGES + partition;
   return caches.open(name)
-    .then((cache) => cache.put(request, res))
+    .then((cache) => cache.put(pageKey(request), res))
     .then(() => dropUserPages(name));
 }
 
@@ -119,6 +127,6 @@ function livePartition() {
 // share this origin's caches, and never another session's.
 function offlineCopy(request) {
   return livePartition()
-    .then((name) => name ? caches.open(name).then((cache) => cache.match(request)) : undefined)
-    .then((hit) => hit || caches.match(request, { cacheName: PAGES }));
+    .then((name) => name ? caches.open(name).then((cache) => cache.match(pageKey(request))) : undefined)
+    .then((hit) => hit || caches.match(pageKey(request), { cacheName: PAGES }));
 }
