@@ -110,7 +110,7 @@ nothing changes:
   where a deleted set stood) or belongs to one removed since.
 
 Later changes elsewhere do not stand in the way: undoing an added set leaves
-the sets logged after it in place. Proposals answered before migration 024,
+the sets logged after it in place. Proposals answered before migration 025,
 rejected or failed ones, and undos cannot be undone.
 
 ### Decision records (HCS-0005 section 3.3)

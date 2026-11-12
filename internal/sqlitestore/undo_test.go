@@ -10,7 +10,7 @@ import (
 	"github.com/fullfran/training-mcp/internal/training"
 )
 
-const undoMigration = 24
+const undoMigration = 25
 
 // acceptedWithUndo applies a change as an accepted proposal of user, with the
 // undo image the store captures.

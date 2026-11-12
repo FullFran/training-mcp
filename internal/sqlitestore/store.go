@@ -30,7 +30,10 @@ type Store struct {
 }
 
 func Open(path string) (*Store, error) {
-	db, err := sql.Open("sqlite", path+"?_pragma=foreign_keys(ON)&_pragma=busy_timeout(5000)")
+	// Every transaction here writes, so each takes the write lock when it begins
+	// (immediate) and waits its turn on busy_timeout, instead of failing at once
+	// when it upgrades from reading while another write is under way.
+	db, err := sql.Open("sqlite", path+"?_pragma=foreign_keys(ON)&_pragma=busy_timeout(5000)&_txlock=immediate")
 	if err != nil {
 		return nil, err
 	}
@@ -180,6 +183,7 @@ type userStore struct {
 }
 
 func (s *userStore) Start(ctx context.Context, session training.Session) (training.Session, error) {
+	defer s.writing(ctx)()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return training.Session{}, err
@@ -231,6 +235,7 @@ WHERE plan_id IN (SELECT id FROM plans WHERE id=? AND user_id=?)`,
 	return session, tx.Commit()
 }
 func (s *userStore) AddSet(ctx context.Context, in training.AddSetInput) (training.Set, float64, error) {
+	defer s.writing(ctx)()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return training.Set{}, 0, err
@@ -290,6 +295,7 @@ func insertSet(ctx context.Context, tx *sql.Tx, userID int64, in training.AddSet
 // anything is read, so concurrent calls queue on busy_timeout rather than failing
 // when a read transaction tries to upgrade, and each one sees the previous result.
 func (s *userStore) LogSets(ctx context.Context, in training.LogSetsRecord) (training.LogSetsResult, error) {
+	defer s.writing(ctx)()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return training.LogSetsResult{}, err
@@ -372,6 +378,7 @@ func (s *userStore) LogSets(ctx context.Context, in training.LogSetsRecord) (tra
 	return out, nil
 }
 func (s *userStore) UpdateSet(ctx context.Context, id int64, p training.SetPatch) (training.Set, float64, error) {
+	defer s.writing(ctx)()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return training.Set{}, 0, err
@@ -416,6 +423,7 @@ func (s *userStore) UpdateSet(ctx context.Context, id int64, p training.SetPatch
 	return set, total, err
 }
 func (s *userStore) DeleteSet(ctx context.Context, id int64) (int64, float64, int, error) {
+	defer s.writing(ctx)()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, 0, 0, err
@@ -555,6 +563,7 @@ ORDER BY id DESC LIMIT ?`, s.userID, limit)
 }
 
 func (s *userStore) CreatePlan(ctx context.Context, p training.Plan) (training.Plan, error) {
+	defer s.writing(ctx)()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return training.Plan{}, err
@@ -630,6 +639,7 @@ func (s *userStore) GetPlan(ctx context.Context, id int64) (training.Plan, error
 
 // UpdatePlan edits a plan's name and notes, leaving its exercises alone.
 func (s *userStore) UpdatePlan(ctx context.Context, id int64, p training.PlanPatch) error {
+	defer s.writing(ctx)()
 	var name, notes string
 	err := s.db.QueryRowContext(ctx, `SELECT name,notes FROM plans WHERE id=? AND user_id=?`, id, s.userID).Scan(&name, &notes)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -652,6 +662,7 @@ func (s *userStore) UpdatePlan(ctx context.Context, id int64, p training.PlanPat
 // already there. New items go last. Matched by exercise name in code rather
 // than by a unique constraint, so existing plans need no schema change.
 func (s *userStore) SetPlanItem(ctx context.Context, planID int64, it training.PlanItem) error {
+	defer s.writing(ctx)()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -687,6 +698,7 @@ func (s *userStore) SetPlanItem(ctx context.Context, planID int64, it training.P
 
 // RemovePlanItem drops an exercise and closes the gap in the ordering.
 func (s *userStore) RemovePlanItem(ctx context.Context, planID int64, exercise string) error {
+	defer s.writing(ctx)()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -712,6 +724,7 @@ func (s *userStore) RemovePlanItem(ctx context.Context, planID int64, exercise s
 // MovePlanItem shifts an exercise up or down by one place. Order matters: it is
 // the order the session is performed in.
 func (s *userStore) MovePlanItem(ctx context.Context, planID int64, exercise string, delta int) error {
+	defer s.writing(ctx)()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -788,6 +801,7 @@ func resequencePlan(ctx context.Context, tx *sql.Tx, planID int64) error {
 }
 
 func (s *userStore) DeletePlan(ctx context.Context, id int64) error {
+	defer s.writing(ctx)()
 	res, err := s.db.ExecContext(ctx, `DELETE FROM plans WHERE id=? AND user_id=?`, id, s.userID)
 	if err != nil {
 		return err
@@ -863,6 +877,7 @@ WHERE st.session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?) AND st
 // stored value: superset, notes, RPE, and the rep range (sent as a pair, so
 // either bound replaces both and a partial send cannot invert it).
 func (s *userStore) SetSessionItem(ctx context.Context, sessionID int64, it training.PlanItem) error {
+	defer s.writing(ctx)()
 	res, err := s.db.ExecContext(ctx, `
 INSERT INTO session_items (session_id,position,exercise,target_sets,rep_min,rep_max,target_rpe,superset,notes)
 SELECT id,(SELECT COALESCE(MAX(position),0)+1 FROM session_items WHERE session_id=?),?,?,?,?,?,?,?
@@ -884,6 +899,7 @@ ON CONFLICT(session_id,exercise) DO UPDATE SET
 // PatchSessionItem changes only the fields given, so bumping the set count does
 // not require restating the rep range.
 func (s *userStore) PatchSessionItem(ctx context.Context, sessionID int64, exercise string, p training.SessionItemPatch) error {
+	defer s.writing(ctx)()
 	var it training.PlanItem
 	var skipped bool
 	err := s.db.QueryRowContext(ctx, `SELECT i.exercise,i.target_sets,i.rep_min,i.rep_max,i.target_rpe,i.skipped FROM session_items i JOIN sessions se ON se.id=i.session_id WHERE i.session_id=? AND i.exercise=? AND se.user_id=?`,
@@ -917,6 +933,7 @@ func (s *userStore) PatchSessionItem(ctx context.Context, sessionID int64, exerc
 // SwapSessionItem substitutes one exercise for another in place, keeping its
 // position and prescription. This is the occupied-machine case.
 func (s *userStore) SwapSessionItem(ctx context.Context, sessionID int64, from, to string) error {
+	defer s.writing(ctx)()
 	res, err := s.db.ExecContext(ctx, `UPDATE session_items SET exercise=? WHERE session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?) AND exercise=?`, to, sessionID, s.userID, from)
 	if err != nil {
 		return err
@@ -934,6 +951,7 @@ func (s *userStore) SwapSessionItem(ctx context.Context, sessionID int64, from, 
 // RemoveSessionItem drops an exercise from today's plan. Sets already logged
 // against it are untouched and resurface as off-plan work.
 func (s *userStore) RemoveSessionItem(ctx context.Context, sessionID int64, exercise string) error {
+	defer s.writing(ctx)()
 	res, err := s.db.ExecContext(ctx, `DELETE FROM session_items WHERE session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?) AND exercise=?`, sessionID, s.userID, exercise)
 	if err != nil {
 		return err
@@ -949,6 +967,7 @@ func (s *userStore) RemoveSessionItem(ctx context.Context, sessionID int64, exer
 }
 
 func (s *userStore) SetFeedback(ctx context.Context, sessionID int64, f training.Feedback) error {
+	defer s.writing(ctx)()
 	res, err := s.db.ExecContext(ctx, `
 INSERT INTO session_feedback (session_id,muscle_group,fatigue,pump,recovery,created_at)
 SELECT id,?,?,?,?,CURRENT_TIMESTAMP FROM sessions WHERE id=? AND user_id=?
@@ -1013,6 +1032,7 @@ WHERE id IN (SELECT MAX(f.id) FROM session_feedback f JOIN sessions se ON se.id=
 }
 
 func (s *userStore) SetExerciseNote(ctx context.Context, n training.ExerciseNote) error {
+	defer s.writing(ctx)()
 	if strings.TrimSpace(n.Note) == "" {
 		_, err := s.db.ExecContext(ctx, `DELETE FROM exercise_notes WHERE user_id=? AND exercise=?`, s.userID, n.Exercise)
 		return err
@@ -1077,6 +1097,7 @@ WHERE se.user_id=? ORDER BY f.muscle_group, f.id DESC`, s.userID)
 }
 
 func (s *userStore) SetLandmarks(ctx context.Context, l training.Landmarks) error {
+	defer s.writing(ctx)()
 	_, err := s.db.ExecContext(ctx, `
 INSERT INTO volume_landmarks(user_id,muscle_group,mev,mrv,updated_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP)
 ON CONFLICT(user_id,muscle_group) DO UPDATE SET mev=excluded.mev, mrv=excluded.mrv, updated_at=CURRENT_TIMESTAMP`,
@@ -1105,6 +1126,7 @@ func (s *userStore) AllLandmarks(ctx context.Context) (map[string]training.Landm
 // It returns how many sets went with it so the caller can report the cost of an
 // irreversible delete.
 func (s *userStore) DeleteSession(ctx context.Context, id int64) (int, error) {
+	defer s.writing(ctx)()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
@@ -1217,6 +1239,7 @@ WHERE se.user_id=? AND st.category='working'`
 }
 
 func (s *userStore) SetExerciseGroup(ctx context.Context, g training.ExerciseGroup) error {
+	defer s.writing(ctx)()
 	_, err := s.db.ExecContext(ctx, `
 INSERT INTO exercise_groups(user_id,exercise,muscle_group,updated_at) VALUES (?,?,?,CURRENT_TIMESTAMP)
 ON CONFLICT(user_id,exercise) DO UPDATE SET muscle_group=excluded.muscle_group, updated_at=CURRENT_TIMESTAMP`,
@@ -1335,6 +1358,7 @@ func (s *userStore) RestTarget(ctx context.Context) (int, error) {
 }
 
 func (s *userStore) SetRestTarget(ctx context.Context, seconds int) error {
+	defer s.writing(ctx)()
 	_, err := s.db.ExecContext(ctx, `UPDATE users SET rest_seconds=? WHERE id=?`, seconds, s.userID)
 	return err
 }

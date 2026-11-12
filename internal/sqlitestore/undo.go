@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/fullfran/training-mcp/internal/training"
 )
@@ -178,19 +179,47 @@ type undoImage struct {
 	Rows    []undoChange `json:"rows"`
 }
 
-// undoLocks serialises the captures of one user, so rows another of their
-// proposals adds at the same moment are not taken for this one's.
+// undoLocks serialise one user's writes while a change is captured: every
+// direct write of the user, and every capture and undo, holds the user's lock,
+// so the rows a change's capture sees differ only by what the change did. A
+// write made by the change itself runs inside the capture, which already holds
+// it. Different users never wait on each other.
 type undoLocks struct{ m sync.Map }
 
-func (l *undoLocks) lock(userID int64) func() {
+// lockWait bounds the wait for a user's lock. A capture lasts milliseconds; a
+// write still waiting after this proceeds rather than hang a request.
+const lockWait = 10 * time.Second
+
+type heldKey struct{}
+
+// held marks a context as running inside one user's capture.
+type held struct {
+	locks *undoLocks
+	user  int64
+}
+
+func (l *undoLocks) lock(ctx context.Context, userID int64) func() {
 	if l == nil {
 		return func() {}
 	}
-	v, _ := l.m.LoadOrStore(userID, &sync.Mutex{})
-	mu := v.(*sync.Mutex)
-	mu.Lock()
-	return mu.Unlock
+	if h, ok := ctx.Value(heldKey{}).(held); ok && h.locks == l && h.user == userID {
+		return func() {}
+	}
+	v, _ := l.m.LoadOrStore(userID, make(chan struct{}, 1))
+	sem := v.(chan struct{})
+	timer := time.NewTimer(lockWait)
+	defer timer.Stop()
+	select {
+	case sem <- struct{}{}:
+		return func() { <-sem }
+	case <-timer.C:
+	case <-ctx.Done():
+	}
+	return func() {}
 }
+
+// writing holds the user's lock for one direct write.
+func (s *userStore) writing(ctx context.Context) func() { return s.locks.lock(ctx, s.userID) }
 
 type queryer interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
@@ -345,14 +374,11 @@ func (s *userStore) scopeSessions(ctx context.Context, q queryer, scope training
 	return out, nil
 }
 
-// before reads the state a change starts from, in one read transaction.
+// before reads the state a change starts from. It needs no read transaction:
+// the user's lock keeps their rows still, and no read lock is held long enough
+// to make another account's write wait.
 func (s *userStore) before(ctx context.Context, scope training.UndoScope) ([]int64, map[string]int64, snapshot, error) {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	defer tx.Rollback()
-	sessions, err := s.scopeSessions(ctx, tx, scope)
+	sessions, err := s.scopeSessions(ctx, s.db, scope)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -362,22 +388,13 @@ func (s *userStore) before(ctx context.Context, scope training.UndoScope) ([]int
 			continue
 		}
 		var max int64
-		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(id),0) FROM `+t.name).Scan(&max); err != nil {
+		if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(MAX(id),0) FROM `+t.name).Scan(&max); err != nil {
 			return nil, nil, nil, err
 		}
 		maxIDs[t.name] = max
 	}
-	snap, err := s.capture(ctx, tx, sessions, nil)
+	snap, err := s.capture(ctx, s.db, sessions, nil)
 	return sessions, maxIDs, snap, err
-}
-
-func (s *userStore) after(ctx context.Context, sessions []int64, maxIDs map[string]int64) (snapshot, error) {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-	return s.capture(ctx, tx, sessions, maxIDs)
 }
 
 // diff lists the rows that differ, in table order.
@@ -423,7 +440,8 @@ func diff(before, after snapshot) []undoChange {
 
 // CaptureUndo applies a change and returns what undoing it needs.
 func (s *userStore) CaptureUndo(ctx context.Context, scope training.UndoScope, apply training.ApplyFunc) (json.RawMessage, json.RawMessage, error) {
-	defer s.locks.lock(s.userID)()
+	defer s.writing(ctx)()
+	ctx = context.WithValue(ctx, heldKey{}, held{locks: s.locks, user: s.userID})
 	sessions, maxIDs, before, err := s.before(ctx, scope)
 	if err != nil {
 		return nil, nil, err
@@ -432,7 +450,7 @@ func (s *userStore) CaptureUndo(ctx context.Context, scope training.UndoScope, a
 	if err != nil {
 		return result, nil, err
 	}
-	after, err := s.after(ctx, sessions, maxIDs)
+	after, err := s.capture(ctx, s.db, sessions, maxIDs)
 	if err != nil {
 		// The change stands; it just cannot be undone.
 		return result, nil, nil
@@ -646,6 +664,7 @@ func addTo(m map[string]map[string]bool, table, key string) {
 
 // UndoProposal undoes an accepted proposal of this user, all or nothing.
 func (s *userStore) UndoProposal(ctx context.Context, id int64, entry training.Proposal, record training.DecisionRecord) (training.Proposal, error) {
+	defer s.writing(ctx)()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return training.Proposal{}, err

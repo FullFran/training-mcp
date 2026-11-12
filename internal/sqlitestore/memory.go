@@ -163,6 +163,7 @@ const maxMemoryCandidates = 5
 // SaveMemory saves the fact and returns the similar active facts whose relation
 // to it is still to be judged, recording a pending relation for each.
 func (s *userStore) SaveMemory(ctx context.Context, m training.Memory, pinned *bool) (training.MemorySaved, error) {
+	defer s.writing(ctx)()
 	var out training.MemorySaved
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		saved, err := s.saveMemoryTx(ctx, tx, m, pinned)
@@ -341,6 +342,7 @@ func (s *userStore) MemoryHistory(ctx context.Context, id int64) ([]training.Mem
 
 // UpdateMemory is the person's edit: changed text goes to the history first.
 func (s *userStore) UpdateMemory(ctx context.Context, id int64, p training.MemoryPatch) (training.Memory, error) {
+	defer s.writing(ctx)()
 	var out training.Memory
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		kind, title, body := optional(p.Type), optional(p.Title), optional(p.Body)
@@ -366,6 +368,7 @@ func (s *userStore) UpdateMemory(ctx context.Context, id int64, p training.Memor
 // ConfirmMemory moves the review date of the user's active fact; the text and
 // revision stay as they are.
 func (s *userStore) ConfirmMemory(ctx context.Context, id int64, reviewAfter time.Time) (training.Memory, error) {
+	defer s.writing(ctx)()
 	return scanMemory(s.db.QueryRowContext(ctx, `UPDATE coach_memory SET review_after=?
 		WHERE id=? AND user_id=? AND deleted_at='' RETURNING `+memoryReturning, formatMemoryTime(reviewAfter), id, s.userID))
 }
@@ -378,6 +381,7 @@ func (s *userStore) releaseSuperseded(ctx context.Context, q querier, id int64) 
 }
 
 func (s *userStore) ForgetMemory(ctx context.Context, id int64, reason string, at time.Time) (training.Memory, error) {
+	defer s.writing(ctx)()
 	var out training.Memory
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		var err error
@@ -393,6 +397,7 @@ func (s *userStore) ForgetMemory(ctx context.Context, id int64, reason string, a
 // DeleteMemory removes the fact for good; its history and relations go with it,
 // the facts it replaced come back, and facts merged into it keep no pointer to it.
 func (s *userStore) DeleteMemory(ctx context.Context, id int64) (training.Memory, error) {
+	defer s.writing(ctx)()
 	var out training.Memory
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		var err error
@@ -409,6 +414,7 @@ func (s *userStore) DeleteMemory(ctx context.Context, id int64) (training.Memory
 }
 
 func (s *userStore) DeleteAllMemory(ctx context.Context) (int, error) {
+	defer s.writing(ctx)()
 	res, err := s.db.ExecContext(ctx, `DELETE FROM coach_memory WHERE user_id=?`, s.userID)
 	if err != nil {
 		return 0, err
@@ -455,6 +461,7 @@ func (s *userStore) relationRefused(ctx context.Context, q querier, id int64) er
 // JudgeMemory records the coach's verdict on a pending relation. Supersedes
 // retires the older fact at once.
 func (s *userStore) JudgeMemory(ctx context.Context, id int64, relation, reason string, at time.Time) (training.MemoryRelation, error) {
+	defer s.writing(ctx)()
 	var out training.MemoryRelation
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		var r relationScan
@@ -519,6 +526,7 @@ func (s *userStore) ListMemoryConflicts(ctx context.Context) ([]training.MemoryC
 // ResolveMemoryConflict closes a judged conflict as the person decides: the
 // fact not kept is superseded by the one kept; keeping both changes neither.
 func (s *userStore) ResolveMemoryConflict(ctx context.Context, id int64, keep string, at time.Time) error {
+	defer s.writing(ctx)()
 	return s.withTx(ctx, func(tx *sql.Tx) error {
 		var newID, oldID int64
 		err := tx.QueryRowContext(ctx, `UPDATE coach_memory_relations SET status='resolved', judged_at=?
@@ -546,6 +554,7 @@ func (s *userStore) ResolveMemoryConflict(ctx context.Context, id int64, keep st
 // source must still be the user's, not forgotten and at the revision the plan
 // saw. A survivor whose key is a source's updates that fact, which then stays.
 func (s *userStore) ConsolidateMemory(ctx context.Context, c training.MemoryConsolidation) (training.Memory, error) {
+	defer s.writing(ctx)()
 	var out training.Memory
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		// A write first takes the lock, so no save slips in between the checks

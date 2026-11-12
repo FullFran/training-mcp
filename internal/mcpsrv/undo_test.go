@@ -328,3 +328,39 @@ func TestNoToolUndoes(t *testing.T) {
 		}
 	}
 }
+
+// The person logging sets while an agent's proposal is accepted keeps every
+// set: the capture holds their writes back until it ends, so undoing the
+// proposal removes only what the proposal did. Neither side's write fails:
+// transactions take the write lock first and wait for each other.
+func TestUndoKeepsWritesThePersonMadeWhileAProposalApplied(t *testing.T) {
+	ctx := context.Background()
+	for i := 0; i < 15; i++ {
+		w := newIsolationWorld(t)
+		other, err := w.ownerService.StartPlannedSession(ctx, "2026-03-04", 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		done := make(chan int, 1)
+		go func() {
+			stored := 0
+			for j := 0; j < 10; j++ {
+				if _, _, err := w.ownerService.AddSet(ctx, training.AddSetInput{SessionID: other.ID, Exercise: "remo", WeightKG: 50, Reps: 10, RPE: 8}); err == nil {
+					stored++
+				}
+			}
+			done <- stored
+		}()
+		result := structured(t, call(t, w.owner, "add_set", map[string]any{"session_id": w.ids.session, "exercise": "remo", "weight_kg": 60, "reps": 8, "rpe": 8}))
+		if stored := <-done; stored != 10 || result["status"] != "accepted" {
+			t.Fatalf("run %d: person stored %d of 10, proposal %v", i, stored, result["status"])
+		}
+		if _, err := w.ownerService.UndoProposal(ctx, proposalOf(t, result)); err != nil {
+			t.Fatalf("undo: %v", err)
+		}
+		var n int
+		if err := w.db.QueryRow(`SELECT COUNT(*) FROM sets WHERE session_id=?`, other.ID).Scan(&n); err != nil || n != 10 {
+			t.Fatalf("run %d: the person's sets after undo = %d, %v; want 10", i, n, err)
+		}
+	}
+}

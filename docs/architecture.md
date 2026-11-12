@@ -199,9 +199,11 @@ Accepting runs the change inside `sqlitestore`'s `CaptureUndo`, which reads
 the user's undoable rows before and after it (whole for the small tables; for
 sets, session exercises and feedback, only the sessions the payload names by
 `session_id` or `set_id` plus the rows added) and stores the rows that differ
-as the proposal's undo image. Captures of one user are serialised so two
-proposals applied together do not take each other's rows; a write the person
-makes in the PWA during that same instant could still be attributed to it.
+as the proposal's undo image. While it runs, the user's other writes (the
+person's own in the PWA, other proposals, imports) wait on a per-user lock in
+the store, so the image holds only what the change did; the change's own
+writes run inside the capture and do not wait. Different users never wait on
+each other.
 `UndoProposal` checks every row against the image and writes the before rows
 back in one transaction, scoped to the user like every other statement. The
 rules are in [Undo](tools.md#undo).
