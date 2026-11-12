@@ -27,6 +27,22 @@
     <span class="hero-meta num"><span data-live="sets">{{.WorkingSetCount}}{{if .Progress}}/{{.PlannedSets}}{{end}} serie{{if or (ne .WorkingSetCount 1) .Progress}}s{{end}}</span><span data-live="exercises">{{if .Progress}} · {{doneCount .Progress}}/{{len .Progress}} ejercicios{{end}}</span></span>
     <span class="btn primary big"><span class="when-live">Continuar</span><span class="when-done">Abrir el entreno</span></span>
   </a>
+  {{if $active}}{{with .OtherPlans}}
+  <!-- A started routine is not a commitment: the others stay one tap away. With
+       nothing logged the choice replaces today's session; with sets logged they
+       stay and the routine's exercises are added (choosePlan). -->
+  <h2 class="section-label">Cambiar de rutina</h2>
+  {{if $.Session.Sets}}<p class="muted switch-note">Tus series de hoy se quedan; se añaden los ejercicios de la rutina que elijas.</p>{{end}}
+  <ul id="switch-routines" class="list">
+    {{range .}}
+    <li><form method="post" action="{{$.Base}}/plan">{{if $.CSRF}}
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+      <input type="hidden" name="plan_id" value="{{.ID}}">
+      <button type="submit" class="list-row"><span class="row-main"><strong>{{.Name}}</strong><span class="muted">{{.TotalSets}} series</span></span><span class="chev" aria-hidden="true">›</span></button>
+    </form></li>
+    {{end}}
+  </ul>
+  {{end}}{{end}}
   {{if not $active}}
   <div class="home-idle">
   {{with .Home.Next}}
