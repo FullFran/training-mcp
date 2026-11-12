@@ -1,32 +1,20 @@
 {{define "panel.html"}}<section id="panel" class="panel"
   data-last-set-id="{{if .LastSetID}}{{.LastSetID}}{{end}}" data-rest-state="{{.Rest.State}}" data-rest-elapsed="{{.Rest.ElapsedSeconds}}"
   {{with .Next}}data-next="{{.Exercise}}" data-next-rx="{{rx .}}"{{end}}
+  data-active="{{if .Active}}1{{end}}" data-session-id="{{if .Session.ID}}{{.Session.ID}}{{end}}" data-plan-name="{{.Session.PlanName}}"
+  data-sets-done="{{.WorkingSetCount}}" data-sets-planned="{{if .Progress}}{{.PlannedSets}}{{end}}"
+  data-ex-done="{{if .Progress}}{{doneCount .Progress}}{{end}}" data-ex-total="{{if .Progress}}{{len .Progress}}{{end}}"
   {{with .LastSet}}data-last-exercise="{{.Exercise}}" data-last-weight="{{num .WeightKG}}" data-last-reps="{{.Reps}}" data-last-rpe="{{if not .RPEImputed}}{{num .RPE}}{{end}}"{{end}}>
 
   {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
 
-  {{if and (not .ReadOnly) (not .Progress) (not .Session.Sets)}}
-  <!-- Nothing done today: start from a plan or train freely. -->
-  <section id="train-start" class="train-start" aria-label="Empezar">
-    <h2>Elige tu entreno</h2>
-    {{range .Plans}}
-    <form method="post" action="{{$.Base}}/plan" class="plan-pick start-plan">{{if $.CSRF}}
-      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
-      <input type="hidden" name="plan_id" value="{{.ID}}">
-      <button type="submit" class="start-btn"><strong>{{.Name}}</strong> <span class="muted">{{len .Items}} ejercicio{{if ne (len .Items) 1}}s{{end}} · {{.TotalSets}} series</span></button>
-    </form>
-    {{end}}
-    <button type="button" id="free-session" class="start-btn free"><strong>Sesión libre</strong> <span class="muted">Elige los ejercicios sobre la marcha</span></button>
-    {{if not .Plans}}<p class="muted">Crea rutinas en Planificar para empezar con un toque.</p>{{end}}
-  </section>
-  {{end}}
-
   {{if and (not .ReadOnly) .Cards}}
   <section class="plan train-plan" aria-label="Entreno de hoy">
-    <header class="plan-head">
-      <strong>{{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Entreno libre{{end}}</strong>
-      <span class="muted">{{.WorkingSetCount}} serie{{if ne .WorkingSetCount 1}}s{{end}} · {{num .Session.TotalSI}} SI</span>
-    </header>
+    <!-- One chip per exercise with its progress; tapping one opens its card. -->
+    <nav class="ex-chips" aria-label="Ejercicios">
+      {{range .Cards}}<button type="button" class="ex-chip{{if .Skipped}} skipped{{else if .Done}} ok{{end}}{{if .Open}} current{{end}}" data-chip="{{.Exercise}}">{{if .Done}}<span aria-hidden="true">✓</span> {{end}}{{.Exercise}} <span class="num">{{.DoneSets}}{{if .TargetSets}}/{{.TargetSets}}{{end}}</span></button>
+      {{end}}
+    </nav>
     {{if .PlanNotes}}<p class="plan-note">{{.PlanNotes}}</p>{{end}}
     <ol class="planned">
       {{range $card := .Cards}}
@@ -69,7 +57,8 @@
               <template class="row-tpl"><li class="set-row added">{{template "set-row" (rowData $.Base $card.Exercise .Extra)}}</li></template>
             </ol>
             <div class="ex-tools">
-              <button type="button" class="mini add-row">+ Añadir serie</button>
+              <button type="button" class="mini add-row">+ Serie</button>
+              <button type="button" class="mini next-ex">Siguiente ›</button>
               {{if .Planned}}
               <button type="button" class="mini swap" data-exercise="{{.Exercise}}">Sustituir</button>
               <button type="button" class="mini" hx-post="{{$.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML"
