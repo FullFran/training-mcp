@@ -140,6 +140,14 @@ type PlanOut struct {
 type PlansOut struct {
 	Plans []training.Plan `json:"plans"`
 }
+type SimulatePlanInput struct {
+	PlanID          int64           `json:"plan_id,omitempty" jsonschema:"Positive ID of a saved plan to simulate. Give plan_id or items, not both."`
+	Items           []PlanItemInput `json:"items,omitempty" jsonschema:"Unsaved exercises to simulate, in the same shape create_plan takes. Give plan_id or items, not both."`
+	SessionsPerWeek int             `json:"sessions_per_week,omitempty" jsonschema:"How many times a week the plan is done, 1 through 7. Defaults to 1."`
+}
+type SimulatePlanOut struct {
+	Simulation training.PlanSimulation `json:"simulation"`
+}
 type PlanInput struct {
 	PlanID int64 `json:"plan_id" jsonschema:"Positive ID of the plan."`
 }
@@ -616,6 +624,24 @@ func New(service training.ServiceFor) *Server {
 		return nil, RecommendOut{Recommendations: v}, toolError(err)
 	})
 
+	simulateSchema := mustInputSchema[SimulatePlanInput]()
+	setPositiveID(simulateSchema.Properties["plan_id"])
+	simulateSchema.Properties["sessions_per_week"].Minimum = jsonschema.Ptr(1.0)
+	simulateSchema.Properties["sessions_per_week"].Maximum = jsonschema.Ptr(7.0)
+	simulateSchema.Properties["items"].MaxItems = jsonschema.Ptr(40)
+	addTool(s, &mcp.Tool{Name: "simulate_plan", Description: "What a plan would do to a week of training, before it is created or changed. Give a saved plan_id or unsaved items, and sessions_per_week. Returns weekly working sets and SI per muscle group, each compared with the person's MEV and MRV (below_mev, within, above_mrv, no_landmarks), the weekly totals, and exercises with no muscle group. Deterministic and read-only: it stores nothing and creates no proposal. Call it before proposing create_plan or set_plan_exercise.", InputSchema: simulateSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in SimulatePlanInput) (*mcp.CallToolResult, SimulatePlanOut, error) {
+		sim := training.PlanSimulationInput{PlanID: in.PlanID, SessionsPerWeek: in.SessionsPerWeek}
+		for _, it := range in.Items {
+			sim.Items = append(sim.Items, training.PlanItem{
+				Exercise: it.Exercise, TargetSets: it.TargetSets,
+				RepMin: it.RepMin, RepMax: it.RepMax, TargetRPE: it.TargetRPE,
+				Superset: it.Superset, Notes: it.Notes,
+			})
+		}
+		v, err := service(ctx).SimulatePlan(ctx, sim)
+		return nil, SimulatePlanOut{Simulation: v}, toolError(err)
+	})
+
 	deleteSessionSchema := mustInputSchema[SessionInput]()
 	setPositiveID(deleteSessionSchema.Properties["session_id"])
 	addWrite(w, &mcp.Tool{Name: "delete_session", Description: "Permanently delete a training session and every set in it. Irreversible; returns how many sets were destroyed. Use to remove an empty or mistaken session.", InputSchema: deleteSessionSchema}, "session.delete", func(ctx context.Context, svc *training.Service, in SessionInput) (DeleteSessionOut, error) {
@@ -686,7 +712,7 @@ func (s *Server) ToolNames() []string {
 		"set_plan_exercise", "remove_plan_exercise", "move_plan_exercise",
 		"add_session_exercise", "adjust_session_exercise", "swap_session_exercise",
 		"remove_session_exercise", "save_session_as_plan",
-		"record_feedback", "volume_recommendation",
+		"record_feedback", "volume_recommendation", "simulate_plan",
 		"set_volume_landmarks", "list_volume_landmarks",
 		"set_exercise_note", "list_exercise_notes", "suggest_load", "performance_dropoff"}
 }

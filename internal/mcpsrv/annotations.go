@@ -47,6 +47,7 @@ var toolBehaviors = map[string]toolBehavior{
 	"list_exercise_notes":        read("List exercise notes"),
 	"list_volume_landmarks":      read("List volume landmarks"),
 	"volume_recommendation":      read("Recommend weekly volume"),
+	"simulate_plan":              read("Simulate plan"),
 	"exercise_history":           read("Get exercise history"),
 	"weekly_volume":              read("Get weekly volume"),
 	"list_exercise_groups":       read("List exercise groups"),

@@ -1,0 +1,7 @@
+{{define "simulation"}}<section class="simulation" aria-label="Volumen semanal simulado">
+  <p class="sim-head"><strong>Volumen semanal</strong> <span class="muted num">{{.Meta}}</span></p>
+  {{if .Groups}}<ul class="sim-groups">{{range .Groups}}
+    <li class="sim-{{.Tone}}"><span class="sim-name">{{.Name}}</span><span class="num sim-sets">{{.Sets}}</span><span class="sim-status">{{.Status}}</span>{{if .Range}}<span class="muted num sim-range">{{.Range}}</span>{{end}}</li>{{end}}
+  </ul>{{end}}
+  {{if .Unmapped}}<p class="muted sim-unmapped">{{.Unmapped}}</p>{{end}}
+</section>{{end}}

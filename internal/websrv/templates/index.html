@@ -233,6 +233,7 @@
           <strong class="draft-name">{{.Draft.Name}}</strong>
           <span class="muted num">{{.Draft.Meta}}</span>
         </div>
+        {{with .Simulation}}{{template "simulation" .}}{{end}}
         <!-- The list is the details' sibling so opening it never moves the buttons. -->
         <details class="draft-changes"><summary class="btn">Ver cambios</summary></details>
         <ul class="draft-list">{{range .Draft.Changes}}

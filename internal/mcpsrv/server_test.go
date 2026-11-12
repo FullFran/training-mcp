@@ -38,7 +38,7 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_session_exercise", "add_set", "adjust_session_exercise", "create_plan", "delete_plan", "delete_session", "delete_set", "exercise_history", "get_plan", "get_session", "list_exercise_groups", "list_exercise_notes", "list_plans", "list_sessions", "list_volume_landmarks", "live_workout", "log_set", "log_sets", "memory_confirm", "memory_consolidate", "memory_consolidate_preview", "memory_context", "memory_forget", "memory_get", "memory_judge", "memory_save", "memory_search", "move_plan_exercise", "performance_dropoff", "record_feedback", "remove_plan_exercise", "remove_session_exercise", "save_session_as_plan", "session_progress", "set_exercise_group", "set_exercise_note", "set_plan_exercise", "set_rest_target", "set_volume_landmarks", "start_session", "suggest_load", "swap_session_exercise", "update_plan", "update_set", "volume_by_muscle", "volume_recommendation", "weekly_volume"}) {
+	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_session_exercise", "add_set", "adjust_session_exercise", "create_plan", "delete_plan", "delete_session", "delete_set", "exercise_history", "get_plan", "get_session", "list_exercise_groups", "list_exercise_notes", "list_plans", "list_sessions", "list_volume_landmarks", "live_workout", "log_set", "log_sets", "memory_confirm", "memory_consolidate", "memory_consolidate_preview", "memory_context", "memory_forget", "memory_get", "memory_judge", "memory_save", "memory_search", "move_plan_exercise", "performance_dropoff", "record_feedback", "remove_plan_exercise", "remove_session_exercise", "save_session_as_plan", "session_progress", "set_exercise_group", "set_exercise_note", "set_plan_exercise", "set_rest_target", "set_volume_landmarks", "simulate_plan", "start_session", "suggest_load", "swap_session_exercise", "update_plan", "update_set", "volume_by_muscle", "volume_recommendation", "weekly_volume"}) {
 		t.Fatalf("tools=%v", toolNames(tools))
 	}
 	for _, tool := range tools.Tools {
@@ -110,15 +110,15 @@ func TestServerToolsDeclareHowTheyBehave(t *testing.T) {
 		"session_progress": true, "suggest_load": true, "performance_dropoff": true, "list_exercise_notes": true,
 		"list_volume_landmarks": true, "volume_recommendation": true, "exercise_history": true,
 		"weekly_volume": true, "list_exercise_groups": true, "volume_by_muscle": true,
-		"live_workout": true, "memory_search": true, "memory_get": true, "memory_context": true, "memory_consolidate_preview": true,
+		"live_workout": true, "simulate_plan": true, "memory_search": true, "memory_get": true, "memory_context": true, "memory_consolidate_preview": true,
 	}
 	additive := map[string]bool{
 		"start_session": true, "add_set": true, "log_set": true, "create_plan": true,
 		"move_plan_exercise": true, "save_session_as_plan": true,
 	}
 	nonDestructive := func(name string) bool { return additive[name] || name == "log_sets" }
-	if len(result.Tools) != 47 {
-		t.Fatalf("got %d tools, want 47", len(result.Tools))
+	if len(result.Tools) != 48 {
+		t.Fatalf("got %d tools, want 48", len(result.Tools))
 	}
 	for _, tool := range result.Tools {
 		a := tool.Annotations

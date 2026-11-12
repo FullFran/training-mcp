@@ -65,6 +65,7 @@
     weekly_volume: ['Calculando tu volumen semanal', 'Calculado tu volumen semanal'],
     volume_by_muscle: ['Calculando el volumen por músculo', 'Calculado el volumen por músculo'],
     volume_recommendation: ['Calculando cuánto volumen te toca', 'Calculado cuánto volumen te toca'],
+    simulate_plan: ['Simulando la semana de la rutina', 'Simulada la semana de la rutina'],
     list_volume_landmarks: ['Consultando tus marcas de volumen', 'Consultadas tus marcas de volumen'],
     suggest_load: ['Calculando el peso', 'Calculado el peso'],
     list_exercise_notes: ['Consultando tus notas', 'Consultadas tus notas'],
