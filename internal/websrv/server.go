@@ -78,14 +78,18 @@ type ExerciseInfo struct {
 }
 
 type pageData struct {
-	Base      string
-	Today     string
-	Session   training.Session
-	Recent    []training.ExerciseMemory
-	History   []training.SessionSummary
-	Volume    []training.GroupVolume
-	Blocks    []ExerciseBlock
-	Plans     []training.Plan
+	Base    string
+	Today   string
+	Session training.Session
+	Recent  []training.ExerciseMemory
+	History []training.SessionSummary
+	Volume  []training.GroupVolume
+	Blocks  []ExerciseBlock
+	Plans   []training.Plan
+	// Creating opens Rutinas on the create form alone, its name field focused.
+	Creating bool
+	// Editing is the routine Rutinas shows alone, as its editor; 0 lists all.
+	Editing   int64
 	Progress  []training.PlanProgress
 	PlanNotes string
 	// Catalogue is every exercise ever logged, offered as autocomplete. Picking
@@ -239,10 +243,15 @@ func New(service training.ServiceFor, snapshot func(context.Context, string) err
 
 func NewWithOptions(service training.ServiceFor, snapshot func(context.Context, string) error, clock training.Clock, basePath string, opts Options) (*Server, error) {
 	funcs := map[string]any{
-		"num":         formatNumber,
-		"clock":       clockText,
-		"kilos":       kilos,
-		"restClock":   restClock,
+		"num":       formatNumber,
+		"clock":     clockText,
+		"kilos":     kilos,
+		"restClock": restClock,
+		// A routine created by name alone holds only the placeholder.
+		"isPlaceholder": func(it training.PlanItem) bool { return it.Exercise == placeholderExercise },
+		"isBlank": func(p training.Plan) bool {
+			return len(p.Items) == 1 && p.Items[0].Exercise == placeholderExercise
+		},
 		"shortDate":   shortDate,
 		"rpeScale":    rpeScale,
 		"techniques":  func() []string { return training.Techniques },
@@ -620,21 +629,41 @@ func (s *Server) renderPanel(w http.ResponseWriter, r *http.Request, message str
 
 // plansPage lists every routine with its exercises, editable in place. Plan
 // building is a deliberate activity, so it lives on its own screen instead of
-// crowding the logging form.
+// crowding the logging form. ?nueva=1 opens it on the create form alone, and
+// ?rutina=ID on that one routine's editor, where creating a routine lands.
 func (s *Server) plansPage(w http.ResponseWriter, r *http.Request) {
-	data, err := s.plansData(r.Context(), "")
+	var editing int64
+	if raw := r.URL.Query().Get("rutina"); raw != "" {
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || id <= 0 {
+			http.NotFound(w, r)
+			return
+		}
+		editing = id
+	}
+	data, err := s.plansData(r.Context(), "", editing)
+	if errors.Is(err, training.ErrNotFound) {
+		http.NotFound(w, r)
+		return
+	}
 	if err != nil {
 		s.fail(w, err)
 		return
 	}
+	data.Creating = editing == 0 && r.URL.Query().Get("nueva") != ""
 	s.render(w, r, "plans.html", data)
 }
 
-func (s *Server) plansData(ctx context.Context, message string) (pageData, error) {
-	data := pageData{Base: s.base, Today: s.todayDate(), Error: message}
+// plansData loads every routine, or only the one being edited when editing
+// is set (ErrNotFound when that routine is not the person's).
+func (s *Server) plansData(ctx context.Context, message string, editing int64) (pageData, error) {
+	data := pageData{Base: s.base, Today: s.todayDate(), Error: message, Editing: editing}
 	summaries, err := s.service(ctx).ListPlans(ctx)
 	if err != nil {
 		return data, err
+	}
+	if editing != 0 {
+		summaries = []training.Plan{{ID: editing}}
 	}
 	// ListPlans returns totals only; the page needs each plan's exercises.
 	for _, summary := range summaries {
@@ -668,14 +697,23 @@ func (s *Server) planAction(w http.ResponseWriter, r *http.Request) {
 		return v
 	}
 
+	// The routine whose editor sent the edit, kept open in the answer.
+	editing, _ := strconv.ParseInt(r.PostFormValue("rutina"), 10, 64)
+
 	var err error
 	switch strings.TrimSuffix(r.URL.Path, "/") {
 	case s.base + "/plans/create":
-		// A routine starts empty; exercises are added from the page itself.
-		_, err = s.service(r.Context()).CreatePlan(r.Context(), training.Plan{
+		// A routine starts with a placeholder (a plan needs one item); the
+		// first exercise added in its editor replaces it.
+		var created training.Plan
+		created, err = s.service(r.Context()).CreatePlan(r.Context(), training.Plan{
 			Name:  r.PostFormValue("name"),
-			Items: []training.PlanItem{{Exercise: "por definir", TargetSets: 1}},
+			Items: []training.PlanItem{{Exercise: placeholderExercise, TargetSets: 1}},
 		})
+		if r.Header.Get("HX-Request") == "" {
+			s.createdPlan(w, r, created, err)
+			return
+		}
 	case s.base + "/plans/update":
 		name, notes := r.PostFormValue("name"), r.PostFormValue("notes")
 		err = s.service(r.Context()).UpdatePlan(r.Context(), planID, training.PlanPatch{Name: &name, Notes: &notes})
@@ -688,6 +726,9 @@ func (s *Server) planAction(w http.ResponseWriter, r *http.Request) {
 			RepMin: atoi("rep_min"), RepMax: atoi("rep_max"), TargetRPE: rpe,
 			Superset: r.PostFormValue("superset"), Notes: r.PostFormValue("notes"),
 		})
+		if err == nil {
+			err = s.dropPlaceholder(r.Context(), planID, exercise)
+		}
 	case s.base + "/plans/item/remove":
 		err = s.service(r.Context()).RemovePlanItem(r.Context(), planID, exercise)
 	case s.base + "/plans/move":
@@ -712,12 +753,63 @@ func (s *Server) planAction(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, s.base+"/plans", http.StatusSeeOther)
 		return
 	}
-	data, dataErr := s.plansData(r.Context(), message)
+	data, dataErr := s.plansData(r.Context(), message, editing)
+	if errors.Is(dataErr, training.ErrNotFound) && editing != 0 {
+		// The edited routine is gone (deleted from its editor): list them all.
+		data, dataErr = s.plansData(r.Context(), message, 0)
+	}
 	if dataErr != nil {
 		s.fail(w, dataErr)
 		return
 	}
 	s.render(w, r, "plans-main.html", data)
+}
+
+// placeholderExercise fills a routine created by name alone until its first
+// real exercise is added.
+const placeholderExercise = "por definir"
+
+// dropPlaceholder removes the placeholder once another exercise is in the
+// routine, through the same call as the editor's ✕.
+func (s *Server) dropPlaceholder(ctx context.Context, planID int64, added string) error {
+	if strings.EqualFold(strings.TrimSpace(added), placeholderExercise) {
+		return nil
+	}
+	plan, err := s.service(ctx).GetPlan(ctx, planID)
+	if err != nil {
+		return err
+	}
+	for _, it := range plan.Items {
+		if it.Exercise == placeholderExercise && len(plan.Items) > 1 {
+			return s.service(ctx).RemovePlanItem(ctx, planID, placeholderExercise)
+		}
+	}
+	return nil
+}
+
+// createdPlan answers the create form: the new routine's editor, or the create
+// form again with the reason it was refused.
+func (s *Server) createdPlan(w http.ResponseWriter, r *http.Request, created training.Plan, err error) {
+	message := ""
+	switch {
+	case err == nil:
+		http.Redirect(w, r, s.base+"/plans?rutina="+strconv.FormatInt(created.ID, 10), http.StatusSeeOther)
+		return
+	case errors.Is(err, training.ErrValidation):
+		message = "Ponle un nombre a la rutina."
+	default:
+		s.fail(w, err)
+		return
+	}
+	data, dataErr := s.plansData(r.Context(), message, 0)
+	if dataErr != nil {
+		s.fail(w, dataErr)
+		return
+	}
+	data.Creating = true
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusBadRequest)
+	s.render(w, r, "plans.html", data)
 }
 
 // export streams a consistent copy of the whole database. It is the backup

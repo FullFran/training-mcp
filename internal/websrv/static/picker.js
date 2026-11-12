@@ -17,7 +17,7 @@
   const list = $('picker-list');
   const done = $('picker-done');
 
-  let data = { groups: [], recent: [], exercises: [] };
+  let data = { groups: [], recent: [], exercises: [], suggested: null };
   let mode = 'add';
   let from = '';
   let filter = 'recent';
@@ -86,6 +86,18 @@
       const meta = [e.group ? label(e.group) : '', e.last ? 'última: ' + e.last : ''].filter(Boolean).join(' · ');
       return row(e.name, meta, false);
     });
+    // One row from the coach on top while adding, worked out by the server
+    // from the volume recommendation and this week's sets (no model call).
+    const tip = data.suggested;
+    if (mode === 'add' && tip && tip.name && !search.value.trim()) {
+      const li = row(tip.name, tip.reason, false);
+      li.classList.add('suggested');
+      const eyebrow = document.createElement('span');
+      eyebrow.className = 'eyebrow';
+      eyebrow.textContent = 'Sugerido por el coach';
+      li.querySelector('.row-main').prepend(eyebrow);
+      rows.unshift(li);
+    }
     // Nothing matches: the text itself becomes a new exercise.
     const typed = search.value.trim().toLowerCase();
     if (typed && !data.exercises.some((e) => e.name === typed)) rows.push(row(typed, 'Ejercicio nuevo', true));
@@ -167,7 +179,10 @@
       return;
     }
     chosen = chosen.includes(name) ? chosen.filter((n) => n !== name) : chosen.concat(name);
-    b.setAttribute('aria-pressed', String(chosen.includes(name)));
+    // The coach's row and the list may show the same exercise: tick both.
+    list.querySelectorAll('.pick').forEach((p) => {
+      if (p.dataset.name === name) p.setAttribute('aria-pressed', String(chosen.includes(name)));
+    });
     if (b.classList.contains('create') && chosen.includes(name)) {
       // A created name joins the list so it stays ticked while searching on.
       data.exercises = data.exercises.concat({ name });

@@ -740,6 +740,8 @@
 
   document.addEventListener('drawer:open', loadConversations);
   $('chat-new').addEventListener('click', newChat);
+  // A link elsewhere (the finish summary) asks for a new conversation.
+  document.addEventListener('coach:new', newChat);
   $('drawer-new').addEventListener('click', () => {
     document.dispatchEvent(new CustomEvent('drawer:close'));
     newChat();

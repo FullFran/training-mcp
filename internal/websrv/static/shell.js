@@ -163,6 +163,10 @@
     try { doc = frame.contentDocument; } catch (e) { return; }
     if (!doc || sheet.hidden || frame.src === 'about:blank') return;
     doc.documentElement.classList.add('in-panel');
+    // autofocus does not fire inside the frame: creating a routine lands on
+    // its name, and its editor on the exercise field.
+    const first = doc.querySelector('[autofocus]');
+    if (first) first.focus();
     if (isHome(doc.location.href)) {
       changed = true;
       closePanel();

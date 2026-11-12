@@ -61,7 +61,7 @@
     <h2>Aún no tienes rutina</h2>
     <p class="muted">Elige cómo empezar. Puedes cambiarlo luego.</p>
     {{if .CoachOn}}<a id="ask-routine" class="btn primary big" href="{{.Base}}/?modo=planificar" data-mode-go="plan" data-ask="Hazme una rutina de 3 días">Pídele una rutina al coach</a>{{end}}
-    <a class="btn big" href="{{.Base}}/plans" data-panel>Crear rutina a mano</a>
+    <a class="btn big" href="{{.Base}}/plans?nueva=1" data-panel data-title="Nueva rutina">Crear rutina a mano</a>
     <a class="btn big" href="{{.Base}}/import" data-panel>Importar de Hevy o Strong</a>
     <button type="button" class="btn big outline" data-free-session>Entrenar sin rutina</button>
   </div>

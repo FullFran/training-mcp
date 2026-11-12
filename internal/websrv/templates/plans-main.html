@@ -1,6 +1,27 @@
-{{define "plans-main.html"}}<main id="plans">
+{{define "plans-main.html"}}<main id="plans"{{if .Editing}} class="plan-editor" hx-vals='{"rutina":"{{.Editing}}"}'{{end}}>
   {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
 
+  {{if .Creating}}
+  <!-- Creating a routine: its name first, then its editor to add exercises. -->
+  <form class="card plan-create" action="{{.Base}}/plans/create" method="post" autocomplete="off">{{if .CSRF}}
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
+    <label class="field">
+      <span>Nombre de la nueva rutina</span>
+      <input name="name" placeholder="Empuje A" required autofocus>
+    </label>
+    <button type="submit" class="btn primary big">Crear y añadir ejercicios</button>
+    {{if .Plans}}<a class="btn" href="{{.Base}}/plans">Ver mis rutinas</a>{{end}}
+  </form>
+  {{else if .Editing}}
+  <a class="back-link" href="{{.Base}}/plans">‹ Todas las rutinas</a>
+  {{else}}
+  <div class="plan-actions">
+    <a class="btn big" href="{{.Base}}/plans?nueva=1">✎ Crear a mano</a>
+    <a class="btn big outline" href="{{.Base}}/import">↓ Importar de Hevy o Strong</a>
+  </div>
+  {{end}}
+
+  {{if not .Creating}}
   {{range .Plans}}
   <article class="card plan-card">
     <form class="plan-id" hx-post="{{$.Base}}/plans/update" hx-target="#plans" hx-swap="outerHTML">
@@ -8,7 +29,7 @@
       <input name="name" value="{{.Name}}" aria-label="Nombre de la rutina" required>
       <textarea name="notes" rows="2" placeholder="Intención del bloque, qué vigilar…" aria-label="Notas">{{.Notes}}</textarea>
       <div class="plan-id-actions">
-        <span class="muted">{{.TotalSets}} series</span>
+        <span class="muted">{{if isBlank .}}sin ejercicios{{else}}{{.TotalSets}} series{{end}}</span>
         <button type="submit" class="mini">Guardar</button>
         <button type="button" class="mini danger"
                 hx-post="{{$.Base}}/plans/delete" hx-target="#plans" hx-swap="outerHTML"
@@ -19,7 +40,8 @@
 
     <ol class="plan-items">
       {{$plan := .}}
-      {{range .Items}}
+      {{if isBlank .}}<li class="muted plan-blank">Sin ejercicios todavía: añade el primero.</li>{{end}}
+      {{range .Items}}{{if not (isPlaceholder .)}}
       <li>
         <span class="what">
           <span class="ex">{{if .Superset}}<span class="ss">{{.Superset}}</span>{{end}}{{.Exercise}}</span>
@@ -35,12 +57,12 @@
                   hx-vals='{"plan_id":"{{$plan.ID}}","exercise":"{{.Exercise}}"}' aria-label="Quitar">✕</button>
         </span>
       </li>
-      {{end}}
+      {{end}}{{end}}
     </ol>
 
     <form class="add-item" hx-post="{{$.Base}}/plans/item" hx-target="#plans" hx-swap="outerHTML" autocomplete="off">
       <input type="hidden" name="plan_id" value="{{.ID}}">
-      <input name="exercise" list="catalogue" placeholder="ejercicio" required aria-label="Ejercicio"
+      <input name="exercise" list="catalogue" placeholder="ejercicio" required{{if $.Editing}} autofocus{{end}} aria-label="Ejercicio"
              autocapitalize="none" spellcheck="false">
       <input name="target_sets" type="number" inputmode="numeric" min="1" max="20" value="3" required aria-label="Series">
       <input name="rep_min" type="number" inputmode="numeric" min="0" placeholder="min" aria-label="Reps mínimas">
@@ -53,14 +75,7 @@
   {{else}}
   <p class="empty">Sin rutinas todavía.</p>
   {{end}}
-
-  <form class="card" hx-post="{{.Base}}/plans/create" hx-target="#plans" hx-swap="outerHTML" autocomplete="off">
-    <label class="field">
-      <span>Nueva rutina</span>
-      <input name="name" placeholder="Empuje A" required>
-    </label>
-    <button type="submit" class="ghost wide">Crear</button>
-  </form>
+  {{end}}
 
   <datalist id="catalogue">
     {{range .Catalogue}}<option value="{{.}}"></option>{{end}}
