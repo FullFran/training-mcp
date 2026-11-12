@@ -152,3 +152,24 @@ export function writeOutcome(result: { isError?: boolean; structuredContent?: un
   const status = (result.structuredContent as { status?: unknown } | undefined)?.status;
   return status === "accepted" || status === "pending" || status === "rejected" ? status : "error";
 }
+
+// RPE_CHOICES are the efforts the next-set card offers. Anything else is left
+// to the chat, where the person can say 6.5 or 9.5.
+export const RPE_CHOICES: readonly number[] = [7, 8, 9, 10];
+
+export interface SetInput {
+  weightKg: number;
+  reps: number;
+  warmup: boolean;
+  // undefined: the person did not rate it. Then rpe is not sent at all, and the
+  // server stores the set as unrated (rpe_imputed), never as a stated 8.
+  rpe?: number;
+}
+
+// setPayload is one set of a log_sets call from the card.
+export function setPayload(input: SetInput): Record<string, unknown> {
+  const set: Record<string, unknown> = { weight_kg: input.weightKg, reps: input.reps };
+  if (input.warmup) set.category = "warmup";
+  if (input.rpe !== undefined) set.rpe = input.rpe;
+  return set;
+}

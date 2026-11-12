@@ -20,6 +20,8 @@ import {
   headline,
   parseTimerData,
   project,
+  RPE_CHOICES,
+  setPayload,
   toKg,
   toUnit,
   weightStep,
@@ -48,6 +50,7 @@ const el = {
   reps: $<HTMLInputElement>("reps"),
   unit: $("unit"),
   warmup: $<HTMLInputElement>("warmup"),
+  rpe: $("rpe"),
   done: $<HTMLButtonElement>("done"),
   last: $("last"),
   lastText: $("last-text"),
@@ -155,6 +158,7 @@ function drawSets(): void {
       el.weight.value = next.weight_kg ? String(toUnit(next.weight_kg, unit())) : "";
       el.reps.value = next.reps ? String(next.reps) : "";
       el.warmup.checked = false;
+      setRPE(undefined);
       logKey = crypto.randomUUID();
     }
   }
@@ -244,6 +248,30 @@ async function write(button: HTMLButtonElement, name: string, args: Record<strin
   return outcome;
 }
 
+// The effort chosen for the next set; undefined until the person picks one.
+let rpe: number | undefined;
+
+function setRPE(value: number | undefined): void {
+  rpe = value;
+  for (const input of el.rpe.querySelectorAll<HTMLInputElement>("input")) {
+    input.checked = input.value === (value === undefined ? "" : String(value));
+  }
+}
+
+for (const value of [...RPE_CHOICES, undefined]) {
+  const label = document.createElement("label");
+  const input = document.createElement("input");
+  input.type = "radio";
+  input.name = "rpe";
+  input.value = value === undefined ? "" : String(value);
+  input.checked = value === undefined;
+  input.addEventListener("change", () => setRPE(value));
+  const text = document.createElement("span");
+  text.textContent = value === undefined ? "No RPE" : String(value);
+  label.append(input, text);
+  el.rpe.append(label);
+}
+
 function readNumber(input: HTMLInputElement): number {
   const v = Number(input.value.replace(",", "."));
   return Number.isFinite(v) ? v : NaN;
@@ -286,14 +314,13 @@ el.done.addEventListener("click", () => {
   // An untouched weight keeps its stored kg; converting the rounded lb back
   // would log 80.0137 kg for 80.
   const kg = next.weight_kg && weight === toUnit(next.weight_kg, unit()) ? next.weight_kg : toKg(weight, unit());
-  const set: Record<string, unknown> = { weight_kg: kg, reps };
-  if (el.warmup.checked) set.category = "warmup";
+  const set = setPayload({ weightKg: kg, reps, warmup: el.warmup.checked, rpe });
   const body = JSON.stringify([next.exercise, set]);
   if (body !== logBody) {
     logBody = body;
     logKey = crypto.randomUUID();
   }
-  const label = `${el.warmup.checked ? "warm-up " : ""}${next.exercise} ${weight} ${unit()} × ${reps}`;
+  const label = `${el.warmup.checked ? "warm-up " : ""}${next.exercise} ${weight} ${unit()} × ${reps}${rpe === undefined ? "" : ` @ RPE ${rpe}`}`;
   void write(el.done, "log_sets", { idempotency_key: logKey, exercise: next.exercise, sets: [set] }, `Logged ${label}.`).then(
     (outcome) => {
       if (outcome !== "error") logKey = crypto.randomUUID();

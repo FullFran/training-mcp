@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clock, headline, parseTimerData, project, type RestTimerData } from "./model.ts";
+import { clock, headline, parseTimerData, project, setPayload, type RestTimerData } from "./model.ts";
 
 function data(rest: RestTimerData["rest"], extra: Partial<RestTimerData> = {}): RestTimerData {
   return { now: "2026-11-12T20:00:00Z", rest, idle_after_seconds: 1200, ...extra };
@@ -120,4 +120,14 @@ test("v2 results parse with the stopped state, the set ids and the next set", as
   });
   assert.equal(d?.last_set?.id, 7);
   assert.equal(d?.next_set?.target_sets, 3);
+});
+
+test("a set with a chosen RPE carries it; without one, rpe is left out so the server flags it imputed", () => {
+  assert.deepEqual(setPayload({ weightKg: 59, reps: 10, warmup: false, rpe: 9 }), { weight_kg: 59, reps: 10, rpe: 9 });
+  assert.deepEqual(setPayload({ weightKg: 59, reps: 10, warmup: false }), { weight_kg: 59, reps: 10 });
+  assert.equal("rpe" in setPayload({ weightKg: 59, reps: 10, warmup: false, rpe: undefined }), false);
+});
+
+test("a warm-up set keeps its category next to the RPE", () => {
+  assert.deepEqual(setPayload({ weightKg: 40, reps: 12, warmup: true, rpe: 7 }), { weight_kg: 40, reps: 12, category: "warmup", rpe: 7 });
 });
