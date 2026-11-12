@@ -16,8 +16,21 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test:
+  # The race-enabled suite is split across runners: one runner has four cores
+  # and the suite needs about four times that. Each shard is a list of whole
+  # packages; "rest" is every package the others do not name, so a new package
+  # is tested without editing this file.
+  go-test:
+    name: go test (${{ matrix.shard }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [mcpsrv, web, rest]
+    env:
+      # Packages given their own runner, as patterns over `go list ./...`.
+      MCPSRV: '/internal/mcpsrv$'
+      WEB: '/internal/(websrv|engine)$'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -31,6 +44,7 @@ jobs:
       # Formatting is not a matter of taste here: an unformatted diff makes
       # every later review noisier than it needs to be.
       - name: gofmt
+        if: matrix.shard == 'rest'
         run: |
           unformatted="$(gofmt -l .)"
           if [ -n "$unformatted" ]; then
@@ -40,12 +54,23 @@ jobs:
           fi
 
       - name: go vet
+        if: matrix.shard == 'rest'
         run: go vet ./...
+
+      - name: packages in this shard
+        run: |
+          case "${{ matrix.shard }}" in
+            mcpsrv) go list ./... | grep -E "$MCPSRV" ;;
+            web) go list ./... | grep -E "$WEB" ;;
+            rest) go list ./... | grep -vE "$MCPSRV" | grep -vE "$WEB" ;;
+          esac > packages.txt
+          cat packages.txt
+          test -s packages.txt
 
       # -race because the HTTP server and the MCP handler are concurrent, and a
       # data race there corrupts training data rather than crashing loudly.
       - name: go test
-        run: go test -race -count=1 -coverprofile=coverage.out ./...
+        run: go test -race -count=1 -coverprofile=coverage.out $(cat packages.txt)
 
       # The store is the layer that touches the data. Let coverage rot anywhere
       # else, but not there. Measured as package statement coverage, not an
@@ -54,6 +79,7 @@ jobs:
       # step already wrote, rather than running the store's tests a second
       # time: only the package's own files, not its sqlitestoretest helper.
       - name: coverage floor for the store
+        if: matrix.shard == 'rest'
         run: |
           grep -E '^mode:|/internal/sqlitestore/[^/]+\.go:' coverage.out > store.cov
           pct="$(go tool cover -func=store.cov \
@@ -64,6 +90,16 @@ jobs:
             exit 1
           }
           echo "ok"
+
+  # The check to wait for before merging, as before the split: green only when
+  # every shard passed.
+  test:
+    needs: go-test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: every shard passed
+        run: test "${{ needs.go-test.result }}" = success
 
   # The image is what actually ships, so it must build and boot here, not for
   # the first time on the server. See docs/deployment.md.
