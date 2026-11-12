@@ -40,6 +40,31 @@ export interface PromptImage {
   mimeType: string;
 }
 
+/** What the model reads where an earlier turn's photo was. */
+export const IMAGE_PLACEHOLDER = '[A photo was attached here in an earlier turn; it is no longer available.]';
+
+/**
+ * The context as it goes to the model: photos stay with the turn that carried
+ * them (the last user message and what follows it) and earlier ones become a
+ * placeholder, so a photo is not re-sent, on the person's account, with every
+ * later turn. The session's own messages are not changed.
+ */
+export function withoutEarlierImages<T extends { role: string; content?: unknown }>(messages: T[]): T[] {
+  let current = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') { current = i; break; }
+  }
+  return messages.map((message, i) => {
+    if (i >= current || !Array.isArray(message.content) || !message.content.some(isImage)) return message;
+    const content = message.content.map((part) => (isImage(part) ? { type: 'text', text: IMAGE_PLACEHOLDER } : part));
+    return { ...message, content };
+  });
+}
+
+function isImage(part: unknown): boolean {
+  return typeof part === 'object' && part !== null && (part as { type?: unknown }).type === 'image';
+}
+
 /** The photos of a prompt, or null when anything about them is off. */
 export function parseImages(value: unknown): PromptImage[] | null {
   if (value === undefined) return [];

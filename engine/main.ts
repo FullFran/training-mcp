@@ -23,7 +23,7 @@ import {
   type AgentSession,
 } from '@earendil-works/pi-coding-agent';
 import {
-  composePrompt, connectorOf, createApprovalGate, DEVICE_VERIFICATION_URI, encode, LineDecoder, MCP_SERVER_NAME, MCP_TOOL_PREFIX, parseCredential, parseImages,
+  composePrompt, connectorOf, createApprovalGate, DEVICE_VERIFICATION_URI, encode, LineDecoder, MCP_SERVER_NAME, MCP_TOOL_PREFIX, parseCredential, parseImages, withoutEarlierImages,
   parseServers, pickModel, THINKING_LEVELS, thinkingLevels,
   type ApprovalGate, type ChildMessage, type EngineErrorCode, type ParentMessage, type PromptImage, type ThinkingLevel,
 } from './protocol.ts';
@@ -208,6 +208,10 @@ async function createSession(start: Extract<ParentMessage, { type: 'start' }>): 
     noTools: 'builtin',
   });
   await created.session.bindExtensions({});
+  // Earlier turns' photos are not sent again (withoutEarlierImages).
+  const transform = created.session.agent.transformContext;
+  created.session.agent.transformContext = async (messages, signal) =>
+    withoutEarlierImages(transform ? await transform(messages, signal) : messages);
 
   const deadline = Date.now() + MCP_CONNECT_WAIT_MS;
   let tools = created.session.getActiveToolNames();

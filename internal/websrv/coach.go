@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -49,10 +50,45 @@ const (
 	coachEventType = "text/event-stream"
 )
 
+// MaxCoachUploads bounds the prompt bodies read at once, across everyone: each
+// can carry some 8 MB of photos in base64 plus their decoded copy. One person
+// reads one at a time, so nobody takes every slot.
+const MaxCoachUploads = 8
+
+// uploads is the server-wide set of upload slots; a server process has one.
+var uploads = uploadSlots{per: map[int64]bool{}}
+
+type uploadSlots struct {
+	mu  sync.Mutex
+	n   int
+	per map[int64]bool
+}
+
+// acquire takes a slot for the person, or reports there is none: no waiting,
+// so a slow sender never queues another person behind it.
+func (u *uploadSlots) acquire(userID int64) bool {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	if u.n >= MaxCoachUploads || u.per[userID] {
+		return false
+	}
+	u.n++
+	u.per[userID] = true
+	return true
+}
+
+func (u *uploadSlots) release(userID int64) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	u.n--
+	delete(u.per, userID)
+}
+
 var coachHTTPStatus = map[engine.ErrorCode]int{
 	engine.CodeBusy:              http.StatusTooManyRequests,
 	engine.CodeRateLimited:       http.StatusTooManyRequests,
 	engine.CodeTurnInProgress:    http.StatusConflict,
+	engine.CodeLoginPending:      http.StatusConflict,
 	engine.CodeNotConnected:      http.StatusConflict,
 	engine.CodeReconnect:         http.StatusConflict,
 	engine.CodeEngineUnavailable: http.StatusServiceUnavailable,
@@ -192,6 +228,13 @@ func (s *Server) coachPrompt(w http.ResponseWriter, r *http.Request, userID int6
 	// A turn with photos is a few megabytes; a slow sender gets a bounded time
 	// to finish it. The recorder in tests has no deadline to set.
 	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(coachUploadTime))
+	// The body is read and its photos checked inside a slot; the person's
+	// engine then holds them, under its own limits.
+	if !uploads.acquire(userID) {
+		writeCoachJSON(w, http.StatusTooManyRequests, map[string]string{"error": string(engine.CodeBusy)})
+		return
+	}
+	defer uploads.release(userID)
 	var body struct {
 		Text         string `json:"text"`
 		Conversation int64  `json:"conversation"`
