@@ -654,6 +654,7 @@ func testStartingAPastSessionFromAnotherUsersPlanIsRefused(t *testing.T) {
 		t.Fatalf("rows changed:\nbefore\n%s\nafter\n%s", before, after)
 	}
 	writeRoute("/sessions/past", url.Values{"date": {"2026-08-01"}}, "sessions WHERE user_id=2 AND date='2026-08-01'")(t)
+}
 
 // The default weight unit is the person's own: user 2 choosing lb leaves the
 // owner on kg.

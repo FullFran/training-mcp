@@ -1967,3 +1967,7 @@ body.coach-open .plan-today { display: none; }
 .lbfix-row input[type="checkbox"] { width: 24px; height: 24px; accent-color: var(--accent); }
 .lbfix .list-row.done { opacity: .6; }
 .lbfix-done { display: grid; gap: 8px; border-color: var(--accent); }
+.unit-select {
+  min-height: 44px; padding: 0 6px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--card); color: var(--text); font: inherit; font-size: 14px; font-weight: 700; color-scheme: dark;
+}

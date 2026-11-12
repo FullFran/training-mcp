@@ -563,6 +563,15 @@ func formWeightKG(r *http.Request) (float64, error) {
 	return training.ToKG(v, unit), nil
 }
 
+// weightAsShown says a form sent its weight back as the page showed it
+// (weight_was is "<number> <unit>"), so the stored kg is left exactly as is:
+// a value shown rounded to 0.1 lb would otherwise move by a few grams.
+func weightAsShown(r *http.Request) bool {
+	was := strings.TrimSpace(r.PostFormValue("weight_was"))
+	unit := training.NormalizeUnit(r.PostFormValue("weight_unit"))
+	return was != "" && unit != "" && was == strings.TrimSpace(r.PostFormValue("weight_kg"))+" "+unit
+}
+
 // unitOf is the person's default weight unit, kg when it cannot be read.
 func (s *Server) unitOf(ctx context.Context) string {
 	unit, err := s.service(ctx).WeightUnit(ctx)

@@ -303,3 +303,7 @@
 {{/* unit-toggle is a weight input's unit: it starts on the person's default and
      a tap switches the unit of the number typed (never the number itself). */}}
 {{define "unit-toggle"}}<input type="hidden" name="weight_unit" value="{{unit}}"><button type="button" class="unit-toggle" data-unit-toggle aria-label="Unidad del peso: {{unit}}. Tocar para cambiarla">{{unit}}</button>{{end}}
+
+{{/* unit-select is unit-toggle for pages without JavaScript (the set editor):
+     the same choice of the typed number's unit, starting on the default. */}}
+{{define "unit-select"}}<select name="weight_unit" class="unit-select" aria-label="Unidad del peso"><option value="kg"{{if eq unit "kg"}} selected{{end}}>kg</option><option value="lb"{{if eq unit "lb"}} selected{{end}}>lb</option></select>{{end}}

@@ -147,7 +147,7 @@ func (s *Server) addPastSet(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	weight, errWeight := strconv.ParseFloat(strings.TrimSpace(r.PostFormValue("weight_kg")), 64)
+	weight, errWeight := formWeightKG(r)
 	reps, errReps := strconv.Atoi(strings.TrimSpace(r.PostFormValue("reps")))
 	rpe, errRPE := strconv.ParseFloat(strings.TrimSpace(r.PostFormValue("rpe")), 64)
 	if errWeight != nil || errReps != nil || errRPE != nil {
@@ -177,8 +177,8 @@ func (s *Server) updatePastSet(w http.ResponseWriter, r *http.Request) {
 	}
 	patch := training.SetPatch{}
 	bad := false
-	if v := strings.TrimSpace(r.PostFormValue("weight_kg")); v != "" {
-		f, err := strconv.ParseFloat(v, 64)
+	if v := strings.TrimSpace(r.PostFormValue("weight_kg")); v != "" && !weightAsShown(r) {
+		f, err := formWeightKG(r)
 		patch.WeightKG, bad = &f, bad || err != nil
 	}
 	if v := strings.TrimSpace(r.PostFormValue("reps")); v != "" {

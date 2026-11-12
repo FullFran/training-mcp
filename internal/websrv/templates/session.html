@@ -61,7 +61,8 @@
     <div class="edit-set">
       <form class="edit-form" method="post" action="{{$.Base}}/s/{{$id}}/sets/{{.ID}}/update" autocomplete="off">{{if $.CSRF}}
         <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
-        <input name="weight_kg" type="number" inputmode="decimal" step="0.25" min="0.5" value="{{num .WeightKG}}" aria-label="Peso (kg)">
+        <input name="weight_kg" type="number" inputmode="decimal" step="{{wstep}}" min="{{wmin}}" value="{{wt .WeightKG}}" aria-label="Peso ({{unit}})">
+        <input type="hidden" name="weight_was" value="{{wt .WeightKG}} {{unit}}">{{template "unit-select"}}
         <input name="reps" type="number" inputmode="numeric" step="1" min="1" value="{{.Reps}}" aria-label="Reps">
         <input name="rpe" type="number" inputmode="decimal" step="0.5" min="1" max="10" value="{{if not .RPEImputed}}{{num .RPE}}{{end}}" aria-label="RPE">
         <input type="hidden" name="category" value="working">
@@ -80,7 +81,7 @@
     <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
     <input name="exercise" type="text" required autocapitalize="none" spellcheck="false" placeholder="ejercicio" aria-label="Ejercicio"{{with .Blocks}}{{with index . (add (len .) -1)}} value="{{.Exercise}}"{{end}}{{end}}>
     <div class="rx-edit">
-      <input name="weight_kg" type="number" inputmode="decimal" step="0.25" min="0.5" required placeholder="kg" aria-label="Peso (kg)">
+      <input name="weight_kg" type="number" inputmode="decimal" step="{{wstep}}" min="{{wmin}}" required placeholder="{{unit}}" aria-label="Peso">{{template "unit-select"}}
       <input name="reps" type="number" inputmode="numeric" step="1" min="1" required placeholder="reps" aria-label="Reps">
       <input name="rpe" type="number" inputmode="decimal" step="0.5" min="1" max="10" required placeholder="RPE" aria-label="RPE">
     </div>

@@ -251,3 +251,67 @@ func TestImportAssumesThePersonsUnit(t *testing.T) {
 		t.Fatalf("lb person:\n%s", page)
 	}
 }
+
+// The session's set editor (a past session, filled in after the fact) has the
+// same kg/lb choice on both of its weight inputs, without JavaScript: a
+// select that starts on the default. A weight left as shown keeps its kg.
+func TestTheSetEditorTakesAUnit(t *testing.T) {
+	h, svc := newServer(t)
+	ctx := context.Background()
+	session, err := svc.StartSession(ctx, "2026-08-01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	set, _, err := svc.AddSet(ctx, training.AddSetInput{SessionID: session.ID, Exercise: "remo", WeightKG: 61.23, Reps: 8, RPE: 8})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.SetWeightUnit(ctx, "lb"); err != nil {
+		t.Fatal(err)
+	}
+	sid, setID := strconv.FormatInt(session.ID, 10), strconv.FormatInt(set.ID, 10)
+	editor := get(t, h, base+"/s/"+sid+"?editar=1").Body.String()
+	for _, want := range []string{
+		`name="weight_kg" type="number" inputmode="decimal" step="0.1" min="0.1" value="135"`,
+		`<input type="hidden" name="weight_was" value="135 lb">`,
+		`<select name="weight_unit" class="unit-select" aria-label="Unidad del peso"><option value="kg">kg</option><option value="lb" selected>lb</option></select>`,
+	} {
+		if !strings.Contains(editor, want) {
+			t.Fatalf("set editor lacks %s:\n%s", want, section(t, editor, `class="set-editor"`, "</section>"))
+		}
+	}
+	if strings.Count(editor, `name="weight_unit"`) != 2 {
+		t.Fatal("both weight inputs of the set editor need a unit")
+	}
+	weight := func() float64 {
+		got, err := svc.GetSession(ctx, session.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, s := range got.Sets {
+			if s.ID == set.ID {
+				return s.WeightKG
+			}
+		}
+		t.Fatal("set gone")
+		return 0
+	}
+	update := base + "/s/" + sid + "/sets/" + setID + "/update"
+	// Saved as shown (only the reps change): the stored 61.23 stays.
+	post(t, h, update, url.Values{"weight_kg": {"135"}, "weight_unit": {"lb"}, "weight_was": {"135 lb"}, "reps": {"9"}}, false)
+	if got := weight(); got != 61.23 {
+		t.Fatalf("an untouched weight moved to %v", got)
+	}
+	post(t, h, update, url.Values{"weight_kg": {"140"}, "weight_unit": {"lb"}, "weight_was": {"135 lb"}}, false)
+	if got := weight(); got != 63.5 {
+		t.Fatalf("140 lb stored as %v", got)
+	}
+	post(t, h, update, url.Values{"weight_kg": {"65"}}, false) // an older client: kg
+	if got := weight(); got != 65 {
+		t.Fatalf("no unit stored %v", got)
+	}
+	post(t, h, base+"/s/"+sid+"/sets", url.Values{"exercise": {"remo"}, "weight_kg": {"135"}, "weight_unit": {"lb"}, "reps": {"8"}, "rpe": {"8"}}, false)
+	if got := storedWeight(t, svc, "remo"); len(got) != 2 || got[1] != 61.25 {
+		t.Fatalf("added in lb: %v", got)
+	}
+}
