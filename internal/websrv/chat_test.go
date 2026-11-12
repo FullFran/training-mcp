@@ -114,7 +114,7 @@ func TestChatShowsPendingProposalsWithAcceptAndReject(t *testing.T) {
 	p := f.propose(t, "fuerza")
 	cards := section(t, get(t, f.handler, "/").Body.String(), `id="chat-cards"`, `id="chat-end"`)
 	for _, want := range []string{
-		`data-proposal="` + itoa(p.ID) + `"`, "Crear rutina", "fuerza",
+		`data-proposal="` + itoa(p.ID) + `"`, "Borrador de rutina", "fuerza",
 		`action="/review/` + itoa(p.ID) + `/accept"`, `action="/review/` + itoa(p.ID) + `/reject"`,
 		`name="csrf_token" value="tok"`,
 	} {
@@ -187,7 +187,7 @@ func TestComposerHasVoiceAndTheExtrasSlot(t *testing.T) {
 func TestServiceWorkerCachesTheChatShell(t *testing.T) {
 	h, _ := newServer(t)
 	body := get(t, h, base+"/sw.js").Body.String()
-	for _, want := range []string{"const VERSION = 'v15';", "BASE + '/static/shell.js'", "BASE + '/static/modes.js'", "BASE + '/static/progress.js'", "BASE + '/static/picker.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'", "BASE + '/static/coach-attach.js'"} {
+	for _, want := range []string{"const VERSION = 'v16';", "BASE + '/static/shell.js'", "BASE + '/static/modes.js'", "BASE + '/static/progress.js'", "BASE + '/static/picker.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'", "BASE + '/static/coach-attach.js'", "BASE + '/static/coach-apply.js'"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("service worker lacks %s", want)
 		}
@@ -200,8 +200,9 @@ func TestProposalsReadAsASentence(t *testing.T) {
 	f := newReviewFixture(t)
 	f.propose(t, "Pierna <b>coach</b>")
 	want := "Crear rutina «Pierna &lt;b&gt;coach&lt;/b&gt;»: sentadilla 3 series"
+	// In the chat a proposed routine is a draft: its name and its exercises.
 	cards := section(t, get(t, f.handler, "/").Body.String(), `id="chat-cards"`, `id="chat-end"`)
-	if !strings.Contains(cards, want) || strings.Contains(cards, "target_sets") {
+	if !strings.Contains(cards, "Pierna &lt;b&gt;coach&lt;/b&gt;") || !strings.Contains(cards, "+ sentadilla") || strings.Contains(cards, "target_sets") {
 		t.Fatalf("chat card: %s", cards)
 	}
 	review := get(t, f.handler, "/review").Body.String()

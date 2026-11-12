@@ -58,14 +58,14 @@
       link.textContent = '✅ Revisar' + (count ? ' (' + count + ')' : '');
       link.classList.toggle('attention', count > 0);
     }
-    const badge = $('review-badge');
-    if (badge) {
+    // Planificar's Revisión chip.
+    document.querySelectorAll('[data-review-count]').forEach((badge) => {
       badge.hidden = !count;
-      badge.querySelector('span').textContent = String(count);
-    }
+      badge.textContent = String(count);
+    });
   }
   function syncReview(doc) {
-    const fresh = doc.getElementById('review-badge');
+    const fresh = doc.querySelector('[data-review-count]');
     if (fresh) setReview(fresh.hidden ? 0 : parseInt(fresh.textContent.replace(/\D/g, ''), 10) || 0);
   }
 

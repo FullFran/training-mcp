@@ -102,16 +102,22 @@
   const close = $('coach-close');
   if (close) close.addEventListener('click', closeCoach);
   if (scrim) scrim.addEventListener('click', closeCoach);
+  // Aplicar closes the sheet so the filled row is in sight.
+  document.addEventListener('coach:close', closeCoach);
 
   // While the coach is open the rest timer stays in sight in its header.
   const restBar = $('rest');
   const restTime = $('rest-time');
   const coachRest = $('coach-rest');
   if (restBar && restTime && coachRest && window.MutationObserver) {
+    const time = coachRest.querySelector('[data-rest-mirror]');
+    const state = coachRest.querySelector('[data-rest-state]');
     const mirror = () => {
+      const done = restBar.classList.contains('done');
       coachRest.hidden = restBar.hidden;
-      coachRest.textContent = '⏱ ' + restTime.textContent;
-      coachRest.classList.toggle('done', restBar.classList.contains('done'));
+      if (time) time.textContent = restTime.textContent;
+      if (state) state.textContent = done ? 'a por la siguiente' : 'sigue contando';
+      coachRest.classList.toggle('done', done);
     };
     new MutationObserver(mirror).observe(restBar, { attributes: true, childList: true, subtree: true, characterData: true });
     mirror();
