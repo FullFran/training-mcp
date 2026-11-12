@@ -54,6 +54,7 @@ var toolBehaviors = map[string]toolBehavior{
 	"list_exercise_groups":       read("List exercise groups"),
 	"volume_by_muscle":           read("Get volume by muscle"),
 	"live_workout":               read("Get live workout"),
+	"render_rest_timer":          read("Show rest timer"),
 	"memory_search":              read("Search memory"),
 	"memory_get":                 read("Get memory"),
 	"memory_context":             read("Get memory context"),
