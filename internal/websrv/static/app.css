@@ -435,7 +435,7 @@ button { font: inherit; cursor: pointer; }
 /* --- plan --------------------------------------------------------------- */
 .plan { gap: 10px; }
 .plan-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.plan-pick select {
+.plan-pick select, .cat-entry select {
   width: 100%; min-height: var(--tap);
   padding: 0 12px;
   border-radius: 12px;
@@ -1862,3 +1862,10 @@ body.coach-open .plan-today { display: none; }
 .danger-zone { margin: 24px 16px 32px; }
 .danger-zone > summary { min-height: 44px; display: flex; align-items: center; color: var(--danger); }
 .danger-zone p { margin: 8px 0 12px; }
+
+/* Ejercicios under Tú: one folded row per exercise, its form inside. */
+.catalogue > .muted { margin: 12px 16px; }
+.cat-entry > summary { list-style: none; cursor: pointer; }
+.cat-entry > summary::-webkit-details-marker { display: none; }
+.cat-entry[open] > summary .chev { transform: rotate(90deg); }
+.cat-entry form { display: grid; gap: 12px; padding: 4px 16px 16px; }

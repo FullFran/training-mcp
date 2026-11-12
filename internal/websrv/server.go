@@ -122,6 +122,8 @@ type pageData struct {
 	Review ReviewData
 	// Memory is the memory page: what the coach remembers about the person.
 	Memory MemoryData
+	// Exercises is the catalogue page: every exercise with its group and note.
+	Exercises CatalogueData
 	// Import is the import page: earlier imports and a file's preview.
 	Import ImportData
 	// CoachSees is Planificar's context card: what the coach reads.
@@ -366,6 +368,8 @@ func (s *Server) routes() {
 	s.handle("GET "+b+"/progress", s.progress)
 	s.handle("GET "+b+"/progress/exercise", s.exerciseDetail)
 	s.handle("GET "+b+"/exercises", s.exercises)
+	s.handle("GET "+b+"/catalogue", s.cataloguePage)
+	s.handle("POST "+b+"/catalogue", s.saveCatalogueEntry)
 	if s.opts.Export {
 		s.handle("GET "+b+"/export.db", s.export)
 	}

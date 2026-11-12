@@ -226,6 +226,8 @@ var webRoutes = map[string]func(*testing.T){
 	"GET /progress":          pageRoute("/progress", secretExercise),
 	"GET /progress/exercise": pageRoute("/progress/exercise?name="+url.QueryEscape(secretExercise), secretExercise),
 	"GET /exercises":         pageRoute("/exercises", secretExercise),
+	"GET /catalogue":         pageRoute("/catalogue", secretNote),
+	"POST /catalogue":        testCatalogueWritesAreTheUsersOwn,
 	"GET /plans":             pageRoute("/plans", secretPlan),
 	"GET /exercise-info":     pageRoute("/exercise-info?name="+url.QueryEscape(secretExercise), secretNote),
 
@@ -348,6 +350,32 @@ func testDeletingAllMemoryTouchesOnlyTheUsersOwn(t *testing.T) {
 	var n int
 	if err := world.db.QueryRow(`SELECT COUNT(*) FROM coach_memory WHERE user_id=1`).Scan(&n); err != nil || n != 0 {
 		t.Fatalf("owner's memory = %d, %v", n, err)
+	}
+}
+
+// The same exercise name is each user's own: another user grouping and noting
+// it writes their rows and leaves the owner's group and note as they were.
+func testCatalogueWritesAreTheUsersOwn(t *testing.T) {
+	world := newWebWorld(t)
+	owners := func() string {
+		var group, note string
+		if err := world.db.QueryRow(`SELECT g.muscle_group, n.note FROM exercise_groups g JOIN exercise_notes n ON n.user_id=g.user_id AND n.exercise=g.exercise WHERE g.user_id=1 AND g.exercise=?`, secretExercise).Scan(&group, &note); err != nil {
+			t.Fatal(err)
+		}
+		return group + "|" + note
+	}
+	before := owners()
+	form := url.Values{"exercise": {secretExercise}, "muscle_group": {"espalda"}, "note": {"suya"}}
+	w := post(t, world.second, base+"/catalogue", form, true)
+	if w.Code != http.StatusOK || strings.Contains(w.Body.String(), secretNote) {
+		t.Fatalf("status %d, carries the owner's note: %v", w.Code, strings.Contains(w.Body.String(), secretNote))
+	}
+	if after := owners(); after != before {
+		t.Fatalf("owner's group and note: %s, were %s", after, before)
+	}
+	var n int
+	if err := world.db.QueryRow(`SELECT (SELECT COUNT(*) FROM exercise_groups WHERE user_id=2 AND muscle_group='espalda') + (SELECT COUNT(*) FROM exercise_notes WHERE user_id=2 AND note='suya')`).Scan(&n); err != nil || n != 2 {
+		t.Fatalf("second user's rows = %d, %v", n, err)
 	}
 }
 

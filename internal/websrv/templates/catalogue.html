@@ -1,0 +1,51 @@
+{{/* Ejercicios, opened from Tú: every exercise with its muscle group, which
+     decides where its sets count in volume, and its setup note, shown each
+     time it is logged. */}}
+{{define "catalogue.html"}}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ejercicios</title>
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="{{.Base}}/manifest.webmanifest">
+<link rel="icon" href="{{.Base}}/static/icon-192.png">
+<link rel="stylesheet" href="{{.Base}}/static/app.css">
+</head>
+<body data-base="{{.Base}}">
+
+<header class="bar back-only">
+  <div><strong>Ejercicios</strong></div>
+  <a class="ghost" href="{{.Base}}/?modo=tu">Tú</a>
+</header>
+
+<main class="catalogue">
+  {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
+  <p class="muted">El grupo muscular decide dónde cuentan sus series en el volumen. La nota de ajuste aparece cada vez que lo registras.</p>
+  {{with .Exercises}}{{if not .Entries}}
+  <p class="muted">Aún no hay ejercicios. Aparecerán aquí cuando registres el primero.</p>
+  {{end}}
+  <ul class="list">{{range .Entries}}{{$e := .}}
+    <li><details class="cat-entry">
+      <summary class="list-row"><span class="row-main"><strong>{{.Exercise}}</strong><span class="muted">{{if .Group}}{{.Group}}{{else}}Sin grupo{{end}}{{if .Note}} · {{.Note}}{{end}}</span></span><span class="chev" aria-hidden="true">›</span></summary>
+      <form method="post" action="{{$.Base}}/catalogue" autocomplete="off">{{if $.CSRF}}
+        <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+        <input type="hidden" name="exercise" value="{{.Exercise}}">
+        <label class="field"><span>Grupo muscular</span>
+          <select name="muscle_group">{{if not .Group}}
+            <option value="" selected>Sin grupo</option>{{end}}{{range $.Exercises.Groups}}
+            <option value="{{.}}"{{if eq . $e.Group}} selected{{end}}>{{.}}</option>{{end}}
+          </select>
+        </label>
+        <label class="field"><span>Nota de ajuste</span>
+          <input type="text" name="note" value="{{.Note}}" maxlength="280" placeholder="Asiento en el 3, agarre al anillo">
+        </label>
+        <button type="submit" class="primary wide">Guardar</button>
+      </form>
+    </details></li>{{end}}
+  </ul>
+  {{end}}
+</main>
+</body>
+</html>
+{{end}}

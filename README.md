@@ -193,8 +193,10 @@ shared with the MCP tools and cannot drift apart.
   **Cuerpo**: body weight and measurements are not recorded yet, and it says so.
   The old `/history` URL redirects here.
 - **Tú** holds the profile and the coach's memory, connectors, model, account
-  and conversations (kept 90 days), the default rest between sets, and the
-  data: import from Hevy or Strong and the database export.
+  and conversations (kept 90 days), **Ejercicios** (every exercise with its
+  muscle group and setup note, editable: the calls `set_exercise_group` and
+  `set_exercise_note` make), the default rest between sets, and the data:
+  import from Hevy or Strong and the database export.
 - **+ Añadir ejercicio** and **Sustituir** in the workout open an exercise
   picker: search (accents ignored), recent exercises, filters by muscle group,
   each with its last set; several can be added at once, and a name that does
