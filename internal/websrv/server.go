@@ -385,6 +385,7 @@ func (s *Server) routes() {
 	s.handle("GET "+b+"/exercise-info", s.exerciseInfo)
 	s.handle("GET "+b+"/s/{id}", s.session)
 	s.handle("POST "+b+"/s/{id}/plan", s.saveSessionAsPlan)
+	s.handle("POST "+b+"/s/{id}/delete", s.deleteSession)
 	s.handle("GET "+b+"/review", s.reviewPage)
 	s.handle("POST "+b+"/review/{id}/accept", s.acceptProposal)
 	s.handle("POST "+b+"/review/{id}/reject", s.rejectProposal)
@@ -820,6 +821,31 @@ func (s *Server) sessionPage(w http.ResponseWriter, r *http.Request, id int64, s
 		w.WriteHeader(status)
 	}
 	s.render(w, r, "session.html", data)
+}
+
+// deleteSession removes a session and every set in it, the same call the
+// delete_session tool makes. Another user's session gets what a missing one
+// gets. The page it came from no longer exists, so it lands on Progreso.
+func (s *Server) deleteSession(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Esa sesión ya no existe.", http.StatusNotFound)
+		return
+	}
+	switch _, err := s.service(r.Context()).DeleteSession(r.Context(), id); {
+	case errors.Is(err, training.ErrNotFound), errors.Is(err, training.ErrValidation):
+		http.Error(w, "Esa sesión ya no existe.", http.StatusNotFound)
+		return
+	case err != nil:
+		s.fail(w, err)
+		return
+	}
+	to := s.base + "/?modo=progreso"
+	if r.Header.Get("HX-Request") != "" {
+		w.Header().Set("HX-Redirect", to)
+		return
+	}
+	http.Redirect(w, r, to, http.StatusSeeOther)
 }
 
 func (s *Server) manifest(w http.ResponseWriter, r *http.Request) {
