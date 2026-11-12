@@ -1,7 +1,7 @@
 {{define "panel.html"}}<section id="panel" class="panel"
   data-last-set-id="{{if .LastSetID}}{{.LastSetID}}{{end}}" data-rest-state="{{.Rest.State}}" data-rest-elapsed="{{.Rest.ElapsedSeconds}}"
   {{with .Next}}data-next="{{.Exercise}}" data-next-rx="{{rx .}}"{{end}}
-  data-active="{{if .Active}}1{{end}}" data-session-id="{{if .Session.ID}}{{.Session.ID}}{{end}}" data-plan-name="{{.Session.PlanName}}"
+  data-active="{{if .Active}}1{{end}}" data-session-id="{{if .Session.ID}}{{.Session.ID}}{{end}}"{{if .Timed}} data-workout-elapsed="{{.Elapsed}}"{{end}} data-plan-name="{{.Session.PlanName}}"
   data-sets-done="{{.WorkingSetCount}}" data-sets-planned="{{if .Progress}}{{.PlannedSets}}{{end}}"
   data-ex-done="{{if .Progress}}{{doneCount .Progress}}{{end}}" data-ex-total="{{if .Progress}}{{len .Progress}}{{end}}"
   {{with .LastSet}}data-last-exercise="{{.Exercise}}" data-last-weight="{{num .WeightKG}}" data-last-reps="{{.Reps}}" data-last-rpe="{{if not .RPEImputed}}{{num .RPE}}{{end}}"{{end}}>
@@ -223,7 +223,7 @@
   <section id="finish" class="finish" role="dialog" aria-label="Resumen del entreno" hidden>
     <div class="sheet-head"><span class="grab" aria-hidden="true"></span><button type="button" class="ghost mini" data-close-finish>Seguir entrenando</button></div>
     <h2>Resumen de hoy</h2>
-    <p class="finish-totals"><strong>{{.WorkingSetCount}} serie{{if ne .WorkingSetCount 1}}s{{end}}</strong> · {{len .Blocks}} ejercicio{{if ne (len .Blocks) 1}}s{{end}} · SI {{num .Session.TotalSI}}{{if .Progress}} · plan {{doneCount .Progress}}/{{len .Progress}}{{end}}</p>
+    <p class="finish-totals"><strong>{{.WorkingSetCount}} serie{{if ne .WorkingSetCount 1}}s{{end}}</strong> · {{len .Blocks}} ejercicio{{if ne (len .Blocks) 1}}s{{end}} · SI {{num .Session.TotalSI}}{{if .Progress}} · plan {{doneCount .Progress}}/{{len .Progress}}{{end}}{{if .Timed}} · <span class="num clock" data-clock>{{clock .Elapsed}}</span>{{end}}</p>
     {{if .Blocks}}<ul class="finish-list">
       {{range .Blocks}}{{$block := .}}
       <li><span>{{.Exercise}}</span> <span class="muted">{{.WorkingCount}} serie{{if ne .WorkingCount 1}}s{{end}} · mejor {{with $block.Top}}{{num .WeightKG}} kg × {{.Reps}}{{end}}</span>{{range .Sets}}{{if $block.IsRecord .}} <span class="pr">PR</span>{{end}}{{end}}</li>

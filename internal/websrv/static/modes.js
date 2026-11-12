@@ -203,19 +203,16 @@
   // --- the live workout, everywhere ---------------------------------------
   // The panel is the server's latest word on today's workout; the bar, the
   // Continuar card and the pill on the other tabs are painted from it.
-  const START_KEY = 'workout-start';
   const FINISHED_KEY = 'workout-finished';
   const panel = () => $('panel');
 
-  function readStart(id) {
-    try {
-      const saved = JSON.parse(localStorage.getItem(START_KEY) || 'null');
-      if (saved && saved.id === id) return saved.t;
-    } catch (e) { /* a bad value is replaced below */ }
-    // First seen on this device: the clock starts now.
-    const t = Date.now();
-    localStorage.setItem(START_KEY, JSON.stringify({ id, t }));
-    return t;
+  // The server says how long ago the session started, by its own clock, so
+  // every device shows the same duration whatever its clock says. The old
+  // per-device start is dropped.
+  localStorage.removeItem('workout-start');
+  function readStart(d) {
+    const elapsed = parseInt(d.workoutElapsed || '', 10);
+    return isNaN(elapsed) ? 0 : Date.now() - elapsed * 1000;
   }
 
   let startedAt = 0;
@@ -225,7 +222,7 @@
     const d = p.dataset;
     const active = d.active === '1';
     const finished = active && localStorage.getItem(FINISHED_KEY) === d.sessionId;
-    startedAt = active && d.sessionId ? readStart(d.sessionId) : 0;
+    startedAt = active ? readStart(d) : 0;
     const done = parseInt(d.setsDone || '0', 10);
     const count = d.setsPlanned ? done + '/' + d.setsPlanned : String(done);
     const words = {

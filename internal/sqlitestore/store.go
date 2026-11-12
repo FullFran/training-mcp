@@ -476,17 +476,37 @@ func (s *userStore) DeleteSet(ctx context.Context, id int64) (int64, float64, in
 	total, err := s.total(ctx, sessionID)
 	return sessionID, total, len(ids), err
 }
+
+// sessionStart reads a stored started_at as RFC 3339 in UTC. Sessions started
+// here hold CURRENT_TIMESTAMP, which is UTC in SQLite's layout; a value that
+// reads as neither layout is not reported rather than guessed.
+func sessionStart(v string) string {
+	for _, layout := range []string{"2006-01-02 15:04:05", time.RFC3339} {
+		if at, err := time.ParseInLocation(layout, v, time.UTC); err == nil {
+			return at.UTC().Format(time.RFC3339)
+		}
+	}
+	return ""
+}
+
 func (s *userStore) GetSession(ctx context.Context, id int64) (training.Session, error) {
 	var out training.Session
 	var planID sql.NullInt64
-	err := s.db.QueryRowContext(ctx, `SELECT id,date,plan_id,plan_name,notes FROM sessions WHERE id=? AND user_id=?`, id, s.userID).
-		Scan(&out.ID, &out.Date, &planID, &out.PlanName, &out.Notes)
+	var startedAt string
+	var imported bool
+	err := s.db.QueryRowContext(ctx, `SELECT id,date,plan_id,plan_name,notes,started_at,
+ EXISTS (SELECT 1 FROM sets st JOIN imported_sets i ON i.set_id=st.id AND i.user_id=? WHERE st.session_id=sessions.id)
+FROM sessions WHERE id=? AND user_id=?`, s.userID, id, s.userID).
+		Scan(&out.ID, &out.Date, &planID, &out.PlanName, &out.Notes, &startedAt, &imported)
 	out.PlanID = planID.Int64
 	if errors.Is(err, sql.ErrNoRows) {
 		return out, training.ErrNotFound
 	}
 	if err != nil {
 		return out, err
+	}
+	if !imported {
+		out.StartedAt = sessionStart(startedAt)
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT id,session_id,position,exercise,weight_kg,reps,rpe,rpe_imputed,si,technique,superset,category FROM sets WHERE session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?) ORDER BY position`, id, s.userID)
 	if err != nil {

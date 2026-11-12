@@ -66,6 +66,10 @@ type Session struct {
 	PlanName string `json:"plan_name,omitempty"`
 	// Notes are an imported workout's own notes; sessions logged here have none.
 	Notes string `json:"notes,omitempty"`
+	// StartedAt is when the session was started here, RFC 3339 in UTC, so
+	// every device times the workout from the same instant. Imported workouts
+	// leave it empty: their start is in the source app's unknown clock.
+	StartedAt string `json:"started_at,omitempty"`
 }
 type Set struct {
 	ID        int64   `json:"id"`
