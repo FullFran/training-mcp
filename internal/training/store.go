@@ -65,6 +65,10 @@ type UserStore interface {
 	// LastSetAt is the most recently logged set of a session and when it was
 	// logged. A session with no sets, or not the user's, is ErrNotFound.
 	LastSetAt(context.Context, int64) (int64, time.Time, error)
+	// ClaimWorkoutSummary records that the summary of a session was proposed:
+	// true the first time, false once it already was. A session that is not the
+	// user's is ErrNotFound.
+	ClaimWorkoutSummary(context.Context, int64, time.Time) (bool, error)
 	// RestTarget is the stored target rest in seconds; 0 when never set.
 	RestTarget(context.Context) (int, error)
 	SetRestTarget(context.Context, int) error

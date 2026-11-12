@@ -1302,6 +1302,26 @@ WHERE st.session_id=? AND se.user_id=? ORDER BY st.created_at DESC, st.id DESC L
 	return id, at, nil
 }
 
+// ClaimWorkoutSummary marks a session's workout summary as proposed, once. The
+// update and the check are one statement, so two finishes at once cannot both
+// claim it.
+func (s *userStore) ClaimWorkoutSummary(ctx context.Context, sessionID int64, at time.Time) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE sessions SET summary_proposed_at=? WHERE id=? AND user_id=? AND summary_proposed_at IS NULL`,
+		at.UTC().Format(time.RFC3339), sessionID, s.userID)
+	if err != nil {
+		return false, err
+	}
+	if n, err := res.RowsAffected(); err != nil || n == 1 {
+		return n == 1, err
+	}
+	var one int
+	err = s.db.QueryRowContext(ctx, `SELECT 1 FROM sessions WHERE id=? AND user_id=?`, sessionID, s.userID).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, training.ErrNotFound
+	}
+	return false, err
+}
+
 // RestTarget is the user's chosen rest between sets in seconds, 0 if never chosen.
 func (s *userStore) RestTarget(ctx context.Context) (int, error) {
 	var v sql.NullInt64
