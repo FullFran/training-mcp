@@ -32,6 +32,14 @@
     <p class="muted">Con los cambios que hiciste en la sesión y lo que hiciste fuera del plan. Lo saltado no se copia.</p>
     <button type="submit" class="primary wide">Guardar</button>
   </form>{{end}}
+  <details class="danger-zone">
+    <summary>Borrar sesión</summary>
+    <form method="post" action="{{.Base}}/s/{{.Session.ID}}/delete">{{if .CSRF}}
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
+      <p class="muted">Se borran la sesión y sus {{len .Session.Sets}} serie{{if ne (len .Session.Sets) 1}}s{{end}}. No se puede deshacer.</p>
+      <button type="submit" class="ghost wide risky">Borrar definitivamente</button>
+    </form>
+  </details>
 </main>
 </body>
 </html>

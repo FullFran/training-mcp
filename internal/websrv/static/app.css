@@ -1857,3 +1857,8 @@ body.coach-open .plan-today { display: none; }
 /* Saving a past session as a routine, below its sets. */
 .save-plan { margin-top: 16px; display: grid; gap: 12px; }
 .save-plan p { margin: 0; }
+
+/* Deleting a whole session sits below it, folded, so a stray tap cannot. */
+.danger-zone { margin: 24px 16px 32px; }
+.danger-zone > summary { min-height: 44px; display: flex; align-items: center; color: var(--danger); }
+.danger-zone p { margin: 8px 0 12px; }

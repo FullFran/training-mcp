@@ -185,7 +185,8 @@ shared with the MCP tools and cannot drift apart.
   dots with the sessions and kilos moved, then every session by month; each
   opens its detail, where **Guardar como rutina** turns it into a routine
   (the same call as `save_session_as_plan`: adjustments and off-plan work
-  kept, skipped exercises left out). **Ejercicios**: every exercise with its best e1RM, best set
+  kept, skipped exercises left out) and **Borrar sesión** deletes it with
+  every set in it (the same call as `delete_session`). **Ejercicios**: every exercise with its best e1RM, best set
   and a sparkline of the best e1RM per session, plus next week's volume advice
   and volume per muscle group; each opens a detail with the chart, the best
   sets, the fatigue between sets last time and every session's sets.
