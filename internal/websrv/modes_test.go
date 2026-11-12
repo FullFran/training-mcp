@@ -277,7 +277,7 @@ func TestEntrenarOpensTheCoachAsAnOverlay(t *testing.T) {
 		}
 	}
 	sheet := section(t, body, `id="coach-sheet"`, `class="dock"`)
-	for _, want := range []string{`id="coach-close"`, "Volver al entreno", `id="coach-log"`, `id="chat-cards"`, `id="coach-form"`, `id="coach-mic"`} {
+	for _, want := range []string{`id="coach-close"`, `aria-label="Cerrar el coach"`, `id="coach-log"`, `id="chat-cards"`, `id="coach-form"`, `id="coach-mic"`} {
 		if !strings.Contains(sheet, want) {
 			t.Fatalf("coach sheet lacks %s", want)
 		}

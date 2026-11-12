@@ -419,7 +419,11 @@
         const again = t.origin === 'user' ? retryAction() : null;
         if (again) again.label = 'Volver a pedirla';
         runCard(t.el, 'Detuviste la respuesta.', again, true);
-      } else tools(t);
+      } else {
+        tools(t);
+        // coach-apply.js offers the loads of a live answer as Aplicar chips.
+        document.dispatchEvent(new CustomEvent('coach:answer', { detail: { el: t.el, text: t.text } }));
+      }
       // The engine is up now: the model's name can show without starting one.
       if (!models) loadModels(false);
     });

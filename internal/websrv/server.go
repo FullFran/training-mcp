@@ -119,6 +119,8 @@ type pageData struct {
 	Memory MemoryData
 	// Import is the import page: earlier imports and a file's preview.
 	Import ImportData
+	// CoachSees is Planificar's context card: what the coach reads.
+	CoachSees *CoachSees
 	// PendingCount is how many agent proposals wait for an answer.
 	PendingCount int
 	// CoachOn shows the coach chat.
@@ -447,6 +449,9 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) {
 	data.Review.Pending = s.pendingProposals(r)
 	data.Review.Answers = answerLabels
 	data.PendingCount = len(data.Review.Pending)
+	if s.opts.Coach != nil {
+		data.CoachSees = s.coachSees(r.Context(), data.Plans)
+	}
 	s.render(w, r, "index.html", data)
 }
 

@@ -169,7 +169,7 @@ func TestNoSessionProposalOffersOnlyOnceAnswers(t *testing.T) {
 	if !strings.Contains(body, `value="allow_once"`) || strings.Contains(body, `value="allow_always"`) || strings.Contains(body, `value="reject_always"`) {
 		t.Fatalf("answers offered:\n%s", body)
 	}
-	if home := get(t, f.handler, "/").Body.String(); !strings.Contains(home, "Aceptar una vez") || strings.Contains(home, `value="allow_always"`) {
+	if home := get(t, f.handler, "/").Body.String(); !strings.Contains(home, `value="allow_once"`) || strings.Contains(home, `value="allow_always"`) {
 		t.Fatalf("chat card answers:\n%s", home)
 	}
 	if w := post(t, f.handler, "/review/"+itoa(p.ID)+"/accept", url.Values{"answer": {"allow_always"}}, false); w.Code != http.StatusBadRequest {
@@ -183,7 +183,13 @@ func TestNoSessionProposalOffersOnlyOnceAnswers(t *testing.T) {
 // The chat cards offer the same answers as the review page, with the same labels.
 func TestChatCardsOfferTheFourAnswers(t *testing.T) {
 	f := newReviewFixture(t)
-	f.propose(t, "pierna pesada")
+	// A proposed routine is a draft (planificar_test.go); any other change
+	// keeps the four answers.
+	payload := json.RawMessage(`{"seconds":120}`)
+	if _, err := f.service.Propose(training.WithAgentSession(context.Background(), coachSession), training.ProposalInput{Tool: "set_rest_target", ActionType: "rest.set", Payload: payload},
+		func(context.Context) (json.RawMessage, error) { return json.RawMessage(`{}`), nil }); err != nil {
+		t.Fatal(err)
+	}
 	body := get(t, f.handler, "/").Body.String()
 	for _, want := range []string{`value="allow_once" class="primary">Aceptar una vez<`, `value="allow_always" class="ghost">Aceptar siempre en esta sesión<`,
 		`value="reject_once" class="ghost">Rechazar<`, `value="reject_always" class="ghost">Rechazar siempre en esta sesión<`} {

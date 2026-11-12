@@ -110,6 +110,9 @@ type ProposalView struct {
 	// Undoable says the person can undo it; Undone that they already did.
 	Undoable bool
 	Undone   bool
+	// Draft is set for a routine the coach proposes: Planificar shows it as
+	// a draft to review and save.
+	Draft *DraftView
 }
 
 // RuleView is a stored always answer as the review page shows it.
@@ -181,6 +184,7 @@ func (s *Server) proposalView(p training.Proposal) ProposalView {
 		Status: status, DecidedBy: decidedByLabels[p.DecidedBy],
 		When: when.In(s.clock().Location()).Format("02/01 15:04"), Error: p.Error, InSession: p.Session != "",
 		Undoable: p.Undoable, Undone: p.UndoneBy != 0,
+		Draft: routineDraft(p),
 	}
 }
 

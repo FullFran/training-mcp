@@ -143,17 +143,22 @@
 <main id="train" class="train">
   {{template "panel.html" .}}
 </main>
-<header class="bar chat-bar">
-  <div class="bar-start">
-    <button type="button" id="menu-open" class="icon-btn" aria-label="Menú" aria-controls="drawer" aria-expanded="false">☰</button>
+<!-- Planificar: the coach's chat, full screen. ☰ lists the conversations;
+     the chips lead to the routines, the coach's pending changes and memory. -->
+<header id="plan-head" class="bar chat-bar">
+  <button type="button" id="menu-open" class="icon-btn" aria-label="Conversaciones" aria-controls="drawer" aria-expanded="false">☰</button>
+  <div class="plan-title">
+    <h1>Planificar</h1>
+    {{if .CoachOn}}<button type="button" id="model-open" class="model-open" aria-haspopup="dialog" aria-controls="model-sheet" aria-label="Modelo del coach"><span id="model-name" class="muted"></span> <span aria-hidden="true">▾</span></button>{{end}}
   </div>
-  {{if .CoachOn}}<button type="button" id="model-open" class="chat-title model-open" aria-haspopup="dialog" aria-controls="model-sheet"><strong>Coach</strong> <span id="model-name" class="muted">{{.Today}}</span> <span aria-hidden="true">▾</span></button>
-  {{else}}<div class="chat-title"><strong>Coach</strong> <span class="muted">{{.Today}}</span></div>{{end}}
-  <div class="bar-end">
-    <a id="review-badge" class="icon-btn review-badge" href="{{.Base}}/review" data-panel aria-label="Revisar"{{if not .PendingCount}} hidden{{end}}>✅<span>{{.PendingCount}}</span></a>
-    {{if .CoachOn}}<button type="button" id="chat-new" class="icon-btn" aria-label="Nueva conversación">✎</button>{{end}}
-  </div>
+  {{if .CoachOn}}<button type="button" id="chat-new" class="btn pill new-chat" aria-label="Nueva conversación">+ Nueva</button>{{end}}
 </header>
+<nav id="plan-chips" class="plan-chips" aria-label="Planificar">
+  <a href="{{.Base}}/?modo=planificar" aria-current="page">Coach</a>
+  <a href="{{.Base}}/plans" data-panel>Rutinas</a>
+  <a href="{{.Base}}/review" data-panel>Revisión <span class="badge num" data-review-count{{if not .PendingCount}} hidden{{end}}>{{.PendingCount}}</span></a>
+  <a href="{{.Base}}/memory" data-panel>Memoria</a>
+</nav>
 
 <!-- The menu: panels open over the chat and come back to it; without
      JavaScript they are plain pages with a link home. -->
@@ -185,14 +190,19 @@
 <section id="coach-sheet" class="coach-sheet" aria-label="Coach">
 <div class="coach-sheet-head">
   <span class="grab" aria-hidden="true"></span>
-  <strong>Coach</strong>
-  <span id="coach-rest" class="coach-rest" hidden></span>
-  <button type="button" id="coach-close" class="ghost mini">Volver al entreno</button>
+  <span class="live-dot" aria-hidden="true"></span><strong>Coach</strong>
+  {{if $active}}<span class="live-tag">Sesión en vivo</span>{{end}}
+  <button type="button" id="coach-close" class="icon-btn sheet-close" aria-label="Cerrar el coach">×</button>
 </div>
+<!-- The rest timer keeps counting while the person talks to the coach. -->
+<p id="coach-rest" class="coach-rest" hidden><span>⏱ Descanso <span class="num" data-rest-mirror>0:00</span></span><span class="muted" data-rest-state>sigue contando</span></p>
 <main id="chat" class="chat">
   <div id="coach-log" class="coach-log" aria-live="polite">
     <!-- Deterministic cards, rendered here and never by the model. -->
     <div id="chat-cards">
+      {{with .CoachSees}}<a id="coach-sees" class="coach-sees" href="{{$.Base}}/memory" data-panel>
+        <span class="row-main"><strong>El coach ve</strong><span class="muted">{{.Line}}</span></span><span class="chev" aria-hidden="true">›</span>
+      </a>{{end}}
       {{if .Progress}}
       <article class="chat-card plan-today" aria-label="Plan de hoy">
         <header><strong>{{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Plan de hoy{{end}}</strong> <span class="muted">{{doneCount .Progress}}/{{len .Progress}}</span></header>
@@ -215,6 +225,31 @@
       </form>
       {{end}}
       {{range .Review.Pending}}
+      {{if .Draft}}
+      <!-- A routine the coach proposes: nothing is saved until the person says so. -->
+      <article class="chat-card proposal-card draft-card" data-proposal="{{.ID}}">
+        <div class="draft">
+          <span class="eyebrow">Borrador de rutina</span>
+          <strong class="draft-name">{{.Draft.Name}}</strong>
+          <span class="muted num">{{.Draft.Meta}}</span>
+        </div>
+        <!-- The list is the details' sibling so opening it never moves the buttons. -->
+        <details class="draft-changes"><summary class="btn">Ver cambios</summary></details>
+        <ul class="draft-list">{{range .Draft.Changes}}
+          <li>+ {{.Exercise}} <span class="muted num">{{.Rx}}</span></li>{{end}}
+        </ul>
+        <div class="card-actions">
+          <form method="post" action="{{$.Base}}/review/{{.ID}}/accept">{{if $.CSRF}}
+            <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+            <button type="submit" name="answer" value="allow_once" class="primary">Revisar y guardar</button>
+          </form>
+          <form method="post" action="{{$.Base}}/review/{{.ID}}/reject">{{if $.CSRF}}
+            <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+            <button type="submit" name="answer" value="reject_once" class="ghost">Descartar</button>
+          </form>
+        </div>
+      </article>
+      {{else}}
       <article class="chat-card proposal-card" data-proposal="{{.ID}}">
         <header><strong>{{.Label}}</strong> <span class="muted">{{.When}} · pendiente</span></header>
         {{if .Summary}}<p class="summary">{{.Summary}}</p>{{else}}<dl>{{range .Fields}}
@@ -234,7 +269,10 @@
         </div>
       </article>
       {{end}}
+      {{end}}
     </div>
+    <!-- What was accepted in the last 12 h, to undo it (coach-undo.js). -->
+    <div id="undo-cards" class="undo-cards" aria-live="polite"></div>
     {{if .CoachOn}}<!-- Shown until the first message; the suggestions are built here, not by the model. -->
     <div id="chat-empty" class="chat-empty" hidden>
       <h2>¿Qué entrenamos hoy?</h2>
@@ -251,6 +289,12 @@
   <button type="button" id="chat-jump" class="chat-jump" aria-label="Ir al final" hidden>↓</button>
 </main>
 {{if .CoachOn}}
+<!-- Mid-workout prompts that need no typing; they name the open exercise. -->
+<div id="coach-quick" class="coach-quick" aria-label="Atajos">
+  <button type="button" class="chip-btn" data-quick="swap">Sustituir ejercicio</button>
+  <button type="button" class="chip-btn" data-quick="pain">Me duele…</button>
+  <button type="button" class="chip-btn" data-quick="add">Añadir serie</button>
+</div>
 <!-- Coach chat. Connect ChatGPT once, then talk or dictate. -->
 <section id="coach" class="coach" aria-label="Coach">
   <div id="coach-connect" class="coach-connect" hidden>
@@ -402,6 +446,8 @@
 <script src="{{.Base}}/static/markdown.js" defer></script>
 <script src="{{.Base}}/static/coach-attach.js" defer></script>
 <script src="{{.Base}}/static/coach.js" defer></script>
+<script src="{{.Base}}/static/coach-apply.js" defer></script>
+<script src="{{.Base}}/static/coach-undo.js" defer></script>
 {{if .ConnectorsOn}}<script src="{{.Base}}/static/coach-approvals.js" defer></script>{{end}}
 {{end -}}
 
