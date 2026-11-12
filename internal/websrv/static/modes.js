@@ -1,16 +1,17 @@
-// The three screens of the home: the choice, Entrenar and Planificar. They live
-// in one page and switch in place, so the chat, its stream and the rest timer
-// are never reloaded. The URL keeps the screen (?modo=), so a reload or the
-// back button lands where the person was. In Entrenar the coach opens as an
-// overlay over the workout and closes back to the same point.
+// The app's screens: four tabs (Entrenar, Planificar, Progreso, Tú) and the
+// active workout, a full-screen layer over them. They live in one page and
+// switch in place, so the chat, its stream and the rest timer are never
+// reloaded. The URL keeps the screen (?modo=), so a reload or the back button
+// lands where the person was. In the workout the coach opens as an overlay
+// and closes back to the same point; collapsed, the workout is a pill.
 (function () {
   'use strict';
 
   const body = document.body;
   const base = body.dataset.base || '';
   const $ = (id) => document.getElementById(id);
-  const QUERY = { train: 'entrenar', plan: 'planificar' };
-  const MODES = { entrenar: 'train', planificar: 'plan' };
+  const QUERY = { train: 'entrenar', plan: 'planificar', progress: 'progreso', you: 'tu' };
+  const MODES = { entrenar: 'train', planificar: 'plan', progreso: 'progress', tu: 'you' };
 
   const fromURL = () => MODES[new URLSearchParams(window.location.search).get('modo')] || 'home';
   const urlFor = (mode) => base + '/' + (QUERY[mode] ? '?modo=' + QUERY[mode] : '');
@@ -27,6 +28,12 @@
     body.classList.toggle('coach-open', overlay);
     if (scrim) scrim.hidden = !overlay;
     if (mode !== 'train') setFinish(false);
+    // The workout belongs to Entrenar's tab.
+    const tab = mode === 'train' ? 'home' : mode;
+    document.querySelectorAll('#tabs [data-tab]').forEach((a) => {
+      if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    });
     if (mode === 'plan' || overlay) document.dispatchEvent(new CustomEvent('coach:shown'));
   }
 
@@ -52,7 +59,19 @@
     if (!link || event.metaKey || event.ctrlKey || event.shiftKey) return;
     event.preventDefault();
     go(link.dataset.modeGo);
+    // A link that asks the coach something lands in the chat with it typed.
+    if (link.hasAttribute('data-ask')) ask(link.dataset.ask);
   });
+
+  function ask(words) {
+    const text = $('coach-text');
+    if (!text || $('coach-form').hidden) return;
+    if (words) {
+      text.value = words;
+      text.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    text.focus();
+  }
   // Another script (choosing a plan from the chat) can send the person here.
   document.addEventListener('mode:go', (event) => go(event.detail));
 
@@ -112,9 +131,33 @@
     if (body.dataset.mode === 'train') card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   });
 
+  // The chips across the top open their exercise's card.
+  document.addEventListener('click', (event) => {
+    const chip = event.target.closest('.ex-chip');
+    if (chip) document.dispatchEvent(new CustomEvent('workout:focus', { detail: chip.dataset.chip }));
+    const next = event.target.closest('.next-ex');
+    if (next) {
+      const card = next.closest('li.ex-card');
+      const after = card && card.nextElementSibling;
+      if (after) document.dispatchEvent(new CustomEvent('workout:focus', { detail: after.dataset.exercise }));
+    }
+  });
+  document.addEventListener('toggle', (event) => {
+    const details = event.target;
+    if (!(details instanceof HTMLDetailsElement) || !details.open) return;
+    const card = details.closest('li.ex-card');
+    if (!card) return;
+    document.querySelectorAll('.ex-chip').forEach((c) => {
+      const on = c.dataset.chip === card.dataset.exercise;
+      c.classList.toggle('current', on);
+      if (on && c.scrollIntoView) c.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+    });
+  }, true);
+
   // An empty session starts by logging its first exercise.
   document.addEventListener('click', (event) => {
-    if (!event.target.closest('#free-session') || !more) return;
+    if (!event.target.closest('[data-free-session]') || !more) return;
+    go('train');
     more.open = true;
     const exercise = $('exercise');
     if (exercise) {
@@ -144,8 +187,78 @@
     }
   });
   body.addEventListener('htmx:afterSwap', (event) => {
-    if (event.target.id === 'panel' && finishing) setFinish(true);
+    if (event.target.id !== 'panel') return;
+    if (finishing) setFinish(true);
+    // Logging after Terminar picks the workout up again.
+    else localStorage.removeItem(FINISHED_KEY);
+    syncLive();
   });
+
+  // --- the live workout, everywhere ---------------------------------------
+  // The panel is the server's latest word on today's workout; the bar, the
+  // Continuar card and the pill on the other tabs are painted from it.
+  const START_KEY = 'workout-start';
+  const FINISHED_KEY = 'workout-finished';
+  const panel = () => $('panel');
+
+  function readStart(id) {
+    try {
+      const saved = JSON.parse(localStorage.getItem(START_KEY) || 'null');
+      if (saved && saved.id === id) return saved.t;
+    } catch (e) { /* a bad value is replaced below */ }
+    // First seen on this device: the clock starts now.
+    const t = Date.now();
+    localStorage.setItem(START_KEY, JSON.stringify({ id, t }));
+    return t;
+  }
+
+  let startedAt = 0;
+  function syncLive() {
+    const p = panel();
+    if (!p) return;
+    const d = p.dataset;
+    const active = d.active === '1';
+    const finished = active && localStorage.getItem(FINISHED_KEY) === d.sessionId;
+    startedAt = active && d.sessionId ? readStart(d.sessionId) : 0;
+    const done = parseInt(d.setsDone || '0', 10);
+    const count = d.setsPlanned ? done + '/' + d.setsPlanned : String(done);
+    const words = {
+      title: d.planName || 'Entreno libre',
+      count,
+      sets: count + (d.setsPlanned || done !== 1 ? ' series' : ' serie'),
+      exercises: d.exTotal ? ' · ' + d.exDone + '/' + d.exTotal + ' ejercicios' : ''
+    };
+    document.querySelectorAll('[data-live]').forEach((el) => {
+      if (words[el.dataset.live] !== undefined) el.textContent = words[el.dataset.live];
+    });
+    const pill = $('workout-pill');
+    if (pill) pill.hidden = !active || finished;
+    const cont = $('continue');
+    if (cont) {
+      cont.hidden = !active;
+      cont.classList.toggle('finished', finished);
+    }
+    const idle = document.querySelector('.home-idle');
+    if (idle) idle.hidden = active;
+    tick();
+  }
+
+  function tick() {
+    if (!startedAt) return;
+    const s = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const text = (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s % 60).padStart(2, '0');
+    document.querySelectorAll('[data-clock]').forEach((el) => { el.textContent = text; });
+  }
+  setInterval(tick, 1000);
+
+  document.addEventListener('workout:finish', () => {
+    const p = panel();
+    if (p && p.dataset.sessionId) localStorage.setItem(FINISHED_KEY, p.dataset.sessionId);
+    syncLive();
+  });
+  syncLive();
 
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;

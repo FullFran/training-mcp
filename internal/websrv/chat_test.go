@@ -187,7 +187,7 @@ func TestComposerHasVoiceAndTheExtrasSlot(t *testing.T) {
 func TestServiceWorkerCachesTheChatShell(t *testing.T) {
 	h, _ := newServer(t)
 	body := get(t, h, base+"/sw.js").Body.String()
-	for _, want := range []string{"const VERSION = 'v13';", "BASE + '/static/shell.js'", "BASE + '/static/modes.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'", "BASE + '/static/coach-attach.js'"} {
+	for _, want := range []string{"const VERSION = 'v14';", "BASE + '/static/shell.js'", "BASE + '/static/modes.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'", "BASE + '/static/coach-attach.js'"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("service worker lacks %s", want)
 		}

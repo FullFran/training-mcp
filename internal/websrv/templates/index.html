@@ -15,38 +15,106 @@
 {{if .CSRF}}<meta name="csrf-token" content="{{.CSRF}}">
 {{end}}</head>
 <body class="chat-home" data-mode="{{.Mode}}" data-base="{{.Base}}" data-rest-target="{{.RestTarget}}"{{if .CSRF}} hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'{{end}}>
-{{$active := or .Progress .Session.Sets}}
-<!-- The first screen: train now, or plan and analyse. Plain links, so they
-     work without JavaScript; modes.js switches in place and keeps the URL. -->
-<section id="home" class="home" aria-label="Inicio">
-  <header class="home-head"><strong>Entreno</strong> <span class="muted">{{.Today}}</span></header>
-  <h1>¿Qué hacemos hoy?</h1>
-  <a id="go-train" class="mode-card mode-train" href="{{.Base}}/?modo=entrenar" data-mode-go="train">
-    <span class="mode-icon" aria-hidden="true">🏋️</span>
-    <strong>Entrenar</strong>
-    <span class="mode-sub">{{if .Progress}}{{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Plan de hoy{{end}} · {{doneCount .Progress}}/{{len .Progress}} ejercicios{{else if .Session.Sets}}{{.WorkingSetCount}} serie{{if ne .WorkingSetCount 1}}s{{end}} hoy{{else}}Elige un plan o entrena libre{{end}}</span>
+{{$active := .Active}}
+<!-- Entrenar's tab: continue the live workout, or start the next routine.
+     Plain links and forms, so it works without JavaScript; modes.js switches
+     screens in place and keeps the URL. -->
+<section id="home" class="home screen" aria-label="Entrenar">
+  <header class="screen-head"><h1>Entrenar</h1><span class="date-chip">{{shortDate .Today}}</span></header>
+  <a id="continue" class="hero continue" href="{{.Base}}/?modo=entrenar" data-mode-go="train"{{if not $active}} hidden{{end}}>
+    <span class="eyebrow"><span class="live-dot" aria-hidden="true"></span><span class="when-live">En curso</span><span class="when-done">Terminado hoy</span></span>
+    <strong class="hero-title" data-live="title">{{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Entreno libre{{end}}</strong>
+    <span class="hero-meta num"><span data-live="sets">{{.WorkingSetCount}}{{if .Progress}}/{{.PlannedSets}}{{end}} serie{{if or (ne .WorkingSetCount 1) .Progress}}s{{end}}</span><span data-live="exercises">{{if .Progress}} · {{doneCount .Progress}}/{{len .Progress}} ejercicios{{end}}</span></span>
+    <span class="btn primary big"><span class="when-live">Continuar</span><span class="when-done">Abrir el entreno</span></span>
   </a>
-  <a id="go-plan" class="mode-card mode-plan" href="{{.Base}}/?modo=planificar" data-mode-go="plan">
-    <span class="mode-icon" aria-hidden="true">🗂️</span>
-    <strong>Planificar</strong>
-    <span class="mode-sub">Rutinas, progreso, historial y el coach</span>
-  </a>
-  {{if .PendingCount}}<a class="home-review" href="{{.Base}}/review" data-panel>✅ {{.PendingCount}} propuesta{{if ne .PendingCount 1}}s{{end}} por revisar</a>{{end}}
+  {{if not $active}}
+  <div class="home-idle">
+  {{with .Home.Next}}
+  <form id="next-routine" class="hero" method="post" action="{{$.Base}}/plan">{{if $.CSRF}}
+    <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+    <input type="hidden" name="plan_id" value="{{.Plan.ID}}">
+    <span class="eyebrow">Siguiente{{if .Ago}} · {{.Ago}}{{end}}</span>
+    <strong class="hero-title">{{.Plan.Name}}</strong>
+    <span class="hero-list">{{.Exercises}}</span>
+    <span class="hero-meta">{{len .Plan.Items}} ejercicio{{if ne (len .Plan.Items) 1}}s{{end}} · {{.Plan.TotalSets}} series</span>
+    <button type="submit" class="btn primary big">Empezar</button>
+  </form>
+  <div class="home-actions">
+    <button type="button" class="btn" data-free-session>+ Entreno vacío</button>
+    <a class="btn" href="{{$.Base}}/plans" data-panel>Rutinas</a>
+  </div>
+  {{if $.Home.Others}}
+  <h2 class="section-label">Otras rutinas</h2>
+  <ul id="other-routines" class="list">
+    {{range $.Home.Others}}
+    <li><form method="post" action="{{$.Base}}/plan">{{if $.CSRF}}
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+      <input type="hidden" name="plan_id" value="{{.Plan.ID}}">
+      <button type="submit" class="list-row"><span class="row-main"><strong>{{.Plan.Name}}</strong><span class="muted">{{if .Ago}}{{.Ago}}{{else}}sin hacer{{end}} · {{.Plan.TotalSets}} series</span></span><span class="chev" aria-hidden="true">›</span></button>
+    </form></li>
+    {{end}}
+  </ul>
+  {{end}}
+  {{else}}
+  <div class="empty-state">
+    <span class="empty-mark" aria-hidden="true"></span>
+    <h2>Aún no tienes rutina</h2>
+    <p class="muted">Elige cómo empezar. Puedes cambiarlo luego.</p>
+    {{if .CoachOn}}<a id="ask-routine" class="btn primary big" href="{{.Base}}/?modo=planificar" data-mode-go="plan" data-ask="Hazme una rutina de 3 días">Pídele una rutina al coach</a>{{end}}
+    <a class="btn big" href="{{.Base}}/plans" data-panel>Crear rutina a mano</a>
+    <a class="btn big" href="{{.Base}}/import" data-panel>Importar de Hevy o Strong</a>
+    <button type="button" class="btn big outline" data-free-session>Entrenar sin rutina</button>
+  </div>
+  {{end}}
+  {{with .Home.Last}}
+  <h2 class="section-label">Última sesión</h2>
+  <a id="last-session" class="list-row card-row" href="{{$.Base}}/s/{{.ID}}" data-panel><span class="row-main"><strong>{{if .PlanName}}{{.PlanName}}{{else}}Entreno libre{{end}}</strong><span class="muted num">{{.SetCount}} serie{{if ne .SetCount 1}}s{{end}} · SI {{num .TotalSI}}</span></span><span class="muted">{{.Ago}}</span></a>
+  {{end}}
+  </div>
+  {{end}}
+  {{if .PendingCount}}<a class="home-review" href="{{.Base}}/review" data-panel>{{.PendingCount}} propuesta{{if ne .PendingCount 1}}s{{end}} del coach por revisar</a>{{end}}
+  {{if .CoachOn}}<a class="coach-bar" href="{{.Base}}/?modo=planificar" data-mode-go="plan" data-ask=""><span class="live-dot" aria-hidden="true"></span>Pregunta al coach…</a>{{end}}
 </section>
 
-<!-- Entrenar: the list of today's exercises; the entry form is a sheet and the
-     coach an overlay, so neither ever moves this screen. -->
+<!-- Progreso and Tú: the existing panels, until they get screens of their own. -->
+<section id="progress" class="screen" aria-label="Progreso">
+  <header class="screen-head"><h1>Progreso</h1></header>
+  <nav class="list" aria-label="Progreso">
+    <a class="list-row" href="{{.Base}}/history" data-panel><span class="row-main"><strong>Historial</strong><span class="muted">Sesiones y volumen por músculo</span></span><span class="chev" aria-hidden="true">›</span></a>
+    <a class="list-row" href="{{.Base}}/history#progreso" data-panel><span class="row-main"><strong>Ejercicios</strong><span class="muted">e1RM y mejores series</span></span><span class="chev" aria-hidden="true">›</span></a>
+  </nav>
+</section>
+<section id="you" class="screen" aria-label="Tú">
+  <header class="screen-head"><h1>Tú</h1></header>
+  <h2 class="section-label">Coach</h2>
+  <nav class="list" aria-label="Coach">
+    <a class="list-row" href="{{.Base}}/memory" data-panel><span class="row-main"><strong>Memoria</strong><span class="muted">Lo que el coach recuerda de ti</span></span><span class="chev" aria-hidden="true">›</span></a>
+    {{if .ConnectorsOn}}<a class="list-row" href="{{.Base}}/coach/connectors"><span class="row-main"><strong>Conectores</strong><span class="muted">Servicios que el coach puede usar</span></span><span class="chev" aria-hidden="true">›</span></a>{{end}}
+    <a class="list-row" href="{{.Base}}/review" data-panel><span class="row-main"><strong>Revisión</strong><span class="muted">Cambios que propone el coach</span></span><span class="chev" aria-hidden="true">›</span></a>
+  </nav>
+  <h2 class="section-label">Datos</h2>
+  <nav class="list" aria-label="Datos">
+    <a class="list-row" href="{{.Base}}/plans" data-panel><span class="row-main"><strong>Rutinas</strong></span><span class="chev" aria-hidden="true">›</span></a>
+    <a class="list-row" href="{{.Base}}/import" data-panel><span class="row-main"><strong>Importar</strong><span class="muted">Hevy o Strong</span></span><span class="chev" aria-hidden="true">›</span></a>
+  </nav>
+</section>
+
+<!-- The active workout: a full-screen layer over the tabs. Collapsing it
+     leaves a pill on every tab; the list, the entry sheet and the coach
+     overlay never move it. -->
 <header class="bar train-bar">
-  <a class="ghost back" href="{{.Base}}/" data-mode-go="home" aria-label="Volver al inicio">‹ Inicio</a>
-  <strong>Entrenar</strong>
-  <button type="button" id="finish-open" class="ghost finish-open" aria-controls="finish">Terminar</button>
+  <a class="icon-btn collapse" href="{{.Base}}/" data-mode-go="home" aria-label="Minimizar el entreno">⌄</a>
+  <div class="wk-title">
+    <span class="wk-plan" data-live="title">{{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Entreno libre{{end}}</span>
+    <span class="wk-stats"><span id="wk-clock" class="clock num" data-clock>0:00</span> <span class="muted num" data-live="sets">{{.WorkingSetCount}}{{if .Progress}}/{{.PlannedSets}}{{end}} serie{{if or (ne .WorkingSetCount 1) .Progress}}s{{end}}</span></span>
+  </div>
+  <button type="button" id="finish-open" class="btn primary finish-open" aria-controls="finish">Terminar</button>
 </header>
 <main id="train" class="train">
   {{template "panel.html" .}}
 </main>
 <header class="bar chat-bar">
   <div class="bar-start">
-    <a class="icon-btn" href="{{.Base}}/" data-mode-go="home" aria-label="Volver al inicio">‹</a>
     <button type="button" id="menu-open" class="icon-btn" aria-label="Menú" aria-controls="drawer" aria-expanded="false">☰</button>
   </div>
   {{if .CoachOn}}<button type="button" id="model-open" class="chat-title model-open" aria-haspopup="dialog" aria-controls="model-sheet"><strong>Coach</strong> <span id="model-name" class="muted">{{.Today}}</span> <span aria-hidden="true">▾</span></button>
@@ -190,13 +258,15 @@
     <button type="button" id="wk-log" class="primary wk-log" hidden>Registrar</button>
   </div>
   <!-- Rest timer. Counts from the last logged set, as the agent sees it, so it
-       survives a reload; tapping the time dismisses it. The ±30 s buttons change
+       survives a reload; Saltar or tapping the time dismisses it. The ±15 s buttons change
        the person's rest target, shared with the agent. -->
   <div id="rest" class="rest" hidden>
     <p id="rest-next" class="rest-next" hidden></p>
-    <button type="button" class="rest-adj" data-delta="-30">−30s</button>
-    <button type="button" id="rest-time" class="rest-time">0:00</button>
-    <button type="button" class="rest-adj" data-delta="30">+30s</button>
+    <span class="rest-label">Descanso</span>
+    <button type="button" id="rest-time" class="rest-time num">0:00</button>
+    <button type="button" class="rest-adj" data-delta="-15">−15</button>
+    <button type="button" class="rest-adj" data-delta="15">+15</button>
+    <button type="button" class="rest-skip">Saltar</button>
   </div>
   <details id="wk-more" class="wk-more">
     <summary>{{if $active}}Ajustar{{else}}Registrar una serie{{end}}</summary>
@@ -323,11 +393,24 @@
 <!-- One panel at a time over the chat; closing it returns to the same chat. -->
 <section id="panel-sheet" class="panel-sheet" role="dialog" aria-label="Panel" hidden>
   <header class="bar">
-    <button type="button" id="panel-back" class="ghost">← Chat</button>
+    <button type="button" id="panel-back" class="ghost">‹ Volver</button>
     <strong id="panel-title"></strong>
   </header>
   <iframe id="panel-frame" title="Panel"></iframe>
 </section>
+
+<!-- The live workout, collapsed: back to it from any tab. -->
+<a id="workout-pill" class="workout-pill" href="{{.Base}}/?modo=entrenar" data-mode-go="train"{{if not $active}} hidden{{end}}>
+  <span class="live-dot" aria-hidden="true"></span><span data-live="title">{{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Entreno libre{{end}}</span>
+  <span class="num" data-live="count">{{.WorkingSetCount}}{{if .Progress}}/{{.PlannedSets}}{{end}}</span>
+  <span class="num clock" data-clock>0:00</span>
+</a>
+<nav id="tabs" class="tabs" aria-label="Secciones">
+  <a href="{{.Base}}/" data-tab="home" data-mode-go="home"{{if eq .Mode "home" "train"}} aria-current="page"{{end}}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12"/></svg><span>Entrenar</span></a>
+  <a href="{{.Base}}/?modo=planificar" data-tab="plan" data-mode-go="plan"{{if eq .Mode "plan"}} aria-current="page"{{end}}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg><span>Planificar</span></a>
+  <a href="{{.Base}}/?modo=progreso" data-tab="progress" data-mode-go="progress"{{if eq .Mode "progress"}} aria-current="page"{{end}}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Progreso</span></a>
+  <a href="{{.Base}}/?modo=tu" data-tab="you" data-mode-go="you"{{if eq .Mode "you"}} aria-current="page"{{end}}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Tú</span></a>
+</nav>
 
 <script id="exercise-info" type="application/json">{{.InfoJSON}}</script>
 <script src="{{.Base}}/static/htmx.min.js" defer></script>

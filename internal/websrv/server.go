@@ -124,10 +124,13 @@ type pageData struct {
 	CoachOn bool
 	// ConnectorsOn links the connectors panel and shows connector approvals.
 	ConnectorsOn bool
-	// Mode is the screen the home opens on: "home" (the choice), "train"
-	// (Entrenar) or "plan" (Planificar), from ?modo=. The page holds all three
-	// and switches between them in place.
+	// Mode is the screen the page opens on, from ?modo=: "home" (Entrenar's
+	// tab), "train" (the active workout layer), "plan" (Planificar),
+	// "progress" (Progreso) or "you" (Tú). The page holds them all and
+	// switches between them in place.
 	Mode string
+	// Home is Entrenar's tab: the next routine, the others and the last session.
+	Home HomeData
 	// Cards are today's exercises on the training screen, each with its set
 	// table pre-filled.
 	Cards []TrainCard
@@ -217,6 +220,7 @@ func New(service training.ServiceFor, snapshot func(context.Context, string) err
 func NewWithOptions(service training.ServiceFor, snapshot func(context.Context, string) error, clock training.Clock, basePath string, opts Options) (*Server, error) {
 	funcs := map[string]any{
 		"num":         formatNumber,
+		"shortDate":   shortDate,
 		"rpeScale":    rpeScale,
 		"techniques":  func() []string { return training.Techniques },
 		"ratingScale": func() []int { return []int{0, 1, 2, 3} },
@@ -403,6 +407,12 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data.Mode = modeFromQuery(r.URL.Query().Get("modo"))
+	if !data.Active() {
+		if data.Home, err = s.homeData(r.Context(), data.Plans); err != nil {
+			s.fail(w, err)
+			return
+		}
+	}
 	data.Review.Pending = s.pendingProposals(r)
 	data.Review.Answers = answerLabels
 	data.PendingCount = len(data.Review.Pending)
@@ -1261,6 +1271,10 @@ func modeFromQuery(v string) string {
 		return "train"
 	case "planificar":
 		return "plan"
+	case "progreso":
+		return "progress"
+	case "tu":
+		return "you"
 	default:
 		return "home"
 	}

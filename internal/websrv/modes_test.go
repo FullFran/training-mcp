@@ -13,7 +13,7 @@ import (
 func mode(t *testing.T, body string) string {
 	t.Helper()
 	tag := section(t, body, "<body", ">")
-	for _, m := range []string{"home", "train", "plan"} {
+	for _, m := range []string{"home", "train", "plan", "progress", "you"} {
 		if strings.Contains(tag, `data-mode="`+m+`"`) {
 			return m
 		}
@@ -22,31 +22,45 @@ func mode(t *testing.T, body string) string {
 	return ""
 }
 
-// The first screen offers both modes, each a plain link that also works
-// without JavaScript.
-func TestHomeOffersEntrenarAndPlanificar(t *testing.T) {
+// Four tabs, always in the same order, each a plain link that also works
+// without JavaScript; the active workout is a layer over them.
+func TestTabBarLinksTheFourTabs(t *testing.T) {
 	h, _ := newServer(t)
 	body := get(t, h, base+"/").Body.String()
 	if got := mode(t, body); got != "home" {
-		t.Fatalf("first screen = %s, want home", got)
+		t.Fatalf("first screen = %s, want home (Entrenar)", got)
 	}
-	home := section(t, body, `id="home"`, "</section>")
+	tabs := section(t, body, `id="tabs"`, "</nav>")
+	last := 0
 	for _, want := range []string{
-		`href="` + base + `/?modo=entrenar"`, ">Entrenar<",
+		`href="` + base + `/"`, ">Entrenar<",
 		`href="` + base + `/?modo=planificar"`, ">Planificar<",
+		`href="` + base + `/?modo=progreso"`, ">Progreso<",
+		`href="` + base + `/?modo=tu"`, ">Tú<",
 	} {
-		if !strings.Contains(home, want) {
-			t.Fatalf("home lacks %s: %s", want, home)
+		i := strings.Index(tabs, want)
+		if i < last {
+			t.Fatalf("tab bar lacks %s in order: %s", want, tabs)
 		}
+		last = i
+	}
+	if !strings.Contains(section(t, tabs, `data-tab="home"`, "</a>"), `aria-current="page"`) {
+		t.Fatalf("Entrenar is not the current tab: %s", tabs)
+	}
+	plan := section(t, get(t, h, base+"/?modo=planificar").Body.String(), `id="tabs"`, "</nav>")
+	if !strings.Contains(section(t, plan, `data-tab="plan"`, "</a>"), `aria-current="page"`) {
+		t.Fatalf("Planificar is not the current tab: %s", plan)
 	}
 }
 
-// ?modo= picks the screen; anything else is the home.
+// ?modo= picks the screen; anything else is Entrenar's home.
 func TestModeQuerySelectsTheScreen(t *testing.T) {
 	h, _ := newServer(t)
 	for query, want := range map[string]string{
 		"?modo=entrenar":   "train",
 		"?modo=planificar": "plan",
+		"?modo=progreso":   "progress",
+		"?modo=tu":         "you",
 		"?modo=otra":       "home",
 		"":                 "home",
 	} {
@@ -56,20 +70,151 @@ func TestModeQuerySelectsTheScreen(t *testing.T) {
 	}
 }
 
-// The home says how today's workout stands, so the choice is informed.
-func TestHomeShowsTodaysWorkoutOnEntrenar(t *testing.T) {
-	h, _ := newServer(t)
-	if card := section(t, get(t, h, base+"/").Body.String(), `id="go-train"`, "</a>"); !strings.Contains(card, "Elige un plan o entrena libre") {
-		t.Fatalf("idle Entrenar card: %s", card)
+// With no routine and nothing logged, Entrenar says so and offers the ways to
+// begin, the coach first.
+func TestEntrenarHomeFirstUse(t *testing.T) {
+	world := newCoachWorld(t, newFakeCoach())
+	home := section(t, get(t, world.as(1), base+"/").Body.String(), `id="home"`, "</section>")
+	last := 0
+	for _, want := range []string{
+		"Aún no tienes rutina",
+		`id="ask-routine"`, "Pídele una rutina al coach",
+		`href="` + base + `/plans"`, "Crear rutina a mano",
+		`href="` + base + `/import"`, "Importar de Hevy o Strong",
+		`data-free-session`, "Entrenar sin rutina",
+	} {
+		i := strings.Index(home, want)
+		if i < last {
+			t.Fatalf("first-use home lacks %s in order: %s", want, home)
+		}
+		last = i
 	}
-	post(t, h, base+"/sets", setForm("banca", "80", "8", "8"), true)
-	if card := section(t, get(t, h, base+"/").Body.String(), `id="go-train"`, "</a>"); !strings.Contains(card, "1 serie hoy") {
-		t.Fatalf("active Entrenar card: %s", card)
+
+	h, _ := newServer(t)
+	home = section(t, get(t, h, base+"/").Body.String(), `id="home"`, "</section>")
+	if strings.Contains(home, `id="ask-routine"`) || !strings.Contains(home, "Crear rutina a mano") {
+		t.Fatalf("with the coach off the first-use home must not offer it: %s", home)
 	}
 }
 
-// With nothing done today, Entrenar offers every plan and an empty session;
-// once a plan is chosen it lists the exercises with planned against done.
+// The next routine is the one after the last one done, in the plans' order;
+// the others are listed with when they were last done, then the last session.
+func TestEntrenarHomeSuggestsTheNextRoutine(t *testing.T) {
+	h, service := newServer(t)
+	a, err := service.CreatePlan(t.Context(), training.Plan{Name: "Día A", Items: []training.PlanItem{{Exercise: "remo", TargetSets: 3}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := service.CreatePlan(t.Context(), training.Plan{Name: "Día B", Items: []training.PlanItem{
+		{Exercise: "banca", TargetSets: 4}, {Exercise: "militar", TargetSets: 3},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done, err := service.StartPlannedSession(t.Context(), "2026-07-28", a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := service.AddSet(t.Context(), training.AddSetInput{SessionID: done.ID, Exercise: "remo", WeightKG: 60, Reps: 10, RPE: 8}); err != nil {
+		t.Fatal(err)
+	}
+
+	home := section(t, get(t, h, base+"/").Body.String(), `id="home"`, "</section>")
+	next := section(t, home, `id="next-routine"`, "</form>")
+	for _, want := range []string{"Día B", "banca · militar", "2 ejercicios · 7 series", `action="` + base + `/plan"`, `name="plan_id" value="` + itoa(b.ID) + `"`, "Empezar"} {
+		if !strings.Contains(next, want) {
+			t.Fatalf("next routine lacks %s: %s", want, next)
+		}
+	}
+	others := section(t, home, `id="other-routines"`, "</ul>")
+	if !strings.Contains(others, "Día A") || !strings.Contains(others, `value="`+itoa(a.ID)+`"`) || strings.Contains(others, "Día B") {
+		t.Fatalf("other routines: %s", others)
+	}
+	if !strings.Contains(others, "hace ") {
+		t.Fatalf("other routines do not say when: %s", others)
+	}
+	last := section(t, home, `id="last-session"`, "</a>")
+	for _, want := range []string{"Día A", "1 serie", `href="` + base + `/s/` + itoa(done.ID) + `"`} {
+		if !strings.Contains(last, want) {
+			t.Fatalf("last session lacks %s: %s", want, last)
+		}
+	}
+	if !strings.Contains(home, `data-free-session`) {
+		t.Fatal("no empty workout")
+	}
+}
+
+// Once a workout is live, Entrenar continues it and a pill on every tab
+// leads back to it.
+func TestEntrenarHomeContinuesALiveWorkout(t *testing.T) {
+	h, service := newServer(t)
+	if _, err := service.CreatePlan(t.Context(), training.Plan{Name: "Día A", Items: []training.PlanItem{{Exercise: "remo", TargetSets: 3}}}); err != nil {
+		t.Fatal(err)
+	}
+	post(t, h, base+"/sets", setForm("banca", "80", "8", "8"), true)
+	body := get(t, h, base+"/").Body.String()
+	home := section(t, body, `id="home"`, "</section>")
+	if strings.Contains(home, `id="next-routine"`) {
+		t.Fatalf("a live workout still offers to start another: %s", home)
+	}
+	cont := section(t, home, `id="continue"`, "</a>")
+	for _, want := range []string{`href="` + base + `/?modo=entrenar"`, `data-mode-go="train"`, "Continuar", "1 serie"} {
+		if !strings.Contains(cont, want) {
+			t.Fatalf("continue card lacks %s: %s", want, cont)
+		}
+	}
+	pill := section(t, body, `id="workout-pill"`, "</a>")
+	if !strings.Contains(pill, `href="`+base+`/?modo=entrenar"`) || !strings.Contains(pill, `data-mode-go="train"`) {
+		t.Fatalf("pill: %s", pill)
+	}
+	h, _ = newServer(t)
+	if pill := section(t, get(t, h, base+"/").Body.String(), `id="workout-pill"`, ">"); !strings.Contains(pill, " hidden") {
+		t.Fatalf("pill shown with no workout: %s", pill)
+	}
+}
+
+// The active workout is a full-screen layer: a way back to the tabs, chips
+// per exercise with their progress, and a rest bar with -15, +15 and Saltar.
+func TestActiveWorkoutLayer(t *testing.T) {
+	h, service := newServer(t)
+	plan, err := service.CreatePlan(t.Context(), training.Plan{Name: "Día B", Items: []training.PlanItem{
+		{Exercise: "banca", TargetSets: 2}, {Exercise: "militar", TargetSets: 3},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	post(t, h, base+"/plan", url.Values{"plan_id": {itoa(plan.ID)}}, false)
+	post(t, h, base+"/sets", setForm("banca", "80", "8", "8"), true)
+	body := get(t, h, base+"/?modo=entrenar").Body.String()
+	bar := section(t, body, `class="bar train-bar"`, "</header>")
+	for _, want := range []string{`data-mode-go="home"`, `id="wk-clock"`, "Día B", `id="finish-open"`} {
+		if !strings.Contains(bar, want) {
+			t.Fatalf("workout bar lacks %s: %s", want, bar)
+		}
+	}
+	chips := section(t, body, `class="ex-chips"`, "</nav>")
+	for _, want := range []string{`data-chip="banca"`, "1/2", `data-chip="militar"`, "0/3"} {
+		if !strings.Contains(chips, want) {
+			t.Fatalf("chips lack %s: %s", want, chips)
+		}
+	}
+	panel := section(t, body, `id="panel"`, ">")
+	for _, want := range []string{`data-plan-name="Día B"`, `data-sets-done="1"`, `data-sets-planned="5"`} {
+		if !strings.Contains(panel, want) {
+			t.Fatalf("panel lacks %s: %s", want, panel)
+		}
+	}
+	rest := section(t, body, `id="rest"`, "</div>")
+	for _, want := range []string{`data-delta="-15"`, `data-delta="15"`, "Saltar"} {
+		if !strings.Contains(rest, want) {
+			t.Fatalf("rest bar lacks %s: %s", want, rest)
+		}
+	}
+}
+
+// With nothing done today, Entrenar's home offers every plan and an empty
+// session; once a plan is chosen the workout lists the exercises with planned
+// against done.
 func TestEntrenarStartsFromAPlanOrAnEmptySession(t *testing.T) {
 	h, service := newServer(t)
 	plan, err := service.CreatePlan(t.Context(), training.Plan{Name: "Empuje A", Items: []training.PlanItem{
@@ -79,11 +224,10 @@ func TestEntrenarStartsFromAPlanOrAnEmptySession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	train := section(t, get(t, h, base+"/?modo=entrenar").Body.String(), `id="train"`, "</main>")
-	start := section(t, train, `id="train-start"`, "</section>")
+	start := section(t, get(t, h, base+"/").Body.String(), `id="home"`, "</section>")
 	for _, want := range []string{
 		`action="` + base + `/plan"`, `name="plan_id" value="` + itoa(plan.ID) + `"`, "Empuje A", "5 series",
-		`id="free-session"`, "Sesión libre",
+		`data-free-session`, "Entreno vacío",
 	} {
 		if !strings.Contains(start, want) {
 			t.Fatalf("start lacks %s: %s", want, start)
@@ -92,10 +236,7 @@ func TestEntrenarStartsFromAPlanOrAnEmptySession(t *testing.T) {
 
 	post(t, h, base+"/plan", url.Values{"plan_id": {itoa(plan.ID)}}, false)
 	post(t, h, base+"/sets", setForm("banca", "80", "9", "9"), true)
-	train = section(t, get(t, h, base+"/?modo=entrenar").Body.String(), `id="train"`, "</main>")
-	if strings.Contains(train, `id="train-start"`) {
-		t.Fatal("a started workout still offers to start one")
-	}
+	train := section(t, get(t, h, base+"/?modo=entrenar").Body.String(), `id="train"`, "</main>")
 	planned := section(t, train, `class="planned"`, "</section>")
 	for _, want := range []string{`data-exercise="banca"`, "1/3", "8-10 reps @9", `data-exercise="fondos"`, "0/2"} {
 		if !strings.Contains(planned, want) {
@@ -197,7 +338,7 @@ func TestPlanificarIsTheChatWithPanels(t *testing.T) {
 	h := world.as(1)
 	body := get(t, h, base+"/?modo=planificar").Body.String()
 	bar := section(t, body, `class="bar chat-bar"`, "</header>")
-	for _, want := range []string{`id="menu-open"`, `href="` + base + `/"`, `data-mode-go="home"`} {
+	for _, want := range []string{`id="menu-open"`} {
 		if !strings.Contains(bar, want) {
 			t.Fatalf("planning bar lacks %s: %s", want, bar)
 		}
@@ -296,7 +437,7 @@ func TestEntrenarMarksWarmupsInTheSetTable(t *testing.T) {
 	if !strings.Contains(finish, "<strong>1 serie</strong>") || !strings.Contains(finish, "1 serie · mejor 100 kg × 5") {
 		t.Fatalf("the summary counts the warm-up: %s", finish)
 	}
-	if home := section(t, get(t, h, base+"/").Body.String(), `id="go-train"`, "</a>"); strings.Contains(home, "2 series") {
+	if home := section(t, get(t, h, base+"/").Body.String(), `id="continue"`, "</a>"); !strings.Contains(home, "1/2 series") {
 		t.Fatalf("the home counts the warm-up: %s", home)
 	}
 	live := section(t, card, `class="set-row pending live"`, "</form>")
