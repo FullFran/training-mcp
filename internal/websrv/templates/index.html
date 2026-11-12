@@ -271,6 +271,8 @@
       {{end}}
       {{end}}
     </div>
+    <!-- What was accepted in the last 12 h, to undo it (coach-undo.js). -->
+    <div id="undo-cards" class="undo-cards" aria-live="polite"></div>
     {{if .CoachOn}}<!-- Shown until the first message; the suggestions are built here, not by the model. -->
     <div id="chat-empty" class="chat-empty" hidden>
       <h2>¿Qué entrenamos hoy?</h2>
@@ -445,6 +447,7 @@
 <script src="{{.Base}}/static/coach-attach.js" defer></script>
 <script src="{{.Base}}/static/coach.js" defer></script>
 <script src="{{.Base}}/static/coach-apply.js" defer></script>
+<script src="{{.Base}}/static/coach-undo.js" defer></script>
 {{if .ConnectorsOn}}<script src="{{.Base}}/static/coach-approvals.js" defer></script>{{end}}
 {{end -}}
 

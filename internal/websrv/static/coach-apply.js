@@ -152,6 +152,9 @@
     });
     const tools = el.querySelector('.coach-tools');
     el.insertBefore(bar, tools || null);
+    // The chips made the answer taller: keep its end in sight.
+    const log = el.closest('.coach-log');
+    if (log && log.scrollHeight - log.scrollTop - log.clientHeight < 240) log.scrollTop = log.scrollHeight;
   });
 
   // --- quick prompts --------------------------------------------------------

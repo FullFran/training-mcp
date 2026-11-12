@@ -181,3 +181,26 @@ func TestEntrenarCoachSheet(t *testing.T) {
 		t.Fatal("the Aplicar script is not loaded")
 	}
 }
+
+// The chat offers to undo what was accepted in the last 12 h, from U6's
+// endpoint: the page holds the place and the script fills it.
+func TestChatOffersUndoForAcceptedProposals(t *testing.T) {
+	w := newPlanWorld(t)
+	body := get(t, w.handler, "/?modo=planificar").Body.String()
+	log := section(t, body, `id="coach-log"`, `id="chat-end"`)
+	if !strings.Contains(log, `<div id="undo-cards" class="undo-cards" aria-live="polite"></div>`) {
+		t.Fatalf("no undo place in the chat:\n%s", log)
+	}
+	if !strings.Contains(body, `/static/coach-undo.js`) {
+		t.Fatal("the undo script is not loaded")
+	}
+	script := get(t, w.handler, "/static/coach-undo.js").Body.String()
+	for _, want := range []string{"'/review/undoable'", "undo_url", "Aplicado: ", "Deshacer", "X-CSRF-Token"} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("undo script lacks %s", want)
+		}
+	}
+	if sw := get(t, w.handler, "/sw.js").Body.String(); !strings.Contains(sw, "BASE + '/static/coach-undo.js'") {
+		t.Fatal("the undo script is not cached offline")
+	}
+}

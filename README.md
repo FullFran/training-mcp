@@ -172,9 +172,13 @@ shared with the MCP tools and cannot drift apart.
   keep their round rest, and **Terminar** shows the day's summary. A bar at
   the bottom opens the coach (when `TRAINING_COACH=1`, see
   [docs/coach.md](docs/coach.md)) as a sheet over the workout that closes back
-  to the same point. **Planificar** is the chat with the coach and the panels
-  (history, plans, review, progress); the plan of the day, pending proposals
-  (accept or reject) and logged sets appear there as cards rendered by the
+  to the same point; when an answer gives a load («45 kg × 8») an **Aplicar**
+  chip writes it into the set row, which the person still logs with its check.
+  **Planificar** is the coach's chat on the whole screen, with its
+  conversations behind ☰ and the chips Coach, Rutinas, Revisión and Memoria;
+  the plan of the day, pending proposals (a routine the coach proposes is a
+  draft to **Revisar y guardar**), what was applied in the last 12 hours
+  (**Deshacer**) and logged sets appear there as cards rendered by the
   server. The screen is kept in the URL (`/?modo=entrenar`, `/?modo=planificar`,
   `/?modo=progreso`, `/?modo=tu`).
 - **Progreso** has three views. **Historial**: this week's training days as
