@@ -236,8 +236,11 @@ shared with the MCP tools and cannot drift apart.
 - The service worker caches the shell and the last viewed pages for offline
   *reading*. Writes always require the network — a set only counts once stored.
 
-`scripts/backup.sh` takes a consistent snapshot of the whole database with
-`VACUUM INTO`, so it is safe while the server is running. The result is a plain
+`scripts/backup.sh` takes a consistent snapshot of the whole database straight
+from the Docker volume that holds it, with `VACUUM INTO`, so it is safe while the
+server is running. It runs on the host that runs the server and requires
+`.credentials/volume.env` naming the volume (`DB_VOLUME=training-mcp-data`):
+without that file the run fails and notifies, and there is no other source. The result is a plain
 SQLite file: **restoring is copying it back into the data volume.** The script
 verifies it opens and passes an integrity check, and keeps the last 30 daily
 copies. A failed run keeps the existing copy
@@ -256,14 +259,10 @@ cannot be read. Expire old objects with a lifecycle rule on the bucket.
 
 The off-site run lives on the VPS, in `~/training-mcp-backup`: `scripts/backup.sh`,
 `scripts/r2-env.sh` and `scripts/restore-check.sh`, plus `.credentials/r2.env` and
-a `.credentials/volume.env` holding `DB_VOLUME=training-mcp-data`. With that file
-the snapshot comes straight from the Docker volume on the same host (the same
-`VACUUM INTO`, in a throwaway container with no network, as the file's owner), so it
-needs no web route; optional `DB_FILE` (default `training.db`) and `SNAPSHOT_IMAGE`
-(default a pinned `python:3.13-alpine`). Without it, the script reads `WEB_URL`
-from `.credentials/dokploy.env` (the file keeps its historical name; no Dokploy is
-involved) and downloads `/export.db` over the web, a route that only the retired
-secret mount served, so that fallback no longer works. It needs `curl`, `gpg`, `sqlite3`
+`.credentials/volume.env`. The snapshot runs in a throwaway container with no
+network, as the database file's owner, so it needs no web route; `volume.env` may
+also set `DB_FILE` (default `training.db`) and `SNAPSHOT_IMAGE` (default a pinned
+`python:3.13-alpine`). It needs `curl`, `gpg`, `sqlite3`
 and `docker`, and cron runs it with `/bin/bash` hourly with `--daily`. On the VPS a
 failure only reaches `~/.local/state/training-mcp/backup.log`, as there is no
 desktop to notify. The VPS is the only uploader. The bucket expires objects after 90 days by age
