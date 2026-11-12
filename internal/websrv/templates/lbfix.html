@@ -54,7 +54,7 @@
     <h2>{{.Count}} serie{{if ne .Count 1}}s{{end}} por corregir{{if .Corrected}} · {{.Corrected}} ya corregida{{if ne .Corrected 1}}s{{end}}{{end}}</h2>
     {{if .Sets}}<ul class="list">{{range .Sets}}
       <li class="list-row static{{if .Corrected}} done{{end}}"><label class="lbfix-row">
-        {{if .Corrected}}<input type="checkbox" disabled aria-label="Ya corregida">{{else}}<input type="checkbox" name="set_ids" value="{{.SetID}}" checked>{{end}}
+        {{if .Corrected}}<input type="checkbox" disabled aria-label="Ya corregida">{{else}}<input type="checkbox" name="set_ids" value="{{.SetID}}" checked><input type="hidden" name="old_{{.SetID}}" value="{{num .OldKG}}">{{end}}
         <span class="row-main"><strong>{{.Exercise}} · {{.Reps}} reps</strong><span class="muted">{{shortDate .Date}}{{if .Corrected}} · ya corregida{{end}}</span></span>
         <span class="num">{{num .OldKG}} kg{{if not .Corrected}} → {{num .NewKG}} kg{{end}}</span>
       </label></li>{{end}}

@@ -27,6 +27,10 @@ const (
 // ErrLbCorrected refuses a correction of a set already corrected from lb.
 var ErrLbCorrected = fmt.Errorf("%w: a set was already corrected from lb", ErrValidation)
 
+// ErrLbChanged refuses a correction of a set whose weight changed since the
+// person previewed it.
+var ErrLbChanged = fmt.Errorf("%w: a set changed since the preview", ErrValidation)
+
 // LbScope picks the sets to preview: one session, one exercise between two
 // dates (inclusive), or sets by id. Exactly one kind.
 type LbScope struct {
@@ -140,6 +144,15 @@ func (s *Service) LbCorrectionPreview(ctx context.Context, scope LbScope) (LbPre
 // already corrected refuses the whole correction with ErrLbCorrected. Only
 // weight_kg and the correction mark change.
 func (s *Service) CorrectLbSets(ctx context.Context, setIDs []int64) (LbCorrection, error) {
+	return s.CorrectLbSetsFrom(ctx, setIDs, nil)
+}
+
+// CorrectLbSetsFrom is CorrectLbSets for a correction the person previewed:
+// previewed holds the stored kg each set showed, and a set that no longer
+// weighs it (or has none) refuses the whole correction with ErrLbChanged, so
+// a set edited after the preview is never converted from its newer value.
+// A nil previewed checks nothing, as an agent's correction.
+func (s *Service) CorrectLbSetsFrom(ctx context.Context, setIDs []int64, previewed map[int64]float64) (LbCorrection, error) {
 	scope, err := LbScope{SetIDs: setIDs}.normalize()
 	if err != nil {
 		return LbCorrection{}, err
@@ -154,6 +167,11 @@ func (s *Service) CorrectLbSets(ctx context.Context, setIDs []int64) (LbCorrecti
 	for i := range sets {
 		if sets[i].Corrected {
 			return LbCorrection{}, ErrLbCorrected
+		}
+		if previewed != nil {
+			if old, ok := previewed[sets[i].SetID]; !ok || RoundWeight(old) != sets[i].OldKG {
+				return LbCorrection{}, ErrLbChanged
+			}
 		}
 		sets[i].NewKG = ToKG(sets[i].OldKG, UnitLB)
 	}

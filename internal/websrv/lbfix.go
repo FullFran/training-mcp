@@ -81,7 +81,9 @@ func (s *Server) applyLbFix(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
+	// Each ticked set comes with the stored kg its preview showed (old_<id>).
 	var ids []int64
+	previewed := map[int64]float64{}
 	for _, v := range r.PostForm["set_ids"] {
 		id, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
 		if err != nil || id <= 0 {
@@ -89,6 +91,9 @@ func (s *Server) applyLbFix(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		ids = append(ids, id)
+		if old, err := strconv.ParseFloat(strings.TrimSpace(r.PostFormValue("old_"+strconv.FormatInt(id, 10))), 64); err == nil {
+			previewed[id] = old
+		}
 	}
 	if len(ids) == 0 {
 		s.renderLbFix(w, r, http.StatusBadRequest, "Marca al menos una serie.", LbFixData{})
@@ -102,6 +107,13 @@ func (s *Server) applyLbFix(w http.ResponseWriter, r *http.Request) {
 	if err == nil && preview.Corrected > 0 {
 		err = training.ErrLbCorrected
 	}
+	if err == nil {
+		for _, set := range preview.Sets {
+			if old, ok := previewed[set.SetID]; !ok || training.RoundWeight(old) != set.OldKG {
+				err = training.ErrLbChanged
+			}
+		}
+	}
 	if err != nil {
 		s.lbFixRefused(w, r, err)
 		return
@@ -113,7 +125,7 @@ func (s *Server) applyLbFix(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := svc.ApplyAsPerson(ctx, training.ProposalInput{Tool: training.LbCorrectionTool, ActionType: training.LbCorrectionAction, Payload: payload},
 		func(ctx context.Context) (json.RawMessage, error) {
-			v, err := svc.CorrectLbSets(ctx, ids)
+			v, err := svc.CorrectLbSetsFrom(ctx, ids, previewed)
 			if err != nil {
 				return nil, err
 			}
@@ -131,6 +143,8 @@ func (s *Server) lbFixRefused(w http.ResponseWriter, r *http.Request, err error)
 	switch {
 	case errors.Is(err, training.ErrLbCorrected):
 		s.renderLbFix(w, r, http.StatusConflict, "Una de esas series ya estaba corregida: no se ha cambiado nada.", LbFixData{})
+	case errors.Is(err, training.ErrLbChanged):
+		s.renderLbFix(w, r, http.StatusConflict, "Una de esas series cambió desde la vista previa: vuelve a cargarla. No se ha cambiado nada.", LbFixData{})
 	case errors.Is(err, training.ErrNotFound):
 		http.NotFound(w, r)
 	case errors.Is(err, training.ErrValidation):

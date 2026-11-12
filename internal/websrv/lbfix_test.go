@@ -42,6 +42,7 @@ func TestCorrectingPastSetsFromLb(t *testing.T) {
 	for _, want := range []string{
 		"2 series", "135 kg → 61.25 kg", "100 kg → 45.35 kg",
 		`name="set_ids" value="` + squat135 + `" checked`, `name="set_ids" value="` + squat100 + `" checked`,
+		`name="old_` + squat135 + `" value="135"`,
 		`action="` + base + `/units/fix" method="post"`, "Corregir las series marcadas",
 	} {
 		if !strings.Contains(body, want) {
@@ -55,7 +56,7 @@ func TestCorrectingPastSetsFromLb(t *testing.T) {
 
 	// Only the 135 set is ticked: only it changes, plus the history entry.
 	before := dumpDatabase(t, world.db)
-	done := post(t, world.owner, base+"/units/fix", url.Values{"set_ids": {squat135}}, false)
+	done := post(t, world.owner, base+"/units/fix", url.Values{"set_ids": {squat135}, "old_" + squat135: {"135"}}, false)
 	if done.Code != http.StatusSeeOther || !strings.HasPrefix(done.Header().Get("Location"), base+"/units/fix?hecho=") {
 		t.Fatalf("apply: %d %q %s", done.Code, done.Header().Get("Location"), done.Body)
 	}
@@ -83,7 +84,7 @@ func TestCorrectingPastSetsFromLb(t *testing.T) {
 		t.Fatalf("preview after correcting:\n%s", again)
 	}
 	frozen := dumpDatabase(t, world.db)
-	twice := post(t, world.owner, base+"/units/fix", url.Values{"set_ids": {squat135}}, false)
+	twice := post(t, world.owner, base+"/units/fix", url.Values{"set_ids": {squat135}, "old_" + squat135: {"135"}}, false)
 	if twice.Code != http.StatusConflict || !strings.Contains(twice.Body.String(), "ya estaba corregida") {
 		t.Fatalf("second correction: %d\n%s", twice.Code, twice.Body)
 	}
@@ -130,7 +131,7 @@ func testLbFixApplyIsThePersonsOwn(t *testing.T) {
 	if after := dumpDatabase(t, world.db); after != before {
 		t.Fatalf("rows changed:\n%q", onlyIn(after, before))
 	}
-	if owner := post(t, world.owner, base+"/units/fix", url.Values{"set_ids": {world.set}}, false); owner.Code != http.StatusSeeOther {
+	if owner := post(t, world.owner, base+"/units/fix", url.Values{"set_ids": {world.set}, "old_" + world.set: {"80"}}, false); owner.Code != http.StatusSeeOther {
 		t.Fatalf("owner: %d\n%s", owner.Code, owner.Body)
 	}
 }
@@ -150,4 +151,29 @@ func onlyIn(a, b string) []string {
 		out = append(out, l)
 	}
 	return out
+}
+
+// A set edited between the preview and the confirmation is not converted from
+// its newer value: the confirmation carries each previewed weight, and any
+// set that no longer weighs it refuses the whole correction.
+func TestCorrectingFromLbRefusesASetChangedSincePreview(t *testing.T) {
+	world := newWebWorld(t)
+	preview := get(t, world.owner, base+"/units/fix?session_id="+world.session).Body.String()
+	if !strings.Contains(preview, `name="old_`+world.set+`" value="80"`) {
+		t.Fatalf("preview does not carry the weight it shows:\n%s", preview)
+	}
+	// The set is edited after the preview was shown.
+	post(t, world.owner, base+"/sets/"+world.set+"/update", url.Values{"weight_kg": {"85"}}, true)
+	before := dumpDatabase(t, world.db)
+	w := post(t, world.owner, base+"/units/fix", url.Values{"set_ids": {world.set}, "old_" + world.set: {"80"}}, false)
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "cambió desde la vista previa") {
+		t.Fatalf("changed set: %d\n%s", w.Code, w.Body)
+	}
+	if after := dumpDatabase(t, world.db); after != before {
+		t.Fatalf("rows changed:\n%q", onlyIn(after, before))
+	}
+	// A confirmation without the previewed weight is refused the same way.
+	if w := post(t, world.owner, base+"/units/fix", url.Values{"set_ids": {world.set}}, false); w.Code != http.StatusConflict || dumpDatabase(t, world.db) != before {
+		t.Fatalf("no previewed weight: %d\n%s", w.Code, w.Body)
+	}
 }
