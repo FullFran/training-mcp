@@ -164,6 +164,7 @@ and OQ-0005-7).
 | `feedback.record` | `record_feedback` |
 | `landmarks.set` | `set_volume_landmarks` |
 | `rest.set` | `set_rest_target` |
+| `set.correct_lb` | `correct_lb_sets` |
 | `memory.save` / `memory.forget` | `memory_save` / `memory_forget` |
 | `memory.judge` / `memory.confirm` / `memory.consolidate` | `memory_judge` / `memory_confirm` / `memory_consolidate` |
 
@@ -228,6 +229,17 @@ Starting a session from a plan **copies** it. From then on the session owns its 
 ### Live workout and rest
 
 `live_workout` is what a coach watching the session would see. Rest is derived from the timestamp of the most recently logged set, never stored: `rest.state` is `none` (no set yet today), `resting` (with `remaining_seconds`), `ready` (target reached, with `over_by_seconds`), `superset` (the next exercise of the same round follows without rest; after the last exercise of a round the state is `resting` before the next round) or `idle` (more than 20 minutes since the last set, so not a rest). `next` is the exercise to do next: the next unfinished one of a superset round, else the exercise just worked while it has sets to go, else the first unfinished one in plan order. The target is one value per person, shared with the phone's ±30 s buttons. The session in `get_session` and `live_workout` carries `started_at` (RFC 3339, UTC), when it was started here; the app's workout clock and finish summary time the workout from it, so every device shows the same duration. Imported workouts omit it, as their start is in the source app's own clock.
+
+## Weight units
+
+Every weight in every tool is kilograms, as before: `weight_kg` inputs and outputs keep their meaning and are still required where they were. The person chooses how they read and type weights in the app (kg or lb, migration 026 `users.weight_unit`); `live_workout` and `memory_context` report it as `weight_unit` (`kg` until chosen), and a coach chat starts with a host line saying it, so the agent talks in the person's unit and converts (1 lb = 0.45359237 kg). An input in lb was not added because it would change which fields are required.
+
+| Tool | Description |
+|---|---|
+| `preview_lb_correction` | Preview correcting past sets whose weight was typed in lb but stored as kg (135 lb logged as 135 kg). Give exactly one scope: session_id, exercise with from and to, or set_ids. Lists every set with old_kg (now) and new_kg (the number read as lb), marks sets already corrected, and counts what would change. Changes nothing; correct_lb_sets applies it. |
+| `correct_lb_sets` | Correct past sets whose weight was typed in lb but stored as kg: each set's stored number is read as lb and stored in kg, the same as typing it in lb. All or nothing: a set that is not the person's, or one already corrected, refuses the whole correction, so it never applies twice. Only the weight changes; the person can undo it in the app. Preview first with preview_lb_correction and confirm with the person. |
+
+A corrected set is marked (`sets.lb_corrected_at`), which is what refuses a second correction. The person does the same in the app (Tú › Datos › Corregir pesos en lb, or from a session's page): it is recorded as a proposal they decided at once, so it shows in the history and can be undone like any accepted proposal; `correct_lb_sets` payloads name their sets as `set_ids`, which undo uses to capture those sessions.
 
 ## Progression and analysis
 

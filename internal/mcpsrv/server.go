@@ -693,6 +693,7 @@ func New(service training.ServiceFor) *Server {
 		return nil, VolumeOut{Volume: v}, toolError(err)
 	})
 	addMemoryTools(s, w, service)
+	addLbTools(s, w, service)
 
 	// Stateless: the server keeps no per-client session state, so restarting the
 	// container no longer invalidates a live conversation. These tools are plain
@@ -714,7 +715,8 @@ func (s *Server) ToolNames() []string {
 		"remove_session_exercise", "save_session_as_plan",
 		"record_feedback", "volume_recommendation", "simulate_plan",
 		"set_volume_landmarks", "list_volume_landmarks",
-		"set_exercise_note", "list_exercise_notes", "suggest_load", "performance_dropoff"}
+		"set_exercise_note", "list_exercise_notes", "suggest_load", "performance_dropoff",
+		"preview_lb_correction", "correct_lb_sets"}
 }
 
 // noteAction tells setting a note from removing one: an empty note deletes it.

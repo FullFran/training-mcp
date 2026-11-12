@@ -89,6 +89,8 @@
     delete_session: ['Borrando una sesión', 'Sesión borrada'],
     save_session_as_plan: ['Guardando la sesión como rutina', 'Sesión guardada como rutina'],
     set_rest_target: ['Cambiando tu descanso', 'Descanso cambiado'],
+    preview_lb_correction: ['Mirando pesos en lb', 'Mirados los pesos en lb'],
+    correct_lb_sets: ['Corrigiendo pesos de lb a kg', 'Pesos corregidos de lb a kg'],
     set_exercise_note: ['Guardando una nota', 'Nota guardada'],
     set_exercise_group: ['Cambiando un grupo de ejercicios', 'Grupo de ejercicios cambiado'],
     set_volume_landmarks: ['Cambiando tus marcas de volumen', 'Marcas de volumen cambiadas'],

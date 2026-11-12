@@ -204,3 +204,27 @@ func TestAReplyWithoutLearningsProposesNothing(t *testing.T) {
 		t.Fatalf("proposals = %+v", got)
 	}
 }
+
+// A chat that starts tells the engine the person's weight unit, with tools
+// staying in kg; another person gets their own.
+func TestStartingAChatGivesTheEngineThePersonsWeightUnit(t *testing.T) {
+	store := newMemoryConversations()
+	mem := twoPeoplesMemory()
+	one := mem.facts[1]
+	one.WeightUnit = "lb"
+	mem.facts[1] = one
+	h := newHarness(t, "ok", withMemory(store, mem))
+	h.connect(1)
+	h.connect(2)
+
+	_, answer := turn(t, h, 1, 0, "hola")
+	if !strings.Contains(answer, ContextMarker+" weight_unit=lb: ") || !strings.Contains(answer, "tools take and return kg") {
+		t.Fatalf("lb person's chat lacks the unit:\n%s", answer)
+	}
+	if _, theirs := turn(t, h, 2, 0, "hola"); !strings.Contains(theirs, ContextMarker+" weight_unit=kg: ") {
+		t.Fatalf("kg person's chat:\n%s", theirs)
+	}
+	if !strings.Contains(SystemPrompt, "weight_unit") {
+		t.Fatal("the system prompt does not explain weight_unit")
+	}
+}

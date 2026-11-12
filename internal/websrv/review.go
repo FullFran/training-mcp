@@ -19,6 +19,7 @@ var actionLabels = map[string]string{
 	"session.delete":          "Borrar sesión",
 	"set.log":                 "Registrar series",
 	"set.update":              "Corregir serie",
+	"set.correct_lb":          "Corregir pesos de lb a kg",
 	"set.delete":              "Borrar serie",
 	"plan.create":             "Crear rutina",
 	"plan.update":             "Editar rutina",
@@ -162,12 +163,12 @@ func proposalFields(payload json.RawMessage) []ProposalField {
 	return out
 }
 
-func (s *Server) proposalView(p training.Proposal) ProposalView {
+func (s *Server) proposalView(p training.Proposal, unit string) ProposalView {
 	when := p.CreatedAt
 	if !p.DecidedAt.IsZero() {
 		when = p.DecidedAt
 	}
-	summary := proposalSummary(p.Tool, p.Payload)
+	summary := proposalSummary(p.Tool, p.Payload, unit)
 	if p.Tool == training.UndoTool {
 		var undone struct {
 			ProposalID int64 `json:"proposal_id"`
@@ -193,6 +194,7 @@ func (s *Server) proposalView(p training.Proposal) ProposalView {
 func (s *Server) reviewData(r *http.Request) (ReviewData, error) {
 	ctx := r.Context()
 	svc := s.service(ctx)
+	unit := s.unitOf(ctx)
 	pending, err := svc.ListProposals(ctx, training.ProposalFilter{Pending: true, Limit: 100})
 	if err != nil {
 		return ReviewData{}, err
@@ -207,12 +209,12 @@ func (s *Server) reviewData(r *http.Request) (ReviewData, error) {
 	}
 	data := ReviewData{AcceptAll: perms.AcceptAll, Answers: answerLabels}
 	for _, p := range pending {
-		v := s.proposalView(p)
+		v := s.proposalView(p, unit)
 		v.Simulation = s.planSimulation(ctx, p)
 		data.Pending = append(data.Pending, v)
 	}
 	for _, p := range answered {
-		data.Answered = append(data.Answered, s.proposalView(p))
+		data.Answered = append(data.Answered, s.proposalView(p, unit))
 	}
 	for _, rule := range perms.Rules {
 		verb := "aceptar"
@@ -407,6 +409,7 @@ func (s *Server) undoableProposals(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
+	unit := s.unitOf(r.Context())
 	since := s.clock().Add(-training.SessionWindow)
 	out := struct {
 		Proposals []UndoableView `json:"proposals"`
@@ -418,7 +421,7 @@ func (s *Server) undoableProposals(w http.ResponseWriter, r *http.Request) {
 		if !p.Undoable || p.DecidedAt.Before(since) {
 			continue
 		}
-		v := s.proposalView(p)
+		v := s.proposalView(p, unit)
 		out.Proposals = append(out.Proposals, UndoableView{ID: p.ID, Label: v.Label, Summary: v.Summary, When: v.When,
 			UndoURL: s.base + "/review/" + strconv.FormatInt(p.ID, 10) + "/undo"})
 	}
@@ -464,13 +467,14 @@ func (s *Server) forgetRule(w http.ResponseWriter, r *http.Request) {
 // the chat and counted on the link to the review page. A failed read shows
 // none rather than failing the home: the review page still lists them.
 func (s *Server) pendingProposals(r *http.Request) []ProposalView {
+	unit := s.unitOf(r.Context())
 	pending, err := s.service(r.Context()).ListProposals(r.Context(), training.ProposalFilter{Pending: true, Limit: 100})
 	if err != nil {
 		return nil
 	}
 	views := make([]ProposalView, 0, len(pending))
 	for _, p := range pending {
-		v := s.proposalView(p)
+		v := s.proposalView(p, unit)
 		v.Simulation = s.planSimulation(r.Context(), p)
 		views = append(views, v)
 	}

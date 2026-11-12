@@ -90,7 +90,20 @@ func (m *Manager) memoryLines(userID int64) string {
 		m.mu.Unlock()
 		return ""
 	}
-	return memoryContext(c)
+	return unitContext(c.WeightUnit) + "\n" + memoryContext(c)
+}
+
+// unitContext tells a fresh engine the person's weight unit. Only the two
+// known words are written, so the line stays the host's.
+func unitContext(unit string) string {
+	if unit != "lb" {
+		unit = "kg"
+	}
+	line := ContextMarker + " weight_unit=" + unit + ": the person reads and types weights in " + unit + "; tools take and return kg"
+	if unit == "lb" {
+		line += ", so convert (1 lb = 0.45359237 kg) and give loads in lb, in 5 lb steps"
+	}
+	return line
 }
 
 // captureLearnings queues the proposals of a finished reply's learnings block,

@@ -21,13 +21,13 @@
     <ol class="week-strip" aria-label="Esta semana">{{range .Week}}
       <li class="day{{if .Done}} on{{end}}"{{if .Today}} aria-current="date"{{end}}><span>{{.Letter}}</span><i aria-hidden="true"></i></li>{{end}}
     </ol>
-    <p class="week-sum">Esta semana: <span class="num">{{.WeekSessions}} sesi{{if eq .WeekSessions 1}}ón{{else}}ones{{end}}</span>{{if .WeekKG}} · <span class="num">{{kilos .WeekKG}} kg</span>{{end}}</p>
+    <p class="week-sum">Esta semana: <span class="num">{{.WeekSessions}} sesi{{if eq .WeekSessions 1}}ón{{else}}ones{{end}}</span>{{if .WeekKG}} · <span class="num">{{wkilos .WeekKG}} {{unit}}</span>{{end}}</p>
   </div>
   <a class="list-row" href="{{$.Base}}/sessions/past" data-panel data-title="Añadir sesión pasada"><span class="row-main"><strong>Añadir sesión pasada</strong><span class="muted">Un entreno que no registraste ese día</span></span><span class="chev" aria-hidden="true">›</span></a>
   {{range .Months}}
   <h2 class="section-label">{{.Name}}</h2>
   <nav class="list" aria-label="{{.Name}}">{{range .Sessions}}
-    <a class="list-row" href="{{$.Base}}/s/{{.ID}}" data-panel data-title="{{.Day}}"><span class="row-main"><strong>{{if .PlanName}}{{.PlanName}}{{else}}Entreno libre{{end}}</strong><span class="muted num">{{.Day}} · {{.SetCount}} serie{{if ne .SetCount 1}}s{{end}}{{if .KG}} · {{kilos .KG}} kg{{end}}</span></span><span class="row-end num muted">SI {{num .TotalSI}}</span></a>{{end}}
+    <a class="list-row" href="{{$.Base}}/s/{{.ID}}" data-panel data-title="{{.Day}}"><span class="row-main"><strong>{{if .PlanName}}{{.PlanName}}{{else}}Entreno libre{{end}}</strong><span class="muted num">{{.Day}} · {{.SetCount}} serie{{if ne .SetCount 1}}s{{end}}{{if .KG}} · {{wkilos .KG}} {{unit}}{{end}}</span></span><span class="row-end num muted">SI {{num .TotalSI}}</span></a>{{end}}
   </nav>
   {{end}}
 </div>
@@ -36,9 +36,9 @@
   {{if .Exercises}}
   <nav class="list" aria-label="Ejercicios">{{range .Exercises}}
     <a class="list-row ex-row" href="{{$.Base}}/progress/exercise?name={{.Name}}" data-panel data-title="{{.Name}}">
-      <span class="row-main"><strong>{{.Name}}</strong><span class="muted num">{{if .Group}}{{.Group}} · {{end}}<span class="best">mejor {{num .BestWeight}} × {{.BestReps}}</span></span></span>
+      <span class="row-main"><strong>{{.Name}}</strong><span class="muted num">{{if .Group}}{{.Group}} · {{end}}<span class="best">mejor {{wt .BestWeight}} × {{.BestReps}}</span></span></span>
       <svg class="spark" viewBox="0 0 300 80" preserveAspectRatio="none" aria-hidden="true"><polyline points="{{.Trend}}"/></svg>
-      <span class="ex-1rm"><strong class="num">{{num .Best1RM}}</strong><span class="muted">e1RM{{if .Delta}} <span class="delta{{if gt .Delta 0.0}} up{{end}}">{{if gt .Delta 0.0}}+{{end}}{{num .Delta}}</span>{{end}}</span></span>
+      <span class="ex-1rm"><strong class="num">{{wt .Best1RM}}</strong><span class="muted">e1RM{{if .Delta}} <span class="delta{{if gt .Delta 0.0}} up{{end}}">{{if gt .Delta 0.0}}+{{end}}{{wt .Delta}}</span>{{end}}</span></span>
     </a>{{end}}
   </nav>
   {{else}}
@@ -127,15 +127,15 @@
   <section class="chart-card" aria-label="e1RM por sesión">
     <div class="chart-head">
       <span class="muted">Mejor e1RM</span>
-      {{if .Delta}}<span class="delta{{if gt .Delta 0.0}} up{{end}} num">{{if gt .Delta 0.0}}+{{end}}{{num .Delta}} kg</span>{{end}}
+      {{if .Delta}}<span class="delta{{if gt .Delta 0.0}} up{{end}} num">{{if gt .Delta 0.0}}+{{end}}{{wt .Delta}} {{unit}}</span>{{end}}
     </div>
-    {{with .Best}}<strong class="big-num num">{{num .Est1RM}} <small>kg</small></strong>{{end}}
+    {{with .Best}}<strong class="big-num num">{{wt .Est1RM}} <small>{{unit}}</small></strong>{{end}}
     <svg class="spark big" viewBox="0 0 300 80" preserveAspectRatio="none" aria-hidden="true"><polyline points="{{.Trend}}"/></svg>
   </section>
 
   <h2 class="section-label">Mejores series</h2>
   <ol class="list best-sets">{{range .Top}}
-    <li class="list-row"><span class="row-main"><strong class="num">{{num .WeightKG}} × {{.Reps}}</strong><span class="muted">{{shortDate .Date}}{{if and .RPE (not .RPEImputed)}} · RPE {{num .RPE}}{{end}}</span></span><span class="num muted">e1RM {{num .Est1RM}}</span></li>{{end}}
+    <li class="list-row"><span class="row-main"><strong class="num">{{wt .WeightKG}} × {{.Reps}}</strong><span class="muted">{{shortDate .Date}}{{if and .RPE (not .RPEImputed)}} · RPE {{num .RPE}}{{end}}</span></span><span class="num muted">e1RM {{wt .Est1RM}}</span></li>{{end}}
   </ol>
 
   {{with .DropOff}}
@@ -145,7 +145,7 @@
 
   <h2 class="section-label">Historial</h2>
   <ol class="list">{{range .Days}}
-    <li class="list-row"><span class="row-main"><strong>{{.Day}}</strong><span class="muted num">{{range $i, $s := .Sets}}{{if $i}} · {{end}}{{num $s.WeightKG}} × {{$s.Reps}}{{end}}</span></span><span class="num muted">{{num .Best}}</span></li>{{end}}
+    <li class="list-row"><span class="row-main"><strong>{{.Day}}</strong><span class="muted num">{{range $i, $s := .Sets}}{{if $i}} · {{end}}{{wt $s.WeightKG}} × {{$s.Reps}}{{end}}</span></span><span class="num muted">{{wt .Best}}</span></li>{{end}}
   </ol>
 </main>
 {{end}}

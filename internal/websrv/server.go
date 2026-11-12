@@ -44,6 +44,7 @@ type Server struct {
 	base     string
 	opts     Options
 	tpl      *template.Template
+	tpls     map[string]*template.Template // by weight unit
 	// txt renders the manifest and the service worker. They are JSON and
 	// JavaScript documents, so html/template's contextual escaping would be
 	// wrong for them.
@@ -77,6 +78,15 @@ type ExerciseInfo struct {
 	Note string `json:"note,omitempty"`
 	// Suggest is the advised next working weight, with its reasoning.
 	Suggest *training.LoadSuggestion `json:"suggest,omitempty"`
+	// Unit is the person's default weight unit; Weight, Best, Suggested and
+	// Delta are last time's weight, the record e1RM and the advice in it (the
+	// kg fields above stay as they were). A step is a plate in that unit:
+	// 2.5 kg or 5 lb (1.25 kg or 2.5 lb on light loads).
+	Unit      string  `json:"unit"`
+	Weight    float64 `json:"weight,omitempty"`
+	Best      float64 `json:"best,omitempty"`
+	Suggested float64 `json:"suggested,omitempty"`
+	Delta     float64 `json:"delta,omitempty"`
 }
 
 type pageData struct {
@@ -114,6 +124,11 @@ type pageData struct {
 	Error    string
 	// CSRF is the session's token, empty where the mount has no sessions.
 	CSRF string
+	// LbFix is the correction of past sets typed in lb but stored as kg.
+	LbFix LbFixData
+	// Unit is the person's default weight unit, "kg" or "lb"; every weight
+	// shown on the page is in it. Empty is filled in by render.
+	Unit string
 	// CanExport shows the backup link where /export.db is served.
 	CanExport bool
 	// RestTarget is the person's rest between sets in seconds, shared with the
@@ -300,19 +315,6 @@ func NewWithOptions(service training.ServiceFor, snapshot func(context.Context, 
 		// the one-tap log offers next: "last time" skips today on purpose, so
 		// without it the form would offer an older session's weight after heavy
 		// sets. Empty when the exercise has no set today.
-		"todayWeight": func(session training.Session, exercise string) string {
-			var last *training.Set
-			for i := range session.Sets {
-				set := &session.Sets[i]
-				if set.Exercise == exercise && set.Category != training.SetWarmup && (last == nil || set.ID > last.ID) {
-					last = set
-				}
-			}
-			if last == nil {
-				return ""
-			}
-			return formatNumber(last.WeightKG)
-		},
 		// targetReps prefills the middle of the prescribed range, the sensible
 		// first attempt when the plan says "10 to 12".
 		"targetReps": func(p training.PlanProgress) int {
@@ -350,10 +352,17 @@ func NewWithOptions(service training.ServiceFor, snapshot func(context.Context, 
 			return strconv.FormatFloat(math.Round(v/max*1000)/10, 'f', -1, 64)
 		},
 	}
-	tpl, err := template.New("").Funcs(funcs).ParseFS(templateFS, "templates/*.html")
-	if err != nil {
-		return nil, err
+	// One template set per weight unit: wt and unit show a stored kg weight in
+	// the person's default unit, so a page is rendered with the set of theirs.
+	tpls := map[string]*template.Template{}
+	for _, unit := range []string{training.UnitKG, training.UnitLB} {
+		t, err := template.New("").Funcs(funcs).Funcs(unitFuncs(unit)).ParseFS(templateFS, "templates/*.html")
+		if err != nil {
+			return nil, err
+		}
+		tpls[unit] = t
 	}
+	tpl := tpls[training.UnitKG]
 	txt, err := texttemplate.New("").Funcs(funcs).ParseFS(templateFS, "templates/*.tmpl")
 	if err != nil {
 		return nil, err
@@ -364,7 +373,7 @@ func NewWithOptions(service training.ServiceFor, snapshot func(context.Context, 
 	}
 	s := &Server{
 		service: service, snapshot: snapshot, clock: clock, base: strings.TrimSuffix(basePath, "/"), opts: opts,
-		tpl: tpl, txt: txt, assets: files, mux: http.NewServeMux(),
+		tpl: tpl, tpls: tpls, txt: txt, assets: files, mux: http.NewServeMux(),
 	}
 	s.routes()
 	return s, nil
@@ -410,6 +419,9 @@ func (s *Server) routes() {
 	s.handle("POST "+b+"/landmarks", s.setLandmarks)
 	s.handle("POST "+b+"/note", s.saveNote)
 	s.handle("POST "+b+"/rest", s.setRest)
+	s.handle("POST "+b+"/units", s.setUnits)
+	s.handle("GET "+b+"/units/fix", s.lbFixPage)
+	s.handle("POST "+b+"/units/fix", s.applyLbFix)
 	s.handle("POST "+b+"/finish", s.finishWorkout)
 	s.handle("GET "+b+"/exercise-info", s.exerciseInfo)
 	s.handle("GET "+b+"/s/{id}", s.session)
@@ -503,7 +515,7 @@ func (s *Server) addSet(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	weight, errWeight := strconv.ParseFloat(strings.TrimSpace(r.PostFormValue("weight_kg")), 64)
+	weight, errWeight := formWeightKG(r)
 	reps, errReps := strconv.Atoi(strings.TrimSpace(r.PostFormValue("reps")))
 	rpe, errRPE := strconv.ParseFloat(strings.TrimSpace(r.PostFormValue("rpe")), 64)
 	exercise := r.PostFormValue("exercise")
@@ -536,6 +548,95 @@ func (s *Server) addSet(w http.ResponseWriter, r *http.Request) {
 	s.renderPanel(w, r, message)
 }
 
+// formWeightKG reads a form's weight in kg. weight_kg holds the number as
+// typed and weight_unit its unit, kg or lb; a form without weight_unit (every
+// client before units) means kg. An unknown unit is an error.
+func formWeightKG(r *http.Request) (float64, error) {
+	unit := training.NormalizeUnit(r.PostFormValue("weight_unit"))
+	if unit == "" {
+		return 0, training.ErrValidation
+	}
+	v, err := strconv.ParseFloat(strings.TrimSpace(r.PostFormValue("weight_kg")), 64)
+	if err != nil {
+		return 0, err
+	}
+	return training.ToKG(v, unit), nil
+}
+
+// weightAsShown says a form sent its weight back as the page showed it
+// (weight_was is "<number> <unit>"), so the stored kg is left exactly as is:
+// a value shown rounded to 0.1 lb would otherwise move by a few grams.
+func weightAsShown(r *http.Request) bool {
+	was := strings.TrimSpace(r.PostFormValue("weight_was"))
+	unit := training.NormalizeUnit(r.PostFormValue("weight_unit"))
+	return was != "" && unit != "" && was == strings.TrimSpace(r.PostFormValue("weight_kg"))+" "+unit
+}
+
+// unitOf is the person's default weight unit, kg when it cannot be read.
+func (s *Server) unitOf(ctx context.Context) string {
+	unit, err := s.service(ctx).WeightUnit(ctx)
+	if err != nil {
+		return training.UnitKG
+	}
+	return unit
+}
+
+// setUnits stores the person's default weight unit from Tú › Entrenamiento
+// and comes back there; every page shows weights in it from then on.
+func (s *Server) setUnits(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.fail(w, err)
+		return
+	}
+	switch err := s.service(r.Context()).SetWeightUnit(r.Context(), r.PostFormValue("unit")); {
+	case errors.Is(err, training.ErrValidation):
+		http.Error(w, "unit must be kg or lb", http.StatusBadRequest)
+		return
+	case err != nil:
+		s.fail(w, err)
+		return
+	}
+	http.Redirect(w, r, s.base+"/?modo=tu", http.StatusSeeOther)
+}
+
+// unitFuncs are the template functions that depend on the weight unit.
+func unitFuncs(unit string) map[string]any {
+	return map[string]any{
+		// wt is a stored kg weight in the unit, as a number.
+		"wt": func(kg float64) string { return formatNumber(training.FromKG(kg, unit)) },
+		// wkilos is a large kg total (volume) in the unit, with thousands dots.
+		"wkilos": func(kg float64) string { return kilos(training.FromKG(kg, unit)) },
+		"unit":   func() string { return unit },
+		// todayWeight is today's latest working weight of an exercise, in the unit.
+		"todayWeight": func(session training.Session, exercise string) string {
+			var last *training.Set
+			for i := range session.Sets {
+				set := &session.Sets[i]
+				if set.Exercise == exercise && set.Category != training.SetWarmup && (last == nil || set.ID > last.ID) {
+					last = set
+				}
+			}
+			if last == nil {
+				return ""
+			}
+			return formatNumber(training.FromKG(last.WeightKG, unit))
+		},
+		"wmin": func() string {
+			if unit == training.UnitLB {
+				return "0.1"
+			}
+			return "0.5"
+		},
+		// wstep is the input step for a weight typed in the unit.
+		"wstep": func() string {
+			if unit == training.UnitLB {
+				return "0.1"
+			}
+			return "0.25"
+		},
+	}
+}
+
 // lastFormValue is the last value sent for a field: a checkbox after a hidden
 // input of the same name overrides it only when ticked.
 func lastFormValue(r *http.Request, name string) string {
@@ -560,8 +661,8 @@ func (s *Server) updateSet(w http.ResponseWriter, r *http.Request) {
 	}
 	patch := training.SetPatch{}
 	message := ""
-	if v := strings.TrimSpace(r.PostFormValue("weight_kg")); v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil {
+	if strings.TrimSpace(r.PostFormValue("weight_kg")) != "" {
+		if f, err := formWeightKG(r); err == nil {
 			patch.WeightKG = &f
 		} else {
 			message = "Peso inválido."
@@ -1030,7 +1131,7 @@ func (s *Server) serviceWorker(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) todayData(ctx context.Context, message string) (pageData, error) {
 	today := s.todayDate()
-	data := pageData{Base: s.base, Today: today, Error: message}
+	data := pageData{Base: s.base, Today: today, Error: message, Unit: s.unitOf(ctx)}
 
 	// The same reading the agent gets from live_workout.
 	live, err := s.service(ctx).LiveWorkout(ctx)
@@ -1103,7 +1204,7 @@ func (s *Server) exerciseInfo(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("{}"))
 		return
 	}
-	entry, err := s.infoFor(r.Context(), name, s.todayDate())
+	entry, err := s.infoFor(r.Context(), name, s.todayDate(), s.unitOf(r.Context()))
 	if err != nil {
 		s.fail(w, err)
 		return
@@ -1406,7 +1507,7 @@ func (s *Server) decorate(ctx context.Context, data *pageData) error {
 
 	info := map[string]ExerciseInfo{}
 	for _, name := range names {
-		entry, err := s.infoFor(ctx, name, data.Today)
+		entry, err := s.infoFor(ctx, name, data.Today, data.Unit)
 		if err != nil {
 			return err
 		}
@@ -1453,19 +1554,25 @@ func (s *Server) ensureToday(ctx context.Context) (training.Session, error) {
 
 // infoFor gathers what the entry form shows about one exercise: last time's
 // set, the standing record, its muscle group and its setup note.
-func (s *Server) infoFor(ctx context.Context, name, today string) (ExerciseInfo, error) {
+func (s *Server) infoFor(ctx context.Context, name, today, unit string) (ExerciseInfo, error) {
 	h, err := s.service(ctx).ExerciseHistory(ctx, name, 200)
 	if err != nil {
 		return ExerciseInfo{}, err
 	}
-	entry := ExerciseInfo{Group: h.MuscleGroup}
+	if unit == "" {
+		unit = training.UnitKG
+	}
+	entry := ExerciseInfo{Group: h.MuscleGroup, Unit: unit}
 	if h.Best != nil {
 		entry.BestE1RM = h.Best.Est1RM
+		entry.Best = training.FromKG(h.Best.Est1RM, unit)
 	}
+
 	// "Last time" must skip today, or the form would echo the set just logged.
 	for i := range h.Sets {
 		if h.Sets[i].Date != today && h.Sets[i].Category != training.SetWarmup {
 			entry.Last = &h.Sets[i]
+			entry.Weight = training.FromKG(h.Sets[i].WeightKG, unit)
 			break
 		}
 	}
@@ -1487,6 +1594,12 @@ func (s *Server) infoFor(ctx context.Context, name, today string) (ExerciseInfo,
 	// by the previous set being shown.
 	if suggestion.DeltaKG != 0 {
 		entry.Suggest = &suggestion
+		entry.Suggested, entry.Delta = suggestion.SuggestedKG, suggestion.DeltaKG
+		if unit == training.UnitLB {
+			// A kg plate step is half the lb one: 2.5 kg is 5 lb.
+			entry.Delta = suggestion.DeltaKG * 2
+			entry.Suggested = math.Round((training.FromKG(suggestion.LastWeightKG, unit)+entry.Delta)*10) / 10
+		}
 	}
 	return entry, nil
 }
@@ -1498,6 +1611,9 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 	if s.opts.CSRFToken != nil {
 		data.CSRF = s.opts.CSRFToken(r)
 	}
+	if data.Unit == "" {
+		data.Unit = s.unitOf(r.Context())
+	}
 	data.CanExport = s.opts.Export
 	data.CoachOn = s.opts.Coach != nil
 	data.ConnectorsOn = s.opts.Coach != nil && s.opts.Connectors != nil
@@ -1505,7 +1621,11 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 }
 
 func (s *Server) renderTo(w http.ResponseWriter, name string, data pageData) {
-	if err := s.tpl.ExecuteTemplate(w, name, data); err != nil {
+	tpl := s.tpls[data.Unit]
+	if tpl == nil {
+		tpl = s.tpl
+	}
+	if err := tpl.ExecuteTemplate(w, name, data); err != nil {
 		// The response is already partially written, so the status cannot be
 		// changed. Nothing useful is left to do beyond stopping here.
 		return

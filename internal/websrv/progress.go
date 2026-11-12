@@ -524,6 +524,7 @@ func (s *Server) exercises(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
+	unit := s.unitOf(ctx)
 	recent, err := svc.RecentExercises(ctx, 50)
 	if err != nil {
 		s.fail(w, err)
@@ -558,7 +559,7 @@ func (s *Server) exercises(w http.ResponseWriter, r *http.Request) {
 	}{Groups: []string{}, Recent: []string{}}
 	for _, m := range recent {
 		e := ensure(m.Exercise)
-		e.Last = formatNumber(m.WeightKG) + "×" + strconv.Itoa(m.Reps)
+		e.Last = formatNumber(training.FromKG(m.WeightKG, unit)) + "×" + strconv.Itoa(m.Reps)
 		out.Recent = append(out.Recent, m.Exercise)
 	}
 	for _, g := range training.MuscleGroups {

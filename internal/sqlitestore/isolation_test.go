@@ -164,6 +164,9 @@ func seedUser(t *testing.T, user training.UserStore, group string) seeded {
 	if err = user.SetRestTarget(ctx, 90); err != nil {
 		t.Fatal(err)
 	}
+	if err = user.SetWeightUnit(ctx, "lb"); err != nil {
+		t.Fatal(err)
+	}
 	pending, err := user.CreateProposal(ctx, training.Proposal{Tool: "log_sets", ActionType: "set.log", Payload: []byte(`{"exercise":"banca"}`), CreatedAt: time.Unix(0, 0)})
 	if err != nil {
 		t.Fatal(err)
@@ -220,6 +223,22 @@ var idCases = map[string]func(context.Context, training.UserStore, seeded) (any,
 		reps := 1
 		set, total, err := u.UpdateSet(c, id.set, training.SetPatch{Reps: &reps})
 		return []any{set, total}, err
+	},
+	"LbSets": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return u.LbSets(c, training.LbScope{SetIDs: []int64{id.set}})
+	},
+	// The stranger cannot read the owner's weight, so the correction is sent as
+	// the owner would: the weight read first, 0 when nothing is read.
+	"CorrectLbSets": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		cur, err := u.LbSets(c, training.LbScope{SetIDs: []int64{id.set}})
+		if err != nil {
+			return nil, err
+		}
+		old := 0.0
+		if len(cur) == 1 {
+			old = cur[0].OldKG
+		}
+		return nil, u.CorrectLbSets(c, []training.LbSet{{SetID: id.set, OldKG: old, NewKG: 1}}, time.Unix(99, 0))
 	},
 	"DeleteSet": func(c context.Context, u training.UserStore, id seeded) (any, error) {
 		session, total, remaining, err := u.DeleteSet(c, id.set)
@@ -389,6 +408,7 @@ var readCases = map[string]func(context.Context, training.UserStore) (any, error
 	},
 	"ExerciseNotes": func(c context.Context, u training.UserStore) (any, error) { return u.ExerciseNotes(c) },
 	"RestTarget":    func(c context.Context, u training.UserStore) (any, error) { return u.RestTarget(c) },
+	"WeightUnit":    func(c context.Context, u training.UserStore) (any, error) { return u.WeightUnit(c) },
 	"Decisions":     func(c context.Context, u training.UserStore) (any, error) { return u.Decisions(c, 50) },
 	"ListMemory": func(c context.Context, u training.UserStore) (any, error) {
 		listed, err := u.ListMemory(c, training.MemoryQuery{Limit: 50})
@@ -518,6 +538,10 @@ var writeCases = map[string]struct {
 			return u.SetExerciseNote(c, training.ExerciseNote{Exercise: "sentadilla", Note: "barra baja"})
 		},
 		`SELECT COUNT(*) FROM exercise_notes WHERE user_id=2 AND exercise='sentadilla'`,
+	},
+	"SetWeightUnit": {
+		func(c context.Context, u training.UserStore) error { return u.SetWeightUnit(c, "kg") },
+		`SELECT COUNT(*) FROM users WHERE id=2 AND weight_unit='kg'`,
 	},
 	"SetRestTarget": {
 		func(c context.Context, u training.UserStore) error { return u.SetRestTarget(c, 75) },

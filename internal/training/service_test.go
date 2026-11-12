@@ -165,6 +165,7 @@ type memoryStore struct {
 	progress             []PlanProgress
 	setTimes             map[int64]time.Time
 	restSeconds          int
+	weightUnit           string
 	itemSet              PlanItem
 	itemPatched          string
 	itemPatch            SessionItemPatch
@@ -477,6 +478,17 @@ func (m *memoryStore) ClaimWorkoutSummary(context.Context, int64, time.Time) (bo
 func (m *memoryStore) RestTarget(context.Context) (int, error) { return m.restSeconds, nil }
 func (m *memoryStore) SetRestTarget(_ context.Context, seconds int) error {
 	m.restSeconds = seconds
+	return nil
+}
+
+func (m *memoryStore) WeightUnit(context.Context) (string, error) { return m.weightUnit, nil }
+
+func (m *memoryStore) LbSets(context.Context, LbScope) ([]LbSet, error) { return nil, nil }
+
+func (m *memoryStore) CorrectLbSets(context.Context, []LbSet, time.Time) error { return nil }
+
+func (m *memoryStore) SetWeightUnit(_ context.Context, unit string) error {
+	m.weightUnit = unit
 	return nil
 }
 

@@ -8,6 +8,9 @@ import (
 )
 
 // lifecycleFake is a memory store with a few facts, recording what the service asks.
+// WeightUnit is kg: memory_context reports the person's unit.
+func (*lifecycleFake) WeightUnit(context.Context) (string, error) { return "", nil }
+
 type lifecycleFake struct {
 	UserStore
 	facts        map[int64]Memory

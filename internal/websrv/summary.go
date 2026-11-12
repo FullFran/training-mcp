@@ -3,6 +3,7 @@ package websrv
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/fullfran/training-mcp/internal/training"
 	"strconv"
 	"strings"
 )
@@ -22,12 +23,12 @@ var relationLabels = map[string]string{
 // model. The payload shapes mirror the MCP tools' inputs. An unknown tool or a
 // payload that does not read as expected gives "", and the page falls back to
 // listing the payload's fields.
-func proposalSummary(tool string, payload json.RawMessage) string {
+func proposalSummary(tool string, payload json.RawMessage, unit string) string {
 	summarise, ok := summaries[tool]
 	if !ok {
 		return ""
 	}
-	return summarise(payload)
+	return summarise(payload, unit)
 }
 
 type prescription struct {
@@ -82,9 +83,10 @@ func warmupText(set, category string) string {
 	return set
 }
 
-// setText is "80 kg × 8 @9", without the RPE when there is none.
-func setText(weight float64, reps int, rpe float64) string {
-	s := kg(weight) + " kg × " + strconv.Itoa(reps)
+// setText is "80 kg × 8 @9", without the RPE when there is none, with a
+// payload's kg weight shown in unit.
+func setText(weight float64, reps int, rpe float64, unit string) string {
+	s := weightText(weight, unit) + " × " + strconv.Itoa(reps)
 	if rpe > 0 {
 		s += " @" + kg(rpe)
 	}
@@ -98,19 +100,32 @@ func decode[T any](payload json.RawMessage) (T, bool) {
 	return v, err == nil
 }
 
+// weightText is a payload's kg weight in unit: "80 kg", "176.4 lb".
+func weightText(weightKG float64, unit string) string {
+	if unit != training.UnitLB {
+		unit = training.UnitKG
+	}
+	return formatNumber(training.FromKG(weightKG, unit)) + " " + unit
+}
+
 // summary builds a summariser for one payload shape. say returns "" when the
 // payload lacks what the sentence needs.
-func summary[T any](say func(T) string) func(json.RawMessage) string {
-	return func(payload json.RawMessage) string {
+func summary[T any](say func(T) string) func(json.RawMessage, string) string {
+	return summaryIn(func(v T, _ string) string { return say(v) })
+}
+
+// summaryIn is summary for a payload with weights, shown in the person's unit.
+func summaryIn[T any](say func(T, string) string) func(json.RawMessage, string) string {
+	return func(payload json.RawMessage, unit string) string {
 		v, ok := decode[T](payload)
 		if !ok {
 			return ""
 		}
-		return say(v)
+		return say(v, unit)
 	}
 }
 
-var summaries = map[string]func(json.RawMessage) string{
+var summaries = map[string]func(json.RawMessage, string) string{
 	"create_plan": summary(func(in struct {
 		Name  string         `json:"name"`
 		Items []prescription `json:"items"`
@@ -197,38 +212,38 @@ var summaries = map[string]func(json.RawMessage) string{
 		}
 		return s
 	}),
-	"add_set": summary(func(in struct {
+	"add_set": summaryIn(func(in struct {
 		SessionID int64   `json:"session_id"`
 		Exercise  string  `json:"exercise"`
 		WeightKG  float64 `json:"weight_kg"`
 		Reps      int     `json:"reps"`
 		RPE       float64 `json:"rpe"`
 		Category  string  `json:"category"`
-	}) string {
+	}, unit string) string {
 		if in.Exercise == "" {
 			return ""
 		}
-		return fmt.Sprintf("Registrar %s: %s en la sesión %d", in.Exercise, warmupText(setText(in.WeightKG, in.Reps, in.RPE), in.Category), in.SessionID)
+		return fmt.Sprintf("Registrar %s: %s en la sesión %d", in.Exercise, warmupText(setText(in.WeightKG, in.Reps, in.RPE, unit), in.Category), in.SessionID)
 	}),
-	"log_set": summary(func(in struct {
+	"log_set": summaryIn(func(in struct {
 		Exercise string  `json:"exercise"`
 		WeightKG float64 `json:"weight_kg"`
 		Reps     int     `json:"reps"`
 		RPE      float64 `json:"rpe"`
 		Count    int     `json:"count"`
 		Category string  `json:"category"`
-	}) string {
+	}, unit string) string {
 		if in.Exercise == "" {
 			return ""
 		}
-		set := setText(in.WeightKG, in.Reps, in.RPE)
+		set := setText(in.WeightKG, in.Reps, in.RPE, unit)
 		if in.Count > 1 {
 			set = fmt.Sprintf("%d series de %s", in.Count, set)
 		}
 		set = warmupText(set, in.Category)
 		return fmt.Sprintf("Registrar %s: %s", in.Exercise, set)
 	}),
-	"log_sets": summary(func(in struct {
+	"log_sets": summaryIn(func(in struct {
 		Exercise string `json:"exercise"`
 		Sets     []struct {
 			WeightKG float64 `json:"weight_kg"`
@@ -236,17 +251,17 @@ var summaries = map[string]func(json.RawMessage) string{
 			RPE      float64 `json:"rpe"`
 			Category string  `json:"category"`
 		} `json:"sets"`
-	}) string {
+	}, unit string) string {
 		if in.Exercise == "" || len(in.Sets) == 0 {
 			return ""
 		}
 		sets := make([]string, len(in.Sets))
 		for i, s := range in.Sets {
-			sets[i] = warmupText(setText(s.WeightKG, s.Reps, s.RPE), s.Category)
+			sets[i] = warmupText(setText(s.WeightKG, s.Reps, s.RPE, unit), s.Category)
 		}
 		return fmt.Sprintf("Registrar %s: %s", in.Exercise, strings.Join(sets, ", "))
 	}),
-	"update_set": summary(func(in struct {
+	"update_set": summaryIn(func(in struct {
 		SetID     int64    `json:"set_id"`
 		Exercise  *string  `json:"exercise"`
 		WeightKG  *float64 `json:"weight_kg"`
@@ -254,13 +269,13 @@ var summaries = map[string]func(json.RawMessage) string{
 		RPE       *float64 `json:"rpe"`
 		Technique *string  `json:"technique"`
 		Category  *string  `json:"category"`
-	}) string {
+	}, unit string) string {
 		var changes []string
 		if in.Exercise != nil {
 			changes = append(changes, *in.Exercise)
 		}
 		if in.WeightKG != nil {
-			changes = append(changes, kg(*in.WeightKG)+" kg")
+			changes = append(changes, weightText(*in.WeightKG, unit))
 		}
 		if in.Reps != nil {
 			changes = append(changes, strconv.Itoa(*in.Reps)+" reps")
@@ -444,6 +459,18 @@ var summaries = map[string]func(json.RawMessage) string{
 			ids[i] = strconv.FormatInt(id, 10)
 		}
 		return fmt.Sprintf("Fusionar los recuerdos %s en «%s»: %s", strings.Join(ids, ", "), in.Title, in.Body)
+	}),
+	"correct_lb_sets": summary(func(in struct {
+		SetIDs []int64 `json:"set_ids"`
+	}) string {
+		if len(in.SetIDs) == 0 {
+			return ""
+		}
+		ids := make([]string, len(in.SetIDs))
+		for i, id := range in.SetIDs {
+			ids[i] = strconv.FormatInt(id, 10)
+		}
+		return fmt.Sprintf("Leer como lb y pasar a kg %d %s: %s", len(in.SetIDs), plural(len(in.SetIDs), "serie", "series"), strings.Join(ids, ", "))
 	}),
 	"set_rest_target": summary(func(in struct {
 		RestSeconds int `json:"rest_seconds"`

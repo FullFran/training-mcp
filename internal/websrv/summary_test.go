@@ -47,7 +47,7 @@ func TestProposalSummaryPerTool(t *testing.T) {
 		{"memory_consolidate", `{"memory_ids":[1,2],"title":"Hombro","body":"Duele en press","fingerprint":"f"}`, "Fusionar los recuerdos 1, 2 en «Hombro»: Duele en press"},
 	}
 	for _, c := range cases {
-		if got := proposalSummary(c.tool, []byte(c.payload)); got != c.want {
+		if got := proposalSummary(c.tool, []byte(c.payload), "kg"); got != c.want {
 			t.Errorf("%s %s\n got %q\nwant %q", c.tool, c.payload, got, c.want)
 		}
 	}
@@ -61,8 +61,20 @@ func TestProposalSummaryFallsBack(t *testing.T) {
 		{"create_plan", `{"items":[]}`},
 		{"add_set", `{"weight_kg":"heavy"}`},
 	} {
-		if got := proposalSummary(c.tool, []byte(c.payload)); got != "" {
+		if got := proposalSummary(c.tool, []byte(c.payload), "lb"); got != "" {
 			t.Errorf("%s %s summarised as %q", c.tool, c.payload, got)
+		}
+	}
+}
+
+// With lb chosen, a proposal's kg weights read in lb.
+func TestProposalSummaryShowsTheDefaultUnit(t *testing.T) {
+	for _, c := range []struct{ tool, payload, want string }{
+		{"log_set", `{"exercise":"banca","weight_kg":60,"reps":8,"rpe":8}`, "Registrar banca: 132.3 lb × 8 @8"},
+		{"update_set", `{"set_id":3,"weight_kg":100}`, "Corregir la serie 3: 220.5 lb"},
+	} {
+		if got := proposalSummary(c.tool, []byte(c.payload), "lb"); got != c.want {
+			t.Errorf("%s\n got %q\nwant %q", c.payload, got, c.want)
 		}
 	}
 }

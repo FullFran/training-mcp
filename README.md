@@ -213,8 +213,29 @@ shared with the MCP tools and cannot drift apart.
   muscle group and setup note, editable: the calls `set_exercise_group` and
   `set_exercise_note` make), **Límites de volumen** (each muscle group's MEV
   and MRV in weekly sets, the call `set_volume_landmarks` makes; next week's
-  advice never crosses them), the default rest between sets, and the data:
-  import from Hevy or Strong and the database export.
+  advice never crosses them), the default rest between sets, **Unidades**
+  (kg or lb, per person; see below), and the data: import from Hevy or Strong
+  and the database export.
+- **Units.** Every weight is stored in kg, as before. Each person chooses a
+  default unit in Tú (kg until chosen, migration 026 `users.weight_unit`), and
+  every weight the app shows is in it: the workout, the finish summary, a
+  session's page, Progreso, the picker, proposals and chat cards. Every weight
+  input (a set row, the entry form, the edit of a logged set) has a **kg/lb**
+  toggle starting on the default; it changes the unit of the number typed,
+  never the number, and the server stores kg. lb shows to 0.1 lb, and a value
+  typed in lb is stored as the roundest kg that shows as the same number, so
+  a load shown and saved again never drifts (60 kg shows as 132.3 lb and saves
+  back as 60 kg). An edit that leaves the weight as shown does not resend it.
+  Load advice steps a plate: 2.5 kg or 5 lb. A form without a unit is kg, as
+  every client before units sent. Strong's import assumes the person's unit.
+  **Corregir pesos en lb** (Tú › Datos, or a session's page) fixes past sets
+  typed in lb but stored as kg: choose a session, or an exercise between two
+  dates, see every set with its stored kg now and after, untick any, and
+  confirm. Each ticked number is read as lb and stored in kg; a corrected set
+  is marked and never converted twice; it is recorded in the history and can
+  be undone (the same undo as accepted proposals). The agent has the same as
+  `preview_lb_correction` and the proposal-gated `correct_lb_sets`; every MCP
+  weight stays in kg.
 - **+ Añadir ejercicio** and **Sustituir** in the workout open an exercise
   picker: search (accents ignored), recent exercises, filters by muscle group,
   each with its last set; several can be added at once, and a name that does

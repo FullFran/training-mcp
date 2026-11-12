@@ -62,6 +62,9 @@ type LiveWorkout struct {
 	Next     *PlanProgress  `json:"next,omitempty"`
 	LastSet  *LastSet       `json:"last_set,omitempty"`
 	Rest     Rest           `json:"rest"`
+	// WeightUnit is how the person reads and types weights, kg or lb; every
+	// weight here and in every tool stays in kg.
+	WeightUnit string `json:"weight_unit"`
 }
 
 // RestState describes the rest at now after a set logged at lastAt. A zero
@@ -164,6 +167,11 @@ func (s *Service) SetRestTarget(ctx context.Context, seconds int) error {
 func (s *Service) LiveWorkout(ctx context.Context) (LiveWorkout, error) {
 	now := s.clock()
 	out := LiveWorkout{Date: now.Format("2006-01-02"), Now: now.Format(time.RFC3339)}
+	unit, err := s.WeightUnit(ctx)
+	if err != nil {
+		return out, err
+	}
+	out.WeightUnit = unit
 	target, err := s.RestTarget(ctx)
 	if err != nil {
 		return out, err
