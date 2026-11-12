@@ -1,0 +1,13 @@
+{
+  "description": "An answered proposal refuses a later answer.",
+  "requirements": [
+    "HCS-0010-R003"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Proposal p-1 is pending. The person accepts it; later the person (or a stale tab) rejects p-1."
+  },
+  "expect": {
+    "behaviour": "The second answer is refused; p-1 stays accepted with its first answer."
+  }
+}

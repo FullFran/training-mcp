@@ -1,0 +1,13 @@
+{
+  "description": "A DISTRO-1 host refuses the whole set when one entry fails.",
+  "requirements": [
+    "HCS-0007-R016"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Active set {a@1}. A valid envelope brings {a@2, b} where b has a missing dependency."
+  },
+  "expect": {
+    "behaviour": "The host declares all-or-nothing, selects nothing from the new set and keeps a@1 active."
+  }
+}

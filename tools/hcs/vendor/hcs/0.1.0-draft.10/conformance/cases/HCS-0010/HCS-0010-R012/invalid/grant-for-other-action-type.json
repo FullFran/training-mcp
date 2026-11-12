@@ -1,0 +1,29 @@
+{
+  "description": "A grant for one action type does not cover another.",
+  "requirements": [
+    "HCS-0010-R012"
+  ],
+  "level": "authority",
+  "input": {
+    "requests": [],
+    "grants": [
+      {
+        "entry": "dev.example.a",
+        "permission": "dev.example.sets.log"
+      }
+    ],
+    "check": {
+      "entry": "dev.example.a",
+      "permission": "dev.example.sets.remove"
+    }
+  },
+  "expect": {
+    "decision": {
+      "allow": false,
+      "error": {
+        "code": "permission_denied",
+        "message": "denied"
+      }
+    }
+  }
+}

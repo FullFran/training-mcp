@@ -1,0 +1,13 @@
+{
+  "description": "An allow_always for an action type covers all its tools.",
+  "requirements": [
+    "HCS-0010-R012"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Tools log_sets and add_set both map to dev.example.sets.log. The person answers allow_always to a log_sets proposal in session s1; the agent then calls add_set in s1."
+  },
+  "expect": {
+    "behaviour": "The add_set proposal is accepted by the stored grant (answer.by grant) with a decision record; a proposal of another action type is still asked."
+  }
+}

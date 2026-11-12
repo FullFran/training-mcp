@@ -1,0 +1,13 @@
+{
+  "description": "Interrupting the transition must not leave a mixed tree.",
+  "requirements": [
+    "HCS-0007-R017"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Same transition as the valid case; kill the host after half of a@2's files are written."
+  },
+  "expect": {
+    "behaviour": "On restart a@1 is active with its original files; a host that overwrote a@1 in place fails the case."
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "Host unpacks an OCI layer package and finds the skill at its contribution path.",
+  "requirements": [
+    "HCS-0001-R012"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Catalog with one entry of mediaType application/vnd.oci.image.layer.v1.tar+gzip whose archive holds skills/take-notes/SKILL.md; contribution kind skill, path skills/take-notes. Bytes match size and contentHash."
+  },
+  "expect": {
+    "behaviour": "The host unpacks the archive into an empty package root, finds skills/take-notes/SKILL.md and the entry reaches prepared."
+  }
+}

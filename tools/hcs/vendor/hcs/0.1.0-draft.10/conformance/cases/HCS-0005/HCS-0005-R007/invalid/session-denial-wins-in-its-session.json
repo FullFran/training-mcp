@@ -1,0 +1,37 @@
+{
+  "description": "A reject_always denial denies later checks in its session.",
+  "requirements": [
+    "HCS-0005-R007"
+  ],
+  "level": "authority",
+  "input": {
+    "requests": [],
+    "grants": [
+      {
+        "entry": "dev.example.a",
+        "permission": "dev.example.mail.send"
+      }
+    ],
+    "check": {
+      "entry": "dev.example.a",
+      "permission": "dev.example.mail.send",
+      "session": "s1"
+    },
+    "denials": [
+      {
+        "entry": "dev.example.a",
+        "permission": "dev.example.mail.send",
+        "session": "s1"
+      }
+    ]
+  },
+  "expect": {
+    "decision": {
+      "allow": false,
+      "error": {
+        "code": "permission_denied",
+        "message": "denied"
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "training-mcp-ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP Apps views served by training-mcp (see docs/apps.md). Built into single-file HTML that the Go server embeds.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "tsc --noEmit",
+    "test": "node --test 'src/**/*.test.ts'",
+    "check:bundle": "node build.mjs --check"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "@modelcontextprotocol/core": "2.4.0",
+    "@modelcontextprotocol/ext-apps": "2.0.4",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "description": "A root-signed key set with one online key.",
+  "requirements": [
+    "HCS-0007-R002"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0007:signed-catalog:0.1#/$defs/keySet",
+  "input": {
+    "hcsVersion": "0.1",
+    "version": 3,
+    "keys": [
+      {
+        "keyid": "online-1",
+        "keytype": "ed25519",
+        "public": "oNkoBdUQ0xTyv7u+lLzrl8w7lkU/9tOfYLgHuY8YZDs=",
+        "notBefore": "2026-01-01T00:00:00Z",
+        "notAfter": "2027-01-01T00:00:00Z"
+      }
+    ],
+    "signatures": [
+      {
+        "keyid": "root-1",
+        "sig": "tx4NEICY/AHXoefq8kWHBDb9t9jM+wur3eIWBIpMiEs6mKr/4KyuQGk4IGsjOHJ6jJYUbYiFL0BAQP+zOnu8CA=="
+      }
+    ]
+  },
+  "expect": {
+    "outcome": "valid"
+  }
+}

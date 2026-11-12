@@ -1,0 +1,29 @@
+{
+  "description": "The client takes the error from the problem's hcsError member.",
+  "requirements": [
+    "HCS-0006-R006"
+  ],
+  "level": "client",
+  "input": {
+    "problem": {
+      "type": "urn:hcs:error:missing_dependency",
+      "title": "missing_dependency",
+      "status": 409,
+      "detail": "dev.example.notes requires dev.example.search@1, which no entry provides",
+      "hcsError": {
+        "code": "missing_dependency",
+        "message": "dev.example.notes requires dev.example.search@1, which no entry provides",
+        "entry": "dev.example.notes",
+        "capability": "dev.example.search@1"
+      }
+    }
+  },
+  "expect": {
+    "hcsError": {
+      "code": "missing_dependency",
+      "message": "dev.example.notes requires dev.example.search@1, which no entry provides",
+      "entry": "dev.example.notes",
+      "capability": "dev.example.search@1"
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hcs:schema:hcs-0003:resolution:0.1",
+  "title": "HCS resolution input and result",
+  "description": "Input and output of catalog resolution (HCS-0003).",
+  "$defs": {
+    "activationPolicy": {
+      "description": "Host-declared selection policy after resolution (HCS-0003 section 3, step 6).",
+      "enum": ["all-or-nothing", "partial"]
+    },
+    "host": {
+      "type": "object",
+      "required": ["platform", "contributionKinds", "mediaTypes", "builtins"],
+      "dependentRequired": { "id": ["version"], "version": ["id"] },
+      "properties": {
+        "activationPolicy": { "$ref": "#/$defs/activationPolicy" },
+        "id": { "$ref": "urn:hcs:schema:hcs-0000:common:0.1#/$defs/dottedId" },
+        "version": { "$ref": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1#/$defs/opaqueVersion" },
+        "platform": { "$ref": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1#/$defs/platform" },
+        "contributionKinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1#/$defs/contribution/properties/kind" }
+        },
+        "mediaTypes": {
+          "description": "Package media types the host can unpack (HCS-0001-R013).",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1#/$defs/entry/properties/mediaType" }
+        },
+        "builtins": { "$ref": "urn:hcs:schema:hcs-0002:capability:0.1#/$defs/capabilityRefList" }
+      },
+      "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+      "additionalProperties": false
+    },
+    "resolutionInput": {
+      "type": "object",
+      "required": ["catalog", "host"],
+      "properties": {
+        "catalog": { "$ref": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1" },
+        "host": { "$ref": "#/$defs/host" }
+      },
+      "additionalProperties": false
+    },
+    "resolutionResult": {
+      "type": "object",
+      "required": ["activationOrder", "errors"],
+      "properties": {
+        "activationOrder": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1#/$defs/packageId" }
+        },
+        "errors": { "type": "array", "items": { "$ref": "urn:hcs:schema:hcs-0006:error:0.1" } },
+        "selected": {
+          "description": "Entries selected for activation under the host's activation policy, in activation order.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1#/$defs/packageId" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "description": "A declaration with a client and no limit says nothing.",
+  "requirements": [
+    "HCS-0008-R036"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0008:client-limits:0.1",
+  "input": {
+    "client": "chatgpt"
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

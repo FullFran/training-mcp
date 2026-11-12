@@ -1,0 +1,47 @@
+{
+  "description": "Version 4 replaces version 3.",
+  "requirements": [
+    "HCS-0007-R012"
+  ],
+  "level": "distribution",
+  "input": {
+    "check": "key-set",
+    "now": "2026-11-06T12:00:00Z",
+    "trustAnchor": {
+      "keys": [
+        {
+          "keyid": "root-1",
+          "keytype": "ed25519",
+          "public": "LWB8cicdNrnQPkwy2jC4f24oJ6JOv49Apy61kpnIRsU="
+        }
+      ],
+      "threshold": 1
+    },
+    "keySet": {
+      "hcsVersion": "0.1",
+      "version": 4,
+      "keys": [
+        {
+          "keyid": "online-2",
+          "keytype": "ed25519",
+          "public": "wedLmmPnPgjkN3NIl9rJLHaNk6aPmllxoxjt4dZij3A=",
+          "notBefore": "2026-01-01T00:00:00Z",
+          "notAfter": "2027-01-01T00:00:00Z"
+        }
+      ],
+      "signatures": [
+        {
+          "keyid": "root-1",
+          "sig": "whSBSx6JLBCelaeebu/eO/98gcb0jz/TpgbhHIFaKjrkVX2sCcX4g/6QDxYrbt8cBIHSq19FdPHzPB5MJ/4yDw=="
+        }
+      ]
+    },
+    "lastKeySet": {
+      "version": 3,
+      "digest": "sha256:cca05e2eabdad8c985e0ab053754c656523a017c27d29d436c86dc7a31fcb677"
+    }
+  },
+  "expect": {
+    "outcome": "valid"
+  }
+}

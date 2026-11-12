@@ -1,0 +1,89 @@
+{
+  "description": "a needs b needs c; all resolve.",
+  "requirements": [
+    "HCS-0003-R005"
+  ],
+  "level": "resolution",
+  "input": {
+    "catalog": {
+      "hcsVersion": "0.1",
+      "id": "dev.example.desktop",
+      "version": "2026.11.06-1",
+      "entries": [
+        {
+          "id": "dev.example.a",
+          "version": "1.0.0",
+          "contentHash": "sha256:abababababababababababababababababababababababababababababababab",
+          "size": 10,
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/a"
+            }
+          ],
+          "requires": [
+            "dev.example.cap-b@1"
+          ]
+        },
+        {
+          "id": "dev.example.b",
+          "version": "1.0.0",
+          "contentHash": "sha256:abababababababababababababababababababababababababababababababab",
+          "size": 10,
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/b",
+              "provides": [
+                "dev.example.cap-b@1"
+              ]
+            }
+          ],
+          "requires": [
+            "dev.example.cap-c@1"
+          ]
+        },
+        {
+          "id": "dev.example.c",
+          "version": "1.0.0",
+          "contentHash": "sha256:abababababababababababababababababababababababababababababababab",
+          "size": 10,
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/c",
+              "provides": [
+                "dev.example.cap-c@1"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "host": {
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "contributionKinds": [
+        "skill",
+        "mcp-server"
+      ],
+      "mediaTypes": [
+        "application/vnd.oci.image.layer.v1.tar+gzip"
+      ],
+      "builtins": []
+    }
+  },
+  "expect": {
+    "activationOrder": [
+      "dev.example.c",
+      "dev.example.b",
+      "dev.example.a"
+    ],
+    "errors": []
+  }
+}

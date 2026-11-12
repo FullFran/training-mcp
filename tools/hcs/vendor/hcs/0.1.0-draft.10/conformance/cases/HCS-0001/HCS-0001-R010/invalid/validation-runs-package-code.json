@@ -1,0 +1,13 @@
+{
+  "description": "A host that runs a package hook to validate is non-conforming.",
+  "requirements": [
+    "HCS-0001-R010"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Give the host a catalog whose only way to validate an entry would be to run a package script."
+  },
+  "expect": {
+    "behaviour": "The host does not run the script; it validates the document as data and reports the verdict."
+  }
+}

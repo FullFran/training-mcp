@@ -148,6 +148,17 @@ Every package has a test file next to it, and coverage is measured per package:
 
 CI runs `go test ./...`, `go vet ./...`, `-race`, `gofmt`, a Docker build, and
 enforces the coverage floor on `sqlitestore`.
+A `ui` job typechecks and tests the MCP Apps views in `ui/` and fails when a
+committed bundle in `internal/mcpsrv/apps/` is stale ([MCP Apps](apps.md)).
+
+The HCS release the code cites (HCS-0005 and later) is vendored in
+`tools/hcs/vendor/hcs/<version>/` with the HCS consumer kit
+(`tools/hcs/hcs_kit.py`, see `tools/hcs/README.md`), pinned by its tarball
+digest in `tools/hcs/vendor/hcs/PIN.json`. It lives under `tools/hcs` and not
+in a root `vendor/`, which Go reserves for module vendoring. CI runs
+`python3 tools/hcs/hcs_kit.py verify --root tools/hcs`, which fails on any
+edited, removed or added vendored file. To upgrade, run `sync` with the new
+version and digest and the same `--root`, then review the diff.
 
 ## Security boundary
 

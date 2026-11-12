@@ -1,0 +1,41 @@
+{
+  "description": "An unmeasured server is projected when no tool-list limit is declared.",
+  "requirements": [
+    "HCS-0008-R038"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "skill",
+      "mcp-server"
+    ],
+    "hostOwned": [],
+    "grantedSecrets": {},
+    "activationPolicy": "partial",
+    "generation": {
+      "id": "gen-0070",
+      "entries": [
+        {
+          "id": "dev.example.unmeasured",
+          "contributions": [
+            {
+              "kind": "mcp-server",
+              "path": "mcp/unmeasured/server.json",
+              "descriptor": {
+                "name": "io.example/unmeasured",
+                "description": "Example server",
+                "version": "1.0.0"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "errors": [],
+    "selected": [
+      "dev.example.unmeasured"
+    ]
+  }
+}

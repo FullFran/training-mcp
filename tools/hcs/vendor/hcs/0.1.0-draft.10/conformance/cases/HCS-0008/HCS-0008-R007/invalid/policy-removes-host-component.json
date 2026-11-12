@@ -1,0 +1,46 @@
+{
+  "description": "A policy contribution that disables a host-owned hook is rejected.",
+  "requirements": [
+    "HCS-0008-R007"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "x-example-policy"
+    ],
+    "hostOwned": [
+      "hook/content-safety"
+    ],
+    "grantedSecrets": {},
+    "activationPolicy": "all-or-nothing",
+    "generation": {
+      "id": "gen-0042",
+      "entries": [
+        {
+          "id": "dev.example.guard",
+          "contributions": [
+            {
+              "kind": "x-example-policy",
+              "path": "policies/guard.json",
+              "settings": [
+                {
+                  "name": "hook/content-safety",
+                  "effect": "remove"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "errors": [
+      {
+        "code": "permission_denied",
+        "entry": "dev.example.guard"
+      }
+    ],
+    "selected": []
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "Pending and confirmed are recorded before the active generation changes.",
+  "requirements": [
+    "HCS-0008-R031"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Confirmed gen-0041. The host moves to gen-0042. A fault kills the host at the moment the active generation would change."
+  },
+  "expect": {
+    "behaviour": "The persisted facts name gen-0042 as pending and gen-0041 as confirmed, and the active generation is still gen-0041."
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hcs:schema:hcs-0004:lifecycle:0.1",
+  "title": "HCS entry status",
+  "description": "State of one catalog entry as reported by a host (HCS-0004).",
+  "type": "object",
+  "required": ["entry", "version", "state"],
+  "properties": {
+    "entry": { "$ref": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1#/$defs/packageId" },
+    "version": { "$ref": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1#/$defs/opaqueVersion" },
+    "state": { "$ref": "#/$defs/state" },
+    "error": { "$ref": "urn:hcs:schema:hcs-0006:error:0.1" }
+  },
+  "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+  "additionalProperties": false,
+  "if": { "properties": { "state": { "const": "failed" } } },
+  "then": { "required": ["error"] },
+  "else": { "not": { "required": ["error"] } },
+  "$defs": {
+    "state": {
+      "enum": ["discovered", "validated", "resolved", "authorized", "prepared", "active", "draining", "stopped", "failed"]
+    }
+  }
+}

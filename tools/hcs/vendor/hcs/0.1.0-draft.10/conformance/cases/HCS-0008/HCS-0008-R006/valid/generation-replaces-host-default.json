@@ -1,0 +1,37 @@
+{
+  "description": "A skill with the name of a host-provided default (not host-owned) replaces it; no collision.",
+  "requirements": [
+    "HCS-0008-R006"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "skill",
+      "mcp-server"
+    ],
+    "hostOwned": [],
+    "grantedSecrets": {},
+    "activationPolicy": "all-or-nothing",
+    "generation": {
+      "id": "gen-0042",
+      "entries": [
+        {
+          "id": "dev.example.review",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/review",
+              "name": "review"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "errors": [],
+    "selected": [
+      "dev.example.review"
+    ]
+  }
+}

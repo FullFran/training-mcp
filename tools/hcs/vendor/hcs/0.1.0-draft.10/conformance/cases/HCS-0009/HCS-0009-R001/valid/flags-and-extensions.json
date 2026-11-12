@@ -1,0 +1,22 @@
+{
+  "description": "Optional flags and extension members.",
+  "requirements": [
+    "HCS-0009-R001"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0009:tool-effects:0.1#/$defs/serverMeta",
+  "input": {
+    "tools": {
+      "add_note": {
+        "effect": "additive",
+        "idempotent": true,
+        "openWorld": false,
+        "x-example-policy": "ask"
+      }
+    },
+    "x-example-note": 1
+  },
+  "expect": {
+    "outcome": "valid"
+  }
+}

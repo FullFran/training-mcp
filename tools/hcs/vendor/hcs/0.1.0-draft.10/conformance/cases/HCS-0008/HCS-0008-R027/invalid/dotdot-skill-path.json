@@ -1,0 +1,24 @@
+{
+  "description": "Skill paths have no '..' segments.",
+  "requirements": [
+    "HCS-0008-R027"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0008:acp:0.1#/$defs/sessionMeta",
+  "input": {
+    "generation": {
+      "id": "gen-0060",
+      "skills": [
+        "/var/lib/host/generations/gen-0060/../../../etc"
+      ]
+    }
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

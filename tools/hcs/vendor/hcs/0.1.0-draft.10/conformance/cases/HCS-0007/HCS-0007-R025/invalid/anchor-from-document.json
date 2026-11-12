@@ -1,0 +1,57 @@
+{
+  "description": "A key set signed only by the root that its own extension names as trust anchor.",
+  "requirements": [
+    "HCS-0007-R025"
+  ],
+  "level": "distribution",
+  "input": {
+    "check": "key-set",
+    "now": "2026-11-06T12:00:00Z",
+    "trustAnchor": {
+      "keys": [
+        {
+          "keyid": "root-1",
+          "keytype": "ed25519",
+          "public": "LWB8cicdNrnQPkwy2jC4f24oJ6JOv49Apy61kpnIRsU="
+        }
+      ],
+      "threshold": 1
+    },
+    "keySet": {
+      "hcsVersion": "0.1",
+      "version": 3,
+      "keys": [
+        {
+          "keyid": "online-1",
+          "keytype": "ed25519",
+          "public": "oNkoBdUQ0xTyv7u+lLzrl8w7lkU/9tOfYLgHuY8YZDs=",
+          "notBefore": "2026-01-01T00:00:00Z",
+          "notAfter": "2027-01-01T00:00:00Z"
+        }
+      ],
+      "x-example-trust-anchor": {
+        "keys": [
+          {
+            "keyid": "root-2",
+            "keytype": "ed25519",
+            "public": "M15UxbXGiDnkRYbeg/7NAK1+IMGw7m+Xs7sASSityus="
+          }
+        ]
+      },
+      "signatures": [
+        {
+          "keyid": "root-2",
+          "sig": "optyS+OkcHXmrmdAvI3BtVkoeYG2msLUzeePhmli54YWU+2cfpm+UqmwnEaCmpyu6oVInWcMj5/P45RSG3bcAg=="
+        }
+      ]
+    }
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "signature_invalid"
+      }
+    ]
+  }
+}

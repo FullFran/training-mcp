@@ -1,0 +1,52 @@
+{
+  "description": "Version 2 after version 3.",
+  "requirements": [
+    "HCS-0007-R012"
+  ],
+  "level": "distribution",
+  "input": {
+    "check": "key-set",
+    "now": "2026-11-06T12:00:00Z",
+    "trustAnchor": {
+      "keys": [
+        {
+          "keyid": "root-1",
+          "keytype": "ed25519",
+          "public": "LWB8cicdNrnQPkwy2jC4f24oJ6JOv49Apy61kpnIRsU="
+        }
+      ],
+      "threshold": 1
+    },
+    "keySet": {
+      "hcsVersion": "0.1",
+      "version": 2,
+      "keys": [
+        {
+          "keyid": "online-1",
+          "keytype": "ed25519",
+          "public": "oNkoBdUQ0xTyv7u+lLzrl8w7lkU/9tOfYLgHuY8YZDs=",
+          "notBefore": "2026-01-01T00:00:00Z",
+          "notAfter": "2027-01-01T00:00:00Z"
+        }
+      ],
+      "signatures": [
+        {
+          "keyid": "root-1",
+          "sig": "bCO/I912GLADFDm2e/qt66MdLYyEtxUhv/DfFV9aKtPepY7s6Y8Hb6yMfDbKBwA5vUQsnhWp9igIBfWy7Q4uDA=="
+        }
+      ]
+    },
+    "lastKeySet": {
+      "version": 3,
+      "digest": "sha256:cca05e2eabdad8c985e0ab053754c656523a017c27d29d436c86dc7a31fcb677"
+    }
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "rollback_rejected"
+      }
+    ]
+  }
+}

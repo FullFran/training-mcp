@@ -1,0 +1,13 @@
+{
+  "description": "allow_once applies to the operation it was given for.",
+  "requirements": [
+    "HCS-0005-R005"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "No grant. The engine asks to send mail (call 1); the person answers allow_once."
+  },
+  "expect": {
+    "behaviour": "Call 1 runs. No grant or denial is stored."
+  }
+}

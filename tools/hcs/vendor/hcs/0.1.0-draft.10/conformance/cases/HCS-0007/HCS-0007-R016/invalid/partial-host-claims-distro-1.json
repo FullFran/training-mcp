@@ -1,0 +1,13 @@
+{
+  "description": "A host that activates a partial set cannot claim DISTRO-1.",
+  "requirements": [
+    "HCS-0007-R016"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Same envelope as the valid case, on a host that activates a@2 alone."
+  },
+  "expect": {
+    "behaviour": "A conforming DISTRO-1 host never ends with a@2 active and b missing; this host fails the case."
+  }
+}

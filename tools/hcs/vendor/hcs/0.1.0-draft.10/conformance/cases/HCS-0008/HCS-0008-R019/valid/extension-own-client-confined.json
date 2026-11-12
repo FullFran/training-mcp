@@ -1,0 +1,13 @@
+{
+  "description": "A component that builds its own model client cannot send a request past the guard.",
+  "requirements": [
+    "HCS-0008-R019"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The run's outbound traffic is denied by default and the guard is the only allowed destination; a recording endpoint stands in for the provider's public address outside the guard. An extension inside the run creates its own model client for that address and sends a request containing CANARY-7f3a-SECRET."
+  },
+  "expect": {
+    "behaviour": "The request never leaves the run: the recording endpoint receives nothing, and nothing unmasked reaches any provider."
+  }
+}

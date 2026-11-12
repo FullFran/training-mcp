@@ -1,0 +1,48 @@
+{
+  "description": "The largest safe integer is in the domain.",
+  "requirements": [
+    "HCS-0007-R004"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0007:signed-catalog:0.1#/$defs/envelope",
+  "input": {
+    "hcsVersion": "0.1",
+    "sequence": 42,
+    "expires": "2026-11-13T00:00:00Z",
+    "binding": {
+      "tenant": "t-0001",
+      "profile": "desktop",
+      "channel": "stable"
+    },
+    "catalog": {
+      "hcsVersion": "0.1",
+      "id": "dev.example.desktop",
+      "version": "2026.11.06-1",
+      "entries": [
+        {
+          "id": "dev.example.notes",
+          "version": "1.4.0",
+          "contentHash": "sha256:4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
+          "size": 18342,
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/take-notes"
+            }
+          ]
+        }
+      ]
+    },
+    "x-example-limit": 9007199254740991,
+    "signatures": [
+      {
+        "keyid": "online-1",
+        "sig": "tNrc+ZnuulYnAuCu82NgZoiZpKlm0aq6L4WFbPwqeC7zyz4Wgix3O53MA+A9HdWCCLcsB+Oc6x7b6/PA52SXBg=="
+      }
+    ]
+  },
+  "expect": {
+    "outcome": "valid"
+  }
+}

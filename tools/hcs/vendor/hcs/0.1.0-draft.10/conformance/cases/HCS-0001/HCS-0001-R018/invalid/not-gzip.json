@@ -1,0 +1,7 @@
+{
+  "description": "The legacy non-gzip transport fixture must fail when an uncompressed identity is requested.",
+  "requirements": ["HCS-0001-R018"],
+  "level": "integrity",
+  "input": {"entry":{"id":"dev.example.a","size":10,"contentHash":"sha256:785ff27eafe94633368b45bbf0368f8ed61bab85bad2b9fe298e1c1368a9494d","contentId":"sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"},"contentBase64":"aGVsbG8gaGNzCg=="},
+  "expect":{"outcome":"invalid","errors":[{"code":"integrity_mismatch","entry":"dev.example.a"}]}
+}

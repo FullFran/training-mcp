@@ -1,0 +1,26 @@
+{
+  "description": "A cleanup that drops a failed record.",
+  "requirements": [
+    "HCS-0008-R034"
+  ],
+  "level": "recovery",
+  "input": {
+    "persisted": {
+      "active": 41,
+      "confirmed": 41,
+      "pending": null,
+      "failed": [
+        39
+      ]
+    },
+    "onDisk": [
+      39,
+      40,
+      41
+    ]
+  },
+  "expect": {
+    "failed": [],
+    "action": "start"
+  }
+}

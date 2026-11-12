@@ -1,0 +1,25 @@
+{
+  "description": "PAE over sorted, whitespace-free JSON without signatures.",
+  "requirements": [
+    "HCS-0007-R003"
+  ],
+  "level": "distribution",
+  "input": {
+    "check": "signing-input",
+    "payloadType": "application/vnd.hcs.catalog-envelope+json",
+    "document": {
+      "hcsVersion": "0.1",
+      "sequence": 1,
+      "b": "z",
+      "a": [
+        1,
+        true,
+        null
+      ],
+      "signatures": []
+    }
+  },
+  "expect": {
+    "signingInput": "DSSEv1 41 application/vnd.hcs.catalog-envelope+json 59 {\"a\":[1,true,null],\"b\":\"z\",\"hcsVersion\":\"0.1\",\"sequence\":1}"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "description": "Both lists are required, even when empty.",
+  "requirements": [
+    "HCS-0008-R029"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0008:acp:0.1#/$defs/loadedResult",
+  "input": {
+    "skills": [
+      "notes"
+    ]
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

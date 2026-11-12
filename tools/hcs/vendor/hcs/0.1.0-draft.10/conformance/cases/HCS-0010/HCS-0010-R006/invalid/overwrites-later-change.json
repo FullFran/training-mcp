@@ -1,0 +1,13 @@
+{
+  "description": "Applying over a changed target does not conform.",
+  "requirements": [
+    "HCS-0010-R006"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "As in the first case, a host applies the edit to rev-2."
+  },
+  "expect": {
+    "behaviour": "The person's later edit is lost; this violates R006."
+  }
+}

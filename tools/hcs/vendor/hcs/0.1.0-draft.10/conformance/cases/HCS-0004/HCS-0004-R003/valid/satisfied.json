@@ -1,0 +1,13 @@
+{
+  "description": "Move from set {a} to {a, b}; b activates.",
+  "requirements": [
+    "HCS-0004-R003"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Move from set {a} to {a, b}; b activates."
+  },
+  "expect": {
+    "behaviour": "Both a and b are active."
+  }
+}

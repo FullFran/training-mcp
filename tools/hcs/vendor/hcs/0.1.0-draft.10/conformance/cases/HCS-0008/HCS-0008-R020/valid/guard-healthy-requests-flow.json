@@ -1,0 +1,13 @@
+{
+  "description": "With the guard working, requests reach the provider masked.",
+  "requirements": [
+    "HCS-0008-R020"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The guard is on the model transport and healthy; the engine runs one turn."
+  },
+  "expect": {
+    "behaviour": "The mock provider receives the turn's request, masked."
+  }
+}

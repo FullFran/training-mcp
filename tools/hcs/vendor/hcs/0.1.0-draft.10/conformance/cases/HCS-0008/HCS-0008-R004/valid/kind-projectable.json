@@ -1,0 +1,42 @@
+{
+  "description": "An extension kind the adapter projects is not reported.",
+  "requirements": [
+    "HCS-0008-R004"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "skill",
+      "x-example-instructions"
+    ],
+    "hostOwned": [],
+    "grantedSecrets": {},
+    "activationPolicy": "all-or-nothing",
+    "generation": {
+      "id": "gen-0042",
+      "entries": [
+        {
+          "id": "dev.example.style",
+          "contributions": [
+            {
+              "kind": "x-example-instructions",
+              "path": "instructions/style.md",
+              "settings": [
+                {
+                  "name": "instructions/style",
+                  "effect": "add"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "errors": [],
+    "selected": [
+      "dev.example.style"
+    ]
+  }
+}

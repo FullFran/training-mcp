@@ -1,0 +1,16 @@
+{
+  "description": "An HCS error serialized in content text only is not read.",
+  "requirements": ["HCS-0006-R009"],
+  "level": "client",
+  "input": {
+    "response": {
+      "jsonrpc": "2.0",
+      "id": 9,
+      "result": {
+        "content": [{ "type": "text", "text": "{\"hcsError\":{\"code\":\"timeout\",\"message\":\"Slow\"}}" }],
+        "isError": true
+      }
+    }
+  },
+  "expect": { "hcsError": null }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "A static configuration that follows the active pointer.",
+  "requirements": [
+    "HCS-0008-R001"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The engine configuration lists the skills path as <root>/active/packages. An engine run started on gen-0041 rescans after the pointer moved to gen-0042."
+  },
+  "expect": {
+    "behaviour": "Non-conforming: the run reads gen-0042 content (or a mix) although it started from gen-0041; a conforming host names gen-0041 in the projection."
+  }
+}

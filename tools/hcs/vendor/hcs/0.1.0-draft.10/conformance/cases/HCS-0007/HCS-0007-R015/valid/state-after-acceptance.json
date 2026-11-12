@@ -1,0 +1,13 @@
+{
+  "description": "Accepted state advances only after the catalog is accepted, and survives a restart.",
+  "requirements": [
+    "HCS-0007-R015"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Last accepted sequence 41. Deliver envelope 42 (valid), restart the host, deliver envelope 41."
+  },
+  "expect": {
+    "behaviour": "After 42 the host records sequence 42 and its digest; after the restart it still rejects 41 with rollback_rejected."
+  }
+}

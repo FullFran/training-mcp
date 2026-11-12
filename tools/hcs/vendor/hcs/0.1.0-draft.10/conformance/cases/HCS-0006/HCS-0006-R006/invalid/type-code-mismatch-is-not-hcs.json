@@ -1,0 +1,21 @@
+{
+  "description": "A problem whose type disagrees with hcsError.code carries no HCS error.",
+  "requirements": [
+    "HCS-0006-R006"
+  ],
+  "level": "client",
+  "input": {
+    "problem": {
+      "type": "urn:hcs:error:timeout",
+      "title": "timeout",
+      "status": 504,
+      "hcsError": {
+        "code": "plugin_failed",
+        "message": "crashed"
+      }
+    }
+  },
+  "expect": {
+    "hcsError": null
+  }
+}

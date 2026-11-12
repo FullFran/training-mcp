@@ -1,0 +1,30 @@
+{
+  "description": "An unknown class that keeps its idempotent and openWorld flags.",
+  "requirements": [
+    "HCS-0009-R004"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0009:tool-effects:0.1#/$defs/classification",
+  "input": {
+    "tool": "quarantine",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "declared": {
+      "effect": "quarantine",
+      "idempotent": true,
+      "openWorld": false
+    }
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

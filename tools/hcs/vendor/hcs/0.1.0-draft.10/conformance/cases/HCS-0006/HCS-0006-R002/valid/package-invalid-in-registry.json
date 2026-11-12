@@ -1,0 +1,20 @@
+{
+  "description": "package_invalid is in the closed set; it names the HCS-0001 requirement violated and carries the member path in an extension member of details.",
+  "requirements": [
+    "HCS-0006-R002"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0006:error:0.1",
+  "input": {
+    "code": "package_invalid",
+    "message": "package archive has an unsafe member",
+    "entry": "dev.example.a",
+    "requirement": "HCS-0001-R019",
+    "details": {
+      "x-example-member": "../escape"
+    }
+  },
+  "expect": {
+    "outcome": "valid"
+  }
+}

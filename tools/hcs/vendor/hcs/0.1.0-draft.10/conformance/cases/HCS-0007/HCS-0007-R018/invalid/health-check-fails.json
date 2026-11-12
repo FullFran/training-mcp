@@ -1,0 +1,13 @@
+{
+  "description": "A failing health check is a failed transition.",
+  "requirements": [
+    "HCS-0007-R018"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Active set {a@1}. Move to {a@2}; a@2 starts but its post-start health check fails."
+  },
+  "expect": {
+    "behaviour": "The host returns to {a@1} and reports the transition as failed; a@2 is not left active."
+  }
+}

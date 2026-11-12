@@ -1,0 +1,29 @@
+{
+  "description": "A generation that is pending and active at restart is health-checked, not assumed confirmed (item 1).",
+  "requirements": [
+    "HCS-0008-R033"
+  ],
+  "level": "recovery",
+  "input": {
+    "persisted": {
+      "active": 42,
+      "confirmed": 41,
+      "pending": 42,
+      "failed": []
+    },
+    "onDisk": [
+      40,
+      41,
+      42
+    ]
+  },
+  "expect": {
+    "action": "health-check",
+    "generation": 42,
+    "returnTo": 41,
+    "retain": [
+      41,
+      42
+    ]
+  }
+}

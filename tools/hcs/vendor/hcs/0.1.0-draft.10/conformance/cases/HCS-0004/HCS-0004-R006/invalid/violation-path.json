@@ -1,0 +1,13 @@
+{
+  "description": "Send a new call to an entry in draining.",
+  "requirements": [
+    "HCS-0004-R006"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Send a new call to an entry in draining."
+  },
+  "expect": {
+    "behaviour": "The new call is not dispatched to it."
+  }
+}

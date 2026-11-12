@@ -1,0 +1,13 @@
+{
+  "description": "A host that cannot return starts the failed generation anyway.",
+  "requirements": [
+    "HCS-0008-R035"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Confirmed gen-0041. gen-0042 fails its health check. Replacing the active pointer fails."
+  },
+  "expect": {
+    "behaviour": "Non-conforming: the host starts an engine run from gen-0042."
+  }
+}

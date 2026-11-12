@@ -1,0 +1,13 @@
+{
+  "description": "An unreachable guard lets nothing through.",
+  "requirements": [
+    "HCS-0008-R020"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The guard proxy is stopped; the engine runs one turn."
+  },
+  "expect": {
+    "behaviour": "The mock provider receives zero requests; the engine is not given a direct route to the provider."
+  }
+}

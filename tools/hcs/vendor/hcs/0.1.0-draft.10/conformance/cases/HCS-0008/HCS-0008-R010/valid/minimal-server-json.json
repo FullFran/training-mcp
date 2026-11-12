@@ -1,0 +1,50 @@
+{
+  "description": "A server.json with name, description and version is read.",
+  "requirements": [
+    "HCS-0008-R010"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "skill",
+      "mcp-server"
+    ],
+    "hostOwned": [],
+    "grantedSecrets": {},
+    "activationPolicy": "all-or-nothing",
+    "generation": {
+      "id": "gen-0042",
+      "entries": [
+        {
+          "id": "dev.example.notes",
+          "contributions": [
+            {
+              "kind": "mcp-server",
+              "path": "mcp/notes/server.json",
+              "descriptor": {
+                "name": "io.example/notes",
+                "description": "Notes server",
+                "version": "1.0.0",
+                "packages": [
+                  {
+                    "registryType": "oci",
+                    "identifier": "registry.example/notes:1.0.0",
+                    "transport": {
+                      "type": "stdio"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "errors": [],
+    "selected": [
+      "dev.example.notes"
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "A correctly signed envelope whose catalog fails HCS-0001 must not advance the sequence.",
+  "requirements": [
+    "HCS-0007-R015"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Last accepted sequence 41. Deliver envelope 43 whose catalog has a duplicate entry id (duplicate_entry), then envelope 42 (valid)."
+  },
+  "expect": {
+    "behaviour": "Envelope 43 is rejected and the accepted sequence stays 41, so envelope 42 is accepted."
+  }
+}

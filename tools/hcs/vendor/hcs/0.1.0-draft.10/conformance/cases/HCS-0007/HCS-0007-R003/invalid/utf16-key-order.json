@@ -1,0 +1,22 @@
+{
+  "description": "Keys sort by UTF-16 code units: U+1F600 before U+E000, the reverse of code point order; control characters escape as \\u00XX.",
+  "requirements": [
+    "HCS-0007-R003"
+  ],
+  "level": "distribution",
+  "input": {
+    "check": "signing-input",
+    "payloadType": "application/vnd.hcs.catalog-envelope+json",
+    "document": {
+      "x-example": {
+        "": 1,
+        "😀": 2,
+        "é": "\u000f\"\\"
+      },
+      "sequence": 1
+    }
+  },
+  "expect": {
+    "signingInput": "DSSEv1 41 application/vnd.hcs.catalog-envelope+json 64 {\"sequence\":1,\"x-example\":{\"é\":\"\\u000f\\\"\\\\\",\"😀\":2,\"\":1}}"
+  }
+}

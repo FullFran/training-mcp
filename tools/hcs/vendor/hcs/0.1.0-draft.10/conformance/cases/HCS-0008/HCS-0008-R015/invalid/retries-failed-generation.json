@@ -1,0 +1,13 @@
+{
+  "description": "The host retries the failed generation.",
+  "requirements": [
+    "HCS-0008-R015"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Confirmed gen-0041. gen-0042 fails its health check; the host restarts the engine from gen-0042 again."
+  },
+  "expect": {
+    "behaviour": "Non-conforming: the failed generation is started again automatically."
+  }
+}

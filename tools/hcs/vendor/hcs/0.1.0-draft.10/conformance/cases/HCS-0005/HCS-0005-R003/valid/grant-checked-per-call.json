@@ -1,0 +1,13 @@
+{
+  "description": "Grant held for every call.",
+  "requirements": [
+    "HCS-0005-R003"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Grant fs.read, make two calls."
+  },
+  "expect": {
+    "behaviour": "Both calls are allowed."
+  }
+}

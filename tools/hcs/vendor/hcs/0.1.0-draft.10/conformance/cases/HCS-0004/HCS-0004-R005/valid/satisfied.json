@@ -1,0 +1,13 @@
+{
+  "description": "Call a capability whose provider is active.",
+  "requirements": [
+    "HCS-0004-R005"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Call a capability whose provider is active."
+  },
+  "expect": {
+    "behaviour": "The call is dispatched."
+  }
+}

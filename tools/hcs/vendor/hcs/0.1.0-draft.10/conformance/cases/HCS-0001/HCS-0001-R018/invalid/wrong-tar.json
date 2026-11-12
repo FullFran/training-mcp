@@ -1,0 +1,7 @@
+{
+  "description": "Correct transport bytes do not excuse a mismatching uncompressed identity.",
+  "requirements": ["HCS-0001-R018"],
+  "level": "integrity",
+  "input": {"entry":{"id":"dev.example.a","size":29,"contentHash":"sha256:deb230b21e0d7ef6a0a2d65a19599d4251b5f08888a5155882fbef2ef71e1e11","contentId":"sha256:0000000000000000000000000000000000000000000000000000000000000000"},"contentBase64":"H4sIAAAAAAACA2NgGAWjYBSMVAAALq+17wAEAAA="},
+  "expect":{"outcome":"invalid","errors":[{"code":"integrity_mismatch","entry":"dev.example.a"}]}
+}

@@ -1,0 +1,36 @@
+{
+  "description": "Package ids have at least two dotted segments.",
+  "requirements": [
+    "HCS-0001-R001"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1",
+  "input": {
+    "hcsVersion": "0.1",
+    "id": "dev.example.desktop",
+    "version": "2026.11.06-1",
+    "entries": [
+      {
+        "id": "notes",
+        "version": "1.0.0",
+        "contentHash": "sha256:abababababababababababababababababababababababababababababababab",
+        "size": 10,
+        "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+        "contributions": [
+          {
+            "kind": "skill",
+            "path": "skills/notes"
+          }
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

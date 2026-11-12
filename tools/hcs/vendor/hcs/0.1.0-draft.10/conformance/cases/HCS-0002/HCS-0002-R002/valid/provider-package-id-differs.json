@@ -1,0 +1,69 @@
+{
+  "description": "Requirement satisfied by a package whose id is unrelated to the capability id.",
+  "requirements": [
+    "HCS-0002-R002"
+  ],
+  "level": "resolution",
+  "input": {
+    "catalog": {
+      "hcsVersion": "0.1",
+      "id": "dev.example.desktop",
+      "version": "2026.11.06-1",
+      "entries": [
+        {
+          "id": "dev.example.notes",
+          "version": "1.0.0",
+          "contentHash": "sha256:abababababababababababababababababababababababababababababababab",
+          "size": 10,
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/notes"
+            }
+          ],
+          "requires": [
+            "dev.example.search@1"
+          ]
+        },
+        {
+          "id": "org.other.websearch",
+          "version": "1.0.0",
+          "contentHash": "sha256:abababababababababababababababababababababababababababababababab",
+          "size": 10,
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/websearch",
+              "provides": [
+                "dev.example.search@1"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "host": {
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "contributionKinds": [
+        "skill",
+        "mcp-server"
+      ],
+      "mediaTypes": [
+        "application/vnd.oci.image.layer.v1.tar+gzip"
+      ],
+      "builtins": []
+    }
+  },
+  "expect": {
+    "activationOrder": [
+      "org.other.websearch",
+      "dev.example.notes"
+    ],
+    "errors": []
+  }
+}

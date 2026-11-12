@@ -1,0 +1,71 @@
+{
+  "description": "A package named like the capability but not providing it does not satisfy the requirement.",
+  "requirements": [
+    "HCS-0002-R002"
+  ],
+  "level": "resolution",
+  "input": {
+    "catalog": {
+      "hcsVersion": "0.1",
+      "id": "dev.example.desktop",
+      "version": "2026.11.06-1",
+      "entries": [
+        {
+          "id": "dev.example.notes",
+          "version": "1.0.0",
+          "contentHash": "sha256:abababababababababababababababababababababababababababababababab",
+          "size": 10,
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/notes"
+            }
+          ],
+          "requires": [
+            "dev.example.search@1"
+          ]
+        },
+        {
+          "id": "dev.example.search",
+          "version": "1.0.0",
+          "contentHash": "sha256:abababababababababababababababababababababababababababababababab",
+          "size": 10,
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/search"
+            }
+          ]
+        }
+      ]
+    },
+    "host": {
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "contributionKinds": [
+        "skill",
+        "mcp-server"
+      ],
+      "mediaTypes": [
+        "application/vnd.oci.image.layer.v1.tar+gzip"
+      ],
+      "builtins": []
+    }
+  },
+  "expect": {
+    "activationOrder": [
+      "dev.example.search"
+    ],
+    "errors": [
+      {
+        "code": "missing_dependency",
+        "entry": "dev.example.notes",
+        "capability": "dev.example.search@1"
+      }
+    ]
+  }
+}

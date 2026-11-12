@@ -1,0 +1,18 @@
+{
+  "description": "A class this version does not define is a valid document; hosts treat it as destructive (R004).",
+  "requirements": [
+    "HCS-0009-R001"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0009:tool-effects:0.1#/$defs/serverMeta",
+  "input": {
+    "tools": {
+      "quarantine": {
+        "effect": "quarantine"
+      }
+    }
+  },
+  "expect": {
+    "outcome": "valid"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "description": "A status report with a defined state.",
+  "requirements": [
+    "HCS-0004-R002"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0004:lifecycle:0.1",
+  "input": {
+    "entry": "dev.example.a",
+    "version": "1.0.0",
+    "state": "active"
+  },
+  "expect": {
+    "outcome": "valid"
+  }
+}

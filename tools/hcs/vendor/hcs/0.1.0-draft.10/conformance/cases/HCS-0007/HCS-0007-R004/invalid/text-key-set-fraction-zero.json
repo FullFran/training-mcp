@@ -1,0 +1,30 @@
+{
+  "description": "version 3.0 in a key set: the same rule as for an envelope.",
+  "requirements": [
+    "HCS-0007-R004"
+  ],
+  "level": "distribution",
+  "documentBase64": "eyJoY3NWZXJzaW9uIjoiMC4xIiwidmVyc2lvbiI6My4wLCJrZXlzIjpbeyJrZXlpZCI6Im9ubGluZS0xIiwia2V5dHlwZSI6ImVkMjU1MTkiLCJwdWJsaWMiOiJvTmtvQmRVUTB4VHl2N3UrbEx6cmw4dzdsa1UvOXRPZllMZ0h1WThZWkRzPSIsIm5vdEJlZm9yZSI6IjIwMjYtMDEtMDFUMDA6MDA6MDBaIiwibm90QWZ0ZXIiOiIyMDI3LTAxLTAxVDAwOjAwOjAwWiJ9XSwic2lnbmF0dXJlcyI6W3sia2V5aWQiOiJyb290LTEiLCJzaWciOiJ0eDRORUlDWS9BSFhvZWZxOGtXSEJEYjl0OWpNK3d1cjNlSVdCSXBNaUVzNm1Lci80S3l1UUdrNElHc2pPSEo2akpZVWJZaUZMMEJBUVArek9udThDQT09In1dfQ==",
+  "input": {
+    "check": "key-set",
+    "now": "2026-11-06T12:00:00Z",
+    "trustAnchor": {
+      "keys": [
+        {
+          "keyid": "root-1",
+          "keytype": "ed25519",
+          "public": "LWB8cicdNrnQPkwy2jC4f24oJ6JOv49Apy61kpnIRsU="
+        }
+      ],
+      "threshold": 1
+    }
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

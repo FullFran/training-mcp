@@ -1,0 +1,13 @@
+{
+  "description": "The active generation changes with no pending record.",
+  "requirements": [
+    "HCS-0008-R031"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Confirmed gen-0041. The host changes the active generation to gen-0042 and is killed before it records anything."
+  },
+  "expect": {
+    "behaviour": "Non-conforming: after the restart nothing records that gen-0042 was being tried or that gen-0041 is the generation to return to."
+  }
+}

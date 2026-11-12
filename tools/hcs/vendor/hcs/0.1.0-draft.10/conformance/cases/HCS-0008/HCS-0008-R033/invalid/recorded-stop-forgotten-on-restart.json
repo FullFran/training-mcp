@@ -1,0 +1,29 @@
+{
+  "description": "The host forgets the recorded stop, finds a confirmed active generation and starts it.",
+  "requirements": [
+    "HCS-0008-R033"
+  ],
+  "level": "recovery",
+  "input": {
+    "persisted": {
+      "active": 41,
+      "confirmed": 41,
+      "pending": null,
+      "failed": [
+        42
+      ],
+      "stopped": {
+        "generation": 41,
+        "reason": "return-failed"
+      }
+    },
+    "onDisk": [
+      40,
+      41,
+      42
+    ]
+  },
+  "expect": {
+    "action": "start"
+  }
+}

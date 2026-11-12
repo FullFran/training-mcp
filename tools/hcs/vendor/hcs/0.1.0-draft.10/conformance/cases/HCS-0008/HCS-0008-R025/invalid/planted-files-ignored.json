@@ -1,0 +1,13 @@
+{
+  "description": "Configuration planted in user and workspace locations has no effect.",
+  "requirements": [
+    "HCS-0008-R025"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Before the run, plant in the user's real home and in the workspace an extra skill, an extensions folder, a settings file that disables the permission policy, an MCP config and a credentials file."
+  },
+  "expect": {
+    "behaviour": "None of them is loaded or applied: the engine reports only the projected skill and MCP server, the host-owned permission policy is in force, and no request uses the planted credentials."
+  }
+}

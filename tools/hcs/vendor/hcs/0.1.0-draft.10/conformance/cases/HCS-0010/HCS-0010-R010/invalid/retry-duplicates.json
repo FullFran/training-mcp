@@ -1,0 +1,13 @@
+{
+  "description": "A retry that creates a second proposal does not conform.",
+  "requirements": [
+    "HCS-0010-R010"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "As above."
+  },
+  "expect": {
+    "behaviour": "A host that stores two proposals, or applies the change twice, violates R010."
+  }
+}

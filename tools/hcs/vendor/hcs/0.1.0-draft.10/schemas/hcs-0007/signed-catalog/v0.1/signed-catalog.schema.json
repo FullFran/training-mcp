@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hcs:schema:hcs-0007:signed-catalog:0.1",
+  "title": "HCS signed catalog envelope and key set",
+  "description": "DISTRO-1 documents (HCS-0007): the signed catalog envelope, the root-signed key set, and the trust anchor a host receives at enrollment.",
+  "$defs": {
+    "canonicalValue": {
+      "description": "JSON value in the HCS-0007 canonical domain: numbers are integers within the I-JSON safe range (HCS-0007-R004).",
+      "anyOf": [
+        { "type": ["null", "boolean", "string"] },
+        { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+        { "type": "array", "items": { "$ref": "#/$defs/canonicalValue" } },
+        { "type": "object", "additionalProperties": { "$ref": "#/$defs/canonicalValue" } }
+      ]
+    },
+    "timestamp": {
+      "description": "RFC 3339 date-time in UTC with the Z designator, optional fractional seconds.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,9})?Z$"
+    },
+    "keyid": {
+      "description": "Key identifier, unique within a key set or trust anchor. Opaque; it selects a key, it does not prove one.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "signature": {
+      "type": "object",
+      "required": ["keyid", "sig"],
+      "properties": {
+        "keyid": { "$ref": "#/$defs/keyid" },
+        "sig": {
+          "description": "Ed25519 signature (64 bytes), standard base64 with padding.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{86}==$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "signatures": { "type": "array", "items": { "$ref": "#/$defs/signature" } },
+    "publicKey": {
+      "type": "object",
+      "required": ["keyid", "keytype", "public"],
+      "properties": {
+        "keyid": { "$ref": "#/$defs/keyid" },
+        "keytype": { "const": "ed25519" },
+        "public": {
+          "description": "Ed25519 public key (32 bytes), standard base64 with padding.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{43}=$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "onlineKey": {
+      "type": "object",
+      "required": ["keyid", "keytype", "public", "notBefore", "notAfter"],
+      "properties": {
+        "keyid": { "$ref": "#/$defs/keyid" },
+        "keytype": { "const": "ed25519" },
+        "public": { "$ref": "#/$defs/publicKey/properties/public" },
+        "notBefore": { "$ref": "#/$defs/timestamp" },
+        "notAfter": { "$ref": "#/$defs/timestamp" }
+      },
+      "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": { "$ref": "#/$defs/canonicalValue" } },
+      "additionalProperties": false
+    },
+    "binding": {
+      "description": "Distribution-defined assignment the envelope is addressed to; compared for exact equality with the host's assignment (HCS-0007-R006).",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+      "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 256 }
+    },
+    "envelope": {
+      "description": "Signed catalog envelope (HCS-0007 section 3.1). The catalog is checked against HCS-0001 only after the envelope verifies (step 6).",
+      "type": "object",
+      "required": ["hcsVersion", "sequence", "expires", "binding", "catalog"],
+      "properties": {
+        "hcsVersion": { "const": "0.1" },
+        "sequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "expires": { "$ref": "#/$defs/timestamp" },
+        "binding": { "$ref": "#/$defs/binding" },
+        "catalog": { "type": "object", "$ref": "#/$defs/canonicalValue" },
+        "signatures": { "$ref": "#/$defs/signatures" }
+      },
+      "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": { "$ref": "#/$defs/canonicalValue" } },
+      "additionalProperties": false
+    },
+    "keySet": {
+      "description": "Root-signed set of online keys (HCS-0007 section 3.2). keyid uniqueness is checked by the host, not the schema.",
+      "type": "object",
+      "required": ["hcsVersion", "version", "keys"],
+      "properties": {
+        "hcsVersion": { "const": "0.1" },
+        "version": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "threshold": { "type": "integer", "minimum": 1, "maximum": 255 },
+        "keys": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/onlineKey" } },
+        "signatures": { "$ref": "#/$defs/signatures" }
+      },
+      "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": { "$ref": "#/$defs/canonicalValue" } },
+      "additionalProperties": false
+    },
+    "trustAnchor": {
+      "description": "Root public keys and threshold a host receives at enrollment (HCS-0007 section 3.3). Not signed; delivered out of band.",
+      "type": "object",
+      "required": ["keys"],
+      "properties": {
+        "keys": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/publicKey" } },
+        "threshold": { "type": "integer", "minimum": 1, "maximum": 255 }
+      },
+      "additionalProperties": false
+    },
+    "acceptedState": {
+      "description": "What a host remembers about the last accepted envelope (sequence) or key set (version): the number and the sha256 digest of the canonical serialization without signatures.",
+      "type": "object",
+      "required": ["digest"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1 },
+        "version": { "type": "integer", "minimum": 1 },
+        "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

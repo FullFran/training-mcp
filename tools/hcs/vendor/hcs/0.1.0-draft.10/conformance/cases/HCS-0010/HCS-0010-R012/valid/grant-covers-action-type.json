@@ -1,0 +1,25 @@
+{
+  "description": "A grant for an action type covers a proposal of that type, whichever tool made it.",
+  "requirements": [
+    "HCS-0010-R012"
+  ],
+  "level": "authority",
+  "input": {
+    "requests": [],
+    "grants": [
+      {
+        "entry": "dev.example.a",
+        "permission": "dev.example.sets.log"
+      }
+    ],
+    "check": {
+      "entry": "dev.example.a",
+      "permission": "dev.example.sets.log"
+    }
+  },
+  "expect": {
+    "decision": {
+      "allow": true
+    }
+  }
+}

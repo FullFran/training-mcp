@@ -129,6 +129,7 @@ var isolationCases = map[string]isolationCase{
 	"weekly_volume":         {args: noArgs},
 	"volume_by_muscle":      {args: noArgs},
 	"live_workout":          {args: noArgs},
+	"render_rest_timer":     {args: noArgs},
 	"exercise_history": {args: func(toolIDs) map[string]any {
 		return map[string]any{"exercise": isolationExercise}
 	}},

@@ -1,0 +1,13 @@
+{
+  "description": "A host that lets a later answer replace the first does not conform.",
+  "requirements": [
+    "HCS-0010-R003"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Proposal p-1 is accepted. A second answer reject_once arrives for p-1."
+  },
+  "expect": {
+    "behaviour": "A conforming host refuses it; a host that moves p-1 to rejected violates R003."
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "Host-provided defaults that no contribution replaces travel with the generation's skills.",
+  "requirements": [
+    "HCS-0008-R027"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The host bundles default skills help and notes; the generation contributes a skill named notes."
+  },
+  "expect": {
+    "behaviour": "session/new lists the generation's notes directory (inside the generation) and the host's help directory; the host's notes default is not sent; the agent loads exactly those two."
+  }
+}

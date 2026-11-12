@@ -1,0 +1,13 @@
+{
+  "description": "Call a capability whose provider entry is stopped.",
+  "requirements": [
+    "HCS-0004-R005"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Call a capability whose provider entry is stopped."
+  },
+  "expect": {
+    "behaviour": "The call fails with unsupported_capability."
+  }
+}

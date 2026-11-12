@@ -1,0 +1,62 @@
+{
+  "description": "The host id matches and its version is listed exactly.",
+  "requirements": [
+    "HCS-0001-R016"
+  ],
+  "level": "resolution",
+  "input": {
+    "catalog": {
+      "hcsVersion": "0.1",
+      "id": "dev.example.desktop",
+      "version": "2026.11.06-1",
+      "entries": [
+        {
+          "id": "dev.example.a",
+          "version": "1.0.0",
+          "contentHash": "sha256:abababababababababababababababababababababababababababababababab",
+          "size": 10,
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/a"
+            }
+          ],
+          "compatibility": {
+            "hosts": [
+              {
+                "id": "dev.example.host",
+                "versions": [
+                  "2.3.0",
+                  "2.4.0"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "host": {
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "contributionKinds": [
+        "skill",
+        "mcp-server"
+      ],
+      "mediaTypes": [
+        "application/vnd.oci.image.layer.v1.tar+gzip"
+      ],
+      "builtins": [],
+      "id": "dev.example.host",
+      "version": "2.4.0"
+    }
+  },
+  "expect": {
+    "activationOrder": [
+      "dev.example.a"
+    ],
+    "errors": []
+  }
+}

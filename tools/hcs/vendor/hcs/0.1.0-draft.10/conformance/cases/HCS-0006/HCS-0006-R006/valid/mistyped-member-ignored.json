@@ -1,0 +1,24 @@
+{
+  "description": "A problem member of the wrong type (string status) is ignored; the HCS error still counts.",
+  "requirements": [
+    "HCS-0006-R006"
+  ],
+  "level": "client",
+  "input": {
+    "problem": {
+      "type": "urn:hcs:error:permission_denied",
+      "title": "permission_denied",
+      "status": "403",
+      "hcsError": {
+        "code": "permission_denied",
+        "message": "envelope bound to another assignment"
+      }
+    }
+  },
+  "expect": {
+    "hcsError": {
+      "code": "permission_denied",
+      "message": "envelope bound to another assignment"
+    }
+  }
+}

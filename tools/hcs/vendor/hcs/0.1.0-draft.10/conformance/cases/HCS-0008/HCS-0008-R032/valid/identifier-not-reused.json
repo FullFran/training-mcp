@@ -1,0 +1,13 @@
+{
+  "description": "A failed generation's identifier is not reused for other content.",
+  "requirements": [
+    "HCS-0008-R032"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "gen-0042 is recorded as failed and the host removes its content. The host applies a new desired set."
+  },
+  "expect": {
+    "behaviour": "The new generation gets an identifier higher than 0042; gen-0042 stays recorded as failed."
+  }
+}

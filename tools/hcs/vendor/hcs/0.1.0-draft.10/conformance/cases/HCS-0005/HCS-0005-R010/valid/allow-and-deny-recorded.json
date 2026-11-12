@@ -1,0 +1,13 @@
+{
+  "description": "Every decision the host acts on produces one record.",
+  "requirements": [
+    "HCS-0005-R010"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Grant send-mail to dev.example.a. The engine sends mail (allowed) and then writes a file without a grant (denied)."
+  },
+  "expect": {
+    "behaviour": "Two decision records: one with outcome allow and decider kind grant, one with outcome deny and decider {kind: policy, id: HCS-0005-R001}."
+  }
+}

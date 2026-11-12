@@ -1,0 +1,13 @@
+{
+  "description": "Editing or deleting the answered record does not conform.",
+  "requirements": [
+    "HCS-0010-R009"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "As above, the host rewrites p-1's answer.time to the time of the undo or removes p-1."
+  },
+  "expect": {
+    "behaviour": "This violates R009."
+  }
+}

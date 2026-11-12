@@ -1,0 +1,13 @@
+{
+  "description": "A load that does not say its generation is refused.",
+  "requirements": [
+    "HCS-0008-R028"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Session s1 was created on gen-0060; the host sends session/load for s1 without _meta[\"io.github.fullfran.hcs\"]."
+  },
+  "expect": {
+    "behaviour": "The agent answers a JSON-RPC error whose data.hcsError.code is generation_mismatch."
+  }
+}

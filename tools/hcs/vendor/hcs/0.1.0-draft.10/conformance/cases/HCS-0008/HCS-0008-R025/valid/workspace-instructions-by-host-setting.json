@@ -1,0 +1,13 @@
+{
+  "description": "Workspace instruction files are read only when a host-owned setting allows them.",
+  "requirements": [
+    "HCS-0008-R025"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The workspace has an AGENTS.md. Run 1: the host-owned settings do not allow workspace instructions. Run 2: they do."
+  },
+  "expect": {
+    "behaviour": "Run 1 does not load AGENTS.md; run 2 does. Neither run loads anything else from the workspace."
+  }
+}

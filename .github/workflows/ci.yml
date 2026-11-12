@@ -57,6 +57,12 @@ jobs:
         if: matrix.shard == 'rest'
         run: go vet ./...
 
+      # The HCS release vendored in tools/hcs is pinned by digest. Fail when
+      # any vendored file was edited, removed or added since `sync`.
+      - name: HCS vendored release unchanged
+        if: matrix.shard == 'rest'
+        run: python3 tools/hcs/hcs_kit.py verify --root tools/hcs
+
       - name: packages in this shard
         run: |
           case "${{ matrix.shard }}" in
@@ -91,15 +97,39 @@ jobs:
           }
           echo "ok"
 
+  # MCP Apps views (ui/, docs/apps.md): typecheck, test the pure models, and
+  # fail when a committed bundle in internal/mcpsrv/apps is not what the
+  # sources build to, since Go embeds the committed file.
+  ui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm test
+      - run: npm run check:bundle
+
   # The check to wait for before merging, as before the split: green only when
-  # every shard passed.
+  # every shard and the views passed.
   test:
-    needs: go-test
+    needs: [go-test, ui]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: every shard passed
-        run: test "${{ needs.go-test.result }}" = success
+        run: test "${{ needs.go-test.result }}" = success && test "${{ needs.ui.result }}" = success
 
   # The image is what actually ships, so it must build and boot here, not for
   # the first time on the server. See docs/deployment.md.

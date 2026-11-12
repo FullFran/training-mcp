@@ -1,0 +1,60 @@
+{
+  "description": "One byte over the limit is reported; the other entries proceed (R017).",
+  "requirements": [
+    "HCS-0008-R037"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "skill",
+      "mcp-server"
+    ],
+    "hostOwned": [],
+    "grantedSecrets": {},
+    "activationPolicy": "partial",
+    "generation": {
+      "id": "gen-0070",
+      "entries": [
+        {
+          "id": "dev.example.big",
+          "contributions": [
+            {
+              "kind": "mcp-server",
+              "path": "mcp/big/server.json",
+              "descriptor": {
+                "name": "io.example/big",
+                "description": "Example server",
+                "version": "1.0.0"
+              },
+              "toolListBytes": 36001
+            }
+          ]
+        },
+        {
+          "id": "dev.example.notes",
+          "contributions": [
+            {
+              "kind": "skill",
+              "name": "notes"
+            }
+          ]
+        }
+      ]
+    },
+    "clientLimits": {
+      "client": "chatgpt",
+      "toolListBytes": 36000
+    }
+  },
+  "expect": {
+    "errors": [
+      {
+        "code": "unsupported_contribution",
+        "entry": "dev.example.big"
+      }
+    ],
+    "selected": [
+      "dev.example.notes"
+    ]
+  }
+}

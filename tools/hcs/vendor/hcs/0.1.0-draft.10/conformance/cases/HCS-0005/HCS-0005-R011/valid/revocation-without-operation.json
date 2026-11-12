@@ -1,0 +1,23 @@
+{
+  "description": "A revocation record has no operation.",
+  "requirements": [
+    "HCS-0005-R011"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0005:authority:0.1#/$defs/decisionRecord",
+  "input": {
+    "id": "rec-44",
+    "time": "2026-11-07T16:00:00Z",
+    "entry": "dev.example.a",
+    "permission": "dev.example.mail.send",
+    "outcome": "revoked",
+    "decider": {
+      "kind": "subject",
+      "id": "sub-0001"
+    },
+    "channel": "operator-console"
+  },
+  "expect": {
+    "outcome": "valid"
+  }
+}

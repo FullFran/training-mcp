@@ -1,0 +1,24 @@
+{
+  "description": "No grant: deny with permission_denied.",
+  "requirements": [
+    "HCS-0005-R001"
+  ],
+  "level": "authority",
+  "input": {
+    "requests": [],
+    "grants": [],
+    "check": {
+      "entry": "dev.example.a",
+      "permission": "dev.example.fs.read"
+    }
+  },
+  "expect": {
+    "decision": {
+      "allow": false,
+      "error": {
+        "code": "permission_denied",
+        "message": "denied"
+      }
+    }
+  }
+}

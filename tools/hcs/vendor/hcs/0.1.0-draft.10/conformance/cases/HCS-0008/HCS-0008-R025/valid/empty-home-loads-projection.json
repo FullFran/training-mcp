@@ -1,0 +1,13 @@
+{
+  "description": "With an empty home directory the run loads everything it projected.",
+  "requirements": [
+    "HCS-0008-R025"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Start an engine run of a generation with one skill and one MCP server, with HOME (and USERPROFILE, XDG_* dirs) pointing to an empty private directory."
+  },
+  "expect": {
+    "behaviour": "The engine reports the skill and the MCP server loaded; health passes."
+  }
+}

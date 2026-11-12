@@ -1,0 +1,13 @@
+{
+  "description": "Skill paths lie inside the generation.",
+  "requirements": [
+    "HCS-0008-R027"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "A generation entry's skill contribution resolves (through a link) to a directory outside the generation."
+  },
+  "expect": {
+    "behaviour": "The host does not send that path in session/new; the entry is reported with an error and the agent loads no skill from outside the generation."
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "A refused key set leaves the accepted key set in place, and envelopes still verify against it.",
+  "requirements": [
+    "HCS-0007-R026"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Trust anchor root-1. Accepted key set version 3 with online-1. Deliver key set version 4 signed only by root-2, then envelope 42 signed by online-1."
+  },
+  "expect": {
+    "behaviour": "Key set 4 is refused with signature_invalid, the accepted key set stays version 3 with its digest, and envelope 42 is accepted."
+  }
+}

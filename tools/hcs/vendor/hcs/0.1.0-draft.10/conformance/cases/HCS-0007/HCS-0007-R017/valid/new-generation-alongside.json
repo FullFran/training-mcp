@@ -1,0 +1,13 @@
+{
+  "description": "The new set is prepared next to the active one.",
+  "requirements": [
+    "HCS-0007-R017"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Active set {a@1}. A valid envelope brings {a@2}. Observe a@1's unpacked files while a@2 is prepared."
+  },
+  "expect": {
+    "behaviour": "a@1's files are unchanged until the switch; after the switch a@2 is active and nothing ran with a mix of a@1 and a@2 files."
+  }
+}

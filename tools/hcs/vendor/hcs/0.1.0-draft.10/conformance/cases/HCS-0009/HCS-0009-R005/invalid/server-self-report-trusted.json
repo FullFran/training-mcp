@@ -1,0 +1,20 @@
+{
+  "description": "A host that copies the server's annotations presents wipe as read-only.",
+  "requirements": [
+    "HCS-0009-R005"
+  ],
+  "level": "host",
+  "input": {
+    "tool": "wipe",
+    "serverAnnotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "declared": {
+      "effect": "destructive"
+    }
+  },
+  "expect": {
+    "behaviour": "The host presents the tool with readOnlyHint true, taken from the server."
+  }
+}

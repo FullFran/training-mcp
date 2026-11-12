@@ -1,0 +1,7 @@
+{
+  "description": "The exact decompressed-stream limit is inclusive.",
+  "requirements": ["HCS-0001-R018"],
+  "level": "integrity",
+  "input": {"entry":{"id":"dev.example.a","size":29,"contentHash":"sha256:deb230b21e0d7ef6a0a2d65a19599d4251b5f08888a5155882fbef2ef71e1e11","contentId":"sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"},"contentBase64":"H4sIAAAAAAACA2NgGAWjYBSMVAAALq+17wAEAAA=","maxUncompressedBytes":1024},
+  "expect":{"outcome":"valid","errors":[]}
+}

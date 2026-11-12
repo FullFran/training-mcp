@@ -1,0 +1,36 @@
+{
+  "description": "A matching denial wins over a matching grant.",
+  "requirements": [
+    "HCS-0005-R007"
+  ],
+  "level": "authority",
+  "input": {
+    "requests": [],
+    "grants": [
+      {
+        "entry": "dev.example.a",
+        "permission": "dev.example.mail.send"
+      }
+    ],
+    "check": {
+      "entry": "dev.example.a",
+      "permission": "dev.example.mail.send"
+    },
+    "denials": [
+      {
+        "entry": "dev.example.a",
+        "permission": "dev.example.mail.send",
+        "origin": "rec-17"
+      }
+    ]
+  },
+  "expect": {
+    "decision": {
+      "allow": false,
+      "error": {
+        "code": "permission_denied",
+        "message": "denied"
+      }
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "description": "A limit of zero bytes is not a limit.",
+  "requirements": [
+    "HCS-0008-R036"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0008:client-limits:0.1",
+  "input": {
+    "client": "chatgpt",
+    "toolListBytes": 0
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

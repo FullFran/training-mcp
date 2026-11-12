@@ -1,0 +1,32 @@
+{
+  "description": "Right hash prefix but declared size differs.",
+  "requirements": [
+    "HCS-0001-R007"
+  ],
+  "level": "integrity",
+  "input": {
+    "entry": {
+      "id": "dev.example.a",
+      "version": "1",
+      "contentHash": "sha256:785ff27eafe94633368b45bbf0368f8ed61bab85bad2b9fe298e1c1368a9494d",
+      "size": 11,
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "contributions": [
+        {
+          "kind": "skill",
+          "path": "s"
+        }
+      ]
+    },
+    "contentBase64": "aGVsbG8gaGNzCg=="
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "integrity_mismatch",
+        "entry": "dev.example.a"
+      }
+    ]
+  }
+}

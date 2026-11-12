@@ -1,0 +1,13 @@
+{
+  "description": "Resolution uses declared data only.",
+  "requirements": [
+    "HCS-0003-R001"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Resolve a catalog whose packages export capabilities only at runtime."
+  },
+  "expect": {
+    "behaviour": "Resolution uses only declared provides/requires; no package process is started."
+  }
+}

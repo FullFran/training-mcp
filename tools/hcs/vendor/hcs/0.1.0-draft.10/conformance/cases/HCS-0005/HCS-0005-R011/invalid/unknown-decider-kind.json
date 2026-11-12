@@ -1,0 +1,31 @@
+{
+  "description": "decider.kind is a closed set.",
+  "requirements": [
+    "HCS-0005-R011"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0005:authority:0.1#/$defs/decisionRecord",
+  "input": {
+    "id": "rec-42",
+    "time": "2026-11-07T15:40:02Z",
+    "entry": "dev.example.a",
+    "permission": "dev.example.mail.send",
+    "outcome": "allow",
+    "operation": "toolu_01",
+    "session": "s1",
+    "decider": {
+      "kind": "engine",
+      "id": "engine-cache"
+    },
+    "channel": "acp:session/request_permission",
+    "answer": "allow_always"
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

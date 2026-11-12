@@ -1,0 +1,20 @@
+{
+  "description": "No declaration: the most dangerous annotations.",
+  "requirements": [
+    "HCS-0009-R004"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0009:tool-effects:0.1#/$defs/classification",
+  "input": {
+    "tool": "mystery",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  "expect": {
+    "outcome": "valid"
+  }
+}

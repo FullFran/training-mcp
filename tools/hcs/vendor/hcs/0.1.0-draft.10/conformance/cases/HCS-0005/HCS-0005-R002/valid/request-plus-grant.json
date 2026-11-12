@@ -1,0 +1,36 @@
+{
+  "description": "Request and grant together allow.",
+  "requirements": [
+    "HCS-0005-R002"
+  ],
+  "level": "authority",
+  "input": {
+    "requests": [
+      {
+        "hcsVersion": "0.1",
+        "entry": "dev.example.a",
+        "requests": [
+          {
+            "permission": "dev.example.fs.read",
+            "reason": "read notes"
+          }
+        ]
+      }
+    ],
+    "grants": [
+      {
+        "entry": "dev.example.a",
+        "permission": "dev.example.fs.read"
+      }
+    ],
+    "check": {
+      "entry": "dev.example.a",
+      "permission": "dev.example.fs.read"
+    }
+  },
+  "expect": {
+    "decision": {
+      "allow": true
+    }
+  }
+}

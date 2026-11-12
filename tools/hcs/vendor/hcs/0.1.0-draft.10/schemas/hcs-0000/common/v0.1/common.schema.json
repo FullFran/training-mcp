@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hcs:schema:hcs-0000:common:0.1",
+  "title": "HCS common definitions",
+  "description": "Shared definitions used by every HCS schema (HCS-0000).",
+  "$defs": {
+    "extensionName": {
+      "description": "Extension member name: x-<distribution>[-<segment>...] (HCS-0000 section 7).",
+      "type": "string",
+      "pattern": "^x-[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "hcsVersion": {
+      "description": "HCS contract version as MAJOR.MINOR.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "dottedId": {
+      "description": "Lowercase dotted identifier with at least two segments, for example dev.example.search.",
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+    }
+  }
+}

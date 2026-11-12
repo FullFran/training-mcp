@@ -1,0 +1,27 @@
+{
+  "description": "An active generation recorded as failed completes the return to the confirmed generation (item 4).",
+  "requirements": [
+    "HCS-0008-R033"
+  ],
+  "level": "recovery",
+  "input": {
+    "persisted": {
+      "active": 42,
+      "confirmed": 41,
+      "pending": 42,
+      "failed": [
+        42
+      ]
+    },
+    "onDisk": [
+      40,
+      41,
+      42
+    ]
+  },
+  "expect": {
+    "action": "return",
+    "generation": 42,
+    "returnTo": 41
+  }
+}

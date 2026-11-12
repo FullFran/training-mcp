@@ -1,0 +1,21 @@
+{
+  "description": "The generation id is required.",
+  "requirements": [
+    "HCS-0008-R027"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0008:acp:0.1#/$defs/sessionMeta",
+  "input": {
+    "generation": {
+      "skills": []
+    }
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

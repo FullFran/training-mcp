@@ -1,0 +1,76 @@
+{
+  "description": "A file package names a script inside its contribution folder.",
+  "requirements": [
+    "HCS-0008-R021"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "skill",
+      "mcp-server"
+    ],
+    "hostOwned": [],
+    "hostRuntimes": {
+      "node": [
+        "NODE_OPTIONS"
+      ]
+    },
+    "grantedSecrets": {},
+    "activationPolicy": "partial",
+    "generation": {
+      "id": "gen-0050",
+      "entries": [
+        {
+          "id": "dev.example.echo",
+          "contributions": [
+            {
+              "kind": "mcp-server",
+              "path": "mcp/echo/server.json",
+              "files": [
+                "server.mjs"
+              ],
+              "descriptor": {
+                "name": "io.example/echo",
+                "description": "Echo server",
+                "version": "1.0.0",
+                "packages": [
+                  {
+                    "registryType": "file",
+                    "identifier": "server.mjs",
+                    "runtimeHint": "node",
+                    "transport": {
+                      "type": "stdio"
+                    },
+                    "environmentVariables": [
+                      {
+                        "name": "ECHO_TOKEN",
+                        "isSecret": true,
+                        "isRequired": false
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "dev.example.notes",
+          "contributions": [
+            {
+              "kind": "skill",
+              "name": "notes"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "errors": [],
+    "selected": [
+      "dev.example.echo",
+      "dev.example.notes"
+    ]
+  }
+}

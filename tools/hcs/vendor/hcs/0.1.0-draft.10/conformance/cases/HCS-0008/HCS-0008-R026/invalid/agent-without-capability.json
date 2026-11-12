@@ -1,0 +1,13 @@
+{
+  "description": "An agent that does not advertise the extension gets no projection.",
+  "requirements": [
+    "HCS-0008-R026"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The ACP agent's initialize response has no agentCapabilities._meta[\"io.github.fullfran.hcs\"]; the generation has entries for that engine."
+  },
+  "expect": {
+    "behaviour": "The host sends no session/new from the generation to it and reports unsupported_contribution for each of those entries; per R017 this does not fail the generation on other engines."
+  }
+}

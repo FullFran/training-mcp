@@ -1,0 +1,13 @@
+{
+  "description": "A session is not reopened on another generation.",
+  "requirements": [
+    "HCS-0008-R028"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Session s1 was created on gen-0060; gen-0061 is now active; the host sends session/load for s1 with generation.id gen-0061."
+  },
+  "expect": {
+    "behaviour": "The agent answers a JSON-RPC error whose data.hcsError.code is generation_mismatch; the host starts a new session on gen-0061 and session-limited grants of s1 do not apply to it."
+  }
+}

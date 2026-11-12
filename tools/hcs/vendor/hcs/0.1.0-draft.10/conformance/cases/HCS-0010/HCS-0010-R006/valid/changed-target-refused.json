@@ -1,0 +1,13 @@
+{
+  "description": "A proposal made against an older state is not applied.",
+  "requirements": [
+    "HCS-0010-R006"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "An agent proposes an edit with base rev-1. The person edits the target (now rev-2), then accepts the proposal."
+  },
+  "expect": {
+    "behaviour": "The host refuses to apply, the target stays at rev-2, the person is told the target changed, the proposal stays pending."
+  }
+}

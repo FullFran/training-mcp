@@ -1,0 +1,13 @@
+{
+  "description": "The loaded report decides R014 over ACP.",
+  "requirements": [
+    "HCS-0008-R029"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "A generation projects skill notes and MCP server io.example/echo; the agent's _io.github.fullfran.hcs/loaded answer lists only notes."
+  },
+  "expect": {
+    "behaviour": "The host fails the health check (R014) and reports the generation failed (R015)."
+  }
+}

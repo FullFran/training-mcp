@@ -1,0 +1,13 @@
+{
+  "description": "Removing a grant is recorded.",
+  "requirements": [
+    "HCS-0005-R010"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The operator revokes the send-mail grant of dev.example.a."
+  },
+  "expect": {
+    "behaviour": "One decision record with outcome revoked, no operation, and the operator as decider."
+  }
+}

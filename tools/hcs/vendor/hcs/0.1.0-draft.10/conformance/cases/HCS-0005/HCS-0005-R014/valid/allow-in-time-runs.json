@@ -1,0 +1,13 @@
+{
+  "description": "An allow answer before the deadline lets the operation run.",
+  "requirements": [
+    "HCS-0005-R014"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "dev.example.a has no grant for dev.example.mail.send; the engine asks to send mail and the host asks the person over ACP session/request_permission with a 30 s deadline. The person answers allow_once after 5 s."
+  },
+  "expect": {
+    "behaviour": "The call runs; one decision record with outcome allow and decider kind subject."
+  }
+}

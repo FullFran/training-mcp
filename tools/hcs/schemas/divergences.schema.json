@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hcs:consumer-kit:divergences:0.1",
+  "title": "HCS consumer divergences",
+  "description": "Where a consumer deliberately differs from HCS (divergences) or does not implement a feature (notApplicable). Non-normative.",
+  "type": "object",
+  "properties": {
+    "$comment": {"type": "string"},
+    "divergences": {"type": "array", "items": {"$ref": "#/$defs/rule"}},
+    "notApplicable": {"type": "array", "items": {"$ref": "#/$defs/rule"}}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "required": ["requirement", "reason"],
+      "properties": {
+        "requirement": {"type": "string", "pattern": "^HCS-[0-9]{4}-R[0-9]{3}$"},
+        "reason": {"type": "string", "minLength": 1},
+        "cases": {
+          "description": "Case keys (path below cases/). Without it the rule covers every case of the requirement.",
+          "type": "array",
+          "items": {"type": "string", "pattern": "^HCS-[0-9]{4}/HCS-[0-9]{4}-R[0-9]{3}/(valid|invalid)/[^/]+\\.json$"}
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

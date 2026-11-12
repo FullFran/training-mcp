@@ -1,0 +1,13 @@
+{
+  "description": "An answer the engine remembered does not outlive the host's revocation.",
+  "requirements": [
+    "HCS-0005-R009"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The engine remembers allow_always for send-mail in its own settings. The host revokes the matching grant; the engine sends mail again."
+  },
+  "expect": {
+    "behaviour": "The call is denied with permission_denied: the host does not let the engine's remembered answer decide."
+  }
+}

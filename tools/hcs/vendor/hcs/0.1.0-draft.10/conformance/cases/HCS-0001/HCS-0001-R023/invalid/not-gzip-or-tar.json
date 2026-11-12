@@ -1,0 +1,25 @@
+{
+  "description": "Verified bytes that are not a gzip stream cannot be unpacked.",
+  "requirements": [
+    "HCS-0001-R023"
+  ],
+  "level": "integrity",
+  "input": {
+    "entry": {
+      "id": "dev.example.a",
+      "size": 10,
+      "contentHash": "sha256:a06ea19bf1e0d00ce666ecbc7d426b7fe43b40e694bd2f7c66acfef5c88781b9"
+    },
+    "contentBase64": "aGVsbG8gaGN6Cg==",
+    "unpack": true
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "package_invalid",
+        "entry": "dev.example.a"
+      }
+    ]
+  }
+}

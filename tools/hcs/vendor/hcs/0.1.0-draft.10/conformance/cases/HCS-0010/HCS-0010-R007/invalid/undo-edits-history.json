@@ -1,0 +1,13 @@
+{
+  "description": "Rewriting the undone record does not conform.",
+  "requirements": [
+    "HCS-0010-R007"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Proposal p-1 is accepted; the person undoes it."
+  },
+  "expect": {
+    "behaviour": "A host that sets p-1 back to pending or deletes it violates R007."
+  }
+}

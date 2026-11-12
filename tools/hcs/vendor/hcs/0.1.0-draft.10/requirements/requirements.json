@@ -1,0 +1,1118 @@
+{
+  "generatedBy": "tools/extract_requirements.py",
+  "requirements": [
+    {
+      "id": "HCS-0000-R001",
+      "document": "HCS-0000",
+      "keyword": "MUST",
+      "text": "Every MUST or MUST NOT requirement on documents or hosts in an HCS document MUST be referenced by at least one conformance case that satisfies it and at least one conformance case that violates it.",
+      "source": "spec/HCS-0000-conventions.md"
+    },
+    {
+      "id": "HCS-0000-R002",
+      "document": "HCS-0000",
+      "keyword": "MUST NOT",
+      "text": "A conformance case MUST NOT reference a requirement identifier that does not exist in `requirements/requirements.json`.",
+      "source": "spec/HCS-0000-conventions.md"
+    },
+    {
+      "id": "HCS-0000-R003",
+      "document": "HCS-0000",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT reject a document because it contains extension members it does not understand.",
+      "source": "spec/HCS-0000-conventions.md"
+    },
+    {
+      "id": "HCS-0000-R004",
+      "document": "HCS-0000",
+      "keyword": "MUST NOT",
+      "text": "An extension member MUST NOT change the validity verdict a host reaches for the members defined by HCS.",
+      "source": "spec/HCS-0000-conventions.md"
+    },
+    {
+      "id": "HCS-0001-R001",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "A catalog manifest MUST validate against the HCS-0001 catalog manifest schema for the `hcsVersion` it declares.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R002",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "A host MUST read `hcsVersion` before any other validation and MUST report `unsupported_hcs_version`, not `manifest_invalid`, when it does not implement that contract.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R003",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "Entry `id` values MUST be unique within a catalog manifest; a host MUST report `duplicate_entry` for every repeated id.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R004",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "`contentHash` MUST be `sha256:` followed by 64 lowercase hex digits or `sha512:` followed by 128 lowercase hex digits.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R017",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "When present, `contentId` MUST be `sha256:` followed by 64 lowercase hex digits or `sha512:` followed by 128 lowercase hex digits.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R005",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "A contribution `path` MUST be relative, use `/` as separator, and MUST NOT contain a `..` segment.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R006",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "A contribution `kind` MUST be `skill`, `mcp-server` or an extension name.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R011",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "Every entry MUST declare `mediaType`.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R007",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "A host MUST verify that fetched package bytes have exactly `size` bytes and match `contentHash` before unpacking or executing any of them, and MUST report `integrity_mismatch` otherwise.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R018",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "When `contentId` is present, a host MUST verify it against the exact uncompressed tar stream after verifying `size` and `contentHash`, using bounded decompression and before using any package content (including permission requests and extraction); it MUST report `integrity_mismatch` when decompression or identity verification fails, and MUST retain its extraction safety checks and resource limits. A host making decisions from this identity MUST protect its association with the authenticated catalog entry and MUST NOT interpret an absent identity as equality.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R019",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "A host MUST refuse a package whose tar has a member with an empty path, an absolute path, a `..` segment, a NUL or a backslash in its path, or a path component that starts with `.wh.` (an OCI whiteout name), and MUST report `package_invalid`. A path is empty when it names no member below the package root: an empty name, or one made only of `/` and `.` segments.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R020",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "A host MUST refuse a package whose tar has a member that is neither a regular file nor a directory (so every symbolic link, hard link, character or block device, FIFO and extended header record), or a directory member that carries data, and MUST report `package_invalid`.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R021",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "A host MUST refuse a package whose tar has a member whose path equals the path of an earlier member, or lies below the path of a regular file member whatever the order of the members, and MUST report `package_invalid`. Paths are compared after resolving `.` segments and removing a trailing `/`.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R022",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "A host MUST check member safety (R019 to R021, R023) after verifying `size`, `contentHash` and, when declared, `contentId` (R007, R018), which keep their `integrity_mismatch` errors; MUST finish those checks before writing any member to its final location; and MUST leave no part of a refused package at that location.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R023",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "A host MUST refuse a package whose tar cannot be parsed, or whose unpacked size or member count exceeds a limit the host sets, and MUST report `package_invalid`. A host MAY set such limits; HCS states no number. When `contentId` is declared, a failed or over-limit decompression stays `integrity_mismatch` (R018).",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R008",
+      "document": "HCS-0001",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT activate an entry that has a contribution whose `kind` it does not implement, and MUST report `unsupported_contribution` for that entry.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R009",
+      "document": "HCS-0001",
+      "keyword": "MUST NOT",
+      "text": "When `compatibility.platforms` is present, a host MUST NOT activate the entry unless one item matches the host platform, and MUST report `platform_incompatible` otherwise.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R010",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "A host MUST validate a catalog manifest without executing code from any package.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R016",
+      "document": "HCS-0001",
+      "keyword": "MUST NOT",
+      "text": "When `compatibility.hosts` is present, a host MUST NOT activate the entry unless one item names the host's id and lists the host's version exactly, and MUST report `version_incompatible` otherwise.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R012",
+      "document": "HCS-0001",
+      "keyword": "MUST",
+      "text": "A host MUST be able to unpack packages of media type `application/vnd.oci.image.layer.v1.tar+gzip` as described in section 3.4.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R013",
+      "document": "HCS-0001",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT activate an entry whose `mediaType` it does not implement, and MUST report `unsupported_contribution` for that entry.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R014",
+      "document": "HCS-0001",
+      "keyword": "SHOULD",
+      "text": "A producer SHOULD build package archives deterministically, so that `contentHash` changes only when the packaged content changes.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0001-R015",
+      "document": "HCS-0001",
+      "keyword": "SHOULD",
+      "text": "A host SHOULD reject a document that exceeds its declared maximum size or maximum nesting depth with `manifest_invalid` before schema validation, and SHOULD declare limits of at least 4 MiB (4 194 304 bytes) and 64 levels.",
+      "source": "spec/HCS-0001-catalog-manifest.md"
+    },
+    {
+      "id": "HCS-0002-R001",
+      "document": "HCS-0002",
+      "keyword": "MUST",
+      "text": "A capability reference in an HCS document MUST match the capability reference grammar.",
+      "source": "spec/HCS-0002-capability-ids.md"
+    },
+    {
+      "id": "HCS-0002-R002",
+      "document": "HCS-0002",
+      "keyword": "MUST",
+      "text": "A host MUST match a required capability to providers by capability reference only, never by the id of the package that provides it.",
+      "source": "spec/HCS-0002-capability-ids.md"
+    },
+    {
+      "id": "HCS-0002-R003",
+      "document": "HCS-0002",
+      "keyword": "MUST",
+      "text": "A host MUST treat two references with the same capability id and different majors as different contracts.",
+      "source": "spec/HCS-0002-capability-ids.md"
+    },
+    {
+      "id": "HCS-0002-R004",
+      "document": "HCS-0002",
+      "keyword": "SHOULD",
+      "text": "The owner of a contract SHOULD use a capability id whose leading segments are a reversed domain name it controls.",
+      "source": "spec/HCS-0002-capability-ids.md"
+    },
+    {
+      "id": "HCS-0002-R005",
+      "document": "HCS-0002",
+      "keyword": "SHOULD",
+      "text": "The owner of a contract SHOULD publish a new major when a change can break an existing provider or consumer.",
+      "source": "spec/HCS-0002-capability-ids.md"
+    },
+    {
+      "id": "HCS-0003-R001",
+      "document": "HCS-0003",
+      "keyword": "MUST",
+      "text": "A host MUST resolve a catalog without executing code from any package.",
+      "source": "spec/HCS-0003-resolution.md"
+    },
+    {
+      "id": "HCS-0003-R002",
+      "document": "HCS-0003",
+      "keyword": "MUST",
+      "text": "A host MUST report `missing_dependency` for an entry when no other eligible entry and no host built-in provides a capability id it requires.",
+      "source": "spec/HCS-0003-resolution.md"
+    },
+    {
+      "id": "HCS-0003-R003",
+      "document": "HCS-0003",
+      "keyword": "MUST",
+      "text": "A host MUST report `version_incompatible`, not `missing_dependency`, when the required capability id is provided only at other majors.",
+      "source": "spec/HCS-0003-resolution.md"
+    },
+    {
+      "id": "HCS-0003-R004",
+      "document": "HCS-0003",
+      "keyword": "MUST",
+      "text": "A host MUST report `ambiguous_provider` when more than one provider matches a required reference, and MUST NOT choose one of them implicitly.",
+      "source": "spec/HCS-0003-resolution.md"
+    },
+    {
+      "id": "HCS-0003-R005",
+      "document": "HCS-0003",
+      "keyword": "MUST",
+      "text": "A host MUST fail an entry whose requirement was satisfiable only by entries that themselves failed, reporting `missing_dependency` for it.",
+      "source": "spec/HCS-0003-resolution.md"
+    },
+    {
+      "id": "HCS-0003-R006",
+      "document": "HCS-0003",
+      "keyword": "MUST",
+      "text": "A host MUST report `dependency_cycle` for every entry whose requirements form a cycle, and MUST NOT activate any of them.",
+      "source": "spec/HCS-0003-resolution.md"
+    },
+    {
+      "id": "HCS-0003-R007",
+      "document": "HCS-0003",
+      "keyword": "MUST",
+      "text": "A host MUST place every entry after all the entries that provide its requirements in the activation order, and MUST break ties by ascending entry id compared as byte strings.",
+      "source": "spec/HCS-0003-resolution.md"
+    },
+    {
+      "id": "HCS-0003-R008",
+      "document": "HCS-0003",
+      "keyword": "MUST",
+      "text": "A host MUST apply one declared activation policy, `all-or-nothing` or `partial`, to every desired-set transition.",
+      "source": "spec/HCS-0003-resolution.md"
+    },
+    {
+      "id": "HCS-0003-R009",
+      "document": "HCS-0003",
+      "keyword": "MUST NOT",
+      "text": "A host whose activation policy is `all-or-nothing` MUST NOT select any entry of a new desired set when resolution reported an error for that set, and MUST keep the previous desired set active.",
+      "source": "spec/HCS-0003-resolution.md"
+    },
+    {
+      "id": "HCS-0003-R010",
+      "document": "HCS-0003",
+      "keyword": "MUST",
+      "text": "A host whose activation policy is `partial` MUST select exactly the entries in the activation order.",
+      "source": "spec/HCS-0003-resolution.md"
+    },
+    {
+      "id": "HCS-0004-R001",
+      "document": "HCS-0004",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT run code from a package before its entry reaches `prepared`.",
+      "source": "spec/HCS-0004-lifecycle.md"
+    },
+    {
+      "id": "HCS-0004-R002",
+      "document": "HCS-0004",
+      "keyword": "MUST",
+      "text": "A host that reports entry state MUST use the state names in section 2 and the HCS-0004 status schema.",
+      "source": "spec/HCS-0004-lifecycle.md"
+    },
+    {
+      "id": "HCS-0004-R003",
+      "document": "HCS-0004",
+      "keyword": "MUST",
+      "text": "When a host moves from one desired set to another and any entry selected for activation fails to reach `active`, the host MUST return every entry to the state it had before the transition began.",
+      "source": "spec/HCS-0004-lifecycle.md"
+    },
+    {
+      "id": "HCS-0004-R004",
+      "document": "HCS-0004",
+      "keyword": "MUST",
+      "text": "A host MUST stop entries in the reverse of their activation order.",
+      "source": "spec/HCS-0004-lifecycle.md"
+    },
+    {
+      "id": "HCS-0004-R005",
+      "document": "HCS-0004",
+      "keyword": "MUST",
+      "text": "A host MUST report `unsupported_capability` for a call to a capability whose providing entry is not `active`.",
+      "source": "spec/HCS-0004-lifecycle.md"
+    },
+    {
+      "id": "HCS-0004-R006",
+      "document": "HCS-0004",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT dispatch new calls to an entry in `draining`.",
+      "source": "spec/HCS-0004-lifecycle.md"
+    },
+    {
+      "id": "HCS-0004-R007",
+      "document": "HCS-0004",
+      "keyword": "MUST",
+      "text": "A host that abandons a lifecycle step because it exceeded the host's deadline MUST move the entry to `failed` with code `timeout`.",
+      "source": "spec/HCS-0004-lifecycle.md"
+    },
+    {
+      "id": "HCS-0005-R001",
+      "document": "HCS-0005",
+      "keyword": "MUST",
+      "text": "A host MUST deny an operation that needs a permission unless it holds a grant for that entry and that permission or a person allowed that one operation (R005), and MUST report the denial with code `permission_denied`.",
+      "source": "spec/HCS-0005-authority.md"
+    },
+    {
+      "id": "HCS-0005-R002",
+      "document": "HCS-0005",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT treat a permission request, or any contribution metadata such as Agent Skills `allowed-tools`, as a grant.",
+      "source": "spec/HCS-0005-authority.md"
+    },
+    {
+      "id": "HCS-0005-R003",
+      "document": "HCS-0005",
+      "keyword": "MUST",
+      "text": "A host MUST evaluate grants when each operation is dispatched, so that a revoked grant denies every operation dispatched after the revocation.",
+      "source": "spec/HCS-0005-authority.md"
+    },
+    {
+      "id": "HCS-0005-R004",
+      "document": "HCS-0005",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT let an extension member on a request turn the request into a grant.",
+      "source": "spec/HCS-0005-authority.md"
+    },
+    {
+      "id": "HCS-0005-R005",
+      "document": "HCS-0005",
+      "keyword": "MUST",
+      "text": "A host MUST apply an `allow_once` or `reject_once` answer to the one operation it was given for, and MUST NOT store it as a grant or a denial.",
+      "source": "spec/HCS-0005-authority.md"
+    },
+    {
+      "id": "HCS-0005-R006",
+      "document": "HCS-0005",
+      "keyword": "MUST",
+      "text": "A host MUST store an `allow_always` answer as a grant for that entry and permission, limited to the session in which it was given and carrying in `origin` the decision record of the answer, and MUST revoke it like any other grant (R003).",
+      "source": "spec/HCS-0005-authority.md"
+    },
+    {
+      "id": "HCS-0005-R007",
+      "document": "HCS-0005",
+      "keyword": "MUST",
+      "text": "A host MUST store a `reject_always` answer as a denial for that entry and permission, limited like R006, and MUST deny with `permission_denied` every later check the denial matches, even when a grant also matches.",
+      "source": "spec/HCS-0005-authority.md"
+    },
+    {
+      "id": "HCS-0005-R008",
+      "document": "HCS-0005",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT let a grant or denial that has a `session` match a check from another session or a check without a session.",
+      "source": "spec/HCS-0005-authority.md"
+    },
+    {
+      "id": "HCS-0005-R009",
+      "document": "HCS-0005",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT let the engine or the client keep an \"always\" answer where the host cannot revoke it; an operation the host has not decided under section 3.1 or 3.2 MUST be denied even if the engine or client remembers an earlier answer.",
+      "source": "spec/HCS-0005-authority.md"
+    },
+    {
+      "id": "HCS-0005-R014",
+      "document": "HCS-0005",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT run an operation that waits for a person's answer unless an `allow_once` or `allow_always` answer for that operation arrives before the host's deadline. A reject answer, the deadline passing, an ACP `cancelled` outcome, an error in the host's approval handling and a lost connection to the person MUST each deny the operation with `permission_denied`.",
+      "source": "spec/HCS-0005-authority.md"
+    },
+    {
+      "id": "HCS-0005-R015",
+      "document": "HCS-0005",
+      "keyword": "MUST",
+      "text": "A host MUST take a person's answer only from its own channel to that person (for example the ACP client connection), never from text the model, a tool or a package produced.",
+      "source": "spec/HCS-0005-authority.md"
+    },
+    {
+      "id": "HCS-0005-R010",
+      "document": "HCS-0005",
+      "keyword": "MUST",
+      "text": "A host MUST write a decision record for every permission decision it acts on and for every grant or denial it removes.",
+      "source": "spec/HCS-0005-authority.md"
+    },
+    {
+      "id": "HCS-0005-R011",
+      "document": "HCS-0005",
+      "keyword": "MUST",
+      "text": "A decision record MUST validate against the HCS-0005 `decisionRecord` schema and MUST NOT contain the operation's arguments, its result or any content of the conversation, in any member, extension members included.",
+      "source": "spec/HCS-0005-authority.md"
+    },
+    {
+      "id": "HCS-0005-R012",
+      "document": "HCS-0005",
+      "keyword": "MUST",
+      "text": "A host that cannot write a decision record for an operation MUST deny that operation with `permission_denied`.",
+      "source": "spec/HCS-0005-authority.md"
+    },
+    {
+      "id": "HCS-0005-R013",
+      "document": "HCS-0005",
+      "keyword": "SHOULD",
+      "text": "A host that sends decision records to its distribution SHOULD send each one as a CloudEvents 1.0.2 event whose `data` is the record, as HCS-0007-R021 does for observed state.",
+      "source": "spec/HCS-0005-authority.md"
+    },
+    {
+      "id": "HCS-0006-R001",
+      "document": "HCS-0006",
+      "keyword": "MUST",
+      "text": "An error a host reports for an HCS-defined failure MUST validate against the HCS-0006 error schema.",
+      "source": "spec/HCS-0006-errors.md"
+    },
+    {
+      "id": "HCS-0006-R002",
+      "document": "HCS-0006",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT report a `code` outside the closed set in section 3; distribution-specific detail goes in `details` under extension members.",
+      "source": "spec/HCS-0006-errors.md"
+    },
+    {
+      "id": "HCS-0006-R003",
+      "document": "HCS-0006",
+      "keyword": "MUST",
+      "text": "When an HCS error is carried in a JSON-RPC 2.0 error response, the HCS error object MUST be the value of `error.data.hcsError`.",
+      "source": "spec/HCS-0006-errors.md"
+    },
+    {
+      "id": "HCS-0006-R004",
+      "document": "HCS-0006",
+      "keyword": "MUST",
+      "text": "When an HCS error is carried as an RFC 9457 problem details object, its `type` MUST be `urn:hcs:error:<code>`, where `<code>` equals `hcsError.code`.",
+      "source": "spec/HCS-0006-errors.md"
+    },
+    {
+      "id": "HCS-0006-R005",
+      "document": "HCS-0006",
+      "keyword": "MUST",
+      "text": "When an HCS error is carried as an RFC 9457 problem details object, the HCS error object MUST be the value of the extension member `hcsError`.",
+      "source": "spec/HCS-0006-errors.md"
+    },
+    {
+      "id": "HCS-0006-R006",
+      "document": "HCS-0006",
+      "keyword": "MUST",
+      "text": "A client MUST take an HCS error only from `error.data.hcsError` of a JSON-RPC 2.0 error response, from the `hcsError` member of an RFC 9457 problem details object, or from an MCP tool result as R009 says, and MUST NOT derive an HCS code from any other member (for example a top-level `code`, `reason` or `title`). A response whose `hcsError` is missing or fails the HCS-0006 schema, or a problem whose `type` does not equal `urn:hcs:error:<hcsError.code>`, carries no HCS error. Other members of a problem with the wrong type (for example a string `status`) are ignored, as RFC 9457 section 3.1 says, and do not affect the HCS error.",
+      "source": "spec/HCS-0006-errors.md"
+    },
+    {
+      "id": "HCS-0006-R007",
+      "document": "HCS-0006",
+      "keyword": "MUST",
+      "text": "When an HCS error is carried in the result of an MCP `tools/call`, the result MUST have `isError` equal to `true`, MUST carry the HCS error object as the value of `structuredContent.hcsError`, and MUST have at least one `text` item in `content`.",
+      "source": "spec/HCS-0006-errors.md"
+    },
+    {
+      "id": "HCS-0006-R008",
+      "document": "HCS-0006",
+      "keyword": "MUST",
+      "text": "When a tool declares an `outputSchema`, the `structuredContent` of an HCS error result for that tool MUST validate against it.",
+      "source": "spec/HCS-0006-errors.md"
+    },
+    {
+      "id": "HCS-0006-R009",
+      "document": "HCS-0006",
+      "keyword": "MUST",
+      "text": "A client MUST take an HCS error from an MCP tool result only when `isError` is `true` and `structuredContent.hcsError` validates against the HCS-0006 error schema, and MUST NOT take one from `content` text, from a result whose `isError` is not `true`, or from any other member of `structuredContent`.",
+      "source": "spec/HCS-0006-errors.md"
+    },
+    {
+      "id": "HCS-0007-R001",
+      "document": "HCS-0007",
+      "keyword": "MUST",
+      "text": "A host MUST check an envelope's `hcsVersion` once the document is readable, and then its number spelling (R004) and its shape against the HCS-0007 envelope schema, all before verifying any signature, reporting `unsupported_hcs_version` or `manifest_invalid` as HCS-0001-R002 and HCS-0001-R001 do for catalogs.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R002",
+      "document": "HCS-0007",
+      "keyword": "MUST",
+      "text": "A host MUST check a key set's `hcsVersion` once the document is readable, before its number spelling and its shape, and report `unsupported_hcs_version` when it is not supported, as R001 requires for envelopes; a key set MUST then validate against the HCS-0007 key set schema and MUST NOT list two keys with the same `keyid`, and a host MUST report `manifest_invalid` otherwise.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R003",
+      "document": "HCS-0007",
+      "keyword": "MUST",
+      "text": "The signature input of an envelope or key set MUST be the DSSE v1 pre-authentication encoding of its payload type and of the RFC 8785 serialization of the document without its `signatures` member, as defined in section 4.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R004",
+      "document": "HCS-0007",
+      "keyword": "MUST NOT",
+      "text": "An envelope or key set MUST NOT contain a number whose token in the received text is not spelled `-?(0|[1-9][0-9]*)` with a value between -(2^53-1) and 2^53-1, and `-0` is not allowed; a host MUST report `manifest_invalid` citing this requirement otherwise.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R005",
+      "document": "HCS-0007",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT accept an envelope unless valid signatures from at least `threshold` distinct public keys of its accepted key set, each within its validity window, cover the signature input, and MUST report `signature_invalid` otherwise.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R006",
+      "document": "HCS-0007",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT accept an envelope whose `binding` is not exactly equal to the host's assignment (same member names, same values), and MUST report `permission_denied` otherwise.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R007",
+      "document": "HCS-0007",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT accept an envelope when the current time is equal to or later than `expires`, and MUST report `signature_invalid` otherwise.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R008",
+      "document": "HCS-0007",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT accept an envelope whose `sequence` is lower than the last accepted one, or equal to it with different content, and MUST report `rollback_rejected` otherwise.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R009",
+      "document": "HCS-0007",
+      "keyword": "MUST",
+      "text": "A host MUST apply the envelope checks in the order of section 5.2 and MUST report only the first check that fails.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R010",
+      "document": "HCS-0007",
+      "keyword": "MUST",
+      "text": "A host MUST validate the enclosed catalog as HCS-0001 requires, after every envelope check has passed, and MUST NOT accept an envelope whose catalog fails that validation.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R022",
+      "document": "HCS-0007",
+      "keyword": "MUST NOT",
+      "text": "An envelope or key set MUST NOT list two items of `signatures` with the same `keyid`; a host MUST report `manifest_invalid` and MUST do so before verifying any signature.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R023",
+      "document": "HCS-0007",
+      "keyword": "MUST",
+      "text": "A host that limits the number of keys in a key set or of items in `signatures` MUST report `manifest_invalid` for a document that exceeds a limit and MUST do so before verifying any signature; HCS states no number, and a host MAY set such limits.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R011",
+      "document": "HCS-0007",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT accept a key set unless valid signatures from at least the trust anchor's threshold of distinct root public keys cover its signature input, and MUST report `signature_invalid` otherwise.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R012",
+      "document": "HCS-0007",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT accept a key set whose `version` is lower than the last accepted one, or equal to it with different content, and MUST report `rollback_rejected` otherwise.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R013",
+      "document": "HCS-0007",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT accept a key set in which no key is within its validity window at the current time, and MUST report `signature_invalid` otherwise.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R014",
+      "document": "HCS-0007",
+      "keyword": "MUST",
+      "text": "A host MUST count a signature toward a threshold only when the current time is equal to or later than its key's `notBefore` and earlier than its `notAfter`.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R024",
+      "document": "HCS-0007",
+      "keyword": "MUST",
+      "text": "When a host counts signatures toward the threshold of R005 or R011, it MUST ignore a signature whose `keyid` names no key of the key set or trust anchor it verifies against, a signature that does not verify, and a signature whose key is outside its validity window (R014), and MUST NOT refuse the document because it carries such a signature when the signatures it counts meet the threshold.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R025",
+      "document": "HCS-0007",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT take its trust anchor, or any root key of it, from an envelope, a key set, an extension member or any other document it receives with them, and MUST verify every key set against the trust anchor it already holds.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R026",
+      "document": "HCS-0007",
+      "keyword": "MUST",
+      "text": "A host MUST record a key set as accepted only after every check of section 5.3 has passed; a host that refuses a key set MUST keep its accepted key set and its accepted state unchanged, and MUST go on verifying envelopes against that key set.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R015",
+      "document": "HCS-0007",
+      "keyword": "MUST",
+      "text": "A host MUST record an envelope's `sequence` and content digest as accepted only after every check of section 5.2 has passed, and MUST keep the accepted state of envelopes and key sets across restarts.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R016",
+      "document": "HCS-0007",
+      "keyword": "MUST",
+      "text": "A host that claims DISTRO-1 MUST use the `all-or-nothing` activation policy of HCS-0003.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R017",
+      "document": "HCS-0007",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT modify the unpacked content of an active entry while moving to a new desired set; it MUST prepare the new set separately and switch to it as one step (HCS-0004-R003).",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R018",
+      "document": "HCS-0007",
+      "keyword": "MUST",
+      "text": "A host that runs a health check after starting a new desired set MUST treat a failed check as a failed transition under HCS-0004-R003 and return to the previous set.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R019",
+      "document": "HCS-0007",
+      "keyword": "SHOULD",
+      "text": "A distribution SHOULD keep root private keys offline and SHOULD NOT hold any private key on the endpoint that serves envelopes and key sets, so that compromising that endpoint cannot produce an acceptable envelope.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R020",
+      "document": "HCS-0007",
+      "keyword": "SHOULD",
+      "text": "A distribution SHOULD publish, for each package, SLSA Provenance v1 (`https://slsa.dev/provenance/v1`) in an in-toto Statement v1 in a DSSE envelope signed by an online key of its key set, with a subject digest equal to the entry's `contentHash`.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R021",
+      "document": "HCS-0007",
+      "keyword": "SHOULD",
+      "text": "A host that reports observed state to its distribution SHOULD send each report as a CloudEvents 1.0.2 event whose `data` is an HCS-0004 status document, and SHOULD carry errors over HTTP as RFC 9457 problem details as HCS-0006 section 4.2 defines.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R027",
+      "document": "HCS-0007",
+      "keyword": "SHOULD",
+      "text": "A distribution that replaces a root key SHOULD sign every key set it publishes during the transition with the threshold of both the old and the new trust anchor, until every host it serves holds the new trust anchor, and its signing tool SHOULD refuse to sign a key set with fewer root signatures than the previous version unless the operator asks for it explicitly.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R028",
+      "document": "HCS-0007",
+      "keyword": "SHOULD",
+      "text": "A distribution that learns an online key is compromised SHOULD publish a key set with a higher `version` that does not list it, and SHOULD re-sign the current envelope with a key that remains (section 5.3.1).",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0007-R029",
+      "document": "HCS-0007",
+      "keyword": "SHOULD NOT",
+      "text": "A host SHOULD NOT let any input that a received document, a package or the serving endpoint can set replace its trust anchor, and a host in production SHOULD NOT hold a fixture root key of the conformance cases in its trust anchor; those keys are derived from public seeds and protect nothing.",
+      "source": "spec/HCS-0007-signed-catalog.md"
+    },
+    {
+      "id": "HCS-0008-R001",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "A host MUST derive each engine run's projection from exactly one generation and MUST make the projection reference that generation by an identifier that does not change during the run, never by a pointer the host moves to the next generation.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R002",
+      "document": "HCS-0008",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT change what a running engine reads through its projection; it MUST move an engine to another generation only by starting a new engine run from a new projection.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R003",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "An adapter MUST, for every contribution of every entry in the generation, either project it into the engine run or report an HCS-0006 error with the entry's id; it MUST NOT leave a contribution out silently.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R004",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "An adapter MUST report `unsupported_contribution` for an entry that has a contribution whose kind it cannot project into its engine.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R005",
+      "document": "HCS-0008",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT report an entry as `active` unless every contribution of that entry was projected into the engine run.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R017",
+      "document": "HCS-0008",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT fail or roll back a move to a new generation only because an adapter reported `unsupported_contribution`; it MUST treat the reported entry as not selected for activation on that engine and MUST keep it reported until a generation or an engine change lets the adapter project it.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R006",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "When two contributions of one generation would project the same engine-level name, an adapter MUST project neither and MUST report `ambiguous_provider` for each entry involved.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R007",
+      "document": "HCS-0008",
+      "keyword": "MUST NOT",
+      "text": "An adapter MUST NOT produce a projection in which a generation contribution replaces, removes or widens a host-owned setting, and MUST report `permission_denied` for that entry.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R008",
+      "document": "HCS-0008",
+      "keyword": "MUST NOT",
+      "text": "An adapter MUST NOT modify the files of a `skill` contribution's directory when it projects the skill.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R009",
+      "document": "HCS-0008",
+      "keyword": "SHOULD",
+      "text": "An adapter SHOULD project a skill under its Agent Skills `name`, without a prefix or namespace added by the engine.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R010",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "An adapter MUST read an `mcp-server` contribution's `path` as an MCP Registry `server.json` document of schema revision 2025-12-11, and MUST report `manifest_invalid` for an entry whose document does not validate against that schema.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R011",
+      "document": "HCS-0008",
+      "keyword": "MUST NOT",
+      "text": "A `server.json` document in a generation MUST NOT give a `value` or a `default` to an input whose `isSecret` is true; an adapter MUST report `manifest_invalid` for an entry that has one.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R012",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "An adapter MUST take the value of a secret input only from the secrets the host grants to that entry, MUST NOT write it inside the generation, and MUST report `permission_denied` for an entry with a required secret input that has no granted value.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R030",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "An adapter MUST apply the `server.json` substitutions once, never to text a substitution inserted, and MUST deliver each resulting value or URL of an MCP server input (environment variables, headers, arguments, URL variables) so that the server receives exactly that string, escaping it for the engine or passing it through a channel the engine does not interpret. It MUST report `unsupported_contribution` for an entry with an input it cannot deliver that way to that engine; it decides this without reading secret values, treating a secret as an arbitrary string.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R021",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "A `server.json` package whose `registryType` is `file` MUST have a `stdio` transport and an `identifier` that is a relative path as HCS-0001-R005 defines for contribution paths, with no empty segments, that names, after removing `.` segments, a regular file inside the directory of the `mcp-server` contribution; a document MUST NOT have more than one such package. An adapter MUST report `manifest_invalid` for an entry that breaks this, including when the file, after resolving links, lies outside that directory.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R022",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "An adapter MUST start a `file` server from the file inside the generation, by a path that does not change during the run (R001), with the contribution's directory as working directory, and MUST NOT copy, move or modify the server's files to do so.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R023",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "An adapter MUST start a `file` server with a runtime the host provides for its `runtimeHint`, and MUST report `unsupported_contribution` for an entry whose `runtimeHint` names no runtime the host provides, whose package has a non-empty `runtimeArguments`, or whose package sets an environment variable that the host declares as a control setting of that runtime or of the loader (for example `NODE_OPTIONS`, `PYTHONPATH`, `LD_PRELOAD`).",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R024",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "An adapter MUST pass the secrets granted to a `file` server only through its environment, never as command-line arguments, and MUST report `unsupported_contribution` for an entry whose package declares a secret argument, including an argument with a secret input among its `variables`.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R019",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "A host that declares a guard on model requests as a host-owned setting MUST run the engine so that no request from a process of the run (the engine, its extensions and tools, and the MCP servers the run starts) can leave toward a model provider except through that guard, which runs outside those processes, and MUST NOT count a hook inside the engine, or a wrapper around the engine's own provider object, as that guard.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R020",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "When such a guard is unavailable or fails on a request, a host MUST ensure that the request does not reach the model provider.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R025",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "A host MUST start each engine run so that the engine reads its configuration, skills, extensions, prompts, MCP servers and credentials only from the projection and from host settings, never from user-global locations, and never from workspace locations except instruction files the host allows as a host-owned setting.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R026",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "A host MUST project a generation over ACP only to an agent whose `initialize` response advertises, in `agentCapabilities._meta[\"io.github.fullfran.hcs\"]`, an object whose `projection` member is `\"0.1\"`. With any other agent it starts no engine run from the generation and reports `unsupported_contribution` for each entry with contributions for that engine (R004, R017).",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R027",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "A host that creates an engine run over ACP MUST send, in the `session/new` request, the generation's MCP servers in `mcpServers` and an object `_meta[\"io.github.fullfran.hcs\"].generation` with the generation's `id` and, in `skills`, the absolute paths of every skill directory the run gets, valid against the `sessionMeta` schema: the generation's skills, and the host-provided defaults and host-owned skills no generation contribution replaces (R006). A path of a generation skill MUST resolve inside the generation by its identifier, never through a pointer the host moves (R001), and no path may contain `..` segments. An agent that advertises R026 MUST load skills only from those paths.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R028",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "A host MUST send `_meta[\"io.github.fullfran.hcs\"].generation` in every ACP `session/load` and `session/resume`, as in R027. An agent that advertises R026 MUST refuse a `session/load` or `session/resume` that lacks it or whose `generation.id` differs from the generation the session was created with, with a JSON-RPC error that carries an HCS error with code `generation_mismatch` (HCS-0006-R003). A host MUST NOT reopen a session on another generation; it starts a new session instead.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R029",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "An agent that advertises R026 MUST answer the request `_io.github.fullfran.hcs/loaded` (params `{ \"sessionId\": <id> }`) with what the session has loaded at that moment, valid against the `loadedResult` schema: skills by their Agent Skills `name`, MCP servers by the `name` the host gave them in `mcpServers`. A host that drives the engine over ACP MUST use that answer as the engine's report under R014; it may ask again until the health deadline passes (R013).",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R036",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "A host that applies a limit of an MCP client to a projection MUST declare it as a host-owned setting, valid against the `clientLimits` schema (`schemas/hcs-0008/client-limits/v0.1/client-limits.schema.json`, `urn:hcs:schema:hcs-0008:client-limits:0.1`): the client's name, and at least one of `instructionsPrefix` (a positive number of characters) and `toolListBytes` (a positive number of bytes). A limit that is not declared is not applied, and HCS defines no default.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R037",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "When the client's declared limits include `toolListBytes`, an adapter MUST compare it, at projection time, with the size of the `tools` array that each projected `mcp-server` contribution answers to `tools/list` (all pages, serialized as compact JSON in UTF-8), and MUST report `unsupported_contribution` for the entry of a server whose size is greater than the limit.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R038",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "When the client's declared limits include `toolListBytes` and the host supplies no measured size for a projected `mcp-server` contribution, an adapter MUST report `unsupported_contribution` for its entry, and MUST NOT assume the server fits.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R039",
+      "document": "HCS-0008",
+      "keyword": "SHOULD",
+      "text": "An MCP server's `instructions` SHOULD give, within their first `instructionsPrefix` characters, what a model needs to use the server, for the smallest `instructionsPrefix` the host declares for a client it projects to.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R013",
+      "document": "HCS-0008",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT confirm a generation until an engine run started from its projection has passed the host's health check within the host's deadline.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R014",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "A host whose engine reports which skills or MCP servers it loaded MUST fail the health check when a projected skill or MCP server is missing from that report.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R015",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "When the health check of a new generation fails or its deadline passes, a host MUST report the generation as failed with `plugin_failed` or `timeout`, MUST start an engine run from the confirmed generation, and MUST NOT start the failed generation again automatically.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R016",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "When the engine run started from the confirmed generation after a failure also fails its health check, a host MUST stop and report it, and MUST NOT start a further rollback or retry until a new desired set or an operator action arrives. The stop outlives a restart (R033 item 5, R035). R035 applies when the host cannot return to the confirmed generation at all.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R018",
+      "document": "HCS-0008",
+      "keyword": "SHOULD",
+      "text": "A host that reports the health of an engine run SHOULD report one of the states `healthy`, `unhealthy` or `unknown`, and SHOULD report the failure itself with the codes of R015.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R031",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "Before a host changes which generation is active, it MUST durably record the generation it is moving to as pending and the confirmed generation it would return to.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R032",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "A host that reports a generation as failed under R015 MUST durably record it as failed before it starts the engine run from the confirmed generation, MUST NOT start a generation recorded as failed, including after a restart, and MUST NOT reuse the identifier of a generation recorded as failed for other content.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R033",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "After a restart, a host MUST decide what to start from its persisted facts alone, as follows, and MUST NOT treat an unconfirmed generation as confirmed:",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R034",
+      "document": "HCS-0008",
+      "keyword": "MUST",
+      "text": "A host that removes old generations MUST keep the active, the pending and the confirmed generation and MUST keep every failed record; it MAY remove the content of a failed generation.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0008-R035",
+      "document": "HCS-0008",
+      "keyword": "MUST NOT",
+      "text": "When a host cannot complete a return to the confirmed generation because it cannot change which generation is active, or because there is none to return to, it MUST NOT start an engine run from the failed generation, MUST durably record the stop, MUST stop, and MUST report as R016 requires, until a new desired set or an operator action arrives. A host that stops under R016 records the stop in the same way.",
+      "source": "spec/HCS-0008-host-adapter.md"
+    },
+    {
+      "id": "HCS-0009-R001",
+      "document": "HCS-0009",
+      "keyword": "MUST",
+      "text": "If the `_meta[\"io.github.fullfran.hcs\"]` member of a `server.json` of an `mcp-server` contribution is present, it MUST validate against the `serverMeta` definition of the HCS-0009 schema, and an adapter MUST report `manifest_invalid` for an entry whose member does not.",
+      "source": "spec/HCS-0009-tool-surface.md"
+    },
+    {
+      "id": "HCS-0009-R002",
+      "document": "HCS-0009",
+      "keyword": "SHOULD",
+      "text": "A package that contributes an `mcp-server` SHOULD declare every tool its server lists.",
+      "source": "spec/HCS-0009-tool-surface.md"
+    },
+    {
+      "id": "HCS-0009-R003",
+      "document": "HCS-0009",
+      "keyword": "MUST",
+      "text": "A host that presents the tools of a projected MCP server to an engine, a client or a person MUST present each tool with the four annotations that the table in section 4 gives for its declaration.",
+      "source": "spec/HCS-0009-tool-surface.md"
+    },
+    {
+      "id": "HCS-0009-R004",
+      "document": "HCS-0009",
+      "keyword": "MUST",
+      "text": "A host MUST present a tool whose declaration is missing, or whose `effect` is not `read`, `additive` or `destructive`, as `destructive` with `idempotent` false and `openWorld` true, that is `readOnlyHint` false, `destructiveHint` true, `idempotentHint` false and `openWorldHint` true.",
+      "source": "spec/HCS-0009-tool-surface.md"
+    },
+    {
+      "id": "HCS-0009-R005",
+      "document": "HCS-0009",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT take the effect of a tool from the annotations the server reports for itself, and MUST replace them with the annotations of R003 or R004 when it presents the tool.",
+      "source": "spec/HCS-0009-tool-surface.md"
+    },
+    {
+      "id": "HCS-0009-R006",
+      "document": "HCS-0009",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT treat a declared effect class, `read` included, as a grant, and MUST evaluate every `tools/call` of a package's server under HCS-0005-R001 as if the declaration did not exist.",
+      "source": "spec/HCS-0009-tool-surface.md"
+    },
+    {
+      "id": "HCS-0010-R001",
+      "document": "HCS-0010",
+      "keyword": "MUST",
+      "text": "A proposal record MUST validate against the HCS-0010 `proposal` schema.",
+      "source": "spec/HCS-0010-proposals.md"
+    },
+    {
+      "id": "HCS-0010-R002",
+      "document": "HCS-0010",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT apply the change of a proposal unless its state is `accepted`.",
+      "source": "spec/HCS-0010-proposals.md"
+    },
+    {
+      "id": "HCS-0010-R003",
+      "document": "HCS-0010",
+      "keyword": "MUST",
+      "text": "A host MUST move a proposal only from `pending` to `accepted` or to `rejected`, MUST do so once, and MUST refuse any later answer to the same proposal.",
+      "source": "spec/HCS-0010-proposals.md"
+    },
+    {
+      "id": "HCS-0010-R004",
+      "document": "HCS-0010",
+      "keyword": "MUST",
+      "text": "A host MUST answer a proposal only from a person's answer taken under HCS-0005-R015 or from a grant or denial it holds under HCS-0005 section 3.2, and MUST NOT offer an agent, a tool or a package any operation that answers or undoes a proposal.",
+      "source": "spec/HCS-0010-proposals.md"
+    },
+    {
+      "id": "HCS-0010-R005",
+      "document": "HCS-0010",
+      "keyword": "MUST",
+      "text": "A host MUST write the HCS-0005 decision record of an answer before it applies the change, MUST carry its `id` in the proposal's `answer.decision`, and MUST NOT apply the change when it cannot write the record (HCS-0005-R012).",
+      "source": "spec/HCS-0010-proposals.md"
+    },
+    {
+      "id": "HCS-0010-R006",
+      "document": "HCS-0010",
+      "keyword": "MUST",
+      "text": "When a proposal carries a `base` and the target's current state no longer matches it, a host MUST refuse to apply the proposal, MUST leave the target unchanged, and MUST tell the person that the target changed.",
+      "source": "spec/HCS-0010-proposals.md"
+    },
+    {
+      "id": "HCS-0010-R007",
+      "document": "HCS-0010",
+      "keyword": "MUST",
+      "text": "A host MUST record an undo as a new proposal whose `undoes` names an accepted proposal, and MUST NOT change, remove or re-open the record of the proposal it undoes.",
+      "source": "spec/HCS-0010-proposals.md"
+    },
+    {
+      "id": "HCS-0010-R008",
+      "document": "HCS-0010",
+      "keyword": "MUST",
+      "text": "A host MUST refuse an undo of a proposal that is not `accepted`, that was already undone, or whose change was altered or relied on by a later change, and MUST leave the target unchanged.",
+      "source": "spec/HCS-0010-proposals.md"
+    },
+    {
+      "id": "HCS-0010-R009",
+      "document": "HCS-0010",
+      "keyword": "MUST NOT",
+      "text": "A host MUST NOT edit or remove an answered proposal record or the link to its decision record; every later event about it, such as an undo, is a new record.",
+      "source": "spec/HCS-0010-proposals.md"
+    },
+    {
+      "id": "HCS-0010-R010",
+      "document": "HCS-0010",
+      "keyword": "MUST",
+      "text": "When a proposal arrives with the same identity as one the host already holds and the same action type, target and payload digest, the host MUST return the existing proposal and MUST NOT create another, whatever its state.",
+      "source": "spec/HCS-0010-proposals.md"
+    },
+    {
+      "id": "HCS-0010-R011",
+      "document": "HCS-0010",
+      "keyword": "MUST",
+      "text": "When a proposal arrives with the same identity as one the host already holds but a different action type, target or payload digest, the host MUST refuse it and MUST NOT change the existing proposal.",
+      "source": "spec/HCS-0010-proposals.md"
+    },
+    {
+      "id": "HCS-0010-R012",
+      "document": "HCS-0010",
+      "keyword": "MUST",
+      "text": "A host MUST decide a proposal under the HCS-0005 permission id equal to its `actionType`, so that a grant or denial for an action type covers every tool the host maps to it and no other action type.",
+      "source": "spec/HCS-0010-proposals.md"
+    }
+  ]
+}

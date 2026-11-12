@@ -1,0 +1,8 @@
+{
+  "description": "Optional contentId uses the same digest grammar as transport identity.",
+  "requirements": ["HCS-0001-R017"],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1",
+  "input": {"hcsVersion":"0.1","id":"dev.example.catalog","version":"1","entries":[{"id":"dev.example.a","version":"1","contentHash":"sha256:deb230b21e0d7ef6a0a2d65a19599d4251b5f08888a5155882fbef2ef71e1e11","contentId":"sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef","size":29,"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip","contributions":[{"kind":"skill","path":"skill"}]}]},
+  "expect": {"outcome":"valid","errors":[]}
+}

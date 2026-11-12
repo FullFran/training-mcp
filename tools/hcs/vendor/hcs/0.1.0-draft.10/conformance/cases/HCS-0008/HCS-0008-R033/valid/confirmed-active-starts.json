@@ -1,0 +1,24 @@
+{
+  "description": "A confirmed active generation with nothing pending is started.",
+  "requirements": [
+    "HCS-0008-R033"
+  ],
+  "level": "recovery",
+  "input": {
+    "persisted": {
+      "active": 41,
+      "confirmed": 41,
+      "pending": null,
+      "failed": []
+    },
+    "onDisk": [
+      40,
+      41,
+      42
+    ]
+  },
+  "expect": {
+    "action": "start",
+    "generation": 41
+  }
+}

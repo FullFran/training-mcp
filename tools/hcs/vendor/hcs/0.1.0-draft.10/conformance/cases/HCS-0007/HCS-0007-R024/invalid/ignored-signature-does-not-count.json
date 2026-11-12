@@ -1,0 +1,101 @@
+{
+  "description": "Threshold 2: online-1 and a key that is not in the key set do not make two.",
+  "requirements": [
+    "HCS-0007-R024"
+  ],
+  "level": "distribution",
+  "input": {
+    "check": "envelope",
+    "now": "2026-11-06T12:00:00Z",
+    "trustAnchor": {
+      "keys": [
+        {
+          "keyid": "root-1",
+          "keytype": "ed25519",
+          "public": "LWB8cicdNrnQPkwy2jC4f24oJ6JOv49Apy61kpnIRsU="
+        }
+      ],
+      "threshold": 1
+    },
+    "keySet": {
+      "hcsVersion": "0.1",
+      "version": 3,
+      "keys": [
+        {
+          "keyid": "online-1",
+          "keytype": "ed25519",
+          "public": "oNkoBdUQ0xTyv7u+lLzrl8w7lkU/9tOfYLgHuY8YZDs=",
+          "notBefore": "2026-01-01T00:00:00Z",
+          "notAfter": "2027-01-01T00:00:00Z"
+        },
+        {
+          "keyid": "online-2",
+          "keytype": "ed25519",
+          "public": "wedLmmPnPgjkN3NIl9rJLHaNk6aPmllxoxjt4dZij3A=",
+          "notBefore": "2026-01-01T00:00:00Z",
+          "notAfter": "2027-01-01T00:00:00Z"
+        }
+      ],
+      "threshold": 2,
+      "signatures": [
+        {
+          "keyid": "root-1",
+          "sig": "cffiYHOUkZjaNrnyGJO5DvrX86Nl2tdEQHEH6ixqr6C9KGNDItyZscOuvcvUZQDkf3Svpm0GtSG88UNB2Cr8CQ=="
+        }
+      ]
+    },
+    "envelope": {
+      "hcsVersion": "0.1",
+      "sequence": 42,
+      "expires": "2026-11-13T00:00:00Z",
+      "binding": {
+        "tenant": "t-0001",
+        "profile": "desktop",
+        "channel": "stable"
+      },
+      "catalog": {
+        "hcsVersion": "0.1",
+        "id": "dev.example.desktop",
+        "version": "2026.11.06-1",
+        "entries": [
+          {
+            "id": "dev.example.notes",
+            "version": "1.4.0",
+            "contentHash": "sha256:4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
+            "size": 18342,
+            "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+            "contributions": [
+              {
+                "kind": "skill",
+                "path": "skills/take-notes"
+              }
+            ]
+          }
+        ]
+      },
+      "signatures": [
+        {
+          "keyid": "online-1",
+          "sig": "TGCDGGOTOVuEQinEdpriOx5op5Gro+NjGChykotg7BtYZyoVjYUzfEnxB6628p/xgw4zQE+sIw2aMgUASss4Bg=="
+        },
+        {
+          "keyid": "online-9",
+          "sig": "40N5SUKF7j48YnE5Kor2sWnI0r1KTdWxusqKN7TUDRXLpkmOwbYtxXmOc7VQ5cAXuio21gbbYZhZs/8cg5/0CQ=="
+        }
+      ]
+    },
+    "assignment": {
+      "tenant": "t-0001",
+      "profile": "desktop",
+      "channel": "stable"
+    }
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "signature_invalid"
+      }
+    ]
+  }
+}

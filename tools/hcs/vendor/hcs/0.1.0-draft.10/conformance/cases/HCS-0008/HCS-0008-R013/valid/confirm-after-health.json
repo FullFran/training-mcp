@@ -1,0 +1,13 @@
+{
+  "description": "Confirmation waits for the engine.",
+  "requirements": [
+    "HCS-0008-R013"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "gen-0042 is prepared; the engine is started from its projection and its health check passes within the deadline."
+  },
+  "expect": {
+    "behaviour": "Only then the host records gen-0042 as confirmed and releases gen-0041."
+  }
+}

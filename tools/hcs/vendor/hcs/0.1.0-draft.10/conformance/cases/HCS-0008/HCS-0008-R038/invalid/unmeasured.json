@@ -1,0 +1,59 @@
+{
+  "description": "With a declared limit and no measured size, the adapter does not assume the server fits.",
+  "requirements": [
+    "HCS-0008-R038"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "skill",
+      "mcp-server"
+    ],
+    "hostOwned": [],
+    "grantedSecrets": {},
+    "activationPolicy": "partial",
+    "generation": {
+      "id": "gen-0070",
+      "entries": [
+        {
+          "id": "dev.example.unmeasured",
+          "contributions": [
+            {
+              "kind": "mcp-server",
+              "path": "mcp/unmeasured/server.json",
+              "descriptor": {
+                "name": "io.example/unmeasured",
+                "description": "Example server",
+                "version": "1.0.0"
+              }
+            }
+          ]
+        },
+        {
+          "id": "dev.example.notes",
+          "contributions": [
+            {
+              "kind": "skill",
+              "name": "notes"
+            }
+          ]
+        }
+      ]
+    },
+    "clientLimits": {
+      "client": "chatgpt",
+      "toolListBytes": 36000
+    }
+  },
+  "expect": {
+    "errors": [
+      {
+        "code": "unsupported_contribution",
+        "entry": "dev.example.unmeasured"
+      }
+    ],
+    "selected": [
+      "dev.example.notes"
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "Returning the first proposal for different content does not conform.",
+  "requirements": [
+    "HCS-0010-R011"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "As above."
+  },
+  "expect": {
+    "behaviour": "A host that answers the second call with the first proposal, as if it were the retry of B, violates R011."
+  }
+}

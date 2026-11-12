@@ -1,0 +1,20 @@
+{
+  "description": "failed carries an HCS error.",
+  "requirements": [
+    "HCS-0004-R002"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0004:lifecycle:0.1",
+  "input": {
+    "entry": "dev.example.a",
+    "version": "1.0.0",
+    "state": "failed",
+    "error": {
+      "code": "plugin_failed",
+      "message": "exited with status 1"
+    }
+  },
+  "expect": {
+    "outcome": "valid"
+  }
+}

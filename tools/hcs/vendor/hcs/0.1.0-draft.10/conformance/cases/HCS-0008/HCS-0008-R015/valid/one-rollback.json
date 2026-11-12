@@ -1,0 +1,13 @@
+{
+  "description": "A failed health check returns to the confirmed generation once.",
+  "requirements": [
+    "HCS-0008-R015"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Confirmed gen-0041. The engine started from gen-0042 does not pass its health check before the deadline."
+  },
+  "expect": {
+    "behaviour": "The host reports gen-0042 failed with timeout, starts an engine run from gen-0041, and does not start gen-0042 again until a new desired set or an operator action."
+  }
+}

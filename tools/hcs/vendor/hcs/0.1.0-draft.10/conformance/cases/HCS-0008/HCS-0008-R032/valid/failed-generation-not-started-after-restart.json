@@ -1,0 +1,24 @@
+{
+  "description": "After a restart the only other generation is failed: the host does not start it and stops.",
+  "requirements": [
+    "HCS-0008-R032"
+  ],
+  "level": "recovery",
+  "input": {
+    "persisted": {
+      "active": 42,
+      "confirmed": null,
+      "pending": null,
+      "failed": [
+        42
+      ]
+    },
+    "onDisk": [
+      42
+    ]
+  },
+  "expect": {
+    "action": "stop-and-report",
+    "generation": 42
+  }
+}

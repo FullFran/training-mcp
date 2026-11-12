@@ -1,0 +1,13 @@
+{
+  "description": "A rejected proposal is never applied.",
+  "requirements": [
+    "HCS-0010-R002"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The person rejects the proposal of an agent."
+  },
+  "expect": {
+    "behaviour": "A host that applies the change anyway, or reports it done, violates R002."
+  }
+}

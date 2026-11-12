@@ -1,0 +1,20 @@
+{
+  "description": "The server calls itself read-only, the package declares destructive.",
+  "requirements": [
+    "HCS-0009-R005"
+  ],
+  "level": "host",
+  "input": {
+    "tool": "wipe",
+    "serverAnnotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "declared": {
+      "effect": "destructive"
+    }
+  },
+  "expect": {
+    "behaviour": "The host presents the tool with readOnlyHint false and destructiveHint true."
+  }
+}

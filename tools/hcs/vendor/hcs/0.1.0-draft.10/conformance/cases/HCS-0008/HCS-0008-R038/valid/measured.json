@@ -1,0 +1,46 @@
+{
+  "description": "A server with a measured size under the limit is projected.",
+  "requirements": [
+    "HCS-0008-R038"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "skill",
+      "mcp-server"
+    ],
+    "hostOwned": [],
+    "grantedSecrets": {},
+    "activationPolicy": "partial",
+    "generation": {
+      "id": "gen-0070",
+      "entries": [
+        {
+          "id": "dev.example.small",
+          "contributions": [
+            {
+              "kind": "mcp-server",
+              "path": "mcp/small/server.json",
+              "descriptor": {
+                "name": "io.example/small",
+                "description": "Example server",
+                "version": "1.0.0"
+              },
+              "toolListBytes": 1200
+            }
+          ]
+        }
+      ]
+    },
+    "clientLimits": {
+      "client": "chatgpt",
+      "toolListBytes": 36000
+    }
+  },
+  "expect": {
+    "errors": [],
+    "selected": [
+      "dev.example.small"
+    ]
+  }
+}

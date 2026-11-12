@@ -1,0 +1,13 @@
+{
+  "description": "A projected skill is not loaded.",
+  "requirements": [
+    "HCS-0008-R014"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The projection lists take-notes and search; the engine starts and answers its HTTP health endpoint, but its skill listing returns only take-notes."
+  },
+  "expect": {
+    "behaviour": "The health check fails; a host that confirms gen-0042 because the endpoint answered is non-conforming."
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "An error in the host's approval handling denies.",
+  "requirements": [
+    "HCS-0005-R014"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "dev.example.a has no grant for dev.example.mail.send; the engine asks to send mail and the host asks the person over ACP session/request_permission with a 30 s deadline. The host's approval handler throws before showing the dialog."
+  },
+  "expect": {
+    "behaviour": "The call does not run; permission_denied; record outcome error."
+  }
+}

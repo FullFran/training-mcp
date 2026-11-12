@@ -1,0 +1,13 @@
+{
+  "description": "Validation of a catalog whose packages contain install scripts.",
+  "requirements": [
+    "HCS-0001-R010"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Give the host a catalog whose packages contain executable install hooks; ask it to validate only."
+  },
+  "expect": {
+    "behaviour": "The host reports the validation verdict and no process from any package was started."
+  }
+}

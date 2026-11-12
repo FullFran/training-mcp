@@ -1,0 +1,13 @@
+{
+  "description": "A guard that fails lets nothing through.",
+  "requirements": [
+    "HCS-0008-R020"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The guard is on the model transport and throws on every request; the engine runs one turn and then tries to compact."
+  },
+  "expect": {
+    "behaviour": "The mock provider receives zero requests; the turn fails and the host reports it."
+  }
+}

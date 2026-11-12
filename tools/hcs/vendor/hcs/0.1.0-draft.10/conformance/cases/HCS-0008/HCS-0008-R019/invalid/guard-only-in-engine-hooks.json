@@ -1,0 +1,13 @@
+{
+  "description": "A guard placed only in engine message hooks misses requests the engine makes for itself.",
+  "requirements": [
+    "HCS-0008-R019"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The host declares a masking guard on model requests and points the engine at a mock model provider that logs every request body. A tool returns the canary string CANARY-7f3a-SECRET, which the guard masks. The guard is installed only as the engine's context/before-request hook; the engine compacts its context."
+  },
+  "expect": {
+    "behaviour": "This placement does not meet R019: the compaction request reaches the mock provider with CANARY-7f3a-SECRET. A conforming host places the guard on the model transport, and the canary never arrives."
+  }
+}

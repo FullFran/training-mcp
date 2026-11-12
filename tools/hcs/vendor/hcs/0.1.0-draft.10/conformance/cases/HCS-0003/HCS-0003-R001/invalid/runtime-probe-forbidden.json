@@ -1,0 +1,13 @@
+{
+  "description": "A host that loads a package to learn what it provides is non-conforming.",
+  "requirements": [
+    "HCS-0003-R001"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "A requirement is only satisfiable if the host loads a package to discover undeclared capabilities."
+  },
+  "expect": {
+    "behaviour": "The host reports missing_dependency instead of loading the package."
+  }
+}

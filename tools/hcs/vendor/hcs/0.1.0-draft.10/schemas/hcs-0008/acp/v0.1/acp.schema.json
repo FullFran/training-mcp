@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hcs:schema:hcs-0008:acp:0.1",
+  "title": "HCS projection over ACP",
+  "description": "Objects of the HCS ACP extension under the namespace io.github.fullfran.hcs (HCS-0008 section 6.8).",
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "absolutePath": {
+      "description": "An absolute POSIX path, or a Windows path with a drive letter, a UNC prefix or a \\\\?\\ prefix; no '..' segments (HCS-0008-R027).",
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 32767,
+      "pattern": "^(?!.*(^|[\\\\/])\\.\\.([\\\\/]|$))(/|[A-Za-z]:[\\\\/]|\\\\\\\\)[^\\u0000\\n\\r]*$"
+    },
+    "capability": {
+      "description": "Value of agentCapabilities._meta[\"io.github.fullfran.hcs\"] in the initialize response (HCS-0008-R026).",
+      "type": "object",
+      "required": ["projection"],
+      "properties": { "projection": { "const": "0.1" } },
+      "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+      "additionalProperties": false
+    },
+    "sessionMeta": {
+      "description": "Value of session/new and session/load _meta[\"io.github.fullfran.hcs\"] (HCS-0008-R027, R028).",
+      "type": "object",
+      "required": ["generation"],
+      "properties": {
+        "generation": {
+          "type": "object",
+          "required": ["id", "skills"],
+          "properties": {
+            "id": { "$ref": "#/$defs/identifier" },
+            "skills": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/absolutePath" } }
+          },
+          "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+          "additionalProperties": false
+        }
+      },
+      "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+      "additionalProperties": false
+    },
+    "loadedRequest": {
+      "description": "Params of the _io.github.fullfran.hcs/loaded request (HCS-0008-R029).",
+      "type": "object",
+      "required": ["sessionId"],
+      "properties": {
+        "sessionId": { "$ref": "#/$defs/identifier" },
+        "_meta": { "type": ["object", "null"] }
+      },
+      "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+      "additionalProperties": false
+    },
+    "loadedResult": {
+      "description": "Result of the _io.github.fullfran.hcs/loaded request: what the session loaded (HCS-0008-R029).",
+      "type": "object",
+      "required": ["skills", "mcpServers"],
+      "properties": {
+        "skills": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "mcpServers": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      },
+      "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+      "additionalProperties": false
+    }
+  }
+}

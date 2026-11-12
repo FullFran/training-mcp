@@ -1,0 +1,21 @@
+{
+  "description": "entries is required.",
+  "requirements": [
+    "HCS-0001-R001"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1",
+  "input": {
+    "hcsVersion": "0.1",
+    "id": "dev.example.desktop",
+    "version": "2026.11.06-1"
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}
