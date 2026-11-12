@@ -109,3 +109,16 @@ func TestCoachPromptDuringAPendingLogin(t *testing.T) {
 		t.Fatalf("prompt during a pending login: %d %s", w.Code, w.Body)
 	}
 }
+
+// The person reads why: the chat has a Spanish line for login_pending and,
+// as for not_connected, refreshes the connect panel.
+func TestCoachScriptExplainsAPendingLogin(t *testing.T) {
+	world := newCoachWorld(t, newFakeCoach())
+	js := get(t, world.as(1), base+"/static/coach.js").Body.String()
+	if !strings.Contains(js, "login_pending: 'Termina de conectar ChatGPT antes de escribir al coach.'") {
+		t.Error("coach.js has no message for login_pending")
+	}
+	if !strings.Contains(js, "code === 'login_pending'") {
+		t.Error("coach.js does not refresh the connect panel on login_pending")
+	}
+}
