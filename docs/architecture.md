@@ -148,6 +148,8 @@ Every package has a test file next to it, and coverage is measured per package:
 
 CI runs `go test ./...`, `go vet ./...`, `-race`, `gofmt`, a Docker build, and
 enforces the coverage floor on `sqlitestore`.
+A `ui` job typechecks and tests the MCP Apps views in `ui/` and fails when a
+committed bundle in `internal/mcpsrv/apps/` is stale ([MCP Apps](apps.md)).
 
 The HCS release the code cites (HCS-0005 and later) is vendored in
 `tools/hcs/vendor/hcs/<version>/` with the HCS consumer kit
