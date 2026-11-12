@@ -15,10 +15,10 @@ Assumptions: plans carry no weight targets today (PlanItem has sets, reps, RPE o
 
 ## Tasks
 
-- [x] T1 (S1, S2b, S3) inline: migration 026 `users.weight_unit` + `sets.lb_corrected_at`, store/service get/set unit, conversion helpers, Tú › Entrenamiento setting (`POST /units`), isolation. Commit 21f4488c.
-- [x] T2 (S2c, S3, S4) inline: every web weight input with a kg/lb toggle converting to kg on save (set entry, set row, edit form); display in the default unit on every page and card; drift and edit tests. Commit 21f4488c.
-- [x] T3 (S2d, S3) inline: `weight_unit` in live_workout and memory_context outputs (additive), coach context line and system prompt; import default unit (in T2's commit); differential against main.
-- [x] T4 (S5) inline: bulk lb→kg correction: preview by session / exercise+dates / set ids, apply as a person-decided proposal with undo image, double-apply refusal, MCP proposal tool, dump and isolation tests. Risk: item 1.
+- [x] T1 (S1, S2b, S3) inline: migration 026 `users.weight_unit` + `sets.lb_corrected_at`, store/service get/set unit, conversion helpers, Tú › Entrenamiento setting (`POST /units`), isolation. Commit c719654f.
+- [x] T2 (S2c, S3, S4) inline: every web weight input with a kg/lb toggle converting to kg on save (set entry, set row, edit form); display in the default unit on every page and card; drift and edit tests. Commit c719654f.
+- [x] T3 (S2d, S3) inline: `weight_unit` in live_workout and memory_context outputs (additive), coach context line and system prompt; import default unit (in T2's commit); differential against main. Commit f8b20096.
+- [x] T4 (S5) inline: bulk lb→kg correction: preview by session / exercise+dates / set ids, apply as a person-decided proposal with undo image, double-apply refusal, MCP proposal tool, dump and isolation tests. Risk: item 1. Commit e2c0c942.
 
 Route evidence: one PR, sequential units sharing the weight helpers; no writer trigger (no parallel units requested, subagents not allowed by the brief).
 
@@ -29,3 +29,4 @@ Route evidence: one PR, sequential units sharing the weight helpers; no writer t
 - L3: RED evidence. T1: units_test.go did not build (no ToKG/UnitLB). T2: five websrv tests failed (no /units, inputs ignore weight_unit, kg shown everywhere). Aplicar chip: lb cases parsed with no unit against the old coach-apply.js. T3: engine and mcpsrv tests did not build (no WeightUnit fields). T4: no /units/fix, no tools.
 - L4: Decisions. Input toggle changes the unit of the typed number, never the number. lb input snaps to the roundest kg showing the same lb number (grids 2.5, 1.25, 0.5, 0.25, 0.05, 0.01 kg), so 60 kg → 132.3 lb → 60 kg; arbitrary stored values (61.23 from an lb import) can move 0.02 kg if re-saved, which the edit form avoids by not resending an untouched weight. MCP inputs stay kg-only: weight_kg is required in every write schema, so an alternative lb input would not be additive. Web correction validates by preview before recording, so a foreign or already-corrected id leaves no proposal row.
 - L5: Differential against origin/main (scratch test in a mktemp worktree, not committed): tools/list and a 13-call script (log_sets, log_set, start_session, add_set, update_set, get_session, list_sessions, exercise_history, suggest_load, weekly_volume, live_workout, memory_context, delete_set) are identical except timestamps, the two new tools, and `weight_unit` in live_workout and memory_context outputs (and their output schemas).
+- L6: Rebased on main after #109 (SW v26 there), so this PR's service worker is v27. Full `go test -count=1 -p 2 ./...` green after the rebase; one earlier fully parallel run failed TestUndoKeepsWritesThePersonMadeWhileAProposalApplied (42 s, an internal tool error under load), which passed three times alone and in every later run.
