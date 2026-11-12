@@ -10,7 +10,8 @@ import (
 	"github.com/fullfran/training-mcp/internal/training"
 )
 
-const proposalColumns = `id,tool,action_type,payload,session,status,decided_by,result,error,created_at,decided_at`
+const proposalColumns = `id,tool,action_type,payload,session,status,decided_by,result,error,created_at,decided_at,
+	(status='accepted' AND undo_image<>'' AND undone_by=0),undone_by`
 
 func formatTime(t time.Time) string {
 	if t.IsZero() {
@@ -31,7 +32,7 @@ type rowScanner interface{ Scan(...any) error }
 func scanProposal(row rowScanner) (training.Proposal, error) {
 	var p training.Proposal
 	var payload, result, created, decided string
-	if err := row.Scan(&p.ID, &p.Tool, &p.ActionType, &payload, &p.Session, &p.Status, &p.DecidedBy, &result, &p.Error, &created, &decided); err != nil {
+	if err := row.Scan(&p.ID, &p.Tool, &p.ActionType, &payload, &p.Session, &p.Status, &p.DecidedBy, &result, &p.Error, &created, &decided, &p.Undoable, &p.UndoneBy); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return training.Proposal{}, training.ErrNotFound
 		}
@@ -109,9 +110,13 @@ func (s *userStore) FinishProposal(ctx context.Context, id int64, out training.P
 	if out.Status != training.ProposalAccepted && out.Status != training.ProposalFailed {
 		return training.Proposal{}, training.ErrValidation
 	}
-	row := s.db.QueryRowContext(ctx, `UPDATE proposals SET status=?, decided_by=?, result=?, error=?, decided_at=?
+	image := ""
+	if out.Status == training.ProposalAccepted {
+		image = string(out.UndoImage)
+	}
+	row := s.db.QueryRowContext(ctx, `UPDATE proposals SET status=?, decided_by=?, result=?, error=?, decided_at=?, undo_image=?
 		WHERE id=? AND user_id=? AND status='applying' RETURNING `+proposalColumns,
-		out.Status, out.DecidedBy, string(out.Result), out.Error, formatTime(out.At), id, s.userID)
+		out.Status, out.DecidedBy, string(out.Result), out.Error, formatTime(out.At), image, id, s.userID)
 	p, err := scanProposal(row)
 	if errors.Is(err, training.ErrNotFound) {
 		return training.Proposal{}, s.notPendingOrMissing(ctx, id)

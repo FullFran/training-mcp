@@ -98,6 +98,10 @@ type Proposal struct {
 	Error      string          `json:"error,omitempty"`
 	CreatedAt  time.Time       `json:"created_at"`
 	DecidedAt  time.Time       `json:"decided_at,omitzero"`
+	// Undoable says it is accepted with an undo image and was not undone yet.
+	Undoable bool `json:"undoable,omitempty"`
+	// UndoneBy is the history entry that undid it, 0 while it stands.
+	UndoneBy int64 `json:"undone_by,omitempty"`
 }
 
 // ProposalFilter selects proposals: pending ones, or answered ones (history).
@@ -179,6 +183,8 @@ type ProposalOutcome struct {
 	Result    json.RawMessage
 	Error     string
 	At        time.Time
+	// UndoImage is what undoing it needs; empty when it cannot be undone.
+	UndoImage json.RawMessage
 }
 
 // ApplyFunc writes a proposal's change and returns what the write returned.
@@ -233,10 +239,10 @@ func (s *Service) Propose(ctx context.Context, in ProposalInput, apply ApplyFunc
 		return rejected, err
 	case perms.AcceptAll:
 		record.Outcome, record.DeciderKind, record.DeciderID = OutcomeAllow, DeciderGrant, AcceptAllGrant
-		return s.applyProposal(ctx, p.ID, DecidedByAcceptAll, record, nil, apply)
+		return s.applyProposal(ctx, p.ID, p.Payload, DecidedByAcceptAll, record, nil, apply)
 	case grant != nil:
 		record.Outcome, record.DeciderKind, record.DeciderID = OutcomeAllow, DeciderGrant, ruleID(grant.ID)
-		return s.applyProposal(ctx, p.ID, DecidedBySessionGrant, record, nil, apply)
+		return s.applyProposal(ctx, p.ID, p.Payload, DecidedBySessionGrant, record, nil, apply)
 	}
 	return p, nil
 }
@@ -267,7 +273,7 @@ func (s *Service) AcceptProposal(ctx context.Context, id int64, answer string, a
 	if answer == AnswerAllowAlways {
 		rule = &AnswerRule{ActionType: p.ActionType, Effect: EffectAllow, Session: p.Session, ExpiresAt: s.clock().Add(SessionWindow)}
 	}
-	return s.applyProposal(ctx, id, DecidedByPerson, record, rule, func(ctx context.Context) (json.RawMessage, error) {
+	return s.applyProposal(ctx, id, p.Payload, DecidedByPerson, record, rule, func(ctx context.Context) (json.RawMessage, error) {
 		return apply(ctx, s, p.Tool, p.Payload)
 	})
 }
@@ -333,8 +339,9 @@ func (s *Service) reject(ctx context.Context, id int64, decidedBy string, record
 
 // applyProposal claims a pending proposal, records the allow decision, stores
 // the grant an allow_always creates and only then applies the change. A record
-// or grant that cannot be written denies the operation (HCS-0005 R012).
-func (s *Service) applyProposal(ctx context.Context, id int64, decidedBy string, record DecisionRecord, grant *AnswerRule, apply ApplyFunc) (Proposal, error) {
+// or grant that cannot be written denies the operation (HCS-0005 R012). The
+// change is applied with its undo image, so the person can undo it later.
+func (s *Service) applyProposal(ctx context.Context, id int64, payload json.RawMessage, decidedBy string, record DecisionRecord, grant *AnswerRule, apply ApplyFunc) (Proposal, error) {
 	// Claiming first means two answers to one proposal cannot both apply it.
 	if err := s.store.ClaimProposal(ctx, id); err != nil {
 		return Proposal{}, err
@@ -349,8 +356,8 @@ func (s *Service) applyProposal(ctx context.Context, id int64, decidedBy string,
 		p, finishErr := s.store.FinishProposal(ctx, id, ProposalOutcome{Status: ProposalFailed, DecidedBy: decidedBy, Error: publicError(err), At: s.clock()})
 		return p, errors.Join(err, finishErr)
 	}
-	result, applyErr := apply(ctx)
-	out := ProposalOutcome{Status: ProposalAccepted, DecidedBy: decidedBy, Result: result, At: s.clock()}
+	result, image, applyErr := s.capture(ctx, payload, apply)
+	out := ProposalOutcome{Status: ProposalAccepted, DecidedBy: decidedBy, Result: result, At: s.clock(), UndoImage: image}
 	if applyErr != nil {
 		out = ProposalOutcome{Status: ProposalFailed, DecidedBy: decidedBy, Error: publicError(applyErr), At: s.clock()}
 	}

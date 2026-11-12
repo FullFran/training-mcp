@@ -26,6 +26,7 @@ var migrationFS embed.FS
 type Store struct {
 	db        *sql.DB
 	failpoint func(string) error
+	locks     *undoLocks
 }
 
 func Open(path string) (*Store, error) {
@@ -33,7 +34,7 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Store{db: db}
+	s := &Store{db: db, locks: &undoLocks{}}
 	if err = migrate(db); err != nil {
 		db.Close()
 		return nil, err
@@ -145,12 +146,12 @@ func (s *Store) Snapshot(ctx context.Context, path string) error {
 // ForUser returns the data methods bound to one user. Nothing else in this package
 // reaches user data, so every statement knows whose row it is touching.
 func (s *Store) ForUser(userID int64) training.UserStore {
-	return &userStore{db: s.db, failpoint: s.failpoint, userID: userID}
+	return &userStore{db: s.db, failpoint: s.failpoint, userID: userID, locks: s.locks}
 }
 
 // ImportsFor returns one user's imports, bound like ForUser.
 func (s *Store) ImportsFor(userID int64) training.ImportStore {
-	return &userStore{db: s.db, failpoint: s.failpoint, userID: userID}
+	return &userStore{db: s.db, failpoint: s.failpoint, userID: userID, locks: s.locks}
 }
 
 func (s *Store) UserBySubject(ctx context.Context, subject string) (int64, bool, error) {
@@ -175,6 +176,7 @@ type userStore struct {
 	db        *sql.DB
 	failpoint func(string) error
 	userID    int64
+	locks     *undoLocks
 }
 
 func (s *userStore) Start(ctx context.Context, session training.Session) (training.Session, error) {
