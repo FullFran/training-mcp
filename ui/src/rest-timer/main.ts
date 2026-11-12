@@ -69,7 +69,9 @@ let extra = 0;
 // what the person is typing for the same set.
 let filledFor = "";
 // One key per set to log: a retry after a lost answer replays, never doubles.
+// It is only reused for the same body: a retry with other values is a new set.
 let logKey = crypto.randomUUID();
+let logBody = "";
 
 function unit(): string {
   return data?.weight_unit === "lb" ? "lb" : "kg";
@@ -286,6 +288,11 @@ el.done.addEventListener("click", () => {
   const kg = next.weight_kg && weight === toUnit(next.weight_kg, unit()) ? next.weight_kg : toKg(weight, unit());
   const set: Record<string, unknown> = { weight_kg: kg, reps };
   if (el.warmup.checked) set.category = "warmup";
+  const body = JSON.stringify([next.exercise, set]);
+  if (body !== logBody) {
+    logBody = body;
+    logKey = crypto.randomUUID();
+  }
   const label = `${el.warmup.checked ? "warm-up " : ""}${next.exercise} ${weight} ${unit()} × ${reps}`;
   void write(el.done, "log_sets", { idempotency_key: logKey, exercise: next.exercise, sets: [set] }, `Logged ${label}.`).then(
     (outcome) => {
