@@ -35,6 +35,7 @@ const (
 	CodeLoginFailed       ErrorCode = "login_failed"
 	CodeRateLimited       ErrorCode = "rate_limited"
 	CodeTurnLimit         ErrorCode = "turn_limit"
+	CodeLoginPending      ErrorCode = "login_pending"
 	// CodeBadRequest is the host's own refusal of a request it cannot serve as
 	// asked (a model the person's engine did not list). An engine never sends it.
 	CodeBadRequest ErrorCode = "bad_request"

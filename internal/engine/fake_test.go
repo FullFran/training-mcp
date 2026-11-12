@@ -203,6 +203,14 @@ func runFakeEngine(mode string) {
 					}
 					send(map[string]any{"type": "delta", "text": "approvals=" + strings.Join(got, ",") + "\n"})
 				}
+				if mode == "crash" {
+					// A burst of answer, then the engine dies mid-turn: everything it
+					// wrote before dying must still reach the person, then one error.
+					for i := range crashDeltas {
+						send(map[string]any{"type": "delta", "text": fmt.Sprintf("%04d%s", i, strings.Repeat("x", 996))})
+					}
+					os.Exit(3)
+				}
 				if mode == "flood" {
 					for range 50 {
 						send(map[string]any{"type": "delta", "text": strings.Repeat("x", 1000)})
@@ -235,6 +243,10 @@ func runFakeEngine(mode string) {
 		}
 	}
 }
+
+// crashDeltas is how many 1000-byte deltas the crash mode writes before exiting:
+// about what the engine's stdout pipe holds, so the host must read it all.
+const crashDeltas = 60
 
 func orEmpty(v any) string {
 	if v == nil {
