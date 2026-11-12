@@ -549,11 +549,15 @@ func TestEachSignedInUserSeesOnlyTheirOwnData(t *testing.T) {
 		t.Fatalf("owner sessions: %v %v", sessions, err)
 	}
 	guest := f.login(guestSubject)
-	for _, path := range []string{"/", "/history", "/plans", "/exercise-info?name=press+secreto"} {
+	for _, path := range []string{"/", "/progress", "/plans", "/exercise-info?name=press+secreto"} {
 		w := f.do(http.MethodGet, path, nil, []*http.Cookie{guest}, nil)
 		if w.Code != http.StatusOK || strings.Contains(w.Body.String(), "press secreto") {
 			t.Errorf("guest %s: status %d, sees owner data=%v", path, w.Code, strings.Contains(w.Body.String(), "press secreto"))
 		}
+	}
+	// The old history URL still lands on Progreso for a signed-in person.
+	if w := f.do(http.MethodGet, "/history", nil, []*http.Cookie{guest}, nil); w.Code != http.StatusFound || w.Header().Get("Location") != "/?modo=progreso" {
+		t.Errorf("guest /history: status %d, location %q", w.Code, w.Header().Get("Location"))
 	}
 	if w := f.do(http.MethodGet, fmt.Sprintf("/s/%d", sessions[0].ID), nil, []*http.Cookie{guest}, nil); w.Code != http.StatusNotFound {
 		t.Errorf("guest opening the owner's session: status %d", w.Code)
