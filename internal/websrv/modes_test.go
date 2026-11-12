@@ -79,7 +79,7 @@ func TestEntrenarHomeFirstUse(t *testing.T) {
 	for _, want := range []string{
 		"Aún no tienes rutina",
 		`id="ask-routine"`, "Pídele una rutina al coach",
-		`href="` + base + `/plans"`, "Crear rutina a mano",
+		`href="` + base + `/plans?nueva=1"`, "Crear rutina a mano",
 		`href="` + base + `/import"`, "Importar de Hevy o Strong",
 		`data-free-session`, "Entrenar sin rutina",
 	} {

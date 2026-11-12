@@ -103,7 +103,7 @@
     </form>
   </article>
   {{else}}
-  <p class="empty">No hay nada{{if or .Memory.Query .Memory.Type}} con ese filtro{{else}} todavía{{end}}.</p>
+  <p class="empty">{{if or .Memory.Query .Memory.Type}}No hay nada con ese filtro.{{else if ne .Memory.View "active"}}No hay nada aquí todavía.{{else}}El coach aún no recuerda nada. Lo que le cuentes y confirmes aparecerá aquí.{{end}}</p>
   {{end}}
   {{end}}
 

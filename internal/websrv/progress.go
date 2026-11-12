@@ -407,6 +407,108 @@ type pickerExercise struct {
 	Last  string `json:"last,omitempty"`
 }
 
+// pickerSuggestion is the picker's "Sugerido por el coach" row.
+type pickerSuggestion struct {
+	Name   string `json:"name"`
+	Reason string `json:"reason"`
+}
+
+// suggestExercise picks the picker's suggestion from stored data only, so
+// opening the picker never calls the model. The group is the one the volume
+// recommendation raises most; without one, the group with the fewest working
+// sets this week (ties in MuscleGroups order). The exercise is that group's
+// most recently logged one not already in today's session, else its first by
+// name. Only groups with an exercise to offer count; nil when none has one.
+func (s *Server) suggestExercise(ctx context.Context, groups []training.ExerciseGroup, recent []string) (*pickerSuggestion, error) {
+	svc := s.service(ctx)
+	live, err := svc.LiveWorkout(ctx)
+	if err != nil {
+		return nil, err
+	}
+	today := map[string]bool{}
+	if live.Session != nil {
+		for _, set := range live.Session.Sets {
+			today[set.Exercise] = true
+		}
+	}
+	for _, p := range live.Progress {
+		today[p.Exercise] = true
+	}
+	rank := map[string]int{}
+	for i, name := range recent {
+		rank[name] = i
+	}
+	pick := map[string]string{} // group -> exercise to offer
+	for _, g := range groups {
+		if g.MuscleGroup == "" || today[g.Exercise] {
+			continue
+		}
+		cur, ok := pick[g.MuscleGroup]
+		if !ok || better(g.Exercise, cur, rank) {
+			pick[g.MuscleGroup] = g.Exercise
+		}
+	}
+	if len(pick) == 0 {
+		return nil, nil
+	}
+
+	recs, err := svc.VolumeRecommendation(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var top *training.SetChange
+	for i := range recs {
+		if _, ok := pick[recs[i].MuscleGroup]; ok && recs[i].SetsDelta > 0 && (top == nil || recs[i].SetsDelta > top.SetsDelta) {
+			top = &recs[i]
+		}
+	}
+	if top != nil {
+		return &pickerSuggestion{Name: pick[top.MuscleGroup], Reason: label(top.MuscleGroup) + ": el volumen pide +" + strconv.Itoa(top.SetsDelta) + " series"}, nil
+	}
+
+	now := s.clock()
+	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	monday := day.AddDate(0, 0, -((int(day.Weekday()) + 6) % 7))
+	weeks, err := svc.WeeklyVolume(ctx, training.ListFilter{From: monday.Format("2006-01-02"), To: monday.AddDate(0, 0, 6).Format("2006-01-02")})
+	if err != nil {
+		return nil, err
+	}
+	sets := map[string]int{}
+	for _, w := range weeks {
+		sets[w.MuscleGroup] += w.Sets
+	}
+	best := ""
+	for _, g := range training.MuscleGroups {
+		if _, ok := pick[g]; ok && (best == "" || sets[g] < sets[best]) {
+			best = g
+		}
+	}
+	return &pickerSuggestion{Name: pick[best], Reason: label(best) + ": " + strconv.Itoa(sets[best]) + " " + plural(sets[best], "serie", "series") + " esta semana"}, nil
+}
+
+// better says whether exercise a is a better offer than b: logged more
+// recently, or, with neither logged, first by name.
+func better(a, b string, rank map[string]int) bool {
+	ra, okA := rank[a]
+	rb, okB := rank[b]
+	switch {
+	case okA && okB:
+		return ra < rb
+	case okA != okB:
+		return okA
+	default:
+		return a < b
+	}
+}
+
+// label capitalises a muscle group for a row: "Cuadriceps".
+func label(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
+}
+
 // exercises feeds the exercise picker: every exercise the person knows, its
 // muscle group and last set, the groups present and the latest used.
 func (s *Server) exercises(w http.ResponseWriter, r *http.Request) {
@@ -452,6 +554,7 @@ func (s *Server) exercises(w http.ResponseWriter, r *http.Request) {
 		Groups    []string          `json:"groups"`
 		Recent    []string          `json:"recent"`
 		Exercises []*pickerExercise `json:"exercises"`
+		Suggested *pickerSuggestion `json:"suggested,omitempty"`
 	}{Groups: []string{}, Recent: []string{}}
 	for _, m := range recent {
 		e := ensure(m.Exercise)
@@ -465,6 +568,10 @@ func (s *Server) exercises(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
 	out.Exercises = list
+	if out.Suggested, err = s.suggestExercise(ctx, groups, out.Recent); err != nil {
+		s.fail(w, err)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
 }

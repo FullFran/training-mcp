@@ -58,7 +58,11 @@
     const link = event.target.closest('[data-mode-go]');
     if (!link || event.metaKey || event.ctrlKey || event.shiftKey) return;
     event.preventDefault();
+    if (link.closest('#finish')) setFinish(false);
     go(link.dataset.modeGo);
+    // data-new-chat starts a new conversation first (the finish summary's
+    // "Comentar con el coach"); coach.js empties the chat.
+    if (link.hasAttribute('data-new-chat')) document.dispatchEvent(new CustomEvent('coach:new'));
     // A link that asks the coach something lands in the chat with it typed.
     if (link.hasAttribute('data-ask')) ask(link.dataset.ask);
   });

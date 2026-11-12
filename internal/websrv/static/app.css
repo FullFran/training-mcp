@@ -655,6 +655,15 @@ main { padding-bottom: 140px; }
 
 /* --- routine editing ---------------------------------------------------- */
 .plan-card { gap: 10px; }
+/* Rutinas: create first; creating is the name alone, then the editor. */
+.plan-actions { display: grid; gap: 10px; margin-bottom: 12px; }
+.plan-create { display: grid; gap: 12px; }
+.plan-create input[name="name"] {
+  width: 100%; min-height: 52px; padding: 10px 14px; font: inherit; font-size: 18px;
+  border-radius: 10px; border: 1px solid var(--line); background: #10131a; color: var(--text);
+}
+.plan-create input[name="name"]:focus { outline: none; border-color: var(--accent); }
+.back-link { display: inline-flex; align-items: center; min-height: 52px; color: var(--accent); font-weight: 600; text-decoration: none; }
 .plan-id { display: grid; gap: 8px; }
 .plan-id input, .plan-id textarea {
   width: 100%; padding: 10px 12px;
@@ -1264,6 +1273,7 @@ body.coach-open .coach-sheet {
 .finish-totals { margin: 0 0 10px; font-size: 16px; }
 .finish-list { margin: 0 0 12px; padding: 0; list-style: none; display: grid; gap: 6px; }
 .finish-list li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.finish-comment { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; min-height: 52px; }
 .finish .primary.wide { width: 100%; min-height: 52px; margin-top: 12px; font-size: 17px; }
 
 /* --- Entrenar: one card per exercise with its set table ---------------------
@@ -1662,6 +1672,8 @@ body[data-mode="plan"]:has(.workout-pill:not([hidden])) .coach-sheet > .coach { 
 .pick .row-main strong { font-size: 17px; }
 .pick .row-main strong::first-letter { text-transform: uppercase; }
 .pick.create strong { color: var(--accent); }
+.picker-list > li.suggested .row-main { display: grid; gap: 2px; }
+.picker-list > li.suggested .eyebrow { font-size: 11px; }
 .tick { flex: none; width: 32px; height: 32px; border-radius: 10px; border: 2px solid var(--line); transition: background .12s ease, border-color .12s ease; }
 .pick[aria-pressed="true"] .tick { border-color: var(--accent); background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%2307240f' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 20px no-repeat; }
 .picker:has(#picker-done[hidden]) .tick { display: none; }

@@ -261,6 +261,9 @@
       <input type="hidden" name="session_id" value="{{.Session.ID}}">
       <button type="submit" id="finish-done" class="primary wide">Terminar entreno</button>
     </form>
+    {{if and .CoachOn .Blocks}}<!-- A new Planificar conversation about this session, its message typed in. -->
+    <a id="finish-comment" class="btn big finish-comment" href="{{.Base}}/?modo=planificar" data-mode-go="plan" data-new-chat
+       data-ask="Comenta mi sesión de hoy ({{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Entreno libre{{end}}, {{.Session.Date}}): ¿qué tal ha ido y qué ajusto para la próxima?"><span class="live-dot" aria-hidden="true"></span>Comentar con el coach</a>{{end}}
   </section>
   {{end}}
 </section>

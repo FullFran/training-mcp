@@ -169,7 +169,9 @@ shared with the MCP tools and cannot drift apart.
   (Serie, Anterior, kg, Reps, RPE), pre-filled from the plan, the set before
   and last session; tapping a row's number marks it as a warm-up (an amber
   **W** that never counts); one check logs a set and starts the rest timer, supersets
-  keep their round rest, and **Terminar** shows the day's summary. A bar at
+  keep their round rest, and **Terminar** shows the day's summary; with the
+  coach on, **Comentar con el coach** there opens a new Planificar conversation
+  with a message about that session typed in, ready to send. A bar at
   the bottom opens the coach (when `TRAINING_COACH=1`, see
   [docs/coach.md](docs/coach.md)) as a sheet over the workout that closes back
   to the same point; when an answer gives a load («45 kg × 8») an **Aplicar**
@@ -204,7 +206,11 @@ shared with the MCP tools and cannot drift apart.
 - **+ Añadir ejercicio** and **Sustituir** in the workout open an exercise
   picker: search (accents ignored), recent exercises, filters by muscle group,
   each with its last set; several can be added at once, and a name that does
-  not exist yet can be created.
+  not exist yet can be created. While adding, one **Sugerido por el coach** row
+  comes first, worked out from stored data with no model call: the muscle
+  group the volume recommendation raises most, else the one with the fewest
+  working sets this week, and that group's most recently logged exercise not
+  already in today's session.
 - `/review` lists the agent's pending proposals with what each would change
   (one sentence per write tool, the exact payload one tap away),
   accepts or rejects them (once, or always in that session), shows the answer history
@@ -233,6 +239,12 @@ shared with the MCP tools and cannot drift apart.
 - `/plans` builds and edits routines from the phone: rename, add, reorder and
   remove exercises, and write the routine's notes. It is a separate screen
   because planning is deliberate work, not something done between sets.
+  **Crear a mano** there, and **Crear rutina a mano** in Entrenar's empty
+  state, open `/plans?nueva=1`: the name alone, focused; **Crear y añadir
+  ejercicios** lands on that routine's own editor (`/plans?rutina=ID`) with
+  the exercise field focused. A routine starts with a placeholder exercise
+  (a plan needs one), hidden in the editor and dropped when the first real
+  exercise is added.
 - A rest timer starts when a new set is logged, counts from when the server
   stored it (so a reload resumes it) and shows the exercise planned next. Its
   ±30 s buttons change the rest target the agent also reads (`live_workout`).

@@ -290,3 +290,19 @@ func TestAcceptingAStaleMergeExplainsWhy(t *testing.T) {
 		t.Fatalf("a stale merge merged: %v", active)
 	}
 }
+
+// With nothing remembered, Memoria says what will appear there; a filter that
+// matches nothing still says so.
+func TestMemoryEmptyStateSaysWhatWillAppear(t *testing.T) {
+	h, _ := memoryWeb(t)
+	empty := "El coach aún no recuerda nada. Lo que le cuentes y confirmes aparecerá aquí."
+	if page := get(t, h, base+"/memory").Body.String(); !strings.Contains(page, empty) {
+		t.Fatalf("empty Memoria lacks %q:\n%s", empty, page)
+	}
+	if page := get(t, h, base+"/memory?q=sentadilla").Body.String(); !strings.Contains(page, "No hay nada con ese filtro.") || strings.Contains(page, empty) {
+		t.Fatalf("filtered empty Memoria:\n%s", page)
+	}
+	if page := get(t, h, base+"/memory?view=forgotten").Body.String(); !strings.Contains(page, "No hay nada aquí todavía.") || strings.Contains(page, empty) {
+		t.Fatalf("empty forgotten view:\n%s", page)
+	}
+}
