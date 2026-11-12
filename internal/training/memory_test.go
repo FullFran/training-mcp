@@ -116,6 +116,9 @@ func TestSearchMemoryBoundsTheLimitAndChecksTheType(t *testing.T) {
 	}
 }
 
+// WeightUnit is kg: memory_context reports the person's unit.
+func (*memoryFake) WeightUnit(context.Context) (string, error) { return "", nil }
+
 func TestMemoryContextIsCompact(t *testing.T) {
 	fake := &memoryFake{listed: []Memory{{ID: 1, Title: "t", Body: strings.Repeat("é", memoryContextBody+10), Pinned: true}}}
 	got, err := NewService(fake, memoryClock).MemoryContext(context.Background())

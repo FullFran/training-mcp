@@ -185,6 +185,9 @@ type MemoryContext struct {
 	Due []Memory `json:"due"`
 	// Conflicts counts conflicts waiting for the person in the memory panel.
 	Conflicts int `json:"conflicts"`
+	// WeightUnit is how the person reads and types weights, kg or lb; the
+	// tools stay in kg. Empty where it was not read.
+	WeightUnit string `json:"weight_unit,omitempty"`
 }
 
 // MemoryInput saves a fact. An empty topic key is derived from the type and
@@ -401,7 +404,11 @@ func (s *Service) MemoryContext(ctx context.Context) (MemoryContext, error) {
 	}
 	compactBodies(memories)
 	compactBodies(due)
-	return MemoryContext{Memories: memories, Due: due, Conflicts: len(conflicts)}, nil
+	unit, err := s.WeightUnit(ctx)
+	if err != nil {
+		return MemoryContext{}, err
+	}
+	return MemoryContext{Memories: memories, Due: due, Conflicts: len(conflicts), WeightUnit: unit}, nil
 }
 
 // UpdateMemory is the person editing a fact from the app; it restarts the
