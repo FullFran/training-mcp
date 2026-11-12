@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="{{.Base}}/static/app.css">
 {{if .CSRF}}<meta name="csrf-token" content="{{.CSRF}}">
 {{end}}</head>
-<body class="chat-home" data-mode="{{.Mode}}" data-base="{{.Base}}" data-rest-target="{{.RestTarget}}"{{if .CSRF}} hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'{{end}}>
+<body class="chat-home" data-mode="{{.Mode}}" data-base="{{.Base}}" data-unit="{{.Unit}}" data-rest-target="{{.RestTarget}}"{{if .CSRF}} hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'{{end}}>
 {{$active := .Active}}
 <!-- Entrenar's tab: continue the live workout, or start the next routine.
      Plain links and forms, so it works without JavaScript; modes.js switches
@@ -138,6 +138,16 @@
         <button type="button" class="step" data-rest-step="15" aria-label="Añadir 15 segundos">+</button>
       </span>
     </div>
+    <!-- The default weight unit. Weights stay stored in kg; each weight input
+         can still be switched to the other unit. -->
+    <form class="list-row static units-setting" method="post" action="{{.Base}}/units">{{if .CSRF}}
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
+      <span class="row-main"><strong>Unidades</strong><span class="muted">Cómo ves y escribes los pesos</span></span>
+      <span class="segmented" role="group" aria-label="Unidades">
+        <button type="submit" name="unit" value="kg" aria-pressed="{{if eq .Unit "kg"}}true{{else}}false{{end}}">kg</button>
+        <button type="submit" name="unit" value="lb" aria-pressed="{{if eq .Unit "lb"}}true{{else}}false{{end}}">lb</button>
+      </span>
+    </form>
   </div>
 
   <h2 class="section-label">Datos</h2>
@@ -381,7 +391,7 @@
         {{range .Recent}}
         <button type="button" class="chip"
                 data-exercise="{{.Exercise}}"
-                data-weight="{{num .WeightKG}}"
+                data-weight="{{wt .WeightKG}}"
                 data-reps="{{.Reps}}"
                 data-rpe="{{if not .RPEImputed}}{{num .RPE}}{{end}}">{{.Exercise}}</button>
         {{end}}
@@ -401,12 +411,13 @@
       <p id="previous" class="previous" hidden></p>
 
       <div class="row">
-        <div class="stepper" data-target="weight" data-step="2.5" data-min="0.5">
-          <span class="label">Peso (kg)</span>
+        <div class="stepper" data-target="weight" data-step="{{if eq unit "lb"}}5{{else}}2.5{{end}}" data-min="{{wmin}}">
+          <span class="label">Peso (<span data-unit-label>{{unit}}</span>)</span>
           <div class="controls">
             <button type="button" class="pad" data-delta="-1" aria-label="Bajar peso">−</button>
             <input id="weight" name="weight_kg" type="number" inputmode="decimal"
-                   step="0.5" min="0.5" value="20" required>
+                   step="{{if eq unit "lb"}}0.1{{else}}0.5{{end}}" min="{{wmin}}" value="{{if eq unit "lb"}}45{{else}}20{{end}}" required>
+            {{template "unit-toggle"}}
             <button type="button" class="pad" data-delta="1" aria-label="Subir peso">+</button>
           </div>
         </div>

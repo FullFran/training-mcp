@@ -14,6 +14,8 @@ type suggestion struct {
 	Weight   float64 `json:"weight"`
 	Reps     int     `json:"reps"`
 	RPE      float64 `json:"rpe"`
+	// Unit is the weight's: kg, or lb when the answer says lb.
+	Unit string `json:"unit"`
 }
 
 // TestCoachSuggestionsReadTheNumbersOfAnAnswer runs static/coach-apply.js under
@@ -39,6 +41,17 @@ func TestCoachSuggestionsReadTheNumbersOfAnAnswer(t *testing.T) {
 		{"Hiciste 47,5 kg × 7, una por debajo del rango.", nil},
 		// Two suggestions, and the same one twice is offered once.
 		{"Primero 45 kg × 8; si va bien, 47,5 kg × 6. Repito: 45 kg × 8.", []suggestion{{Weight: 45, Reps: 8}, {Weight: 47.5, Reps: 6}}},
+		// A load in lb keeps its unit, so the chip fills the row in lb.
+		{"Sube a 135 lb × 5 en press banca.", []suggestion{{Exercise: "press banca", Weight: 135, Reps: 5, Unit: "lb"}}},
+		{"Haz 100 libras a 8 reps.", []suggestion{{Weight: 100, Reps: 8, Unit: "lb"}}},
+		{"Llevas 3.200 lb de volumen.", nil},
+	}
+	for i := range cases {
+		for j := range cases[i].want {
+			if cases[i].want[j].Unit == "" {
+				cases[i].want[j].Unit = "kg"
+			}
+		}
 	}
 	type input struct {
 		Text      string   `json:"text"`

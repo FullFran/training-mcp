@@ -164,6 +164,9 @@ func seedUser(t *testing.T, user training.UserStore, group string) seeded {
 	if err = user.SetRestTarget(ctx, 90); err != nil {
 		t.Fatal(err)
 	}
+	if err = user.SetWeightUnit(ctx, "lb"); err != nil {
+		t.Fatal(err)
+	}
 	pending, err := user.CreateProposal(ctx, training.Proposal{Tool: "log_sets", ActionType: "set.log", Payload: []byte(`{"exercise":"banca"}`), CreatedAt: time.Unix(0, 0)})
 	if err != nil {
 		t.Fatal(err)
@@ -389,6 +392,7 @@ var readCases = map[string]func(context.Context, training.UserStore) (any, error
 	},
 	"ExerciseNotes": func(c context.Context, u training.UserStore) (any, error) { return u.ExerciseNotes(c) },
 	"RestTarget":    func(c context.Context, u training.UserStore) (any, error) { return u.RestTarget(c) },
+	"WeightUnit":    func(c context.Context, u training.UserStore) (any, error) { return u.WeightUnit(c) },
 	"Decisions":     func(c context.Context, u training.UserStore) (any, error) { return u.Decisions(c, 50) },
 	"ListMemory": func(c context.Context, u training.UserStore) (any, error) {
 		listed, err := u.ListMemory(c, training.MemoryQuery{Limit: 50})
@@ -518,6 +522,10 @@ var writeCases = map[string]struct {
 			return u.SetExerciseNote(c, training.ExerciseNote{Exercise: "sentadilla", Note: "barra baja"})
 		},
 		`SELECT COUNT(*) FROM exercise_notes WHERE user_id=2 AND exercise='sentadilla'`,
+	},
+	"SetWeightUnit": {
+		func(c context.Context, u training.UserStore) error { return u.SetWeightUnit(c, "kg") },
+		`SELECT COUNT(*) FROM users WHERE id=2 AND weight_unit='kg'`,
 	},
 	"SetRestTarget": {
 		func(c context.Context, u training.UserStore) error { return u.SetRestTarget(c, 75) },

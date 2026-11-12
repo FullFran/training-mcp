@@ -1226,7 +1226,7 @@ func TestPlannedItemCarriesTodaysWeightForOneTapLog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(script), "item.dataset.todayWeight || (known.last ? known.last.weight_kg : null)") {
+	if !strings.Contains(string(script), "item.dataset.todayWeight || (known.last ? known.weight : null)") {
 		t.Fatal("fillPlanned does not prefer today's weight")
 	}
 }

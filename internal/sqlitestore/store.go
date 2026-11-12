@@ -1384,6 +1384,22 @@ func (s *userStore) SetRestTarget(ctx context.Context, seconds int) error {
 	return err
 }
 
+// WeightUnit is the person's default weight unit, "" if never chosen.
+func (s *userStore) WeightUnit(ctx context.Context) (string, error) {
+	var v sql.NullString
+	err := s.db.QueryRowContext(ctx, `SELECT weight_unit FROM users WHERE id=?`, s.userID).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return v.String, err
+}
+
+func (s *userStore) SetWeightUnit(ctx context.Context, unit string) error {
+	defer s.writing(ctx)()
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET weight_unit=? WHERE id=?`, unit, s.userID)
+	return err
+}
+
 // CoachPreferences returns the person's coach model and thinking level; empty
 // when never chosen.
 func (s *Store) CoachPreferences(ctx context.Context, userID int64) (model, thinking string, err error) {

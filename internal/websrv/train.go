@@ -76,7 +76,7 @@ func (s *Server) trainCards(ctx context.Context, data pageData) ([]TrainCard, er
 			row := DoneRow{Set: set, Warmup: set.Category == training.SetWarmup}
 			if !row.Warmup {
 				row.N = len(working) + 1
-				row.Previous = previousAt(last, len(working))
+				row.Previous = previousAt(last, len(working), data.Unit)
 				working = append(working, set)
 			}
 			c.Logged = append(c.Logged, row)
@@ -90,9 +90,9 @@ func (s *Server) trainCards(ctx context.Context, data pageData) ([]TrainCard, er
 			rows = 1
 		}
 		for j := 0; j < rows; j++ {
-			c.Pending = append(c.Pending, pendingRow(*c, working, last, len(working)+j))
+			c.Pending = append(c.Pending, pendingRow(*c, working, last, len(working)+j, data.Unit))
 		}
-		c.Extra = pendingRow(*c, working, last, len(working)+rows)
+		c.Extra = pendingRow(*c, working, last, len(working)+rows, data.Unit)
 	}
 	open := -1
 	for i, c := range cards {
@@ -153,17 +153,18 @@ func (s *Server) lastSession(ctx context.Context, exercise string, today int64) 
 	return out, nil
 }
 
-func previousAt(last []training.ExerciseSet, i int) string {
+func previousAt(last []training.ExerciseSet, i int, unit string) string {
 	if i >= len(last) {
 		return ""
 	}
-	return formatNumber(last[i].WeightKG) + " × " + strconv.Itoa(last[i].Reps)
+	return formatNumber(training.FromKG(last[i].WeightKG, unit)) + " × " + strconv.Itoa(last[i].Reps)
 }
 
 // pendingRow pre-fills the working set at position i; working are today's
 // working sets, so a warm-up never sets the next weight.
-func pendingRow(c TrainCard, working []training.Set, last []training.ExerciseSet, i int) PendingRow {
-	row := PendingRow{N: i + 1, Previous: previousAt(last, i), RPE: "8"}
+// Weights are in unit, the person's default.
+func pendingRow(c TrainCard, working []training.Set, last []training.ExerciseSet, i int, unit string) PendingRow {
+	row := PendingRow{N: i + 1, Previous: previousAt(last, i, unit), RPE: "8"}
 	var before *training.Set
 	if len(working) > 0 {
 		before = &working[len(working)-1]
@@ -177,11 +178,11 @@ func pendingRow(c TrainCard, working []training.Set, last []training.ExerciseSet
 	}
 	switch {
 	case before != nil:
-		row.Weight = formatNumber(before.WeightKG)
+		row.Weight = formatNumber(training.FromKG(before.WeightKG, unit))
 	case lastSame != nil:
-		row.Weight = formatNumber(lastSame.WeightKG)
+		row.Weight = formatNumber(training.FromKG(lastSame.WeightKG, unit))
 	case lastEnd != nil:
-		row.Weight = formatNumber(lastEnd.WeightKG)
+		row.Weight = formatNumber(training.FromKG(lastEnd.WeightKG, unit))
 	}
 	switch {
 	case c.RepMin > 0 && c.RepMax > 0:

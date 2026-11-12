@@ -114,6 +114,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   align-items: center;
 }
 .stepper input { text-align: center; padding: 0 2px; }
+.stepper .controls:has(.unit-toggle) { grid-template-columns: var(--tap) 1fr auto var(--tap); }
 /* Native spinners are too small to hit reliably; the pads replace them. */
 .stepper input::-webkit-outer-spin-button,
 .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
@@ -1304,7 +1305,7 @@ body.coach-open .coach-sheet {
 .train-plan .set-table > li,
 .set-row .row-form {
   display: grid;
-  grid-template-columns: 2.2rem minmax(4.4rem, 1fr) 4rem 3.2rem 3.2rem 3rem;
+  grid-template-columns: 2.2rem minmax(3.4rem, 1fr) 5.6rem 3.2rem 3.2rem 3rem;
   align-items: center;
   gap: 4px;
   min-height: 52px;
@@ -1931,3 +1932,21 @@ body.coach-open .plan-today { display: none; }
 @media (prefers-color-scheme: light) {
   .past-session input[type="date"], .past-session select { background: #f0f2f6; color-scheme: light; }
 }
+
+/* --- weight units ---------------------------------------------------------- */
+/* A weight input's kg/lb toggle: it says the unit of the number typed. */
+.wcell { display: grid; grid-template-columns: 1fr 1.9rem; gap: 2px; align-items: center; }
+.unit-toggle {
+  min-width: 1.9rem; min-height: 44px; padding: 0 2px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--card);
+  color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; text-transform: lowercase;
+}
+.unit-toggle.other { border-color: #f59e0b; color: #f59e0b; }
+.edit-form .unit-toggle { min-height: 44px; }
+.segmented { display: inline-flex; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.segmented button {
+  min-width: 52px; min-height: 44px; border: 0; background: transparent;
+  color: var(--muted); font: inherit; font-weight: 700;
+}
+.segmented button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.units-setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

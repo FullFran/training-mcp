@@ -264,6 +264,7 @@ var webRoutes = map[string]func(*testing.T){
 
 	"POST /finish": testFinishingAnotherUsersSessionProposesNothing,
 	"POST /rest":   testRestTargetBelongsToWhoSetsIt,
+	"POST /units":  testWeightUnitBelongsToWhoSetsIt,
 	"GET /review":  pageRoute("/review", secretPlan+" 2"),
 	"POST /review/{id}/accept": idRoute(func(w webWorld) string { return w.proposal }, func(id string) (string, url.Values) {
 		return "/review/" + id + "/accept", url.Values{"answer": {"allow_always"}}
@@ -651,4 +652,25 @@ func testStartingAPastSessionFromAnotherUsersPlanIsRefused(t *testing.T) {
 		t.Fatalf("rows changed:\nbefore\n%s\nafter\n%s", before, after)
 	}
 	writeRoute("/sessions/past", url.Values{"date": {"2026-08-01"}}, "sessions WHERE user_id=2 AND date='2026-08-01'")(t)
+
+// The default weight unit is the person's own: user 2 choosing lb leaves the
+// owner on kg.
+func testWeightUnitBelongsToWhoSetsIt(t *testing.T) {
+	world := newWebWorld(t)
+	if w := post(t, world.second, base+"/units", url.Values{"unit": {"lb"}}, false); w.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d: %s", w.Code, w.Body)
+	}
+	var second, owner sql.NullString
+	if err := world.db.QueryRow(`SELECT weight_unit FROM users WHERE id=2`).Scan(&second); err != nil {
+		t.Fatal(err)
+	}
+	if err := world.db.QueryRow(`SELECT weight_unit FROM users WHERE id=1`).Scan(&owner); err != nil {
+		t.Fatal(err)
+	}
+	if second.String != "lb" || owner.Valid {
+		t.Fatalf("user 2 = %v, owner = %v", second, owner)
+	}
+	if page := get(t, world.owner, base+"/").Body.String(); !strings.Contains(page, `data-unit="kg"`) {
+		t.Fatal("the owner's page is not in kg")
+	}
 }

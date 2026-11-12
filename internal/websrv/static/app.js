@@ -17,6 +17,13 @@
     try { info = JSON.parse(infoTag.textContent) || {}; } catch (e) { info = {}; }
   }
 
+  // The person's default weight unit: every weight the page shows is in it.
+  const unitDefault = document.body.dataset.unit || 'kg';
+  const entryUnit = () => {
+    const u = form && form.querySelector('input[name="weight_unit"]');
+    return u ? u.value : unitDefault;
+  };
+
   const buzz = (ms) => { if (navigator.vibrate) navigator.vibrate(ms); };
   const num = (v) => Math.round(parseFloat(v) * 100) / 100;
 
@@ -45,7 +52,7 @@
     const known = info[name] || {};
     fill({
       exercise: name,
-      weight: item.dataset.todayWeight || (known.last ? known.last.weight_kg : null),
+      weight: item.dataset.todayWeight || (known.last ? known.weight : null),
       reps: item.dataset.reps !== '0' ? item.dataset.reps : null,
       rpe: item.dataset.rpe !== '0' ? item.dataset.rpe : null
     });
@@ -72,7 +79,7 @@
     quick.hidden = !name;
     if (!name) return;
     const rpe = checkedRPE();
-    const what = weight.value + ' kg × ' + reps.value + (rpe ? ' @' + rpe : '');
+    const what = weight.value + ' ' + entryUnit() + ' × ' + reps.value + (rpe ? ' @' + rpe : '');
     quick.textContent = '✓ ' + what;
     quick.setAttribute('aria-label', 'Registrar ' + name + ', ' + what);
     if (now) {
@@ -127,13 +134,13 @@
     if (!entry) { previous.hidden = true; return; }
     const bits = [];
     if (entry.last) {
-      bits.push(`Anterior: <strong>${num(entry.last.weight_kg)} kg × ${entry.last.reps} @${entry.last.rpe_imputed ? '?' : num(entry.last.rpe)}</strong> (${entry.last.date})`);
+      bits.push(`Anterior: <strong>${num(entry.weight)} ${entry.unit} × ${entry.last.reps} @${entry.last.rpe_imputed ? '?' : num(entry.last.rpe)}</strong> (${entry.last.date})`);
     }
-    if (entry.best_e1rm) bits.push(`Récord 1RM est. <strong>${entry.best_e1rm} kg</strong>`);
-    if (entry.suggest && entry.suggest.delta_kg) {
+    if (entry.best) bits.push(`Récord 1RM est. <strong>${entry.best} ${entry.unit}</strong>`);
+    if (entry.suggest && entry.delta) {
       const s = entry.suggest;
-      const sign = s.delta_kg > 0 ? '+' : '';
-      bits.push(`<button type="button" class="suggest" data-kg="${s.suggested_kg}" title="${s.reason}">→ ${s.suggested_kg} kg (${sign}${s.delta_kg})</button>`);
+      const sign = entry.delta > 0 ? '+' : '';
+      bits.push(`<button type="button" class="suggest" data-weight="${entry.suggested}" data-unit="${entry.unit}" title="${s.reason}">→ ${entry.suggested} ${entry.unit} (${sign}${entry.delta})</button>`);
     }
     if (entry.group) bits.push(entry.group);
     let html = bits.join(' · ');
@@ -150,7 +157,8 @@
   document.addEventListener('click', (event) => {
     const btn = event.target.closest('.suggest');
     if (!btn) return;
-    weight.value = btn.dataset.kg;
+    weight.value = btn.dataset.weight;
+    setUnit(form, btn.dataset.unit);
     syncQuick();
     buzz(8);
   });
@@ -348,7 +356,9 @@
     f.setAttribute('hx-target', '#panel');
     f.setAttribute('hx-swap', 'outerHTML');
     f.innerHTML =
-      `<input name="weight_kg" type="number" step="0.5" min="0.5" inputmode="decimal" value="${li.dataset.weight}" aria-label="Peso">` +
+      `<input name="weight_kg" type="number" step="${unitDefault === 'lb' ? '0.1' : '0.5'}" min="${unitDefault === 'lb' ? '0.1' : '0.5'}" inputmode="decimal" value="${li.dataset.weight}" aria-label="Peso">` +
+      `<input type="hidden" name="weight_unit" value="${unitDefault}">` +
+      `<button type="button" class="unit-toggle" data-unit-toggle aria-label="Unidad del peso: ${unitDefault}. Tocar para cambiarla">${unitDefault}</button>` +
       `<input name="reps" type="number" step="1" min="1" inputmode="numeric" value="${li.dataset.reps}" aria-label="Reps">` +
       `<input name="rpe" type="number" step="0.5" min="1" max="10" inputmode="decimal" value="${li.dataset.rpe}" aria-label="RPE">` +
       `<input name="technique" type="text" list="techniques" placeholder="técnica" value="${li.dataset.technique || ''}" aria-label="Técnica">` +
@@ -357,8 +367,47 @@
       `<button type="submit" class="ok">Guardar</button>` +
       `<button type="button" class="del" hx-post="${base}/sets/${li.dataset.setId}/delete" hx-target="#panel" hx-swap="outerHTML" hx-confirm="¿Borrar esta serie?" aria-label="Borrar serie">✕</button>`;
     li.appendChild(f);
+    // A weight left as shown, in the unit shown, is not sent: the stored kg
+    // stays exactly as it was (a value shown in lb is rounded to 0.1 lb).
+    const shown = li.dataset.weight;
+    f.addEventListener('submit', () => {
+      const w = f.querySelector('input[name="weight_kg"]');
+      const u = f.querySelector('input[name="weight_unit"]');
+      const same = w.value === shown && u.value === unitDefault;
+      w.disabled = same;
+      u.disabled = same;
+    });
     if (window.htmx) window.htmx.process(f);
     f.querySelector('input').focus();
+  });
+
+  // --- weight units --------------------------------------------------------
+  // Each weight input has a kg/lb toggle that starts on the person's default.
+  // A tap changes the unit of the number typed, never the number, so a past
+  // set really lifted in lb is fixed by keeping its number and choosing lb.
+  function setUnit(scope, unit) {
+    if (!scope || (unit !== 'kg' && unit !== 'lb')) return;
+    scope.querySelectorAll('input[name="weight_unit"]').forEach((u) => { u.value = unit; });
+    scope.querySelectorAll('[data-unit-toggle]').forEach((b) => {
+      b.textContent = unit;
+      b.setAttribute('aria-label', 'Unidad del peso: ' + unit + '. Tocar para cambiarla');
+      b.classList.toggle('other', unit !== unitDefault);
+    });
+    scope.querySelectorAll('[data-unit-label]').forEach((l) => { l.textContent = unit; });
+    scope.querySelectorAll('input[name="weight_kg"]').forEach((w) => {
+      w.step = unit === 'lb' ? '0.1' : '0.25';
+      w.min = unit === 'lb' ? '0.1' : '0.5';
+    });
+  }
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-unit-toggle]');
+    if (!btn) return;
+    const scope = btn.closest('form');
+    const u = scope && scope.querySelector('input[name="weight_unit"]');
+    if (!u) return;
+    setUnit(scope, u.value === 'lb' ? 'kg' : 'lb');
+    if (scope === form) syncQuick();
+    buzz(8);
   });
 
   // --- rest timer --------------------------------------------------------
@@ -497,7 +546,7 @@
     if (more) more.open = false;
     // The chat shows the set as a card; the data is the server's, not the model's.
     document.dispatchEvent(new CustomEvent('workout:set-logged', { detail: {
-      exercise: panel.dataset.lastExercise, weight: panel.dataset.lastWeight,
+      exercise: panel.dataset.lastExercise, weight: panel.dataset.lastWeight, unit: unitDefault,
       reps: panel.dataset.lastReps, rpe: panel.dataset.lastRpe
     } }));
     // The set the server stored last is the one just logged, from a card's row

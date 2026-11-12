@@ -7,8 +7,8 @@
 
   // --- reading an answer (pure, tested under node) --------------------------
   const NUM = '(\\d{1,3}(?:[.,]\\d{1,2})?)';
-  // A weight in kg not glued to a bigger number ("3.200 kg" is a total).
-  const WEIGHT = new RegExp('(?<![\\d.,])' + NUM + '\\s*kg\\b', 'gi');
+  // A weight in kg or lb not glued to a bigger number ("3.200 kg" is a total).
+  const WEIGHT = new RegExp('(?<![\\d.,])' + NUM + '\\s*(kg|lbs?|libras?)\\b', 'gi');
   // Reps right after the weight: "× 8", "x8", "a 8 reps", "por 8 repeticiones".
   const REPS = /^\s*(?:[×xX*]\s*(\d{1,2})(?!\d)|(?:a|por|para|de)\s+(\d{1,2})\s*(?:reps?|repeticiones)\b)/;
   const RPE = /(?:@\s*|\bRPE\s*)(\d{1,2}(?:[.,]5)?)(?![\d])/i;
@@ -44,11 +44,12 @@
           exercise,
           n,
           weight: num(m[1]),
+          unit: /^l/i.test(m[2]) ? 'lb' : 'kg',
           reps: reps ? parseInt(reps[1] || reps[2], 10) : 0,
           rpe: rpe ? num(rpe[1]) : rir ? 10 - parseInt(rir[1], 10) : 0,
         };
         if (!(s.weight > 0) || (s.rpe && (s.rpe < 1 || s.rpe > 10))) return;
-        const key = [s.exercise, s.n, s.weight, s.reps, s.rpe].join('|');
+        const key = [s.exercise, s.n, s.weight, s.unit, s.reps, s.rpe].join('|');
         if (seen.has(key) || out.length >= 3) return;
         seen.add(key);
         out.push(s);
@@ -95,7 +96,8 @@
     const row = rowFor(card, s);
     const open = card.querySelector('details[open]');
     const where = (open ? '' : card.dataset.exercise + ', ') + (row ? 'serie ' + (setNumber(row) || s.n) : 'nueva serie');
-    return 'Aplicar a ' + where + ': ' + fmt(s.weight) + (s.reps ? ' × ' + s.reps : ' kg') + (s.rpe ? ' @' + fmt(s.rpe) : '');
+    const lb = s.unit === 'lb';
+    return 'Aplicar a ' + where + ': ' + fmt(s.weight) + (lb ? ' lb' : '') + (s.reps ? ' × ' + s.reps : lb ? '' : ' kg') + (s.rpe ? ' @' + fmt(s.rpe) : '');
   }
 
   function write(input, value) {
@@ -117,6 +119,12 @@
     }
     if (!row) return false;
     write(row.querySelector('input[name="weight_kg"]'), s.weight);
+    // The row takes the answer's unit, as if its kg/lb toggle were tapped.
+    const unit = row.querySelector('input[name="weight_unit"]');
+    if (unit && s.unit && unit.value !== s.unit) {
+      const toggle = row.querySelector('[data-unit-toggle]');
+      if (toggle) toggle.click();
+    }
     write(row.querySelector('input[name="reps"]'), s.reps);
     write(row.querySelector('input[name="rpe"]'), s.rpe);
     document.dispatchEvent(new CustomEvent('workout:focus', { detail: card.dataset.exercise }));

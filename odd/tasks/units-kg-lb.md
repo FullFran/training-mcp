@@ -1,0 +1,28 @@
+# Units: kg and lb
+
+Objective: weights can be entered and read in kg or lb, with a per-person default, while stored weights stay in kg; past sets entered in lb but stored as kg can be corrected in bulk, undoably.
+Branch: `FullFran/u10-units` from `main` (after #107), one PR, coordinator merges. Delivery: `single-pr` (coordinator asked for one PR 2). Test runner: `go test ./...`.
+
+## Specs
+
+- S1 (owner, verbatim): "necesito que tenga unidades y que puedas usar ambas".
+- S2 (coordinator design, verbatim): "(a) stored weights stay in kg exactly as today, so no existing data changes; (b) a per-person default unit in Tu > Entrenamiento, stored with additive migration 026 (users.weight_unit, NULL = kg, like 015_rest_target.sql); (c) both units usable: every weight input (set entry, plan targets, edits) has a kg/lb toggle that starts on the default unit, so a set can be logged in lb while the default is kg and the other way round; values convert to kg on save and display in the person's default unit everywhere (sets, plans, progress, volume, coach cards, finish summary), with sensible rounding (plate steps 2.5 kg / 5 lb) and no drift when a value is saved and shown again; (d) MCP tools keep kg as today; add an optional unit field where an agent enters or reads a weight only if it is additive, never change existing fields; tell the coach the person's unit in its context. Also the import from Hevy/Strong if it carries a unit."
+- S3 (coordinator, verbatim): "RED test per rule (conversion round-trip without drift, toggle per input, default per person isolated between people, display everywhere, MCP unchanged for existing callers via a differential against main), screenshots in both units, Risk line (item 1 for the migration). Ask me before anything that changes stored values."
+- S4 (owner, verbatim): "a y los registros se pueden editar igual que antes, en mi base de datos tengo pendiente hacer una revision de unidades". Coordinator, verbatim: "editing existing sets (and plan targets) must keep working exactly as before, everywhere it works today (session page, history, workout layer), and the edit form gets the same kg/lb toggle, so a past set that was really entered in lb can be corrected by typing its real value with lb selected; it saves converted to kg. Pin with tests: an edit of an old set in kg changes nothing else (same rows as on main), an edit in lb stores the converted kg, editing another person's set is refused."
+- S5 (owner, verbatim): "la necesito y desde chat gpt antes se podia jajaja". Coordinator, verbatim: "the units PR also includes a bulk correction for past records entered in lb but stored as kg: the person selects a scope (one session, one exercise within a date range, or individual sets), sees a preview listing every set with its old and new kg value and the count, and confirms; it converts those stored values from lb to kg. Requirements: it touches only the selected person's selected sets (isolation test), it is undoable (reuse the proposal undo mechanism from #96, internal/sqlitestore/undo.go, or an equivalent single-step undo that restores the exact previous values), applying it twice to the same sets is prevented or clearly warned, no other rows change (dump comparison test), and an agent can do the same through MCP as a proposal-gated write action. This is Risk item 1; I will run an independent verifier on that PR before merging."
+
+Assumptions: plans carry no weight targets today (PlanItem has sets, reps, RPE only), so "plan targets" has no weight input to convert; the input toggle changes the unit of the typed number and never rewrites it (so a past set really entered in lb is fixed by selecting lb and keeping its number); lb shows to 0.1 lb (0.01 kg storage round-trips exactly), load suggestions step 5 lb in lb and 2.5 kg in kg.
+
+## Tasks
+
+- [ ] T1 (S1, S2b, S3) inline: migration 026 `users.weight_unit` + `sets.lb_corrected_at`, store/service get/set unit, conversion helpers, Tú › Entrenamiento setting (`POST /units`), isolation.
+- [ ] T2 (S2c, S3, S4) inline: every web weight input with a kg/lb toggle converting to kg on save (set entry, set row, edit form); display in the default unit on every page and card; drift and edit tests.
+- [ ] T3 (S2d, S3) inline: MCP optional `unit` fields (additive), coach context line, import default unit; differential against main.
+- [ ] T4 (S5) inline: bulk lb→kg correction: preview by session / exercise+dates / set ids, apply as a person-decided proposal with undo image, double-apply refusal, MCP proposal tool, dump and isolation tests. Risk: item 1.
+
+Route evidence: one PR, sequential units sharing the weight helpers; no writer trigger (no parallel units requested, subagents not allowed by the brief).
+
+## Log
+
+- L1 (2026-11-12, coordinator task, verbatim): "#107 is merged to main. Start PR 2 (FullFran/u10-units) from origin/main now, with the next SW VERSION (v25 unless main moved). Another worker (B2) may also bump the SW VERSION; take the next free number when you rebase."
+- L2: S1-S5 arrived as coordinator messages while PR 1 (#107) was being built; quoted verbatim above.

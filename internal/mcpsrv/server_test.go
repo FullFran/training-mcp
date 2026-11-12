@@ -536,8 +536,10 @@ func (testStore) LastSetAt(context.Context, int64) (int64, time.Time, error) {
 func (testStore) ClaimWorkoutSummary(context.Context, int64, time.Time) (bool, error) {
 	return false, training.ErrNotFound
 }
-func (testStore) RestTarget(context.Context) (int, error)  { return 0, nil }
-func (testStore) SetRestTarget(context.Context, int) error { return nil }
+func (testStore) RestTarget(context.Context) (int, error)     { return 0, nil }
+func (testStore) SetRestTarget(context.Context, int) error    { return nil }
+func (testStore) WeightUnit(context.Context) (string, error)  { return "", nil }
+func (testStore) SetWeightUnit(context.Context, string) error { return nil }
 func (testStore) ExerciseHistory(context.Context, string, int) (training.ExerciseHistory, error) {
 	return training.ExerciseHistory{}, nil
 }

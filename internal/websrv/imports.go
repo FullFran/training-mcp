@@ -60,7 +60,8 @@ func (s *Server) renderImport(w http.ResponseWriter, r *http.Request, status int
 	}
 	in.History = history
 	if in.Unit == "" {
-		in.Unit = "kg"
+		// Strong writes weights without a unit: assume the person's own.
+		in.Unit = s.unitOf(ctx)
 	}
 	data := pageData{Base: s.base, Today: s.todayDate(), Error: message, Import: in}
 	if status != http.StatusOK {

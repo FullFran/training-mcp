@@ -210,7 +210,7 @@
     const d = event.detail || {};
     if (!d.exercise) return;
     const el = card('set-card', '✓ ' + d.exercise,
-      d.weight + ' kg × ' + d.reps + (d.rpe ? ' @' + d.rpe : ''));
+      d.weight + ' ' + (d.unit || 'kg') + ' × ' + d.reps + (d.rpe ? ' @' + d.rpe : ''));
     const reaction = Array.from(log.querySelectorAll('.coach-turn[data-origin="reaction"]'))
       .find((t) => Number(t.dataset.at) >= setSentAt);
     if (setSentAt && reaction) log.insertBefore(el, reaction);

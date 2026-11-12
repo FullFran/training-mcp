@@ -72,6 +72,9 @@ type UserStore interface {
 	// RestTarget is the stored target rest in seconds; 0 when never set.
 	RestTarget(context.Context) (int, error)
 	SetRestTarget(context.Context, int) error
+	// WeightUnit is the stored default unit, "" when never chosen (kg).
+	WeightUnit(context.Context) (string, error)
+	SetWeightUnit(context.Context, string) error
 }
 
 // ProposalStore keeps one user's agent proposals and standing answers.
