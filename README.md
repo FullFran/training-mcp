@@ -174,7 +174,12 @@ shared with the MCP tools and cannot drift apart.
   **W** that never counts); one check logs a set and starts the rest timer, supersets
   keep their round rest, and **Terminar** shows the day's summary; with the
   coach on, **Comentar con el coach** there opens a new Planificar conversation
-  with a message about that session typed in, ready to send. A bar at
+  with a message about that session typed in, ready to send. Changes
+  made during the workout (sets, rep range, RPE, skip, swap, add, remove) edit
+  today's session only; the routine stays a template. **Cancelar entreno**, at
+  the end of the workout, deletes today's session (the same call as
+  `delete_session`) and returns to Entrenar to choose any routine; with sets
+  logged it asks first and says how many sets go. A bar at
   the bottom opens the coach (when `TRAINING_COACH=1`, see
   [docs/coach.md](docs/coach.md)) as a sheet over the workout that closes back
   to the same point; when an answer gives a load («45 kg × 8») an **Aplicar**

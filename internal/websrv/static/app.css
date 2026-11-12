@@ -1904,3 +1904,7 @@ body.coach-open .plan-today { display: none; }
 
 /* Cambiar de rutina, under Continuar while a workout runs. */
 .switch-note { margin: 6px 2px 0; font-size: 13px; }
+
+/* Cancelar entreno: with nothing logged it is a plain button at the end of the
+   workout; with sets it sits behind the danger-zone confirmation. */
+.panel > form.cancel-workout { margin: 24px 16px 32px; }
