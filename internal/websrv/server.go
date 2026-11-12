@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	texttemplate "text/template"
+	"time"
 
 	"github.com/fullfran/training-mcp/internal/training"
 )
@@ -113,6 +114,10 @@ type pageData struct {
 	Rest       training.Rest
 	Next       *training.PlanProgress
 	LastSetID  int64
+	// Timed says today's session has a stored start; Elapsed is the seconds
+	// since then by the server's clock, so every device shows one duration.
+	Timed   bool
+	Elapsed int
 	// Review is the review page: proposals waiting and answered, and the standing answers.
 	Review ReviewData
 	// Memory is the memory page: what the coach remembers about the person.
@@ -231,6 +236,7 @@ func New(service training.ServiceFor, snapshot func(context.Context, string) err
 func NewWithOptions(service training.ServiceFor, snapshot func(context.Context, string) error, clock training.Clock, basePath string, opts Options) (*Server, error) {
 	funcs := map[string]any{
 		"num":         formatNumber,
+		"clock":       clockText,
 		"kilos":       kilos,
 		"restClock":   restClock,
 		"shortDate":   shortDate,
@@ -788,6 +794,9 @@ func (s *Server) todayData(ctx context.Context, message string) (pageData, error
 	}
 	if live.Session != nil {
 		data.Session = *live.Session
+		if at, err := time.Parse(time.RFC3339, live.Session.StartedAt); err == nil {
+			data.Timed, data.Elapsed = true, max(0, int(s.clock().Sub(at)/time.Second))
+		}
 	}
 	data.Progress, data.Next, data.Rest, data.RestTarget = live.Progress, live.Next, live.Rest, live.Rest.TargetSeconds
 	if live.LastSet != nil {
@@ -1296,3 +1305,12 @@ func modeFromQuery(v string) string {
 
 // trainURL is the training screen, where a write without JavaScript lands.
 func (s *Server) trainURL() string { return s.base + "/?modo=entrenar" }
+
+// clockText is a workout duration as the app's clock shows it: 7:05, 1:02:09.
+func clockText(seconds int) string {
+	h, m, sec := seconds/3600, seconds%3600/60, seconds%60
+	if h > 0 {
+		return fmt.Sprintf("%d:%02d:%02d", h, m, sec)
+	}
+	return fmt.Sprintf("%d:%02d", m, sec)
+}
