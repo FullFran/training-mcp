@@ -16,6 +16,7 @@
   const chips = $('picker-chips');
   const list = $('picker-list');
   const done = $('picker-done');
+  const extra = $('picker-extra');
 
   let data = { groups: [], recent: [], exercises: [], suggested: null };
   let mode = 'add';
@@ -135,6 +136,13 @@
     filter = 'recent';
     search.value = '';
     title.textContent = mode === 'swap' ? 'Sustituir ' + from : 'Añadir ejercicio';
+    // Superset and notes, as add_session_exercise takes them: optional,
+    // collapsed, and only when adding.
+    if (extra) {
+      extra.hidden = mode === 'swap';
+      extra.open = false;
+      extra.querySelectorAll('input').forEach((i) => { i.value = ''; });
+    }
     paint();
     setOpen(true);
     try {
@@ -154,11 +162,14 @@
     for (const name of names) {
       const values = mode === 'swap'
         ? { action: 'swap', exercise: from, replacement: name }
-        : { action: 'add', exercise: name, target_sets: '3' };
+        : { action: 'add', exercise: name, target_sets: '3', superset: superset(), notes: notes() };
       await window.htmx.ajax('POST', base + '/plan/item', { target: '#panel', swap: 'outerHTML', values });
     }
     if (navigator.vibrate) navigator.vibrate(8);
   }
+
+  const superset = () => ($('picker-superset') ? $('picker-superset').value.trim() : '');
+  const notes = () => ($('picker-notes') ? $('picker-notes').value.trim() : '');
 
   window.openExercisePicker = open;
 

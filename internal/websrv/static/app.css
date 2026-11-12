@@ -1908,3 +1908,26 @@ body.coach-open .plan-today { display: none; }
 /* Cancelar entreno: with nothing logged it is a plain button at the end of the
    workout; with sets it sits behind the danger-zone confirmation. */
 .panel > form.cancel-workout { margin: 24px 16px 32px; }
+
+/* Optional superset and notes when adding an exercise, collapsed by default. */
+.add-extra { margin: 6px 0; }
+.add-extra > summary { font-size: 13px; cursor: pointer; }
+.add-extra[open] > input { display: block; width: 100%; margin-top: 6px; }
+
+/* A session's set editor: plain forms, for a session on a past date. */
+.set-editor { display: grid; gap: 10px; }
+.set-editor .edit-set { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+.set-editor .edit-form { flex: 1; min-width: 0; grid-template-columns: 1.5fr 1fr 1fr auto auto; gap: 6px; }
+.set-editor .edit-form input { min-width: 0; width: 100%; }
+.set-editor .edit-form .ok { padding: 0 10px; }
+.set-editor .edit-form { padding-top: 0; }
+.set-editor .add-set { display: grid; gap: 8px; }
+.past-session { display: grid; gap: 12px; }
+.past-session input[type="date"], .past-session select {
+  width: 100%; min-height: var(--tap); padding: 0 14px; border-radius: 12px;
+  border: 1px solid var(--line); background: #10131a; color: var(--text); font-size: 17px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  .past-session input[type="date"], .past-session select { background: #f0f2f6; color-scheme: light; }
+}
