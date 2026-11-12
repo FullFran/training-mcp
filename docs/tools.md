@@ -73,7 +73,7 @@ to change it from the chat is tracked in #125.
 | `accept_all` | Aceptar todo | Every proposal is applied at once, in every session and in none, including action types added later, like Claude Code's `--dangerously-skip-permissions`. The decision record names the `accept_all` grant. |
 
 The deleting action types are `set.delete`, `session.delete`, `plan.delete`,
-`memory.forget`, `plan.exercise.remove` and `session.exercise.remove`
+`memory.forget`, `plan.exercise.remove`, `session.exercise.remove` and `exercise.note.remove`
 (`training.IsDeletingAction`).
 
 Defaults: an account created from migration 027 on starts in
@@ -232,7 +232,7 @@ Starting a session from a plan **copies** it. From then on the session owns its 
 | Tool | What it does |
 |---|---|
 | `live_workout` | What is happening in today's workout right now: the session with its sets, planned versus done per exercise, the exercise planned next, the last set and when it was logged, and the rest since it against the person's target. Needs no session id. |
-| `render_rest_timer` | The person's rest since their last logged set, as an interactive countdown in chats that support MCP Apps (`ui://vibetraining/rest-timer/v1`) and as one line of text elsewhere. Reads only; takes no arguments. See [MCP Apps](apps.md). |
+| `render_rest_timer` | The person's rest since their last logged set, as an interactive countdown in chats that support MCP Apps (`ui://vibetraining/rest-timer/v2`) and as one line of text elsewhere. Reads only; takes no arguments. See [MCP Apps](apps.md). |
 | `set_rest_target` | Set the person's target rest between sets, 30 to 900 seconds (120 until set). The phone's rest timer uses the same value. |
 | `session_progress` | For a session following a plan: planned versus completed sets per exercise, with the prescribed rep range and RPE. Exercises done off-plan are listed with target_sets 0. |
 | `add_session_exercise` | Add an exercise to today's session plan. If it is already there, target_sets is replaced and every optional field you omit (rep range, RPE, superset, notes) keeps its current value; sending either rep bound replaces the whole range. To clear a field, remove the exercise and add it again. Adjusting a session never edits the plan it was started from. |

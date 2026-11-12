@@ -157,6 +157,8 @@ var deletingActions = map[string]bool{
 	"memory.forget":           true,
 	"plan.exercise.remove":    true,
 	"session.exercise.remove": true,
+	// set_exercise_note with an empty note deletes the note.
+	"exercise.note.remove": true,
 }
 
 // IsDeletingAction reports whether an action type removes data. The
