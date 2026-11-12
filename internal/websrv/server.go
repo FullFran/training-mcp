@@ -124,6 +124,8 @@ type pageData struct {
 	Memory MemoryData
 	// Exercises is the catalogue page: every exercise with its group and note.
 	Exercises CatalogueData
+	// Landmarks is every muscle group with its recorded MEV and MRV, 0 if unknown.
+	Landmarks []training.Landmarks
 	// Import is the import page: earlier imports and a file's preview.
 	Import ImportData
 	// CoachSees is Planificar's context card: what the coach reads.
@@ -383,6 +385,8 @@ func (s *Server) routes() {
 	s.handle("POST "+b+"/plan", s.choosePlan)
 	s.handle("POST "+b+"/plan/item", s.adjustItem)
 	s.handle("POST "+b+"/feedback", s.recordFeedback)
+	s.handle("GET "+b+"/landmarks", s.landmarksPage)
+	s.handle("POST "+b+"/landmarks", s.setLandmarks)
 	s.handle("POST "+b+"/note", s.saveNote)
 	s.handle("POST "+b+"/rest", s.setRest)
 	s.handle("POST "+b+"/finish", s.finishWorkout)

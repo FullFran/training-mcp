@@ -10,7 +10,7 @@
 // only that partition is ever read offline: a new session drops the others, an
 // expired one is dropped before reading, and the logged-out page (X-Cache-Clear)
 // drops them all. The secret mount sends no partition and keeps the old cache.
-const VERSION = 'v21';
+const VERSION = 'v22';
 const SHELL = 'shell-' + VERSION;
 const PAGES = 'pages-' + VERSION;
 const BASE = '{{.Base}}';

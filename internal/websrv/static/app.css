@@ -1869,3 +1869,12 @@ body.coach-open .plan-today { display: none; }
 .cat-entry > summary::-webkit-details-marker { display: none; }
 .cat-entry[open] > summary .chev { transform: rotate(90deg); }
 .cat-entry form { display: grid; gap: 12px; padding: 4px 16px 16px; }
+
+/* Límites de volumen under Tú: one row per muscle group, MEV and MRV inline. */
+.landmarks > .muted { margin: 12px 16px; }
+.list .lm-row { display: grid; grid-template-columns: 1fr 64px 64px auto; gap: 8px; align-items: end; width: 100%; }
+.lm-name { align-self: center; }
+.lm-field { display: grid; gap: 2px; }
+.lm-field > span { font-size: 12px; color: var(--muted); }
+.lm-field input[type="number"] { padding: 0 8px; text-align: center; }
+.lm-row .mini { min-height: var(--tap); }

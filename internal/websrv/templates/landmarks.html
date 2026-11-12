@@ -1,0 +1,38 @@
+{{/* Límites de volumen, opened from Tú: each muscle group's weekly sets below
+     which it stops growing (MEV) and above which fatigue outpaces recovery
+     (MRV). The volume advice in Progreso never pushes past them. */}}
+{{define "landmarks.html"}}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Límites de volumen</title>
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="{{.Base}}/manifest.webmanifest">
+<link rel="icon" href="{{.Base}}/static/icon-192.png">
+<link rel="stylesheet" href="{{.Base}}/static/app.css">
+</head>
+<body data-base="{{.Base}}">
+
+<header class="bar back-only">
+  <div><strong>Límites de volumen</strong></div>
+  <a class="ghost" href="{{.Base}}/?modo=tu">Tú</a>
+</header>
+
+<main class="landmarks">
+  {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
+  <p class="muted">Series por semana. <strong>MEV</strong>: por debajo, el músculo deja de crecer. <strong>MRV</strong>: por encima, la fatiga supera a la recuperación. La recomendación de la semana que viene nunca los cruza. Déjalo vacío si no lo sabes.</p>
+  <ul class="list">{{range .Landmarks}}
+    <li class="list-row static"><form class="lm-row" method="post" action="{{$.Base}}/landmarks" autocomplete="off">{{if $.CSRF}}
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+      <input type="hidden" name="muscle_group" value="{{.MuscleGroup}}">
+      <strong class="lm-name">{{.MuscleGroup}}</strong>
+      <label class="lm-field"><span>MEV</span><input type="number" name="mev" value="{{if .MEV}}{{.MEV}}{{end}}" min="0" max="60" inputmode="numeric" aria-label="MEV de {{.MuscleGroup}}"></label>
+      <label class="lm-field"><span>MRV</span><input type="number" name="mrv" value="{{if .MRV}}{{.MRV}}{{end}}" min="0" max="60" inputmode="numeric" aria-label="MRV de {{.MuscleGroup}}"></label>
+      <button type="submit" class="mini">Guardar</button>
+    </form></li>{{end}}
+  </ul>
+</main>
+</body>
+</html>
+{{end}}

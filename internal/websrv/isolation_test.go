@@ -102,6 +102,9 @@ func newWebWorld(t *testing.T) webWorld {
 	if err = owner.SetExerciseGroup(ctx, secretExercise, "pecho"); err != nil {
 		t.Fatal(err)
 	}
+	if err = owner.SetLandmarks(ctx, training.Landmarks{MuscleGroup: "pecho", MEV: 7, MRV: 19}); err != nil {
+		t.Fatal(err)
+	}
 	// The owner asks before agent writes and has one waiting; the second user
 	// accepts everything, as the owner of an empty database does.
 	if err = owner.SetAcceptAll(ctx, false); err != nil {
@@ -235,6 +238,8 @@ var webRoutes = map[string]func(*testing.T){
 		`sets st JOIN sessions se ON se.id=st.session_id WHERE se.user_id=2 AND st.exercise='`+secretExercise+`'`),
 	"POST /note": writeRoute("/note", url.Values{"exercise": {secretExercise}, "note": {"suya"}},
 		`exercise_notes WHERE user_id=2 AND note='suya'`),
+	"GET /landmarks":  pageRoute("/landmarks", `name="mrv" value="19"`),
+	"POST /landmarks": testLandmarksAreTheUsersOwn,
 	"POST /feedback": writeRoute("/feedback", url.Values{"muscle_group": {"pecho"}, "fatigue": {"1"}, "pump": {"1"}, "recovery": {"1"}},
 		`session_feedback f JOIN sessions se ON se.id=f.session_id WHERE se.user_id=2 AND f.muscle_group='pecho'`),
 	"POST /plans/create": writeRoute("/plans/create", url.Values{"name": {secretPlan}},
@@ -375,6 +380,31 @@ func testCatalogueWritesAreTheUsersOwn(t *testing.T) {
 	}
 	var n int
 	if err := world.db.QueryRow(`SELECT (SELECT COUNT(*) FROM exercise_groups WHERE user_id=2 AND muscle_group='espalda') + (SELECT COUNT(*) FROM exercise_notes WHERE user_id=2 AND note='suya')`).Scan(&n); err != nil || n != 2 {
+		t.Fatalf("second user's rows = %d, %v", n, err)
+	}
+}
+
+// Landmarks are per user: another user recording the same group writes their
+// own row and leaves the owner's MEV and MRV as they were.
+func testLandmarksAreTheUsersOwn(t *testing.T) {
+	world := newWebWorld(t)
+	owners := func() string {
+		var mev, mrv int
+		if err := world.db.QueryRow(`SELECT mev, mrv FROM volume_landmarks WHERE user_id=1 AND muscle_group='pecho'`).Scan(&mev, &mrv); err != nil {
+			t.Fatal(err)
+		}
+		return fmt.Sprint(mev, mrv)
+	}
+	before := owners()
+	w := post(t, world.second, base+"/landmarks", url.Values{"muscle_group": {"pecho"}, "mev": {"5"}, "mrv": {"9"}}, true)
+	if w.Code != http.StatusOK || strings.Contains(w.Body.String(), `value="19"`) {
+		t.Fatalf("status %d, carries the owner's MRV: %v", w.Code, strings.Contains(w.Body.String(), `value="19"`))
+	}
+	if after := owners(); after != before {
+		t.Fatalf("owner's landmarks: %s, were %s", after, before)
+	}
+	var n int
+	if err := world.db.QueryRow(`SELECT COUNT(*) FROM volume_landmarks WHERE user_id=2 AND muscle_group='pecho' AND mev=5 AND mrv=9`).Scan(&n); err != nil || n != 1 {
 		t.Fatalf("second user's rows = %d, %v", n, err)
 	}
 }
