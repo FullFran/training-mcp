@@ -10,7 +10,7 @@
 
 ## 1. Scope
 
-A harness that lets an agent change a person's data has to decide who approves the change. Two consuming harnesses reached the same answer on their own: the agent never writes, it records a **proposal**, and only a person (or an answer a person gave earlier and the host still holds) turns the proposal into a change. This document defines the proposal record, its states, how an answer links to the HCS-0005 decision record, and four behaviours both harnesses need: refusing an answer on state that has changed, retrying without duplicates, undoing as a new entry, and grouping tools under an action type ([ADR-0036](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0036-proposals-record-agent-writes.md)).
+A harness that lets an agent change a person's data has to decide who approves the change. Two consuming harnesses reached the same answer on their own: the agent never writes, it records a **proposal**, and only a person (or an answer a person gave earlier and the host still holds) turns the proposal into a change. This document defines the proposal record, its states, how an answer links to the HCS-0005 decision record, and four behaviours both harnesses need: refusing an answer on state that has changed, retrying without duplicates, undoing as a new entry, and grouping tools under an action type ([ADR-0036](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0036-proposals-record-agent-writes.md)).
 
 It does not define what a change is, how a host applies it, how a person is asked, or which action types exist. Those stay with the host and the distribution (README rule 4).
 

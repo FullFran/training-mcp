@@ -14,9 +14,9 @@ Packages ask for authority; the host decides. This document defines the shape of
 
 What existing standards cover and what they do not:
 
-- OAuth 2.0 scopes authorize a client against a resource server, not a plugin inside a host ([docs/standards/oauth2.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/oauth2.md)).
-- OPA returns decisions; it is a policy decision point, and the host stays the enforcement point ([docs/standards/opa.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/opa.md)). A host MAY delegate the decision to OPA; the rules below still apply to enforcement.
-- Agent Skills `allowed-tools` is experimental and advisory ([docs/standards/agent-skills.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/agent-skills.md)).
+- OAuth 2.0 scopes authorize a client against a resource server, not a plugin inside a host ([docs/standards/oauth2.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/oauth2.md)).
+- OPA returns decisions; it is a policy decision point, and the host stays the enforcement point ([docs/standards/opa.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/opa.md)). A host MAY delegate the decision to OPA; the rules below still apply to enforcement.
+- Agent Skills `allowed-tools` is experimental and advisory ([docs/standards/agent-skills.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/agent-skills.md)).
 
 ## 2. Objects
 
@@ -46,7 +46,7 @@ R001, R002, R004, R007 and R008 are checked by the reference evaluator in the ru
 
 ### 3.2 Answers from a person
 
-A host may ask a person before an operation, for example through ACP `session/request_permission`, whose options have the kinds `allow_once`, `allow_always`, `reject_once` and `reject_always` ([docs/standards/acp.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/acp.md)). ACP says an "always" option means "remember the choice" without saying who remembers it or for how long. If the engine or client remembers it, the host cannot revoke it and R003 no longer holds. The rules below make the host the only place where a remembered answer lives ([ADR-0023](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0023-always-answers-become-host-grants.md)).
+A host may ask a person before an operation, for example through ACP `session/request_permission`, whose options have the kinds `allow_once`, `allow_always`, `reject_once` and `reject_always` ([docs/standards/acp.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/acp.md)). ACP says an "always" option means "remember the choice" without saying who remembers it or for how long. If the engine or client remembers it, the host cannot revoke it and R003 no longer holds. The rules below make the host the only place where a remembered answer lives ([ADR-0023](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0023-always-answers-become-host-grants.md)).
 
 **[HCS-0005-R005]** A host MUST apply an `allow_once` or `reject_once` answer to the one operation it was given for, and MUST NOT store it as a grant or a denial.
 
@@ -62,7 +62,7 @@ A host that stores session-limited answers gives every check made inside a sessi
 
 A host that cannot meet R009 with a given engine does not offer the `allow_always` and `reject_always` options on that engine. Whether some permissions refuse "always" answers entirely is issue #16.
 
-An approval path fails open easily: engines commonly block a tool call when a pre-call hook throws but let other hooks continue on error, and a closed dialog or a lost connection leaves the call waiting on nobody. Only an explicit allow lets the operation through ([ADR-0025](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0025-host-guards-fail-closed.md)).
+An approval path fails open easily: engines commonly block a tool call when a pre-call hook throws but let other hooks continue on error, and a closed dialog or a lost connection leaves the call waiting on nobody. Only an explicit allow lets the operation through ([ADR-0025](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0025-host-guards-fail-closed.md)).
 
 **[HCS-0005-R014]** A host MUST NOT run an operation that waits for a person's answer unless an `allow_once` or `allow_always` answer for that operation arrives before the host's deadline. A reject answer, the deadline passing, an ACP `cancelled` outcome, an error in the host's approval handling and a lost connection to the person MUST each deny the operation with `permission_denied`.
 
@@ -72,7 +72,7 @@ The decision record of an operation denied under R014 has `outcome` `deny` for a
 
 ### 3.3 Decision records
 
-After an incident, the question is "who allowed this, when, and through which channel". A host can answer it only if it recorded every decision when it made it ([ADR-0024](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0024-permission-decisions-are-recorded.md)).
+After an incident, the question is "who allowed this, when, and through which channel". A host can answer it only if it recorded every decision when it made it ([ADR-0024](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0024-permission-decisions-are-recorded.md)).
 
 A decision record has these members:
 

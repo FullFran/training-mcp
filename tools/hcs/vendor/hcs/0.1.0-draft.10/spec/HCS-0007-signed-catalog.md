@@ -11,9 +11,9 @@
 
 ## 1. Scope
 
-A catalog manifest (HCS-0001) says what a host should run; it does not say who published it, whether it is current, or whether it was meant for this host. This document defines how a distribution signs a catalog and how a host decides to accept it: a signed envelope around the catalog, a root-signed set of online keys, the verification order with its error codes, and how the host moves to the accepted set. It is the DISTRO-1 profile of [composition-map.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/research/composition-map.md) section 5.
+A catalog manifest (HCS-0001) says what a host should run; it does not say who published it, whether it is current, or whether it was meant for this host. This document defines how a distribution signs a catalog and how a host decides to accept it: a signed envelope around the catalog, a root-signed set of online keys, the verification order with its error codes, and how the host moves to the accepted set. It is the DISTRO-1 profile of [composition-map.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/research/composition-map.md) section 5.
 
-It is derived from the signed envelope that the first host runs, adjusted where a neutral standard needs it ([lf-fit-distro-1-and-core-0.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/research/lf-fit-distro-1-and-core-0.md) section 2, row 7).
+It is derived from the signed envelope that the first host runs, adjusted where a neutral standard needs it ([lf-fit-distro-1-and-core-0.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/research/lf-fit-distro-1-and-core-0.md) section 2, row 7).
 
 Out of scope: how a host is enrolled and receives its trust anchor and assignment; transport (any HTTP or file delivery); package signing (HCS-0001 `contentHash` already binds each package to the signed catalog); new contribution kinds (issue #3).
 
@@ -23,14 +23,14 @@ HCS-0007 reuses, and does not restate:
 
 | Need | Standard | How |
 | --- | --- | --- |
-| Rollback, freeze, threshold, key rotation, offline root | TUF 1.0.37 ([tuf.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/tuf.md)) | Same properties, one signed document instead of four roles. Mapping and differences: [lf-fit-distro-1-and-core-0.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/research/lf-fit-distro-1-and-core-0.md) section 3. HCS-0007 does not claim TUF conformance. |
+| Rollback, freeze, threshold, key rotation, offline root | TUF 1.0.37 ([tuf.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/tuf.md)) | Same properties, one signed document instead of four roles. Mapping and differences: [lf-fit-distro-1-and-core-0.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/research/lf-fit-distro-1-and-core-0.md) section 3. HCS-0007 does not claim TUF conformance. |
 | Domain separation of signatures | DSSE v1 pre-authentication encoding (PAE) | Signature input (section 4). |
 | Canonical bytes | RFC 8785 (JSON Canonicalization Scheme) | Restricted to integers (section 4). |
 | Signatures | Ed25519, RFC 8032 | The only key type in this version. |
 | Timestamps | RFC 3339 | UTC with `Z`. |
-| Audience binding | Uptane Director pattern ([uptane.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/uptane.md)) | `binding`, compared for equality. |
-| Provenance | SLSA Provenance v1 in an in-toto Statement v1 ([slsa.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/slsa.md), [in-toto.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/in-toto.md)) | R020. |
-| Reports | CloudEvents 1.0.2, RFC 9457 ([cloudevents.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/cloudevents.md), HCS-0006) | R021. |
+| Audience binding | Uptane Director pattern ([uptane.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/uptane.md)) | `binding`, compared for equality. |
+| Provenance | SLSA Provenance v1 in an in-toto Statement v1 ([slsa.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/slsa.md), [in-toto.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/in-toto.md)) | R020. |
+| Reports | CloudEvents 1.0.2, RFC 9457 ([cloudevents.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/cloudevents.md), HCS-0006) | R021. |
 
 ## 3. Documents
 
@@ -136,7 +136,7 @@ An envelope equal in content to the last accepted one is accepted again; fetchin
 
 **[HCS-0007-R022]** An envelope or key set MUST NOT list two items of `signatures` with the same `keyid`; a host MUST report `manifest_invalid` and MUST do so before verifying any signature.
 
-Validity does not depend on the order of the signatures: a list with an invalid and a valid signature for one `keyid` is refused in either order. TUF requires the `keyid` to be unique within `signatures` ([tuf.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/tuf.md), TUF 1.0.37, Document formats, Object format); HCS refuses the document instead of choosing which of the items to ignore.
+Validity does not depend on the order of the signatures: a list with an invalid and a valid signature for one `keyid` is refused in either order. TUF requires the `keyid` to be unique within `signatures` ([tuf.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/tuf.md), TUF 1.0.37, Document formats, Object format); HCS refuses the document instead of choosing which of the items to ignore.
 
 **[HCS-0007-R023]** A host that limits the number of keys in a key set or of items in `signatures` MUST report `manifest_invalid` for a document that exceeds a limit and MUST do so before verifying any signature; HCS states no number, and a host MAY set such limits.
 
@@ -154,7 +154,7 @@ For an envelope the order of step (1) is: readable (R003), `hcsVersion`, R004, s
 
 **[HCS-0007-R024]** When a host counts signatures toward the threshold of R005 or R011, it MUST ignore a signature whose `keyid` names no key of the key set or trust anchor it verifies against, a signature that does not verify, and a signature whose key is outside its validity window (R014), and MUST NOT refuse the document because it carries such a signature when the signatures it counts meet the threshold.
 
-R024 is what lets a distribution sign one key set with an old and a new root key (section 5.3.1): a host that holds only the old one counts the old signature and ignores the other. R022 and R023 still apply before any signature is counted, so a repeated `keyid` remains `manifest_invalid`. TUF counts signatures the same way: only signatures by the keys of the role, each key once ([tuf.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/tuf.md)).
+R024 is what lets a distribution sign one key set with an old and a new root key (section 5.3.1): a host that holds only the old one counts the old signature and ignores the other. R022 and R023 still apply before any signature is counted, so a repeated `keyid` remains `manifest_invalid`. TUF counts signatures the same way: only signatures by the keys of the role, each key once ([tuf.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/tuf.md)).
 
 **[HCS-0007-R025]** A host MUST NOT take its trust anchor, or any root key of it, from an envelope, a key set, an extension member or any other document it receives with them, and MUST verify every key set against the trust anchor it already holds.
 

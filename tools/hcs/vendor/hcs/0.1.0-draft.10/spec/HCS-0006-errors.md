@@ -10,7 +10,7 @@
 
 ## 1. Scope
 
-A host that composes plugins fails in a small number of ways that callers need to tell apart without parsing text: a document is malformed, content does not match its digest, a dependency is missing or ambiguous, an operation is denied, a plugin fails. This document defines a closed set of error codes, the error object that carries them, and how the object travels over the two transports HCS adapters use: JSON-RPC 2.0 (MCP, ACP) and HTTP (RFC 9457). It does not define new transport error codes; it rides on the ones those standards already define ([ADR-0006](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0006-error-codes-ride-in-data.md)).
+A host that composes plugins fails in a small number of ways that callers need to tell apart without parsing text: a document is malformed, content does not match its digest, a dependency is missing or ambiguous, an operation is denied, a plugin fails. This document defines a closed set of error codes, the error object that carries them, and how the object travels over the two transports HCS adapters use: JSON-RPC 2.0 (MCP, ACP) and HTTP (RFC 9457). It does not define new transport error codes; it rides on the ones those standards already define ([ADR-0006](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0006-error-codes-ride-in-data.md)).
 
 ## 2. Error object
 
@@ -59,9 +59,9 @@ A host that composes plugins fails in a small number of ways that callers need t
 | `rollback_rejected` | a signed catalog envelope or key set is older than the last accepted one, or reuses its sequence or version with different content | HCS-0007 |
 | `generation_mismatch` | an ACP `session/load` asks to reopen a session on a generation other than the one it was created with | HCS-0008 |
 
-For `package_invalid` a host sets `requirement` to the HCS-0001 requirement the package violates and SHOULD name the member path in an extension member of `details`; it never copies member content into `message` or `details`. The code is separate from `integrity_mismatch` because the bytes are exactly what the publisher described: fetching them again from another location cannot help ([ADR-0033](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0033-archive-member-safety.md)).
+For `package_invalid` a host sets `requirement` to the HCS-0001 requirement the package violates and SHOULD name the member path in an extension member of `details`; it never copies member content into `message` or `details`. The code is separate from `integrity_mismatch` because the bytes are exactly what the publisher described: fetching them again from another location cannot help ([ADR-0033](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0033-archive-member-safety.md)).
 
-The table is the single registry of HCS error codes. A profile that needs a new code adds a row here naming itself in the last column; it does not keep a code list of its own ([ADR-0014](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0014-profile-error-codes-join-the-core-registry.md)). A host that does not implement that profile never raises its codes.
+The table is the single registry of HCS error codes. A profile that needs a new code adds a row here naming itself in the last column; it does not keep a code list of its own ([ADR-0014](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0014-profile-error-codes-join-the-core-registry.md)). A host that does not implement that profile never raises its codes.
 
 A condition that no HCS document defines is not an HCS error. A host reports it outside the HCS error object, for example as an RFC 9457 problem type whose URI the distribution owns, and never as an `x-` value in `code`.
 
@@ -69,7 +69,7 @@ A condition that no HCS document defines is not an HCS error. A host reports it 
 
 ### 4.1 JSON-RPC 2.0 (MCP, ACP)
 
-The numeric `error.code` is whatever the carrying protocol prescribes for the situation (for example `-32602` for invalid params, or an implementation-defined code in `-32000..-32099`). HCS does not allocate numeric codes, because MCP and ACP already use parts of the server-error range. See [docs/standards/json-rpc-2.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/json-rpc-2.md).
+The numeric `error.code` is whatever the carrying protocol prescribes for the situation (for example `-32602` for invalid params, or an implementation-defined code in `-32000..-32099`). HCS does not allocate numeric codes, because MCP and ACP already use parts of the server-error range. See [docs/standards/json-rpc-2.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/json-rpc-2.md).
 
 **[HCS-0006-R003]** When an HCS error is carried in a JSON-RPC 2.0 error response, the HCS error object MUST be the value of `error.data.hcsError`.
 
@@ -79,7 +79,7 @@ The numeric `error.code` is whatever the carrying protocol prescribes for the si
 
 **[HCS-0006-R005]** When an HCS error is carried as an RFC 9457 problem details object, the HCS error object MUST be the value of the extension member `hcsError`.
 
-`title` SHOULD be the code; `detail` SHOULD be the `message`; `status` is chosen by the HTTP surface. See [docs/standards/rfc9457-problem-details.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/rfc9457-problem-details.md).
+`title` SHOULD be the code; `detail` SHOULD be the `message`; `status` is chosen by the HTTP surface. See [docs/standards/rfc9457-problem-details.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/rfc9457-problem-details.md).
 
 ### 4.3 Clients
 
@@ -103,7 +103,7 @@ New distributions do not need this: they report a registry code, or no HCS error
 
 ### 4.5 MCP tool results
 
-Over MCP a failure reaches the caller in one of two ways ([docs/standards/mcp.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/mcp.md); MCP 2026-07-28, Tools, Error Handling). A protocol error is a JSON-RPC error for a problem with the request itself that a model is unlikely to fix (an unknown tool, a malformed request, a server failure); section 4.1 carries an HCS error there. A tool execution error is a `CallToolResult` with `isError: true` for actionable feedback a model can use to retry (an API failure, invalid input, a business-rule refusal), which MCP asks clients to show to the model. A host that reports an HCS error for a failure of the tool's own execution, such as `permission_denied` for a call the person has not allowed, uses the second way, because a JSON-RPC error hides the failure from the model. A failure of the request or of the host itself, such as `unsupported_capability` for a call to a tool that is not active, stays a JSON-RPC error. One failure is reported one way, never both. A host that reports every HCS error as a JSON-RPC error still conforms to R003 ([ADR-0035](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0035-hcs-errors-in-mcp-tool-results.md)).
+Over MCP a failure reaches the caller in one of two ways ([docs/standards/mcp.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/mcp.md); MCP 2026-07-28, Tools, Error Handling). A protocol error is a JSON-RPC error for a problem with the request itself that a model is unlikely to fix (an unknown tool, a malformed request, a server failure); section 4.1 carries an HCS error there. A tool execution error is a `CallToolResult` with `isError: true` for actionable feedback a model can use to retry (an API failure, invalid input, a business-rule refusal), which MCP asks clients to show to the model. A host that reports an HCS error for a failure of the tool's own execution, such as `permission_denied` for a call the person has not allowed, uses the second way, because a JSON-RPC error hides the failure from the model. A failure of the request or of the host itself, such as `unsupported_capability` for a call to a tool that is not active, stays a JSON-RPC error. One failure is reported one way, never both. A host that reports every HCS error as a JSON-RPC error still conforms to R003 ([ADR-0035](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0035-hcs-errors-in-mcp-tool-results.md)).
 
 ```json
 {
@@ -139,6 +139,6 @@ A result that fails R009 carries no HCS error; the client handles it as an ordin
 
 - OQ-0006-1: whether errors need a stable machine-readable `retryable` hint (`timeout` usually is, `integrity_mismatch` is not). No consumer needs it yet.
 - OQ-0006-2: whether one failure may carry several errors (a resolution pass usually finds several). The reference runner returns a list; the wire shape for a list is not defined.
-- OQ-0006-3: mapping to OpenTelemetry `error.type` (the GenAI conventions are Development status; see [docs/standards/opentelemetry-genai.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/opentelemetry-genai.md)).
+- OQ-0006-3: mapping to OpenTelemetry `error.type` (the GenAI conventions are Development status; see [docs/standards/opentelemetry-genai.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/opentelemetry-genai.md)).
 - OQ-0006-5: an optional agent-recovery hint for tool results (the next tool to call after a refusal). One consumer puts it in a `next_step` member of its own problem object and repeats it in the text. It names tools of that product, a model is steered by text it already reads, and no second consumer carries a hint, so HCS defines no member. A distribution can put it in the text item (R007) or in `details` under an extension member (`x-<distribution>-next-step`).
 - OQ-0006-4: a stable sub-reason for `signature_invalid` (unsigned, bad signature, threshold not met, expired) so operators can tell them apart without parsing `message`. The first host distinguishes them; HCS-0006 has no member for it yet.

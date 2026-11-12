@@ -12,9 +12,9 @@
 
 A catalog manifest is the desired state of a harness distribution: which packages a host should have, at which versions, with which content digests and sizes, what each package contributes, and where it can run. It is data only. A host reads it, checks it, fetches and verifies content, and hands the result to resolution (HCS-0003) and lifecycle (HCS-0004).
 
-No existing standard covers this: OCI indexes describe transport, TUF targets metadata describes hashes and lengths without contributions, and product manifests such as `openclaw.plugin.json` are product-specific (see [composition-map.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/research/composition-map.md) section 3).
+No existing standard covers this: OCI indexes describe transport, TUF targets metadata describes hashes and lengths without contributions, and product manifests such as `openclaw.plugin.json` are product-specific (see [composition-map.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/research/composition-map.md) section 3).
 
-Out of scope here: signing, freshness and rollback protection of the manifest (DISTRO-1, built on TUF properties, see [docs/standards/tuf.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/tuf.md)); how a contribution is launched (TOOLS-1 for `mcp-server`); permission requests (HCS-0005).
+Out of scope here: signing, freshness and rollback protection of the manifest (DISTRO-1, built on TUF properties, see [docs/standards/tuf.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/tuf.md)); how a contribution is launched (TOOLS-1 for `mcp-server`); permission requests (HCS-0005).
 
 ## 2. Example
 
@@ -56,8 +56,8 @@ Out of scope here: signing, freshness and rollback protection of the manifest (D
 | Member | Required | Type | Meaning |
 | --- | --- | --- | --- |
 | `id` | yes | dotted id | package id, unique in the catalog |
-| `version` | yes | opaque string | package version ([ADR-0004](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0004-opaque-package-versions.md)) |
-| `contentHash` | yes | digest | digest of the exact package bytes ([ADR-0003](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0003-digest-format.md)) |
+| `version` | yes | opaque string | package version ([ADR-0004](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0004-opaque-package-versions.md)) |
+| `contentHash` | yes | digest | digest of the exact package bytes ([ADR-0003](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0003-digest-format.md)) |
 | `size` | yes | integer ≥ 0 | length of the package bytes, in bytes |
 | `contentId` | no | digest | identity of the exact uncompressed tar stream (3.5), separate from transport integrity |
 | `mediaType` | yes | string | media type of the package bytes, as in an OCI descriptor (3.4) |
@@ -67,7 +67,7 @@ Out of scope here: signing, freshness and rollback protection of the manifest (D
 | `compatibility` | no | object | where the package can run: platforms and hosts (3.3) |
 | `x-*` | no | any | extension members |
 
-`contentHash` plus `size` mirror the `digest` plus `size` pair of an OCI descriptor and the `hashes` plus `length` pair of a TUF targets entry (see [docs/standards/oci.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/oci.md)). HCS uses the OCI digest string grammar and restricts the algorithm to `sha256` and `sha512` with lowercase hex.
+`contentHash` plus `size` mirror the `digest` plus `size` pair of an OCI descriptor and the `hashes` plus `length` pair of a TUF targets entry (see [docs/standards/oci.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/oci.md)). HCS uses the OCI digest string grammar and restricts the algorithm to `sha256` and `sha512` with lowercase hex.
 
 ### 3.2 Contribution
 
@@ -80,31 +80,31 @@ Out of scope here: signing, freshness and rollback protection of the manifest (D
 
 Core kinds reference external standards and do not restate them:
 
-- `skill`: `path` names a directory that is an Agent Skill (a `SKILL.md` with frontmatter), as defined by the Agent Skills specification at the revision pinned in [docs/standards/agent-skills.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/agent-skills.md). Its `allowed-tools` field is a request, never a grant (HCS-0005).
-- `mcp-server`: `path` names an MCP server shipped in the package. How it is launched and which MCP revision it speaks are defined by the TOOLS-1 profile, not by HCS-0001 ([docs/standards/mcp.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/mcp.md)).
+- `skill`: `path` names a directory that is an Agent Skill (a `SKILL.md` with frontmatter), as defined by the Agent Skills specification at the revision pinned in [docs/standards/agent-skills.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/agent-skills.md). Its `allowed-tools` field is a request, never a grant (HCS-0005).
+- `mcp-server`: `path` names an MCP server shipped in the package. How it is launched and which MCP revision it speaks are defined by the TOOLS-1 profile, not by HCS-0001 ([docs/standards/mcp.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/mcp.md)).
 - A distribution adds kinds as extension names (for example `x-example-theme`).
 
 ### 3.3 Compatibility
 
-`compatibility.platforms` is a list of OCI platform objects (`os`, `architecture`, optional `variant`), using the OCI image index values (see [docs/standards/oci.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/oci.md)). An absent list means "any platform". Packages that ship different bytes per platform are separate entries with distinct ids or a distinct catalog per platform; HCS 0.1 does not define multi-platform entries (OQ-0001-2).
+`compatibility.platforms` is a list of OCI platform objects (`os`, `architecture`, optional `variant`), using the OCI image index values (see [docs/standards/oci.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/oci.md)). An absent list means "any platform". Packages that ship different bytes per platform are separate entries with distinct ids or a distinct catalog per platform; HCS 0.1 does not define multi-platform entries (OQ-0001-2).
 
-`compatibility.hosts` is a list of items with a host `id` (dotted id, naming a host implementation, not an instance) and `versions`, the exact host versions the entry runs on ([ADR-0012](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0012-host-compatibility-by-exact-versions.md)). Host versions are opaque like package versions ([ADR-0004](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0004-opaque-package-versions.md)), so HCS defines no ranges: an item matches only when its `id` equals the host's id and `versions` contains the host's version as an equal string. An absent list means "any host".
+`compatibility.hosts` is a list of items with a host `id` (dotted id, naming a host implementation, not an instance) and `versions`, the exact host versions the entry runs on ([ADR-0012](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0012-host-compatibility-by-exact-versions.md)). Host versions are opaque like package versions ([ADR-0004](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0004-opaque-package-versions.md)), so HCS defines no ranges: an item matches only when its `id` equals the host's id and `versions` contains the host's version as an equal string. An absent list means "any host".
 
 ### 3.4 Package format
 
-`mediaType` tells the host how to turn the package bytes into a directory tree; contribution `path` values are relative to the root of that tree ([ADR-0011](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0011-package-format-is-an-oci-layer.md)).
+`mediaType` tells the host how to turn the package bytes into a directory tree; contribution `path` values are relative to the root of that tree ([ADR-0011](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0011-package-format-is-an-oci-layer.md)).
 
-- The core format is `application/vnd.oci.image.layer.v1.tar+gzip`: a tar archive compressed with gzip, as defined for OCI image layers in image-spec v1.1.1 `layer.md` ([docs/standards/oci.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/oci.md)). The archive is applied to an empty directory, which becomes the package root. Every host implements it (R012), so a catalog that uses only this type can be consumed by any conforming host.
+- The core format is `application/vnd.oci.image.layer.v1.tar+gzip`: a tar archive compressed with gzip, as defined for OCI image layers in image-spec v1.1.1 `layer.md` ([docs/standards/oci.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/oci.md)). The archive is applied to an empty directory, which becomes the package root. Every host implements it (R012), so a catalog that uses only this type can be consumed by any conforming host.
 - A distribution can define further media types in a vendor tree (for example `application/vnd.example.package.v1.tar+gzip`); a host that does not implement one reports `unsupported_contribution` for the entry (R013) and leaves the rest of the catalog to resolution.
 - A deterministic archive (R014) lists members in byte order of their names, stores zero modification times, owner and group ids and names, and is compressed with fixed settings and no gzip file name or timestamp. Determinism is a producer property; a host cannot check it and does not try.
 - `size` and `contentHash` describe the compressed bytes exactly as fetched (R007), never the unpacked tree.
-- Hashes say the bytes are the ones the publisher described, not that unpacking them is safe. A host refuses a package whose tar has an unsafe or duplicate member, cannot be parsed, or exceeds a limit the host sets (R019 to R023). Those refusals are `package_invalid`, not `integrity_mismatch`: the bytes are exactly what the publisher described, so fetching them again from another location cannot help ([ADR-0033](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0033-archive-member-safety.md)).
+- Hashes say the bytes are the ones the publisher described, not that unpacking them is safe. A host refuses a package whose tar has an unsafe or duplicate member, cannot be parsed, or exceeds a limit the host sets (R019 to R023). Those refusals are `package_invalid`, not `integrity_mismatch`: the bytes are exactly what the publisher described, so fetching them again from another location cannot help ([ADR-0033](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0033-archive-member-safety.md)).
 
 Document limits (R015) protect a host from a hostile document that exhausts memory or the parser stack before validation can reject it. The floor values let a producer know what every host accepts; a host can accept more.
 
 ### 3.5 Optional uncompressed content identity
 
-`contentId` is an OCI DiffID-like digest of the **exact uncompressed tar byte stream**, using the same `sha256` / `sha512` lowercase-hex grammar as `contentHash` ([ADR-0030](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0030-uncompressed-package-identity.md)). For the core gzip media type, hash all bytes produced by decompression, including tar headers, member order, metadata, padding and terminators. Do not hash extracted file contents or reserialize the tar. This adds no canonical tar format and does not strengthen the producer determinism SHOULD (R014).
+`contentId` is an OCI DiffID-like digest of the **exact uncompressed tar byte stream**, using the same `sha256` / `sha512` lowercase-hex grammar as `contentHash` ([ADR-0030](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0030-uncompressed-package-identity.md)). For the core gzip media type, hash all bytes produced by decompression, including tar headers, member order, metadata, padding and terminators. Do not hash extracted file contents or reserialize the tar. This adds no canonical tar format and does not strengthen the producer determinism SHOULD (R014).
 
 Two differently compressed packages can have the same verified `contentId` and different `contentHash` and `size`. Equal trees can have different `contentId` values: this is not a universal tree identity. Compare identities only when both are present, verified and use the same algorithm. Absence means unknown, not equality; different algorithms do not establish inequality of the underlying bytes either.
 
@@ -174,10 +174,10 @@ A platform item matches when `os` and `architecture` are equal to the host's and
 
 ## 5. Open questions
 
-- OQ-0001-1: closed. `mediaType` is required and the core package format is the OCI layer media type (section 3.4, [ADR-0011](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0011-package-format-is-an-oci-layer.md)).
+- OQ-0001-1: closed. `mediaType` is required and the core package format is the OCI layer media type (section 3.4, [ADR-0011](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0011-package-format-is-an-oci-layer.md)).
 - OQ-0001-2: multi-platform entries (one id, per-platform digests, like an OCI image index).
 - OQ-0001-3: reduced. `compatibility.hosts` with exact version lists is defined (section 3.3, R016). Remaining question: version ranges, which need a version ordering HCS does not define (ADR-0004).
 - OQ-0001-4: closed here. The catalog `version` stays opaque; rollback protection is the envelope `sequence` of [HCS-0007](HCS-0007-signed-catalog.md).
 - OQ-0001-5: closed here. The signature input over a catalog is defined by [HCS-0007](HCS-0007-signed-catalog.md) section 4.
-- OQ-0001-6: closed here. Archive member safety is R019 to R023 (section 3.4, [ADR-0033](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0033-archive-member-safety.md)); a violation reports `package_invalid` ([HCS-0006](HCS-0006-errors.md)).
-- Mandatory entries (an entry that distribution policy forbids removing) stay a distribution extension; HCS-0000-R004 keeps such a member from changing any validity verdict ([lf-fit-distro-1-and-core-0.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/research/lf-fit-distro-1-and-core-0.md) row 6).
+- OQ-0001-6: closed here. Archive member safety is R019 to R023 (section 3.4, [ADR-0033](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0033-archive-member-safety.md)); a violation reports `package_invalid` ([HCS-0006](HCS-0006-errors.md)).
+- Mandatory entries (an entry that distribution policy forbids removing) stay a distribution extension; HCS-0000-R004 keeps such a member from changing any validity verdict ([lf-fit-distro-1-and-core-0.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/research/lf-fit-distro-1-and-core-0.md) row 6).

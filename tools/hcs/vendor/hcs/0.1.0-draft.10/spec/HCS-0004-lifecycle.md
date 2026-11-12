@@ -10,7 +10,7 @@
 
 ## 1. Scope
 
-The lifecycle is the per-entry state machine a host runs from reading a catalog to stopping a package, and the rule for moving from one desired set to the next. MCP tasks are per-call jobs on a server and do not cover it ([docs/standards/mcp.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/mcp.md)); Cordis "reversible effects" are the closest precedent ([standards-catalog.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/research/standards-catalog.md), precedents). This document fixes state names and the few transition rules every host needs; it does not define deadlines, retries or how a plugin is started.
+The lifecycle is the per-entry state machine a host runs from reading a catalog to stopping a package, and the rule for moving from one desired set to the next. MCP tasks are per-call jobs on a server and do not cover it ([docs/standards/mcp.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/mcp.md)); Cordis "reversible effects" are the closest precedent ([standards-catalog.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/research/standards-catalog.md), precedents). This document fixes state names and the few transition rules every host needs; it does not define deadlines, retries or how a plugin is started.
 
 ## 2. States
 
@@ -65,13 +65,13 @@ R003 is the atomicity rule: from the caller's view a desired-set change either h
 
 ## 4. Telemetry
 
-A host that emits telemetry for lifecycle transitions SHOULD use OpenTelemetry and the attribute names in [docs/standards/opentelemetry-genai.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/opentelemetry-genai.md) for tool and agent calls; HCS 0.1 defines no lifecycle event names of its own (OQ-0004-3).
+A host that emits telemetry for lifecycle transitions SHOULD use OpenTelemetry and the attribute names in [docs/standards/opentelemetry-genai.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/opentelemetry-genai.md) for tool and agent calls; HCS 0.1 defines no lifecycle event names of its own (OQ-0004-3).
 
 ## 5. Open questions
 
 - OQ-0004-1: deadlines per step and whether the catalog can suggest them.
 - OQ-0004-2: drain semantics (wait for in-flight calls, cancel them, or a deadline then cancel). MCP 2026-07-28 has no resumable streams, so cancellation loses in-flight work.
-- OQ-0004-3: lifecycle event names and whether they are CloudEvents types ([docs/standards/cloudevents.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/cloudevents.md)).
+- OQ-0004-3: lifecycle event names and whether they are CloudEvents types ([docs/standards/cloudevents.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/cloudevents.md)).
 - OQ-0004-4: persistence of per-entry state across host restarts. Which generation a host starts and what it remembers about failed ones is closed by HCS-0008 section 7.1 (R031 to R035).
 - OQ-0004-5: a `failed` entry's recovery path (retry versus a new desired set).
-- OQ-0004-6: out-of-band modification of a prepared or active entry's content (someone edited installed files). The first host detects it and stops reconciling until an operator intervenes; whether HCS defines the condition, its error code, and the host's duty, is open ([ADR-0014](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0014-profile-error-codes-join-the-core-registry.md)).
+- OQ-0004-6: out-of-band modification of a prepared or active entry's content (someone edited installed files). The first host detects it and stops reconciling until an operator intervenes; whether HCS defines the condition, its error code, and the host's duty, is open ([ADR-0014](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0014-profile-error-codes-join-the-core-registry.md)).

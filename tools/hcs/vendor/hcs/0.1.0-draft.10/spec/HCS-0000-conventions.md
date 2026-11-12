@@ -13,7 +13,7 @@ This document defines the conventions every other HCS document uses: requirement
 
 ## 2. Requirement language
 
-The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in HCS documents are to be interpreted as described in BCP 14 ([RFC 2119], [RFC 8174]) when, and only when, they appear in all capitals, as shown here. See [docs/standards/bcp14.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/bcp14.md).
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in HCS documents are to be interpreted as described in BCP 14 ([RFC 2119], [RFC 8174]) when, and only when, they appear in all capitals, as shown here. See [docs/standards/bcp14.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/bcp14.md).
 
 ## 3. Requirement identifiers
 
@@ -43,12 +43,12 @@ A document that defines something no existing standard covers carries, besides i
 - Within one `0.MINOR`, a new `draft.N` changes instance document schemas (catalog, envelope, key set, errors, requests, status) only additively: an instance valid under the previous `N` stays valid. Conformance cases, the case schema and the runner may change in any way.
 - A change that makes a valid instance invalid, or changes what a valid instance means, moves to the next MINOR (`0.(MINOR+1).0-draft.1`) and to the matching `hcsVersion`, so a host can tell which contract an instance follows.
 - Instance documents declare the HCS contract they follow in `hcsVersion` as `MAJOR.MINOR` (for example `"0.1"`). A patch release never changes a schema's accepted language.
-- Package versions inside manifests are opaque strings unless an HCS document defines their semantics ([ADR-0004](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0004-opaque-package-versions.md)).
+- Package versions inside manifests are opaque strings unless an HCS document defines their semantics ([ADR-0004](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0004-opaque-package-versions.md)).
 
 ## 6. Schema identifiers
 
 - Schemas are JSON Schema 2020-12 documents in `schemas/<document>/<name>/v<MAJOR.MINOR>/<name>.schema.json` and are the source of truth for document shape (README rule 2).
-- Until the project controls a domain, every schema `$id` is a URN of the form `urn:hcs:schema:<document>:<name>:<MAJOR.MINOR>` ([ADR-0002](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0002-schema-ids-as-urns.md)).
+- Until the project controls a domain, every schema `$id` is a URN of the form `urn:hcs:schema:<document>:<name>:<MAJOR.MINOR>` ([ADR-0002](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0002-schema-ids-as-urns.md)).
 - Instance documents identify their contract by `hcsVersion`, never by pointing `$schema` at the JSON Schema meta-schema.
 
 ## 7. Extension namespace
@@ -57,7 +57,7 @@ Distributions extend HCS documents only through extension members.
 
 - An extension member name matches `^x-[a-z0-9]+(-[a-z0-9]+)*$`; the first segment after `x-` names the distribution (for example `x-example` or `x-example-trust`).
 - HCS schemas reject unknown members that are not extension members (`additionalProperties: false` plus `patternProperties` for `^x-`).
-- Where another protocol asks for reverse-DNS names for extensions (ACP `_meta` keys and `_`-prefixed methods, MCP `_meta`), HCS's own extensions use the namespace `io.github.fullfran.hcs`. It follows the GitHub-backed reverse-DNS convention the MCP Registry uses for publishers without a domain. Like the `urn:hcs:` schema identifiers ([ADR-0002](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0002-schema-ids-as-urns.md)), it is provisional until the project has a domain of its own ([ADR-0027](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0027-projection-over-acp.md)).
+- Where another protocol asks for reverse-DNS names for extensions (ACP `_meta` keys and `_`-prefixed methods, MCP `_meta`), HCS's own extensions use the namespace `io.github.fullfran.hcs`. It follows the GitHub-backed reverse-DNS convention the MCP Registry uses for publishers without a domain. Like the `urn:hcs:` schema identifiers ([ADR-0002](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0002-schema-ids-as-urns.md)), it is provisional until the project has a domain of its own ([ADR-0027](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0027-projection-over-acp.md)).
 
 **[HCS-0000-R003]** A host MUST NOT reject a document because it contains extension members it does not understand.
 
@@ -69,7 +69,7 @@ R003 cases check that unknown extension members are accepted and that names outs
 
 ## 8. Conformance cases
 
-Cases live in `conformance/cases/<document>/<requirement-id>/{valid,invalid}/<name>.json` and validate against `conformance/case.schema.json`. The directory gives the polarity: `valid/` exercises the path where the requirement is satisfied, `invalid/` the path where it is violated or where a non-conforming implementation would produce a different result ([ADR-0001](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0001-requirement-ids-and-case-polarity.md)). A case names the `requirements` it exercises, its `level` (`document`, `integrity`, `resolution`, `authority`, `distribution`, `projection` or `host`) and its expected outcome. All levels except `host` are executed by the reference runner ([ADR-0008](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0008-reference-runner.md)); `host` cases describe a scenario that needs a running host and engine and are reported as `pending` until a host adapter (HCS-0008) runs them.
+Cases live in `conformance/cases/<document>/<requirement-id>/{valid,invalid}/<name>.json` and validate against `conformance/case.schema.json`. The directory gives the polarity: `valid/` exercises the path where the requirement is satisfied, `invalid/` the path where it is violated or where a non-conforming implementation would produce a different result ([ADR-0001](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0001-requirement-ids-and-case-polarity.md)). A case names the `requirements` it exercises, its `level` (`document`, `integrity`, `resolution`, `authority`, `distribution`, `projection` or `host`) and its expected outcome. All levels except `host` are executed by the reference runner ([ADR-0008](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0008-reference-runner.md)); `host` cases describe a scenario that needs a running host and engine and are reported as `pending` until a host adapter (HCS-0008) runs them.
 
 ## 9. Open questions
 

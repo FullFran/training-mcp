@@ -12,14 +12,14 @@
 
 A capability is a contract a host or package can provide and another package can require ("search the web", "store notes"). Its identifier names the contract, not the package that implements it, so a distribution can swap implementations without touching dependents.
 
-Nothing existing gives this: MCP tool names are local to one server, A2A skills live inside one Agent Card, Agent Skills `name` identifies a directory ([docs/standards/mcp.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/mcp.md), [docs/standards/a2a.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/a2a.md), [docs/standards/agent-skills.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/standards/agent-skills.md)). HCS-0002 adds only the identifier; what a contract means (methods, schemas) stays with the standard the contract is expressed in, for example a set of MCP tools.
+Nothing existing gives this: MCP tool names are local to one server, A2A skills live inside one Agent Card, Agent Skills `name` identifies a directory ([docs/standards/mcp.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/mcp.md), [docs/standards/a2a.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/a2a.md), [docs/standards/agent-skills.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/standards/agent-skills.md)). HCS-0002 adds only the identifier; what a contract means (methods, schemas) stays with the standard the contract is expressed in, for example a set of MCP tools.
 
 ## 2. Grammar
 
 - **Capability id:** lowercase dotted identifier with at least two segments, each `[a-z0-9]([a-z0-9-]*[a-z0-9])?`, at most 128 characters. Example: `dev.example.search`.
 - **Capability reference:** `<capability id>@<major>`, where `<major>` is a non-negative integer without leading zeros. Example: `dev.example.search@1`.
 
-The major is the contract version. Compatible changes keep the major; an incompatible change is a new major ([ADR-0005](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0005-capability-refs-major-only.md)). There are no minor versions or ranges in references.
+The major is the contract version. Compatible changes keep the major; an incompatible change is a new major ([ADR-0005](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0005-capability-refs-major-only.md)). There are no minor versions or ranges in references.
 
 ## 3. Requirements
 

@@ -10,7 +10,7 @@
 
 ## 1. Scope
 
-Resolution turns a validated catalog manifest and a description of the host into an activation order and a list of typed errors, before any package code runs. Cordis resolves dependencies at runtime by service key; OpenClaw validates manifests without executing code ([standards-catalog.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/research/standards-catalog.md) section 2, precedents). HCS makes the declarative, pre-execution version deterministic so two hosts given the same input produce the same output.
+Resolution turns a validated catalog manifest and a description of the host into an activation order and a list of typed errors, before any package code runs. Cordis resolves dependencies at runtime by service key; OpenClaw validates manifests without executing code ([standards-catalog.md](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/research/standards-catalog.md) section 2, precedents). HCS makes the declarative, pre-execution version deterministic so two hosts given the same input produce the same output.
 
 ## 2. Inputs and output
 
@@ -37,7 +37,7 @@ Output (`resolutionResult`):
 3. **Matching.** For each eligible entry and each reference in its `requires`, the candidate providers are the host and the other eligible entries that provide that exact reference. An entry never satisfies its own requirement.
 4. **Propagation.** An entry with an unsatisfied requirement fails. Repeat step 2 to 4 without failed entries until nothing changes.
 5. **Ordering.** Build edges from each remaining entry to the entries that provide its requirements. Entries on a cycle fail. The remaining entries are ordered topologically, with ties broken by ascending entry id.
-6. **Selection.** Under `partial`, the selected entries are the activation order. Under `all-or-nothing`, they are the activation order when `errors` is empty, and none otherwise; the previous desired set then stays active ([ADR-0013](https://github.com/FullFran/hcs/blob/v0.1.0-draft.9/docs/adr/0013-activation-policy-is-host-declared.md)).
+6. **Selection.** Under `partial`, the selected entries are the activation order. Under `all-or-nothing`, they are the activation order when `errors` is empty, and none otherwise; the previous desired set then stays active ([ADR-0013](https://github.com/FullFran/hcs/blob/v0.1.0-draft.10/docs/adr/0013-activation-policy-is-host-declared.md)).
 
 ## 4. Requirements
 
