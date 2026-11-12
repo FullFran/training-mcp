@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -167,7 +168,7 @@ func isolationClock() time.Time { return time.Date(2026, 8, 7, 10, 0, 0, 0, time
 func newIsolationWorld(t *testing.T) isolationWorld {
 	t.Helper()
 	ctx := context.Background()
-	path := t.TempDir() + "/training.db"
+	path := sqlitestoretest.Path(t)
 	store, err := sqlitestore.Open(path)
 	if err != nil {
 		t.Fatal(err)
@@ -304,6 +305,7 @@ func TestEveryToolIsIsolatedBetweenUsers(t *testing.T) {
 	missing := toolIDs{session: missingToolID, set: missingToolID, plan: missingToolID, memory: missingToolID, sibling: missingToolID + 1, relation: missingToolID, fingerprint: "absent"}
 	for name, tc := range isolationCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			world := newIsolationWorld(t)
 			args := tc.args(world.ids)
 
@@ -341,7 +343,7 @@ func TestEveryToolIsIsolatedBetweenUsers(t *testing.T) {
 			default:
 				before := dumpTables(t, world.db, nil)
 				got := answer(t, call(t, world.second, name, args))
-				store, err := sqlitestore.Open(t.TempDir() + "/empty.db")
+				store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 				if err != nil {
 					t.Fatal(err)
 				}

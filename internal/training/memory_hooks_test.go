@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 )
 
@@ -80,7 +81,7 @@ type hookFixture struct {
 
 func newHookFixture(t *testing.T) *hookFixture {
 	t.Helper()
-	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}

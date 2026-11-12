@@ -50,11 +50,14 @@ jobs:
       # The store is the layer that touches the data. Let coverage rot anywhere
       # else, but not there. Measured as package statement coverage, not an
       # average of per-function percentages, which weights a one-line helper
-      # the same as a hundred-line transaction.
+      # the same as a hundred-line transaction. Read from the profile the test
+      # step already wrote, rather than running the store's tests a second
+      # time: only the package's own files, not its sqlitestoretest helper.
       - name: coverage floor for the store
         run: |
-          pct="$(go test -cover ./internal/sqlitestore/ \
-            | sed -n 's/.*coverage: \([0-9.]*\)% of statements.*/\1/p')"
+          grep -E '^mode:|/internal/sqlitestore/[^/]+\.go:' coverage.out > store.cov
+          pct="$(go tool cover -func=store.cov \
+            | sed -n 's/^total:.*[[:space:]]\([0-9.]*\)%$/\1/p')"
           echo "sqlitestore statement coverage: ${pct}%"
           awk -v p="$pct" 'BEGIN {exit !(p < 70)}' && {
             echo "below the 70% floor" >&2

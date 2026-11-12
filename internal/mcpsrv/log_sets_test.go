@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func logSetsSession(t *testing.T) *mcp.ClientSession {
 	t.Helper()
-	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}

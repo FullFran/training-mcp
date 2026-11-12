@@ -11,6 +11,7 @@ import (
 	"github.com/fullfran/training-mcp/internal/engine"
 	"github.com/fullfran/training-mcp/internal/engine/connector"
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 	"github.com/fullfran/training-mcp/internal/websrv"
 )
@@ -109,7 +110,7 @@ func (c *approvingCoach) Revoke(userID int64, server string) { c.record("revoke:
 
 func newConnectorWorld(t *testing.T) (*approvingCoach, *fakeConnectors, *websrv.Server, func(int64) http.Handler) {
 	t.Helper()
-	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}

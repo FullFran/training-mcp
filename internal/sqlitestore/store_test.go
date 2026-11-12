@@ -41,7 +41,7 @@ func TestStorePersistsAndResequencesAcrossRestart(t *testing.T) {
 }
 
 func TestStoreListsWithFiltersAndLimit(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestStoreListsWithFiltersAndLimit(t *testing.T) {
 }
 
 func TestStoreRecentExercisesReturnsLastSetPerExerciseNewestFirst(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestStoreRecentExercisesReturnsLastSetPerExerciseNewestFirst(t *testing.T) 
 }
 
 func TestStoreAddSetReturnsCurrentSessionTotal(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestStoreAddSetReturnsCurrentSessionTotal(t *testing.T) {
 }
 
 func TestStoreNormalizesMultiSetTotal(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestStoreNormalizesMultiSetTotal(t *testing.T) {
 }
 
 func TestStoreDeleteRollbackRestoresRowsAfterInjectedFailure(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestStoreDeleteRollbackRestoresRowsAfterInjectedFailure(t *testing.T) {
 }
 
 func TestStoreVolumeByGroupPartitionsSessionSIAndSurfacesUnmapped(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +239,7 @@ func TestStoreVolumeByGroupPartitionsSessionSIAndSurfacesUnmapped(t *testing.T) 
 }
 
 func TestStoreDeleteSessionRemovesItsSets(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestStoreDeleteSessionRemovesItsSets(t *testing.T) {
 }
 
 func TestStoreExerciseHistoryOrdersNewestFirstAndFindsTheRecord(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +314,7 @@ func TestStoreExerciseHistoryOrdersNewestFirstAndFindsTheRecord(t *testing.T) {
 // estimate is shown: 104x1 is 104, below 95x3 at 104.5, although the raw
 // Epley formula would have put the single at 107.5.
 func TestStoreExerciseHistoryRanksASingleAtItsLiftedWeight(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,7 +346,7 @@ func TestStoreExerciseHistoryRanksASingleAtItsLiftedWeight(t *testing.T) {
 }
 
 func TestStoreWeeklyVolumeBucketsByMondayOfTheTrainingWeek(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +376,7 @@ func TestStoreWeeklyVolumeBucketsByMondayOfTheTrainingWeek(t *testing.T) {
 }
 
 func TestStorePlanRoundTripAndSessionProgress(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -480,7 +480,7 @@ func TestStoreMigrationsAreAppliedOnceAcrossReopen(t *testing.T) {
 }
 
 func TestStoreSessionItemsAreASnapshotOfThePlan(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -560,7 +560,7 @@ func intPtr(v int) *int    { return &v }
 func boolPtr(v bool) *bool { return &v }
 
 func TestStoreFeedbackUpsertsAndReportsTheLatestPerGroup(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -600,7 +600,7 @@ func TestStoreFeedbackUpsertsAndReportsTheLatestPerGroup(t *testing.T) {
 }
 
 func TestStoreUpdateSetRecalculatesAndCarriesTechnique(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -627,7 +627,7 @@ func TestStoreUpdateSetRecalculatesAndCarriesTechnique(t *testing.T) {
 }
 
 func TestStoreSessionItemsAddedAdHocAndSupersetLookup(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -667,7 +667,7 @@ func TestStoreSessionItemsAddedAdHocAndSupersetLookup(t *testing.T) {
 }
 
 func TestStoreExerciseNotesRoundTripAndDeleteOnEmpty(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -692,7 +692,7 @@ func TestStoreExerciseNotesRoundTripAndDeleteOnEmpty(t *testing.T) {
 }
 
 func TestStoreUpdatePlanLeavesExercisesAlone(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -759,7 +759,7 @@ func TestStoreSnapshotProducesAReadableCopy(t *testing.T) {
 }
 
 func TestStorePlanItemsCanBeEditedReorderedAndRemoved(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -829,7 +829,7 @@ func TestStorePlanItemsCanBeEditedReorderedAndRemoved(t *testing.T) {
 // add_session_exercise, adopting a plan mid-session) keeps whatever the caller
 // did not send: superset, notes, RPE and the rep range. Issue #54.
 func TestStoreSessionItemReAddKeepsUnsentFields(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 	"github.com/fullfran/training-mcp/internal/websrv"
 )
@@ -53,7 +54,7 @@ func TestDeletingASessionFromItsPageRemovesItAndItsSets(t *testing.T) {
 // Behind the web login the delete form is a plain form, so it must carry the
 // session's CSRF token itself or the middleware refuses it.
 func TestTheDeleteSessionFormCarriesTheCSRFToken(t *testing.T) {
-	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}

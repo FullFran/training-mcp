@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 )
 
@@ -14,7 +15,7 @@ func liveClock() time.Time { return time.Date(2026, 8, 7, 10, 0, 0, 0, time.UTC)
 
 func TestLiveWorkoutShowsTheSessionTheLastSetAndTheRest(t *testing.T) {
 	ctx := context.Background()
-	path := t.TempDir() + "/training.db"
+	path := sqlitestoretest.Path(t)
 	store, err := sqlitestore.Open(path)
 	if err != nil {
 		t.Fatal(err)

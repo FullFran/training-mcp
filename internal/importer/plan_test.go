@@ -11,6 +11,7 @@ import (
 
 	"github.com/fullfran/training-mcp/internal/importer"
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 )
 
@@ -23,7 +24,7 @@ type world struct {
 
 func newWorld(t *testing.T) world {
 	t.Helper()
-	path := t.TempDir() + "/training.db"
+	path := sqlitestoretest.Path(t)
 	store, err := sqlitestore.Open(path)
 	if err != nil {
 		t.Fatal(err)

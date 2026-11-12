@@ -2,13 +2,12 @@ package sqlitestore
 
 import (
 	"context"
-	"path/filepath"
 	"sync"
 	"testing"
 )
 
 func TestProvisionUserIsOneAccountPerSubject(t *testing.T) {
-	store, err := Open(filepath.Join(t.TempDir(), "training.db"))
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +41,7 @@ func TestProvisionUserIsOneAccountPerSubject(t *testing.T) {
 // A client's first burst of calls arrives together, and must not split into two
 // accounts or fail on the unique subject.
 func TestConcurrentFirstCallsShareOneAccount(t *testing.T) {
-	store, err := Open(filepath.Join(t.TempDir(), "training.db"))
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
