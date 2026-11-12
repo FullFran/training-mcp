@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -187,7 +188,17 @@ func TestComposerHasVoiceAndTheExtrasSlot(t *testing.T) {
 func TestServiceWorkerCachesTheChatShell(t *testing.T) {
 	h, _ := newServer(t)
 	body := get(t, h, base+"/sw.js").Body.String()
-	for _, want := range []string{"const VERSION = 'v27';", "BASE + '/static/shell.js'", "BASE + '/static/modes.js'", "BASE + '/static/progress.js'", "BASE + '/static/picker.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'", "BASE + '/static/coach-attach.js'", "BASE + '/static/coach-apply.js'"} {
+	// The version is derived from the files, never bumped by hand, and an
+	// unchanged build serves the same one from every server it starts.
+	version := regexp.MustCompile(`const VERSION = '([0-9a-f]{12})';`).FindStringSubmatch(body)
+	if version == nil {
+		t.Fatalf("service worker has no derived VERSION:\n%s", body)
+	}
+	other, _ := newServer(t)
+	if again := get(t, other, base+"/sw.js").Body.String(); !strings.Contains(again, version[0]) {
+		t.Fatalf("a second server of the same build lacks %s", version[0])
+	}
+	for _, want := range []string{"BASE + '/static/shell.js'", "BASE + '/static/modes.js'", "BASE + '/static/progress.js'", "BASE + '/static/picker.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'", "BASE + '/static/coach-attach.js'", "BASE + '/static/coach-apply.js'"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("service worker lacks %s", want)
 		}

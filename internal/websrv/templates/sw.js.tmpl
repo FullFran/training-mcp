@@ -10,7 +10,12 @@
 // only that partition is ever read offline: a new session drops the others, an
 // expired one is dropped before reading, and the logged-out page (X-Cache-Clear)
 // drops them all. The secret mount sends no partition and keeps the old cache.
-const VERSION = 'v27';
+
+// VERSION is a hash of every static file and of this worker, computed by the
+// server at startup (see assets.go). Any change to them makes a new worker
+// with new caches; an unchanged build keeps the installed one. Never bump it
+// by hand.
+const VERSION = '{{.AssetVersion}}';
 const SHELL = 'shell-' + VERSION;
 const PAGES = 'pages-' + VERSION;
 const BASE = '{{.Base}}';
@@ -35,8 +40,11 @@ const SHELL_ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
+  // cache: 'reload' skips the browser's HTTP cache, so a new worker never fills
+  // its shell with copies kept from before the deploy.
+  const fresh = SHELL_ASSETS.map((url) => new Request(new URL(url, self.location.origin), { cache: 'reload' }));
   event.waitUntil(
-    caches.open(SHELL).then((cache) => cache.addAll(SHELL_ASSETS)).then(() => self.skipWaiting())
+    caches.open(SHELL).then((cache) => cache.addAll(fresh)).then(() => self.skipWaiting())
   );
 });
 
