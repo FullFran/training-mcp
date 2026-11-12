@@ -533,6 +533,12 @@ var writeCases = map[string]struct {
 		func(c context.Context, u training.UserStore) error { return u.SetAcceptAll(c, true) },
 		`SELECT COUNT(*) FROM agent_permissions WHERE user_id=2 AND accept_all=1`,
 	},
+	"SetApprovalMode": {
+		func(c context.Context, u training.UserStore) error {
+			return u.SetApprovalMode(c, training.ApprovalAcceptAll)
+		},
+		`SELECT COUNT(*) FROM agent_permissions WHERE user_id=2 AND mode='accept_all'`,
+	},
 	"SetExerciseNote": {
 		func(c context.Context, u training.UserStore) error {
 			return u.SetExerciseNote(c, training.ExerciseNote{Exercise: "sentadilla", Note: "barra baja"})

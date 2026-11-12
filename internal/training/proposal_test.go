@@ -21,9 +21,20 @@ type proposalFixture struct {
 	applied  []string
 }
 
-// newProposalFixture opens a store and provisions a user created after migration
-// 14, so it starts in ask-everything.
+// newProposalFixture opens a store and provisions a user, then puts the account
+// in review_all so every proposal waits for the person.
 func newProposalFixture(t *testing.T) (*proposalFixture, *training.Service) {
+	t.Helper()
+	f, svc := newDefaultProposalFixture(t)
+	if err := svc.SetApprovalMode(context.Background(), training.ApprovalReviewAll); err != nil {
+		t.Fatal(err)
+	}
+	return f, svc
+}
+
+// newDefaultProposalFixture provisions a user created after migration 27, so it
+// starts in the default mode, accept_except_delete.
+func newDefaultProposalFixture(t *testing.T) (*proposalFixture, *training.Service) {
 	t.Helper()
 	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
@@ -358,6 +369,9 @@ func TestUnrecordableDecisionDeniesTheOperation(t *testing.T) {
 	}
 	t.Cleanup(func() { store.Close() })
 	id, _ := store.ProvisionUser(context.Background(), "user_new")
+	if err := store.ForUser(id).SetAcceptAll(context.Background(), false); err != nil {
+		t.Fatal(err)
+	}
 	f := &proposalFixture{now: time.Date(2026, 11, 11, 9, 0, 0, 0, time.UTC)}
 	svc := training.NewService(failingRecords{store.ForUser(id)}, func() time.Time { return f.now })
 	p, err := svc.Propose(in(coachA), input("add_set", "set.log"), f.apply("add_set"))

@@ -97,9 +97,13 @@ type ProposalStore interface {
 	// RejectProposal answers a pending proposal with no, decided by decidedBy;
 	// ErrNotPending if it is not pending.
 	RejectProposal(ctx context.Context, id int64, decidedBy string, at time.Time) (Proposal, error)
-	// Permissions are the standing answers. An account without a stored setting asks for everything.
+	// Permissions are the standing answers. An account without a stored
+	// setting accepts everything except deletes (ApprovalAcceptExceptDelete).
 	Permissions(context.Context) (Permissions, error)
 	SetAcceptAll(context.Context, bool) error
+	// SetApprovalMode stores the account's approval mode, one of the
+	// Approval* constants.
+	SetApprovalMode(context.Context, string) error
 	// AddRule stores a session-limited grant or denial and returns its id.
 	AddRule(context.Context, AnswerRule) (int64, error)
 	// ForgetRule removes a grant or denial and returns it; ErrNotFound if this

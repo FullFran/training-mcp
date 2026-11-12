@@ -74,7 +74,7 @@
   }
 
   load();
-  // After anything that may accept a change: an answer (accept-all applies
+  // After anything that may accept a change: an answer (an approval mode applies
   // during it), a new proposal, or a card's form in the chat.
   document.addEventListener('coach:answer', load);
   document.addEventListener('coach:shown', load);

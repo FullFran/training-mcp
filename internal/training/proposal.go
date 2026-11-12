@@ -23,15 +23,16 @@ const (
 )
 
 // Who decided a proposal: the person, a session-limited answer the person gave
-// earlier (a grant or a denial), or the account's accept-all grant. "session"
+// earlier (a grant or a denial), or the account's approval mode. "session"
 // and "always" only appear on proposals decided before migration 018.
 const (
-	DecidedByPerson       = "person"
-	DecidedBySessionGrant = "session_grant"
-	DecidedByDenial       = "session_denial"
-	DecidedByAcceptAll    = "accept_all"
-	DecidedBySession      = "session"
-	DecidedByAlways       = "always"
+	DecidedByPerson             = "person"
+	DecidedBySessionGrant       = "session_grant"
+	DecidedByDenial             = "session_denial"
+	DecidedByAcceptAll          = "accept_all"
+	DecidedByAcceptExceptDelete = "accept_except_delete"
+	DecidedBySession            = "session"
+	DecidedByAlways             = "always"
 )
 
 // A person's answers to a proposal, the option kinds of HCS-0005 section 3.2.
@@ -128,12 +129,45 @@ func (r AnswerRule) matches(actionType, session string, now time.Time) bool {
 	return session != "" && r.Session == session && r.ActionType == actionType && now.Before(r.ExpiresAt)
 }
 
-// Permissions are a user's standing answers to agent proposals. AcceptAll is an
-// account-level host grant: set only from the person's own settings, it allows
-// every action type in every session, and each proposal is still recorded.
+// Approval modes: how an account decides agent proposals that no session answer
+// covers. They are account-level host grants, set only from the person's own
+// settings (never by an agent), and each proposal is still recorded.
+const (
+	// ApprovalReviewAll makes every proposal wait for the person.
+	ApprovalReviewAll = "review_all"
+	// ApprovalAcceptExceptDelete applies every proposal at once except the
+	// deleting action types, which wait. It is the mode of a new account.
+	ApprovalAcceptExceptDelete = "accept_except_delete"
+	// ApprovalAcceptAll applies every action type in every session.
+	ApprovalAcceptAll = "accept_all"
+
+	// DefaultApprovalMode is the mode of an account with no stored setting.
+	DefaultApprovalMode = ApprovalAcceptExceptDelete
+)
+
+// ValidApprovalMode reports whether mode is one of the approval modes.
+func ValidApprovalMode(mode string) bool {
+	return mode == ApprovalReviewAll || mode == ApprovalAcceptExceptDelete || mode == ApprovalAcceptAll
+}
+
+var deletingActions = map[string]bool{
+	"set.delete":              true,
+	"session.delete":          true,
+	"plan.delete":             true,
+	"memory.forget":           true,
+	"plan.exercise.remove":    true,
+	"session.exercise.remove": true,
+}
+
+// IsDeletingAction reports whether an action type removes data. The
+// accept_except_delete mode leaves these to the person.
+func IsDeletingAction(actionType string) bool { return deletingActions[actionType] }
+
+// Permissions are a user's standing answers to agent proposals: the approval
+// mode and the session-limited rules.
 type Permissions struct {
-	AcceptAll bool
-	Rules     []AnswerRule
+	Mode  string
+	Rules []AnswerRule
 }
 
 // Decision record outcomes, decider kinds and channels (HCS-0005 section 3.3).
@@ -155,6 +189,8 @@ const (
 
 	// AcceptAllGrant is the decider id of the account's accept-all grant.
 	AcceptAllGrant = "accept_all"
+	// AcceptExceptDeleteGrant is the decider id of the accept-except-delete mode.
+	AcceptExceptDeleteGrant = "accept_except_delete"
 	// AccountHolder is the decider id of the person who holds the account.
 	AccountHolder = "account"
 )
@@ -201,8 +237,9 @@ type ProposalInput struct {
 }
 
 // Propose records an agent's change in the request's agent session and decides
-// it as HCS-0005 does: a matching denial rejects it, otherwise the accept-all
-// grant or a matching grant applies it at once through apply, otherwise it waits
+// it as HCS-0005 does: a matching denial rejects it, otherwise the account's
+// approval mode (accept_all, or accept_except_delete for a non-deleting action
+// type) or a matching grant applies it at once through apply, otherwise it waits
 // for the person. Every decision gets a decision record before it takes effect;
 // a failed apply is recorded and its error returned.
 func (s *Service) Propose(ctx context.Context, in ProposalInput, apply ApplyFunc) (Proposal, error) {
@@ -237,9 +274,12 @@ func (s *Service) Propose(ctx context.Context, in ProposalInput, apply ApplyFunc
 		record.Outcome, record.DeciderKind, record.DeciderID = OutcomeDeny, DeciderDenial, ruleID(denial.ID)
 		rejected, _, err := s.reject(ctx, p.ID, DecidedByDenial, record)
 		return rejected, err
-	case perms.AcceptAll:
+	case perms.Mode == ApprovalAcceptAll:
 		record.Outcome, record.DeciderKind, record.DeciderID = OutcomeAllow, DeciderGrant, AcceptAllGrant
 		return s.applyProposal(ctx, p.ID, p.Payload, DecidedByAcceptAll, record, nil, apply)
+	case perms.Mode == ApprovalAcceptExceptDelete && !IsDeletingAction(p.ActionType):
+		record.Outcome, record.DeciderKind, record.DeciderID = OutcomeAllow, DeciderGrant, AcceptExceptDeleteGrant
+		return s.applyProposal(ctx, p.ID, p.Payload, DecidedByAcceptExceptDelete, record, nil, apply)
 	case grant != nil:
 		record.Outcome, record.DeciderKind, record.DeciderID = OutcomeAllow, DeciderGrant, ruleID(grant.ID)
 		return s.applyProposal(ctx, p.ID, p.Payload, DecidedBySessionGrant, record, nil, apply)
@@ -407,8 +447,16 @@ func (s *Service) Permissions(ctx context.Context) (Permissions, error) {
 	return perms, nil
 }
 
-// SetAcceptAll turns the account's accept-all grant on or off. Only the person's
-// own settings call it.
+// SetApprovalMode sets the account's approval mode. Only the person's own
+// settings call it; no agent tool does.
+func (s *Service) SetApprovalMode(ctx context.Context, mode string) error {
+	if !ValidApprovalMode(mode) {
+		return ErrValidation
+	}
+	return s.store.SetApprovalMode(ctx, mode)
+}
+
+// SetAcceptAll is shorthand for SetApprovalMode: on is accept_all, off is review_all.
 func (s *Service) SetAcceptAll(ctx context.Context, on bool) error {
 	return s.store.SetAcceptAll(ctx, on)
 }

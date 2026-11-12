@@ -620,9 +620,10 @@ func (acceptAllProposals) RejectProposal(context.Context, int64, string, time.Ti
 	return training.Proposal{}, training.ErrNotFound
 }
 func (acceptAllProposals) Permissions(context.Context) (training.Permissions, error) {
-	return training.Permissions{AcceptAll: true}, nil
+	return training.Permissions{Mode: training.ApprovalAcceptAll}, nil
 }
-func (acceptAllProposals) SetAcceptAll(context.Context, bool) error { return nil }
+func (acceptAllProposals) SetAcceptAll(context.Context, bool) error      { return nil }
+func (acceptAllProposals) SetApprovalMode(context.Context, string) error { return nil }
 func (acceptAllProposals) AddRule(context.Context, training.AnswerRule) (int64, error) {
 	return 0, nil
 }

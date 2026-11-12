@@ -97,6 +97,9 @@ func newHookFixture(t *testing.T) *hookFixture {
 			t.Fatal(err)
 		}
 		ids = append(ids, id)
+		if err := f.services.ForUser(id).SetApprovalMode(ctx, training.ApprovalReviewAll); err != nil {
+			t.Fatal(err)
+		}
 	}
 	f.owner, f.stranger, f.ids = f.services.ForUser(ids[0]), f.services.ForUser(ids[1]), ids
 	return f

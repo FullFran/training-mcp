@@ -60,7 +60,7 @@ func databaseBefore(t *testing.T, stop int) string {
 }
 
 // Existing accounts keep today's behavior (agent writes apply at once); an
-// account created after the migration starts asking for everything.
+// account created after migration 27 starts in accept_except_delete.
 func TestProposalsMigrationAcceptsAllForExistingAccountsOnly(t *testing.T) {
 	store, err := Open(databaseBeforeProposals(t))
 	if err != nil {
@@ -70,8 +70,8 @@ func TestProposalsMigrationAcceptsAllForExistingAccountsOnly(t *testing.T) {
 	ctx := context.Background()
 	for _, id := range []int64{1, 2} {
 		perms, err := store.ForUser(id).Permissions(ctx)
-		if err != nil || !perms.AcceptAll {
-			t.Fatalf("existing user %d: perms=%+v err=%v, want accept-all", id, perms, err)
+		if err != nil || perms.Mode != training.ApprovalAcceptAll {
+			t.Fatalf("existing user %d: perms=%+v err=%v, want accept_all", id, perms, err)
 		}
 	}
 	newID, err := store.ProvisionUser(ctx, "user_new")
@@ -79,8 +79,8 @@ func TestProposalsMigrationAcceptsAllForExistingAccountsOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	perms, err := store.ForUser(newID).Permissions(ctx)
-	if err != nil || perms.AcceptAll || len(perms.Rules) != 0 {
-		t.Fatalf("new user: perms=%+v err=%v, want ask-everything", perms, err)
+	if err != nil || perms.Mode != training.ApprovalAcceptExceptDelete || len(perms.Rules) != 0 {
+		t.Fatalf("new user: perms=%+v err=%v, want accept_except_delete", perms, err)
 	}
 }
 
@@ -157,7 +157,7 @@ func TestRulesAndAcceptAll(t *testing.T) {
 		t.Fatal(err)
 	}
 	perms, err := user.Permissions(ctx)
-	if err != nil || !perms.AcceptAll || len(perms.Rules) != 2 || perms.Rules[0].Effect != training.EffectAllow || !perms.Rules[0].ExpiresAt.Equal(grant.ExpiresAt) || perms.Rules[0].Origin != origin {
+	if err != nil || perms.Mode != training.ApprovalAcceptAll || len(perms.Rules) != 2 || perms.Rules[0].Effect != training.EffectAllow || !perms.Rules[0].ExpiresAt.Equal(grant.ExpiresAt) || perms.Rules[0].Origin != origin {
 		t.Fatalf("perms = %+v, %v", perms, err)
 	}
 	if err := user.SetAcceptAll(ctx, false); err != nil {
@@ -171,7 +171,7 @@ func TestRulesAndAcceptAll(t *testing.T) {
 		t.Fatalf("forget twice = %v", err)
 	}
 	perms, _ = user.Permissions(ctx)
-	if perms.AcceptAll || len(perms.Rules) != 1 || perms.Rules[0].Effect != training.EffectDeny {
+	if perms.Mode != training.ApprovalReviewAll || len(perms.Rules) != 1 || perms.Rules[0].Effect != training.EffectDeny {
 		t.Fatalf("after off and forget = %+v", perms)
 	}
 	for _, bad := range []training.AnswerRule{
@@ -223,10 +223,10 @@ func TestSessionAnswersMigrationDropsUnlimitedAnswers(t *testing.T) {
 	defer store.Close()
 	ctx := context.Background()
 	perms, err := store.ForUser(2).Permissions(ctx)
-	if err != nil || perms.AcceptAll || len(perms.Rules) != 0 {
+	if err != nil || perms.Mode != training.ApprovalReviewAll || len(perms.Rules) != 0 {
 		t.Fatalf("user 2 perms = %+v, %v", perms, err)
 	}
-	if owner, _ := store.ForUser(1).Permissions(ctx); !owner.AcceptAll {
+	if owner, _ := store.ForUser(1).Permissions(ctx); owner.Mode != training.ApprovalAcceptAll {
 		t.Fatal("the owner's accept-all changed")
 	}
 	records, err := store.ForUser(2).Decisions(ctx, 10)
@@ -292,7 +292,7 @@ func TestProposalsAreIsolatedBetweenUsers(t *testing.T) {
 		}
 	}
 	perms, err := second.Permissions(ctx)
-	if err != nil || perms.AcceptAll || len(perms.Rules) != 0 {
+	if err != nil || perms.Mode != training.ApprovalAcceptExceptDelete || len(perms.Rules) != 0 {
 		t.Fatalf("second perms = %+v, %v", perms, err)
 	}
 	if records, err := second.Decisions(ctx, 10); err != nil || len(records) != 0 {
@@ -301,7 +301,7 @@ func TestProposalsAreIsolatedBetweenUsers(t *testing.T) {
 	if err := second.SetAcceptAll(ctx, true); err != nil {
 		t.Fatal(err)
 	}
-	if perms, _ := store.ForUser(3).Permissions(ctx); perms.AcceptAll {
+	if perms, _ := store.ForUser(3).Permissions(ctx); perms.Mode == training.ApprovalAcceptAll {
 		t.Fatal("accept-all leaked to another account")
 	}
 }

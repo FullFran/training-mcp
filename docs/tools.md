@@ -39,7 +39,7 @@ section 3.2:
 | `allow_once` | Aceptar una vez | Apply this proposal only. Nothing is stored. |
 | `reject_once` | Rechazar | Reject this proposal only. Nothing is stored. |
 | `allow_always` | Aceptar siempre en esta sesión | Apply it and store a **grant** for its action type, limited to the session the proposal was asked in. |
-| `reject_always` | Rechazar siempre en esta sesión | Reject it and store a **denial** for its action type, limited the same way. A denial wins over any grant, accept-all included. |
+| `reject_always` | Rechazar siempre en esta sesión | Reject it and store a **denial** for its action type, limited the same way. A denial wins over any grant and over every approval mode. |
 
 The always answers are offered only for a proposal asked inside a session; one
 asked outside every session can only be answered once. A stored grant or
@@ -56,27 +56,39 @@ A **session** is decided per channel by the server, never by the agent:
 | External MCP client (ChatGPT, Claude) | A time window. `/mcp` is stateless (no `Mcp-Session-Id`), and an OAuth access token rotates within the hour, so there is no MCP-native identifier for a conversation. Every external call shares the session `mcp`, which a grant or denial covers for 12 hours from the answer. |
 | Anything else (no HTTP request) | No session. No stored grant or denial ever matches it (HCS-0005 R008). |
 
-### Accept-all
+### Approval modes
 
-A per-account switch that accepts every proposal, in every session and in
-none, including action types added later, like Claude Code's
-`--dangerously-skip-permissions`. It is modelled as an **account-level host
-grant**: it is set only from the person's own settings on `/review`, never by an
-agent, and every proposal it accepts is still recorded, with a decision record
-naming the `accept_all` grant. A session denial still wins over it. Turning it
-off leaves the session grants and denials as they were.
+Each account has one approval mode that decides the proposals no session answer
+covers. It is modelled as an **account-level host grant**: it is set only from
+the person's own settings on `/review` (a three-option selector), never by an
+MCP tool or an agent, and every proposal it accepts is still recorded and can be
+undone like any other. A session denial wins over every mode (HCS-0005 R007).
+Changing the mode leaves the session grants and denials as they were. A button
+to change it from the chat is tracked in #125.
 
-Defaults: every account that existed when migration 014 ran keeps accept-all
-on, so its agents behave as before plus the two fields. Accounts created later
-start asking for everything. Changes a person makes in the PWA apply directly
-and are not proposals.
+| Mode | PWA label | What happens |
+|---|---|---|
+| `review_all` | Revisar todo | Every proposal waits for the person. |
+| `accept_except_delete` | Aceptar todo salvo borrar | Every proposal is applied at once, except deleting action types, which wait (a session grant still applies them). The decision record names the `accept_except_delete` grant. |
+| `accept_all` | Aceptar todo | Every proposal is applied at once, in every session and in none, including action types added later, like Claude Code's `--dangerously-skip-permissions`. The decision record names the `accept_all` grant. |
+
+The deleting action types are `set.delete`, `session.delete`, `plan.delete`,
+`memory.forget`, `plan.exercise.remove` and `session.exercise.remove`
+(`training.IsDeletingAction`).
+
+Defaults: an account created from migration 027 on starts in
+`accept_except_delete`. Every account that existed before keeps exactly its
+behavior: accept-all on stays `accept_all`, and everything else (accept-all
+off, or no stored setting) became an explicit `review_all`. No account was
+loosened by the migration. Changes a person makes in the PWA apply directly and
+are not proposals.
 
 Migration 018 dropped every answer stored before answers became
 session-limited (permanent "always" and 12-hour "session" answers): none had a
 session or an origin, so none could be kept under HCS-0005 R006 and R008. Each
 dropped answer has a `revoked` decision record (decider `policy`
 `HCS-0005-R008`, channel `migration:018`), and the person is asked again.
-Accept-all values were not touched.
+Approval settings were not touched.
 
 ### Undo
 
@@ -119,7 +131,7 @@ Every decision on a proposal writes a decision record before it takes effect:
 `time`, `permission` (the action type), `outcome` (`allow`, `deny`, or
 `revoked` when a grant or denial is forgotten), `operation` (`proposal:<id>`),
 `session`, `decider` (`subject` `account` for the person's own answer, `grant`
-`rule:<id>` or `accept_all`, `denial` `rule:<id>`, or `policy`), `channel`
+`rule:<id>`, `accept_all` or `accept_except_delete`, `denial` `rule:<id>`, or `policy`), `channel`
 (`web` for the person's answer, `grant-store` for a stored answer) and the
 `answer` the person chose. A record never holds the proposal's payload or
 result. A grant or denial carries the id of the record of the answer that
@@ -132,10 +144,10 @@ applied.
 |---|---|
 | R005 once answers never stored | Met. |
 | R006 `allow_always` is a session-limited grant with `origin`, revocable | Met. Revoking is "Olvidar" on `/review`; every later proposal is decided without it (R003). |
-| R007 `reject_always` is a session-limited denial that wins over a grant | Met, including over accept-all. |
+| R007 `reject_always` is a session-limited denial that wins over a grant | Met, including over every approval mode. |
 | R008 no match across sessions or without a session | Met. |
 | R009 nothing outside the host remembers answers | Met: the agent never sees or answers a proposal, and the engine and clients only get `accepted`, `pending` or `rejected` results. |
-| R014 fail closed | Met: a proposal is applied only on an explicit allow (person, grant or accept-all); a pending one waits with nothing applied, and a reject, an error or an unwritable decision record applies nothing. |
+| R014 fail closed | Met: a proposal is applied only on an explicit allow (person, grant or approval mode); a pending one waits with nothing applied, and a reject, an error or an unwritable decision record applies nothing. |
 | R015 answers only from the person's channel | Met: answers come only from the signed-in, CSRF-protected web routes; no MCP tool answers a proposal. |
 
 Remaining divergences: the external session is a 12-hour window shared by every

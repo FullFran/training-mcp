@@ -436,7 +436,7 @@ func (s *Server) routes() {
 	s.handle("GET "+b+"/review", s.reviewPage)
 	s.handle("POST "+b+"/review/{id}/accept", s.acceptProposal)
 	s.handle("POST "+b+"/review/{id}/reject", s.rejectProposal)
-	s.handle("POST "+b+"/review/accept-all", s.setAcceptAll)
+	s.handle("POST "+b+"/review/mode", s.setApprovalMode)
 	s.handle("POST "+b+"/review/forget", s.forgetRule)
 	s.handle("POST "+b+"/review/{id}/undo", s.undoProposal)
 	s.handle("GET "+b+"/review/undoable", s.undoableProposals)

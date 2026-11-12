@@ -24,7 +24,7 @@ type reviewFixture struct {
 	path     string
 }
 
-// newReviewFixture is a user created after migration 14 (asks for everything),
+// newReviewFixture is a user created after migration 27 put in review_all (asks for everything),
 // served with the CSRF token a signed-in mount carries.
 func newReviewFixture(t *testing.T) reviewFixture {
 	t.Helper()
@@ -40,6 +40,9 @@ func newReviewFixture(t *testing.T) reviewFixture {
 		t.Fatal(err)
 	}
 	service := services.ForUser(id)
+	if err := service.SetApprovalMode(context.Background(), training.ApprovalReviewAll); err != nil {
+		t.Fatal(err)
+	}
 	serviceFor := func(context.Context) *training.Service { return service }
 	mcp := mcpsrv.New(serviceFor)
 	server, err := websrv.NewWithOptions(serviceFor, services.Snapshot, webClock, "", websrv.Options{
@@ -220,25 +223,6 @@ func TestRejectingChangesNothing(t *testing.T) {
 	}
 }
 
-func TestAcceptAllSwitch(t *testing.T) {
-	f := newReviewFixture(t)
-	if w := post(t, f.handler, "/review/accept-all", url.Values{"on": {"1"}}, false); w.Code != http.StatusSeeOther {
-		t.Fatalf("status %d", w.Code)
-	}
-	if perms, _ := f.service.Permissions(context.Background()); !perms.AcceptAll {
-		t.Fatal("accept-all is off")
-	}
-	if body := get(t, f.handler, "/review").Body.String(); !strings.Contains(body, "Aceptar todo está activado") {
-		t.Fatalf("the switch is not clearly shown as on:\n%s", body)
-	}
-	if w := post(t, f.handler, "/review/accept-all", url.Values{"on": {"0"}}, false); w.Code != http.StatusSeeOther {
-		t.Fatalf("status %d", w.Code)
-	}
-	if perms, _ := f.service.Permissions(context.Background()); perms.AcceptAll {
-		t.Fatal("accept-all is still on")
-	}
-}
-
 func TestReviewRejectsBadInput(t *testing.T) {
 	f := newReviewFixture(t)
 	p := f.propose(t, "pierna pesada")
@@ -246,7 +230,7 @@ func TestReviewRejectsBadInput(t *testing.T) {
 		"/review/" + itoa(p.ID) + "/accept":     {"answer": {"reject_once"}},
 		"/review/" + itoa(p.ID) + "/reject":     {"answer": {"allow_always"}},
 		"/review/abc/accept":                    {"answer": {"allow_once"}},
-		"/review/accept-all":                    {"on": {"maybe"}},
+		"/review/mode":                          {"mode": {"maybe"}},
 		"/review/forget":                        {"rule_id": {"abc"}},
 		"/review/" + itoa(p.ID) + "/accept?old": {"remember": {"always"}},
 	} {

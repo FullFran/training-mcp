@@ -288,7 +288,7 @@ func TestRootAcceptsAgentProposals(t *testing.T) {
 	srv := startRootServer(t, nil)
 	owner := srv.login()
 	form := "application/x-www-form-urlencoded"
-	if code, _ := owner.do("POST", "/review/accept-all", form, "on=0"); code != http.StatusSeeOther {
+	if code, _ := owner.do("POST", "/review/mode", form, "mode=review_all"); code != http.StatusSeeOther {
 		t.Fatalf("turning accept-all off: %d", code)
 	}
 	code, body := srv.mcp(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_plan","arguments":{"name":"empuje","items":[{"exercise":"banca","target_sets":3}]}}}`)

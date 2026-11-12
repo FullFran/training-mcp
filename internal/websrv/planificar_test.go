@@ -35,6 +35,9 @@ func newPlanWorld(t *testing.T) planWorld {
 		t.Fatal(err)
 	}
 	service := services.ForUser(id)
+	if err := service.SetApprovalMode(context.Background(), training.ApprovalReviewAll); err != nil {
+		t.Fatal(err)
+	}
 	serviceFor := func(context.Context) *training.Service { return service }
 	mcp := mcpsrv.New(serviceFor)
 	server, err := websrv.NewWithOptions(serviceFor, services.Snapshot, webClock, "", websrv.Options{

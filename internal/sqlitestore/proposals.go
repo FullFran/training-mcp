@@ -136,10 +136,15 @@ func (s *userStore) RejectProposal(ctx context.Context, id int64, decidedBy stri
 }
 
 func (s *userStore) Permissions(ctx context.Context) (training.Permissions, error) {
-	var perms training.Permissions
-	err := s.db.QueryRowContext(ctx, `SELECT accept_all FROM agent_permissions WHERE user_id=?`, s.userID).Scan(&perms.AcceptAll)
+	perms := training.Permissions{Mode: training.DefaultApprovalMode}
+	// An account with no row, or a row with no mode, has the default mode.
+	var mode string
+	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(mode,'') FROM agent_permissions WHERE user_id=?`, s.userID).Scan(&mode)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return training.Permissions{}, err
+	}
+	if mode != "" {
+		perms.Mode = mode
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT `+ruleColumns+` FROM answer_rules WHERE user_id=? ORDER BY action_type, session, effect`, s.userID)
 	if err != nil {
@@ -172,11 +177,24 @@ func scanRule(row rowScanner) (training.AnswerRule, error) {
 	return r, err
 }
 
-func (s *userStore) SetAcceptAll(ctx context.Context, on bool) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO agent_permissions(user_id,accept_all,updated_at) VALUES (?,?,?)
-		ON CONFLICT(user_id) DO UPDATE SET accept_all=excluded.accept_all, updated_at=excluded.updated_at`,
-		s.userID, on, formatTime(time.Now()))
+// SetApprovalMode stores the account's approval mode. accept_all stays 1 only
+// for the accept_all mode, so anything still reading it keeps its meaning.
+func (s *userStore) SetApprovalMode(ctx context.Context, mode string) error {
+	if !training.ValidApprovalMode(mode) {
+		return training.ErrValidation
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO agent_permissions(user_id,accept_all,mode,updated_at) VALUES (?,?,?,?)
+		ON CONFLICT(user_id) DO UPDATE SET accept_all=excluded.accept_all, mode=excluded.mode, updated_at=excluded.updated_at`,
+		s.userID, mode == training.ApprovalAcceptAll, mode, formatTime(time.Now()))
 	return err
+}
+
+// SetAcceptAll is shorthand: on stores accept_all, off stores review_all.
+func (s *userStore) SetAcceptAll(ctx context.Context, on bool) error {
+	if on {
+		return s.SetApprovalMode(ctx, training.ApprovalAcceptAll)
+	}
+	return s.SetApprovalMode(ctx, training.ApprovalReviewAll)
 }
 
 // AddRule stores a grant or denial. A newer answer of the same effect in the

@@ -23,17 +23,21 @@
 <main class="review">
   {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
 
-  <section class="card accept-all{{if .Review.AcceptAll}} on{{end}}" aria-label="Aceptar todo">
-    {{if .Review.AcceptAll}}
-    <p><strong>⚠ Aceptar todo está activado.</strong> El agente aplica cualquier cambio sin preguntarte, también los de tipos nuevos. Todo queda en el historial.</p>
-    {{else}}
-    <p><strong>Aceptar todo</strong> está desactivado: el agente te pregunta antes de cada cambio, salvo los que aceptaste o rechazaste siempre en esa misma sesión.</p>
-    {{end}}
-    <form method="post" action="{{.Base}}/review/accept-all">{{if .CSRF}}
+  <section class="card approval" aria-label="Modo de aprobación">
+    <form method="post" action="{{.Base}}/review/mode">{{if .CSRF}}
       <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
-      <input type="hidden" name="on" value="{{if .Review.AcceptAll}}0{{else}}1{{end}}">
-      <button type="submit" class="ghost wide{{if not .Review.AcceptAll}} risky{{end}}">{{if .Review.AcceptAll}}Desactivar aceptar todo{{else}}Activar aceptar todo{{end}}</button>
+      <fieldset class="modes">
+        <legend>Qué hace el agente sin preguntarte</legend>
+        {{range .Review.Modes}}
+        <label class="mode{{if .Risky}} risky-mode{{end}}">
+          <input type="radio" name="mode" value="{{.Value}}"{{if eq $.Review.Mode .Value}} checked{{end}}>
+          <span class="mode-body"><strong>{{.Label}}</strong><span class="muted">{{.Details}}</span></span>
+        </label>
+        {{end}}
+      </fieldset>
+      <button type="submit" class="primary wide">Guardar modo</button>
     </form>
+    <p class="muted mode-note">Solo se cambia aquí. Todo lo que se aplique queda en el historial y se puede deshacer.</p>
   </section>
 
   <h2>Pendientes</h2>

@@ -716,8 +716,21 @@ main { padding-bottom: 140px; }
 .remember { border: 0; padding: 0; margin: 0 0 8px; display: flex; flex-wrap: wrap; gap: 8px; }
 .remember legend { color: var(--muted); font-size: 14px; margin-bottom: 6px; }
 .remember label { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; }
-.accept-all.on { border-color: var(--danger); background: #2a1618; }
-.accept-all p { margin: 0 0 10px; }
+.approval .modes { border: 0; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
+.approval legend { padding: 0; margin-bottom: 8px; color: var(--muted); font-size: 14px; }
+.mode { position: relative; display: flex; align-items: center; gap: 12px; min-height: var(--tap); padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--raise); cursor: pointer; transition: border-color .15s, background .15s; }
+.mode input { appearance: none; -webkit-appearance: none; flex: none; width: 22px; height: 22px; margin: 0; border: 2px solid var(--muted); border-radius: 50%; display: grid; place-content: center; }
+.mode input::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); transform: scale(0); transition: transform .12s; }
+.mode input:checked::before { transform: scale(1); }
+.mode input:checked { border-color: var(--accent); }
+.mode input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.mode-body { display: grid; gap: 2px; }
+.mode-body strong { font-size: 16px; }
+.mode:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.risky-mode input:checked { border-color: var(--danger); }
+.risky-mode input::before { background: var(--danger); }
+.risky-mode:has(input:checked) { border-color: var(--danger); background: #2a1618; }
+.mode-note { margin: 10px 2px 0; font-size: 13px; }
 .risky { border-color: var(--danger); color: var(--danger); }
 .attention { border-color: var(--accent); color: var(--accent); }
 .rules, .answered { list-style: none; padding: 0; margin: 0; }

@@ -278,8 +278,8 @@ var webRoutes = map[string]func(*testing.T){
 		return "/review/" + id + "/undo", url.Values{}
 	}),
 	"GET /review/undoable": pageRoute("/review/undoable", "/undo"),
-	"POST /review/accept-all": writeRoute("/review/accept-all", url.Values{"on": {"0"}},
-		`agent_permissions WHERE user_id=2 AND accept_all=0`),
+	"POST /review/mode": writeRoute("/review/mode", url.Values{"mode": {"review_all"}},
+		`agent_permissions WHERE user_id=2 AND mode='review_all' AND accept_all=0`),
 	"POST /review/forget": testForgettingTouchesOnlyTheUsersOwnRules,
 
 	"GET /memory": pageRoute("/memory", secretMemory),
