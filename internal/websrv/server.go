@@ -403,6 +403,7 @@ func (s *Server) routes() {
 	s.handle("GET "+b+"/s/{id}", s.session)
 	s.handle("POST "+b+"/s/{id}/plan", s.saveSessionAsPlan)
 	s.handle("POST "+b+"/s/{id}/delete", s.deleteSession)
+	s.handle("POST "+b+"/s/{id}/cancel", s.cancelWorkout)
 	s.handle("GET "+b+"/review", s.reviewPage)
 	s.handle("POST "+b+"/review/{id}/accept", s.acceptProposal)
 	s.handle("POST "+b+"/review/{id}/reject", s.rejectProposal)
@@ -940,7 +941,52 @@ func (s *Server) deleteSession(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	to := s.base + "/?modo=progreso"
+	s.redirect(w, r, s.base+"/?modo=progreso")
+}
+
+// cancelWorkout abandons a workout in progress: the session and every set in
+// it go through the same DeleteSession call as the delete_session tool, and
+// Entrenar opens idle again so any routine can be chosen. Routines are
+// templates, so none of them changes. The form states how many sets it will
+// delete; when more were logged since (another device, the coach), nothing is
+// deleted and the workout reopens to show them.
+func (s *Server) cancelWorkout(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.fail(w, err)
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Esa sesión ya no existe.", http.StatusNotFound)
+		return
+	}
+	session, err := s.service(r.Context()).GetSession(r.Context(), id)
+	switch {
+	case errors.Is(err, training.ErrNotFound), errors.Is(err, training.ErrValidation):
+		http.Error(w, "Esa sesión ya no existe.", http.StatusNotFound)
+		return
+	case err != nil:
+		s.fail(w, err)
+		return
+	}
+	stated, err := strconv.Atoi(strings.TrimSpace(r.PostFormValue("sets")))
+	if err != nil || stated != len(session.Sets) {
+		s.redirect(w, r, s.trainURL())
+		return
+	}
+	switch _, err := s.service(r.Context()).DeleteSession(r.Context(), id); {
+	case errors.Is(err, training.ErrNotFound), errors.Is(err, training.ErrValidation):
+		http.Error(w, "Esa sesión ya no existe.", http.StatusNotFound)
+		return
+	case err != nil:
+		s.fail(w, err)
+		return
+	}
+	s.redirect(w, r, s.base+"/")
+}
+
+// redirect sends a plain form to another page, or htmx to a full navigation.
+func (s *Server) redirect(w http.ResponseWriter, r *http.Request, to string) {
 	if r.Header.Get("HX-Request") != "" {
 		w.Header().Set("HX-Redirect", to)
 		return

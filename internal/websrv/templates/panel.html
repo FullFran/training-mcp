@@ -218,6 +218,21 @@
   {{end}}
 
 
+  {{if and (not .ReadOnly) .Session.ID}}
+  <!-- Cancelling deletes today's session; the routine it came from stays as it is.
+       With sets logged it asks first and says how many go. -->
+  {{if .Session.Sets}}<details class="danger-zone cancel-workout">
+    <summary>Cancelar entreno</summary>
+    {{end}}<form class="cancel-workout" method="post" action="{{.Base}}/s/{{.Session.ID}}/cancel">{{if .CSRF}}
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
+      <input type="hidden" name="sets" value="{{len .Session.Sets}}">
+      {{if .Session.Sets}}<p class="muted">Se borran el entreno de hoy y sus {{len .Session.Sets}} serie{{if ne (len .Session.Sets) 1}}s{{end}}. La rutina no cambia. No se puede deshacer.</p>
+      <button type="submit" class="ghost wide risky">Borrar {{len .Session.Sets}} serie{{if ne (len .Session.Sets) 1}}s{{end}} y cancelar</button>
+      {{else}}<button type="submit" class="ghost wide">Cancelar entreno</button>{{end}}
+    </form>{{if .Session.Sets}}
+  </details>{{end}}
+  {{end}}
+
   {{if not .ReadOnly}}
   <!-- Finishing: what was done today, from the server's data. -->
   <section id="finish" class="finish" role="dialog" aria-label="Resumen del entreno" hidden>
