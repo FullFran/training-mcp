@@ -483,6 +483,10 @@ func (m *memoryStore) SetRestTarget(_ context.Context, seconds int) error {
 
 func (m *memoryStore) WeightUnit(context.Context) (string, error) { return m.weightUnit, nil }
 
+func (m *memoryStore) LbSets(context.Context, LbScope) ([]LbSet, error) { return nil, nil }
+
+func (m *memoryStore) CorrectLbSets(context.Context, []LbSet, time.Time) error { return nil }
+
 func (m *memoryStore) SetWeightUnit(_ context.Context, unit string) error {
 	m.weightUnit = unit
 	return nil

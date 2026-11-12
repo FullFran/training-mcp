@@ -153,6 +153,7 @@
   <h2 class="section-label">Datos</h2>
   <nav class="list" aria-label="Datos">
     <a class="list-row" href="{{.Base}}/import" data-panel data-title="Importar"><span class="row-main"><strong>Importar (Hevy, Strong)</strong><span class="muted">Tu historial desde un CSV</span></span><span class="chev" aria-hidden="true">›</span></a>
+    <a class="list-row" href="{{.Base}}/units/fix" data-panel data-title="Corregir pesos en lb"><span class="row-main"><strong>Corregir pesos en lb</strong><span class="muted">Series hechas en libras que se guardaron como kg</span></span><span class="chev" aria-hidden="true">›</span></a>
     {{if .CanExport}}<a class="list-row" href="{{.Base}}/export.db" download><span class="row-main"><strong>Exportar base de datos</strong><span class="muted">Copia de seguridad completa</span></span><span class="chev" aria-hidden="true">↓</span></a>{{end}}
   </nav>
   {{if .CSRF}}<form class="list signout" method="post" action="{{.Base}}/logout">

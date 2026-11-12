@@ -460,6 +460,18 @@ var summaries = map[string]func(json.RawMessage, string) string{
 		}
 		return fmt.Sprintf("Fusionar los recuerdos %s en «%s»: %s", strings.Join(ids, ", "), in.Title, in.Body)
 	}),
+	"correct_lb_sets": summary(func(in struct {
+		SetIDs []int64 `json:"set_ids"`
+	}) string {
+		if len(in.SetIDs) == 0 {
+			return ""
+		}
+		ids := make([]string, len(in.SetIDs))
+		for i, id := range in.SetIDs {
+			ids[i] = strconv.FormatInt(id, 10)
+		}
+		return fmt.Sprintf("Leer como lb y pasar a kg %d %s: %s", len(in.SetIDs), plural(len(in.SetIDs), "serie", "series"), strings.Join(ids, ", "))
+	}),
 	"set_rest_target": summary(func(in struct {
 		RestSeconds int `json:"rest_seconds"`
 	}) string {

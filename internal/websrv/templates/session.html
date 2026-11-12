@@ -25,6 +25,7 @@
   {{if .EditSets}}{{template "set-editor" .}}{{else}}
   {{template "panel.html" .}}
   <a class="btn wide" href="{{.Base}}/s/{{.Session.ID}}?editar=1">Editar series</a>
+  {{if .Session.Sets}}<a class="list-row card-row" href="{{.Base}}/units/fix?session_id={{.Session.ID}}"><span class="row-main"><strong>Corregir pesos en lb</strong><span class="muted">Si estas series eran libras guardadas como kg</span></span><span class="chev" aria-hidden="true">›</span></a>{{end}}
   {{end}}
   {{if .Session.Sets}}<form class="card save-plan" method="post" action="{{.Base}}/s/{{.Session.ID}}/plan" autocomplete="off">{{if .CSRF}}
     <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}

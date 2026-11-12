@@ -38,6 +38,7 @@ func overwriting(title string) toolBehavior {
 
 var toolBehaviors = map[string]toolBehavior{
 	"get_session":                read("Get session"),
+	"preview_lb_correction":      read("Preview lb correction"),
 	"list_sessions":              read("List sessions"),
 	"list_plans":                 read("List plans"),
 	"get_plan":                   read("Get plan"),
@@ -66,7 +67,9 @@ var toolBehaviors = map[string]toolBehavior{
 	"move_plan_exercise":   additive("Move plan exercise"),
 	"save_session_as_plan": additive("Save session as plan"),
 
-	"update_set":              overwriting("Update set"),
+	"update_set": overwriting("Update set"),
+	// Repeating it is refused: a set is never converted twice.
+	"correct_lb_sets":         overwriting("Correct sets from lb"),
 	"delete_set":              overwriting("Delete set"),
 	"delete_session":          overwriting("Delete session"),
 	"update_plan":             overwriting("Update plan"),

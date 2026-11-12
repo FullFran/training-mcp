@@ -28,6 +28,7 @@ var wantActionType = map[string]string{
 	"set_exercise_note": "exercise.note.set", "set_exercise_group": "exercise.group.set",
 	"record_feedback": "feedback.record", "set_volume_landmarks": "landmarks.set",
 	"set_rest_target": "rest.set",
+	"correct_lb_sets": "set.correct_lb",
 	"memory_save":     "memory.save", "memory_forget": "memory.forget",
 	"memory_judge": "memory.judge", "memory_confirm": "memory.confirm", "memory_consolidate": "memory.consolidate",
 }

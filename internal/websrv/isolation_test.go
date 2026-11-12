@@ -262,10 +262,12 @@ var webRoutes = map[string]func(*testing.T){
 	"POST /plan/item": writeRoute("/plan/item", url.Values{"action": {"adopt"}, "exercise": {secretExercise}, "done": {"1"}},
 		`session_items i JOIN sessions se ON se.id=i.session_id WHERE se.user_id=2 AND i.exercise='`+secretExercise+`'`),
 
-	"POST /finish": testFinishingAnotherUsersSessionProposesNothing,
-	"POST /rest":   testRestTargetBelongsToWhoSetsIt,
-	"POST /units":  testWeightUnitBelongsToWhoSetsIt,
-	"GET /review":  pageRoute("/review", secretPlan+" 2"),
+	"POST /finish":    testFinishingAnotherUsersSessionProposesNothing,
+	"POST /rest":      testRestTargetBelongsToWhoSetsIt,
+	"POST /units":     testWeightUnitBelongsToWhoSetsIt,
+	"GET /units/fix":  testLbFixPreviewIsThePersonsOwn,
+	"POST /units/fix": testLbFixApplyIsThePersonsOwn,
+	"GET /review":     pageRoute("/review", secretPlan+" 2"),
 	"POST /review/{id}/accept": idRoute(func(w webWorld) string { return w.proposal }, func(id string) (string, url.Values) {
 		return "/review/" + id + "/accept", url.Values{"answer": {"allow_always"}}
 	}),

@@ -1,0 +1,70 @@
+{{/* Corregir pesos en lb, opened from Tú or a session's page: past sets typed
+     in lb but stored as kg (135 lb saved as 135 kg). The person previews a
+     scope, ticks the sets and confirms; it is recorded as their own change and
+     can be undone. Weights here are the stored kg, before and after. */}}
+{{define "lbfix.html"}}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Corregir pesos en lb</title>
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="{{.Base}}/manifest.webmanifest">
+<link rel="icon" href="{{.Base}}/static/icon-192.png">
+<link rel="stylesheet" href="{{.Base}}/static/app.css">
+</head>
+<body data-base="{{.Base}}">
+
+<header class="bar back-only">
+  <div><strong>Corregir pesos en lb</strong></div>
+  <a class="ghost" href="{{.Base}}/?modo=tu">Tú</a>
+</header>
+
+<main class="lbfix">
+  {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
+  {{with .LbFix}}
+  {{if .Done}}
+  <section class="card lbfix-done" role="status">
+    <strong>Corregida{{if ne .DoneCount 1}}s{{end}} {{.DoneCount}} serie{{if ne .DoneCount 1}}s{{end}}.</strong>
+    <span class="muted">Cada peso se leyó como lb y se guardó en kg.</span>
+    <form method="post" action="{{$.Base}}/review/{{.Done}}/undo">{{if $.CSRF}}
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+      <button type="submit" class="btn">Deshacer</button>
+    </form>
+  </section>
+  {{end}}
+
+  <p class="muted">Para series que hiciste en libras pero se guardaron como kg (135 lb guardado como 135 kg). Cada serie marcada se lee como lb y se guarda en kg. Una serie ya corregida no se vuelve a convertir, y se puede deshacer.</p>
+
+  <form class="card lbfix-scope" method="get" action="{{$.Base}}/units/fix" autocomplete="off">
+    <label class="field"><span>Ejercicio</span>
+      <input name="exercise" list="lbfix-exercises" value="{{.Scope.Exercise}}" placeholder="press banca" required></label>
+    <datalist id="lbfix-exercises">{{range .Exercises}}<option value="{{.}}"></option>{{end}}</datalist>
+    <div class="lbfix-dates">
+      <label class="field"><span>Desde</span><input type="date" name="from" value="{{.Scope.From}}" required></label>
+      <label class="field"><span>Hasta</span><input type="date" name="to" value="{{.Scope.To}}" required></label>
+    </div>
+    <button type="submit" class="btn">Ver series</button>
+    <p class="muted small">Para una sesión, ábrela en Progreso y toca «Corregir pesos en lb».</p>
+  </form>
+
+  {{with .Preview}}
+  <form class="card lbfix-preview" action="{{$.Base}}/units/fix" method="post">{{if $.CSRF}}
+    <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+    <h2>{{.Count}} serie{{if ne .Count 1}}s{{end}} por corregir{{if .Corrected}} · {{.Corrected}} ya corregida{{if ne .Corrected 1}}s{{end}}{{end}}</h2>
+    {{if .Sets}}<ul class="list">{{range .Sets}}
+      <li class="list-row static{{if .Corrected}} done{{end}}"><label class="lbfix-row">
+        {{if .Corrected}}<input type="checkbox" disabled aria-label="Ya corregida">{{else}}<input type="checkbox" name="set_ids" value="{{.SetID}}" checked>{{end}}
+        <span class="row-main"><strong>{{.Exercise}} · {{.Reps}} reps</strong><span class="muted">{{shortDate .Date}}{{if .Corrected}} · ya corregida{{end}}</span></span>
+        <span class="num">{{num .OldKG}} kg{{if not .Corrected}} → {{num .NewKG}} kg{{end}}</span>
+      </label></li>{{end}}
+    </ul>
+    {{if .Count}}<button type="submit" class="btn primary big">Corregir las series marcadas</button>{{end}}
+    {{else}}<p class="muted">No hay series en ese rango.</p>{{end}}
+  </form>
+  {{end}}
+  {{end}}
+</main>
+</body>
+</html>
+{{end}}

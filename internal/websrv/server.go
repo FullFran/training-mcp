@@ -124,6 +124,8 @@ type pageData struct {
 	Error    string
 	// CSRF is the session's token, empty where the mount has no sessions.
 	CSRF string
+	// LbFix is the correction of past sets typed in lb but stored as kg.
+	LbFix LbFixData
 	// Unit is the person's default weight unit, "kg" or "lb"; every weight
 	// shown on the page is in it. Empty is filled in by render.
 	Unit string
@@ -418,6 +420,8 @@ func (s *Server) routes() {
 	s.handle("POST "+b+"/note", s.saveNote)
 	s.handle("POST "+b+"/rest", s.setRest)
 	s.handle("POST "+b+"/units", s.setUnits)
+	s.handle("GET "+b+"/units/fix", s.lbFixPage)
+	s.handle("POST "+b+"/units/fix", s.applyLbFix)
 	s.handle("POST "+b+"/finish", s.finishWorkout)
 	s.handle("GET "+b+"/exercise-info", s.exerciseInfo)
 	s.handle("GET "+b+"/s/{id}", s.session)

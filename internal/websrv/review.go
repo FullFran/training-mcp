@@ -19,6 +19,7 @@ var actionLabels = map[string]string{
 	"session.delete":          "Borrar sesión",
 	"set.log":                 "Registrar series",
 	"set.update":              "Corregir serie",
+	"set.correct_lb":          "Corregir pesos de lb a kg",
 	"set.delete":              "Borrar serie",
 	"plan.create":             "Crear rutina",
 	"plan.update":             "Editar rutina",

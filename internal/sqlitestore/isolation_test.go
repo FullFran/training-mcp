@@ -224,6 +224,22 @@ var idCases = map[string]func(context.Context, training.UserStore, seeded) (any,
 		set, total, err := u.UpdateSet(c, id.set, training.SetPatch{Reps: &reps})
 		return []any{set, total}, err
 	},
+	"LbSets": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return u.LbSets(c, training.LbScope{SetIDs: []int64{id.set}})
+	},
+	// The stranger cannot read the owner's weight, so the correction is sent as
+	// the owner would: the weight read first, 0 when nothing is read.
+	"CorrectLbSets": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		cur, err := u.LbSets(c, training.LbScope{SetIDs: []int64{id.set}})
+		if err != nil {
+			return nil, err
+		}
+		old := 0.0
+		if len(cur) == 1 {
+			old = cur[0].OldKG
+		}
+		return nil, u.CorrectLbSets(c, []training.LbSet{{SetID: id.set, OldKG: old, NewKG: 1}}, time.Unix(99, 0))
+	},
 	"DeleteSet": func(c context.Context, u training.UserStore, id seeded) (any, error) {
 		session, total, remaining, err := u.DeleteSet(c, id.set)
 		return []any{session, total, remaining}, err

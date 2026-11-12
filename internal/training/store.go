@@ -75,6 +75,14 @@ type UserStore interface {
 	// WeightUnit is the stored default unit, "" when never chosen (kg).
 	WeightUnit(context.Context) (string, error)
 	SetWeightUnit(context.Context, string) error
+	// LbSets reads the user's sets in a normalized scope, oldest first, with
+	// OldKG and Corrected set.
+	LbSets(context.Context, LbScope) ([]LbSet, error)
+	// CorrectLbSets writes each set's NewKG and marks it corrected at the time,
+	// in one transaction, only while every set is still the user's, not yet
+	// corrected and still weighs OldKG; otherwise it changes nothing and
+	// returns ErrNotFound or ErrLbCorrected.
+	CorrectLbSets(context.Context, []LbSet, time.Time) error
 }
 
 // ProposalStore keeps one user's agent proposals and standing answers.

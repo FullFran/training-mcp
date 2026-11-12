@@ -68,6 +68,12 @@ var isolationCases = map[string]isolationCase{
 	}},
 	"update_set": {byID: true, args: func(id toolIDs) map[string]any { return map[string]any{"set_id": id.set, "reps": 1} }},
 	"delete_set": {byID: true, args: func(id toolIDs) map[string]any { return map[string]any{"set_id": id.set} }},
+	"correct_lb_sets": {byID: true, args: func(id toolIDs) map[string]any {
+		return map[string]any{"set_ids": []int64{id.set}}
+	}},
+	"preview_lb_correction": {byID: true, args: func(id toolIDs) map[string]any {
+		return map[string]any{"session_id": id.session}
+	}},
 	"delete_session": {byID: true, args: func(id toolIDs) map[string]any {
 		return map[string]any{"session_id": id.session}
 	}},

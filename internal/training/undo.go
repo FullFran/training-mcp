@@ -89,11 +89,13 @@ type UndoStore interface {
 // OperationID is the operation a decision record names for a proposal.
 func OperationID(proposalID int64) string { return operationID(proposalID) }
 
-// undoScope reads the sessions and sets a payload names.
+// undoScope reads the sessions and sets a payload names (set_ids is the
+// correction from lb's list).
 func undoScope(payload json.RawMessage) UndoScope {
 	var fields struct {
-		SessionID int64 `json:"session_id"`
-		SetID     int64 `json:"set_id"`
+		SessionID int64   `json:"session_id"`
+		SetID     int64   `json:"set_id"`
+		SetIDs    []int64 `json:"set_ids"`
 	}
 	var scope UndoScope
 	if json.Unmarshal(payload, &fields) != nil {
@@ -104,6 +106,12 @@ func undoScope(payload json.RawMessage) UndoScope {
 	}
 	if fields.SetID > 0 {
 		scope.SetIDs = append(scope.SetIDs, fields.SetID)
+	}
+	// A correction from lb names its sets: the sessions they belong to.
+	for _, id := range fields.SetIDs {
+		if id > 0 {
+			scope.SetIDs = append(scope.SetIDs, id)
+		}
 	}
 	return scope
 }
