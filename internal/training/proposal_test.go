@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 )
 
@@ -24,7 +25,7 @@ type proposalFixture struct {
 // 14, so it starts in ask-everything.
 func newProposalFixture(t *testing.T) (*proposalFixture, *training.Service) {
 	t.Helper()
-	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,7 +352,7 @@ func (failingRecords) RecordDecision(context.Context, training.DecisionRecord) (
 
 // R012: an operation whose decision cannot be recorded is not run.
 func TestUnrecordableDecisionDeniesTheOperation(t *testing.T) {
-	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}

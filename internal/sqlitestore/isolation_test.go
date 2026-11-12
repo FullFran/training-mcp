@@ -51,7 +51,7 @@ var ownedRows = map[string]string{
 
 func openTwoUsers(t *testing.T) *Store {
 	t.Helper()
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,6 +340,7 @@ func TestAnotherUsersIDBehavesExactlyLikeAMissingOne(t *testing.T) {
 	missing := seeded{session: missingID, set: missingID, plan: missingID, proposal: missingID, claimed: missingID, rule: missingID, memory: missingID, sibling: missingID, relation: missingID, conflict: missingID}
 	for name, run := range idCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			ctx := context.Background()
 			store := openTwoUsers(t)
 			owner := store.ForUser(1)
@@ -422,6 +423,7 @@ var readCases = map[string]func(context.Context, training.UserStore) (any, error
 func TestReadsSeeNothingOfAnotherUser(t *testing.T) {
 	for name, run := range readCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			ctx := context.Background()
 			store := openTwoUsers(t)
 			seedUser(t, store.ForUser(1), "pecho")
@@ -430,7 +432,7 @@ func TestReadsSeeNothingOfAnotherUser(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			alone, err := Open(t.TempDir() + "/alone.db")
+			alone, err := Open(freshDB(t))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -535,6 +537,7 @@ var writeCases = map[string]struct {
 func TestWritesBelongToTheUserWhoMadeThem(t *testing.T) {
 	for name, tc := range writeCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			ctx := context.Background()
 			store := openTwoUsers(t)
 			seedUser(t, store.ForUser(1), "pecho")

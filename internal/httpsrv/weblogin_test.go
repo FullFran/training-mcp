@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -23,6 +22,7 @@ import (
 
 	"github.com/fullfran/training-mcp/internal/mcpsrv"
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 	"github.com/fullfran/training-mcp/internal/websrv"
 	"github.com/golang-jwt/jwt/v5"
@@ -64,7 +64,7 @@ func newLoginFixture(t *testing.T, provision bool) *loginFixture {
 	f.provider = httptest.NewServer(http.HandlerFunc(f.serveProvider))
 	t.Cleanup(f.provider.Close)
 
-	store, err := sqlitestore.Open(filepath.Join(t.TempDir(), "training.db"))
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,12 +14,13 @@ import (
 
 	"github.com/fullfran/training-mcp/internal/httpsrv"
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
-	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -354,7 +355,7 @@ func TestUnexpectedStartSessionErrorUsesGenericMCPError(t *testing.T) {
 }
 
 func TestServerSerializesNormalizedSIValuesAndTotal(t *testing.T) {
-	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}

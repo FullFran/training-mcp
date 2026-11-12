@@ -27,7 +27,7 @@ func storedSets(t *testing.T, store *Store) int {
 }
 
 func TestLogSetsRollsBackEntirelyOnFailure(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestLogSetsRollsBackEntirelyOnFailure(t *testing.T) {
 }
 
 func TestLogSetsSameKeyConcurrentlyRecordsOnce(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +95,7 @@ func TestLogSetsSameKeyConcurrentlyRecordsOnce(t *testing.T) {
 }
 
 func TestLogSetsDifferentKeysConcurrentlyShareOneSession(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestLogSetsReplaySurvivesARestart(t *testing.T) {
 }
 
 func TestLogSetsStampsTheSupersetFromTheSessionPlan(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}

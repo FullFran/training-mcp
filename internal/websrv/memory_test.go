@@ -11,6 +11,7 @@ import (
 
 	"github.com/fullfran/training-mcp/internal/mcpsrv"
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 	"github.com/fullfran/training-mcp/internal/websrv"
 )
@@ -27,7 +28,7 @@ func webHandlerAt(t *testing.T, svc *training.Service, clock training.Clock) htt
 
 func memoryWeb(t *testing.T) (http.Handler, *training.Service) {
 	t.Helper()
-	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +163,7 @@ func TestMemoryPanelShowsEachView(t *testing.T) {
 }
 
 func TestMemoryPanelListsDueFactsAndConfirmsThem(t *testing.T) {
-	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +255,7 @@ func TestDeletingEverythingNeedsTheConfirmationWord(t *testing.T) {
 // message, not an error page, and merges nothing.
 func TestAcceptingAStaleMergeExplainsWhy(t *testing.T) {
 	ctx := context.Background()
-	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}

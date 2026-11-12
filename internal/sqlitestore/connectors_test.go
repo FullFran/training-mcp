@@ -11,7 +11,7 @@ import (
 
 func connectorStore(t *testing.T) (*Store, int64, int64) {
 	t.Helper()
-	store, err := Open(filepath.Join(t.TempDir(), "training.db"))
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}

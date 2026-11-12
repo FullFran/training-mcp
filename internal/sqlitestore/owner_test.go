@@ -116,7 +116,7 @@ func TestOwnerMigrationKeepsEveryRowAndGivesItToTheOwner(t *testing.T) {
 }
 
 func TestOwnerIsTheOnlyUserAndHasNoSubjectYet(t *testing.T) {
-	store, err := Open(filepath.Join(t.TempDir(), "training.db"))
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func TestOwnerIsTheOnlyUserAndHasNoSubjectYet(t *testing.T) {
 }
 
 func TestPersonalKeysAreUniquePerUserAndUpsertsLeaveOthersAlone(t *testing.T) {
-	store, err := Open(filepath.Join(t.TempDir(), "training.db"))
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}

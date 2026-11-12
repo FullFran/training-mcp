@@ -67,7 +67,7 @@ func (f warmupFixture) workingSI() float64 {
 
 // One subtest per computation the owner listed: a warm-up never counts in it.
 func TestWarmupSetsAreExcludedFromEveryComputation(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +178,7 @@ func TestWarmupSetsAreExcludedFromEveryComputation(t *testing.T) {
 // Toggling a set's category recomputes its SI both ways, and leaves the other
 // fields alone.
 func TestStoreUpdateSetTogglesCategory(t *testing.T) {
-	store, err := Open(t.TempDir() + "/training.db")
+	store, err := Open(freshDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}

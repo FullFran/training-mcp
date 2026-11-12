@@ -10,6 +10,7 @@ import (
 
 	"github.com/fullfran/training-mcp/internal/mcpsrv"
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 	"github.com/fullfran/training-mcp/internal/websrv"
 )
@@ -27,7 +28,7 @@ type reviewFixture struct {
 // served with the CSRF token a signed-in mount carries.
 func newReviewFixture(t *testing.T) reviewFixture {
 	t.Helper()
-	path := t.TempDir() + "/training.db"
+	path := sqlitestoretest.Path(t)
 	store, err := sqlitestore.Open(path)
 	if err != nil {
 		t.Fatal(err)

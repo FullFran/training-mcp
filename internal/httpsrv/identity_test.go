@@ -7,13 +7,13 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/fullfran/training-mcp/internal/mcpsrv"
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 )
 
@@ -30,7 +30,7 @@ type identityFixture struct {
 func newIdentityFixture(t *testing.T, provision bool) *identityFixture {
 	t.Helper()
 	f := newOAuthFixture(t)
-	store, err := sqlitestore.Open(filepath.Join(t.TempDir(), "training.db"))
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}

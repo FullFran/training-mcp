@@ -47,6 +47,7 @@ var importReadCases = map[string]func(context.Context, training.ImportStore) (an
 func TestImportReadsSeeNothingOfAnotherUser(t *testing.T) {
 	for name, run := range importReadCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			ctx := context.Background()
 			store := openTwoUsers(t)
 			seedImporter(t, store, 1, "pecho")
@@ -58,7 +59,7 @@ func TestImportReadsSeeNothingOfAnotherUser(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			alone, err := Open(t.TempDir() + "/alone.db")
+			alone, err := Open(freshDB(t))
 			if err != nil {
 				t.Fatal(err)
 			}

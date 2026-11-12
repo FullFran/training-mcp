@@ -57,7 +57,7 @@ func TestStaleIDWriteCannotReachAnotherUser(t *testing.T) {
 	}
 	for name, attack := range cases {
 		t.Run(name, func(t *testing.T) {
-			path := t.TempDir() + "/w.db"
+			path := freshDB(t)
 			store, err := Open(path)
 			if err != nil {
 				t.Fatal(err)
@@ -142,7 +142,7 @@ func TestStaleIDWriteCannotReachAnotherUser(t *testing.T) {
 // someone else between looking it up and storing it on the new session.
 func TestStaleIDStartCannotAdoptAnotherUsersPlan(t *testing.T) {
 	ctx := context.Background()
-	path := t.TempDir() + "/w.db"
+	path := freshDB(t)
 	store, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
@@ -247,7 +247,7 @@ func TestStaleIDReadCannotReturnAnotherUsersRows(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			path := t.TempDir() + "/w.db"
+			path := freshDB(t)
 			store, err := Open(path)
 			if err != nil {
 				t.Fatal(err)

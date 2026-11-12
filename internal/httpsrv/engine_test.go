@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/fullfran/training-mcp/internal/engine"
 	"github.com/fullfran/training-mcp/internal/mcpsrv"
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 )
 
@@ -24,7 +24,7 @@ type engineFixture struct {
 
 func newEngineFixture(t *testing.T, authDisabled bool) *engineFixture {
 	t.Helper()
-	store, err := sqlitestore.Open(filepath.Join(t.TempDir(), "training.db"))
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}

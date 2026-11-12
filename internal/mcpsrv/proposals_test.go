@@ -91,6 +91,7 @@ func TestEveryWriteToolProposesAndAcceptingAppliesTheSameChange(t *testing.T) {
 	ctx := context.Background()
 	for name, action := range wantActionType {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			direct := newIsolationWorld(t)
 			args := isolationCases[name].args(direct.ids)
 			if name == "log_sets" {

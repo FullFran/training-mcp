@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 )
 
@@ -19,7 +20,7 @@ type memoryWorld struct {
 // newMemoryWorld has user 1, who asks before every agent write, and user 2.
 func newMemoryWorld(t *testing.T) memoryWorld {
 	t.Helper()
-	path := t.TempDir() + "/training.db"
+	path := sqlitestoretest.Path(t)
 	store, err := sqlitestore.Open(path)
 	if err != nil {
 		t.Fatal(err)

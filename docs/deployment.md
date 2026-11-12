@@ -43,8 +43,11 @@ The server builds the image for the first time after the merge, so anything
 CI does not catch is caught in production. The `CI` workflow runs on every
 pull request and on every push to `main`:
 
-- `test`: `gofmt`, `go vet`, `go test -race` and the coverage floor for the
-  store.
+- `test`: green only when every `go test (<shard>)` job passed. The
+  race-enabled suite is split by package across three runners: `mcpsrv`,
+  `web` (`websrv` and `engine`) and `rest` (every other package, so a new one
+  is covered without editing the workflow). The `rest` shard also runs
+  `gofmt`, `go vet` and the coverage floor for the store.
 - `image`: strips group and other permissions from the checkout
   (`chmod -R go-rwx .`) to reproduce the server's umask, builds the image,
   boots it with a throwaway bearer token and no volume, waits up to 30 s for

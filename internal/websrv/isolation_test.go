@@ -16,6 +16,7 @@ import (
 	"github.com/fullfran/training-mcp/internal/importer"
 	"github.com/fullfran/training-mcp/internal/mcpsrv"
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 	"github.com/fullfran/training-mcp/internal/websrv"
 )
@@ -66,7 +67,7 @@ func webHandler(t *testing.T, services *training.Services, userID int64) http.Ha
 func newWebWorld(t *testing.T) webWorld {
 	t.Helper()
 	ctx := context.Background()
-	path := t.TempDir() + "/training.db"
+	path := sqlitestoretest.Path(t)
 	store, err := sqlitestore.Open(path)
 	if err != nil {
 		t.Fatal(err)
@@ -300,7 +301,7 @@ func TestEveryWebRouteIsIsolated(t *testing.T) {
 }
 
 func TestEveryWebRouteHasAnIsolationCase(t *testing.T) {
-	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -540,7 +541,7 @@ func testHistoryRedirectIsTheSameForEveryone(t *testing.T) {
 func pageRoute(path, marker string) func(*testing.T) {
 	return func(t *testing.T) {
 		world := newWebWorld(t)
-		store, err := sqlitestore.Open(t.TempDir() + "/empty.db")
+		store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 		if err != nil {
 			t.Fatal(err)
 		}

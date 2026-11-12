@@ -14,6 +14,7 @@ import (
 
 	"github.com/fullfran/training-mcp/internal/engine"
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 	"github.com/fullfran/training-mcp/internal/websrv"
 )
@@ -155,7 +156,7 @@ type coachWorld struct {
 
 func newCoachWorld(t *testing.T, coach websrv.Coach) coachWorld {
 	t.Helper()
-	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +192,7 @@ func coachRequest(t *testing.T, h http.Handler, method, path, body string, heade
 }
 
 func TestCoachOffServesNothingNew(t *testing.T) {
-	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}

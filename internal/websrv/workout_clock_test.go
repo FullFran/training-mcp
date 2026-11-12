@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/fullfran/training-mcp/internal/sqlitestore"
+	"github.com/fullfran/training-mcp/internal/sqlitestore/sqlitestoretest"
 	"github.com/fullfran/training-mcp/internal/training"
 )
 
@@ -16,7 +17,7 @@ import (
 // duration; the other user's page carries no clock from it.
 func TestWorkoutClockStartsWhenTheSessionStarted(t *testing.T) {
 	ctx := context.Background()
-	path := t.TempDir() + "/training.db"
+	path := sqlitestoretest.Path(t)
 	store, err := sqlitestore.Open(path)
 	if err != nil {
 		t.Fatal(err)
