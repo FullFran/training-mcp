@@ -1,0 +1,13 @@
+{
+  "description": "Stop a set where b depends on a, with a host that stops in id order.",
+  "requirements": [
+    "HCS-0004-R004"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Stop a set where b depends on a, with a host that stops in id order."
+  },
+  "expect": {
+    "behaviour": "The host still stops b before a."
+  }
+}

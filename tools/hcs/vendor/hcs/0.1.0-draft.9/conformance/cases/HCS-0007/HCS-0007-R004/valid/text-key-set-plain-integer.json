@@ -1,0 +1,25 @@
+{
+  "description": "A key set with plain integers in its text.",
+  "requirements": [
+    "HCS-0007-R004"
+  ],
+  "level": "distribution",
+  "documentBase64": "eyJoY3NWZXJzaW9uIjoiMC4xIiwidmVyc2lvbiI6Mywia2V5cyI6W3sia2V5aWQiOiJvbmxpbmUtMSIsImtleXR5cGUiOiJlZDI1NTE5IiwicHVibGljIjoib05rb0JkVVEweFR5djd1K2xMenJsOHc3bGtVLzl0T2ZZTGdIdVk4WVpEcz0iLCJub3RCZWZvcmUiOiIyMDI2LTAxLTAxVDAwOjAwOjAwWiIsIm5vdEFmdGVyIjoiMjAyNy0wMS0wMVQwMDowMDowMFoifV0sInNpZ25hdHVyZXMiOlt7ImtleWlkIjoicm9vdC0xIiwic2lnIjoidHg0TkVJQ1kvQUhYb2VmcThrV0hCRGI5dDlqTSt3dXIzZUlXQklwTWlFczZtS3IvNEt5dVFHazRJR3NqT0hKNmpKWVViWWlGTDBCQVFQK3pPbnU4Q0E9PSJ9XX0=",
+  "input": {
+    "check": "key-set",
+    "now": "2026-11-06T12:00:00Z",
+    "trustAnchor": {
+      "keys": [
+        {
+          "keyid": "root-1",
+          "keytype": "ed25519",
+          "public": "LWB8cicdNrnQPkwy2jC4f24oJ6JOv49Apy61kpnIRsU="
+        }
+      ],
+      "threshold": 1
+    }
+  },
+  "expect": {
+    "outcome": "valid"
+  }
+}

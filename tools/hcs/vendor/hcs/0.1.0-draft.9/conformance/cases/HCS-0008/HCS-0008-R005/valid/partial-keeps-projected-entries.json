@@ -1,0 +1,60 @@
+{
+  "description": "Under partial activation, only the entry whose contributions all projected may be reported active.",
+  "requirements": [
+    "HCS-0008-R005"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "skill"
+    ],
+    "hostOwned": [],
+    "grantedSecrets": {},
+    "activationPolicy": "partial",
+    "generation": {
+      "id": "gen-0042",
+      "entries": [
+        {
+          "id": "dev.example.notes",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/take-notes",
+              "name": "take-notes"
+            }
+          ]
+        },
+        {
+          "id": "dev.example.search",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/search",
+              "name": "search"
+            },
+            {
+              "kind": "mcp-server",
+              "path": "mcp/notes/server.json",
+              "descriptor": {
+                "name": "io.example/search",
+                "description": "Notes server",
+                "version": "1.0.0"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "errors": [
+      {
+        "code": "unsupported_contribution",
+        "entry": "dev.example.search"
+      }
+    ],
+    "selected": [
+      "dev.example.notes"
+    ]
+  }
+}

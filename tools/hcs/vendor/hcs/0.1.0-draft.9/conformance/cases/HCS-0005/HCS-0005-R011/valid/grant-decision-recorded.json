@@ -1,0 +1,25 @@
+{
+  "description": "A decision taken by a stored grant names the grant.",
+  "requirements": [
+    "HCS-0005-R011"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0005:authority:0.1#/$defs/decisionRecord",
+  "input": {
+    "id": "rec-43",
+    "time": "2026-11-07T15:40:02Z",
+    "entry": "dev.example.a",
+    "permission": "dev.example.mail.send",
+    "outcome": "allow",
+    "operation": "toolu_02",
+    "session": "s1",
+    "decider": {
+      "kind": "grant",
+      "id": "grant-9"
+    },
+    "channel": "grant-store"
+  },
+  "expect": {
+    "outcome": "valid"
+  }
+}

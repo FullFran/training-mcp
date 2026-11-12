@@ -1,0 +1,28 @@
+{
+  "description": "A session grant allows checks from its session.",
+  "requirements": [
+    "HCS-0005-R008"
+  ],
+  "level": "authority",
+  "input": {
+    "requests": [],
+    "grants": [
+      {
+        "entry": "dev.example.a",
+        "permission": "dev.example.mail.send",
+        "session": "s1",
+        "origin": "rec-3"
+      }
+    ],
+    "check": {
+      "entry": "dev.example.a",
+      "permission": "dev.example.mail.send",
+      "session": "s1"
+    }
+  },
+  "expect": {
+    "decision": {
+      "allow": true
+    }
+  }
+}

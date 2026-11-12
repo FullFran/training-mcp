@@ -1,0 +1,13 @@
+{
+  "description": "With the guard down, a component's own model request still does not leave.",
+  "requirements": [
+    "HCS-0008-R020"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The run is network-confined with the guard as the only allowed destination; the guard is stopped. An extension inside the run creates its own model client and sends a request."
+  },
+  "expect": {
+    "behaviour": "The request does not reach any provider, through the guard or around it."
+  }
+}

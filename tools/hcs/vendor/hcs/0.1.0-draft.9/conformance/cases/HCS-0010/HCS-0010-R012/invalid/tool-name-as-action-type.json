@@ -1,0 +1,25 @@
+{
+  "description": "A bare tool name is not a permission id.",
+  "requirements": [
+    "HCS-0010-R012"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0010:proposal:0.1",
+  "input": {
+    "id": "p-1",
+    "actionType": "log_sets",
+    "proposedBy": "dev.example.coach",
+    "target": "session-7",
+    "payloadDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "time": "2026-11-12T10:00:00Z",
+    "state": "pending"
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

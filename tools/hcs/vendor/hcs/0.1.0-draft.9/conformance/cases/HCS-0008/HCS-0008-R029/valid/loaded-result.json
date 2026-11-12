@@ -1,0 +1,20 @@
+{
+  "description": "What a session loaded.",
+  "requirements": [
+    "HCS-0008-R029"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0008:acp:0.1#/$defs/loadedResult",
+  "input": {
+    "skills": [
+      "notes",
+      "mail"
+    ],
+    "mcpServers": [
+      "io.example/echo"
+    ]
+  },
+  "expect": {
+    "outcome": "valid"
+  }
+}

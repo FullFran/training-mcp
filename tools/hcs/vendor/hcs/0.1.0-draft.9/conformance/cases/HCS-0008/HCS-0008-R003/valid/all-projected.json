@@ -1,0 +1,46 @@
+{
+  "description": "Every contribution is projectable, so nothing is reported.",
+  "requirements": [
+    "HCS-0008-R003"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "skill",
+      "mcp-server"
+    ],
+    "hostOwned": [],
+    "grantedSecrets": {},
+    "activationPolicy": "all-or-nothing",
+    "generation": {
+      "id": "gen-0042",
+      "entries": [
+        {
+          "id": "dev.example.notes",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/take-notes",
+              "name": "take-notes"
+            },
+            {
+              "kind": "mcp-server",
+              "path": "mcp/notes/server.json",
+              "descriptor": {
+                "name": "io.example/notes",
+                "description": "Notes server",
+                "version": "1.0.0"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "errors": [],
+    "selected": [
+      "dev.example.notes"
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hcs:schema:hcs-0002:capability:0.1",
+  "title": "HCS capability identifiers",
+  "description": "Capability id and versioned capability reference (HCS-0002).",
+  "$defs": {
+    "capabilityId": {
+      "description": "Implementation-independent contract name, for example dev.example.search.",
+      "$ref": "urn:hcs:schema:hcs-0000:common:0.1#/$defs/dottedId"
+    },
+    "capabilityRef": {
+      "description": "Capability id plus contract major version: <capabilityId>@<major>, for example dev.example.search@1.",
+      "type": "string",
+      "maxLength": 140,
+      "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+@(0|[1-9][0-9]{0,8})$"
+    },
+    "capabilityRefList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/capabilityRef" },
+      "uniqueItems": true
+    }
+  }
+}

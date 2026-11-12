@@ -1,0 +1,57 @@
+{
+  "description": "Under all-or-nothing, a policy package the engine cannot take is reported and left inactive; the generation switch proceeds with the other entries.",
+  "requirements": [
+    "HCS-0008-R017"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "skill",
+      "mcp-server"
+    ],
+    "hostOwned": [],
+    "grantedSecrets": {},
+    "activationPolicy": "all-or-nothing",
+    "generation": {
+      "id": "gen-0042",
+      "entries": [
+        {
+          "id": "dev.example.notes",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/take-notes",
+              "name": "take-notes"
+            }
+          ]
+        },
+        {
+          "id": "dev.example.guard",
+          "contributions": [
+            {
+              "kind": "x-example-policy",
+              "path": "policies/guard.json",
+              "settings": [
+                {
+                  "name": "permission/bash",
+                  "effect": "narrow"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "errors": [
+      {
+        "code": "unsupported_contribution",
+        "entry": "dev.example.guard"
+      }
+    ],
+    "selected": [
+      "dev.example.notes"
+    ]
+  }
+}

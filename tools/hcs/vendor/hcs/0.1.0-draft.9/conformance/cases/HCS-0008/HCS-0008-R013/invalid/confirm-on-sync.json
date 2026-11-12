@@ -1,0 +1,13 @@
+{
+  "description": "Confirmation by the sync step alone.",
+  "requirements": [
+    "HCS-0008-R013"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The sync service unpacks gen-0042, switches the active pointer and confirms it; no engine has been started from it."
+  },
+  "expect": {
+    "behaviour": "Non-conforming: gen-0042 is confirmed without an engine run having passed a health check."
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "A tool that lets the agent accept its proposal breaks R004.",
+  "requirements": [
+    "HCS-0010-R004"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The host's tool list is read by the agent, which then calls a tool that accepts p-1, or writes 'approved' in its own message."
+  },
+  "expect": {
+    "behaviour": "A conforming host exposes no such tool and ignores the text; p-1 stays pending."
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "description": "An empty effect string.",
+  "requirements": [
+    "HCS-0009-R001"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0009:tool-effects:0.1#/$defs/serverMeta",
+  "input": {
+    "tools": {
+      "list_notes": {
+        "effect": ""
+      }
+    }
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

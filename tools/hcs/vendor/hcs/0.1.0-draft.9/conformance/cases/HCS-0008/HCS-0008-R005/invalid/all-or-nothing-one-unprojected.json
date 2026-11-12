@@ -1,0 +1,60 @@
+{
+  "description": "Under all-or-nothing, an entry with an unprojected contribution is not active on the engine; a host that reports it active is non-conforming. The other entry stays active (R017).",
+  "requirements": [
+    "HCS-0008-R005"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "skill"
+    ],
+    "hostOwned": [],
+    "grantedSecrets": {},
+    "activationPolicy": "all-or-nothing",
+    "generation": {
+      "id": "gen-0042",
+      "entries": [
+        {
+          "id": "dev.example.notes",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/take-notes",
+              "name": "take-notes"
+            }
+          ]
+        },
+        {
+          "id": "dev.example.search",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/search",
+              "name": "search"
+            },
+            {
+              "kind": "mcp-server",
+              "path": "mcp/notes/server.json",
+              "descriptor": {
+                "name": "io.example/search",
+                "description": "Notes server",
+                "version": "1.0.0"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "errors": [
+      {
+        "code": "unsupported_contribution",
+        "entry": "dev.example.search"
+      }
+    ],
+    "selected": [
+      "dev.example.notes"
+    ]
+  }
+}

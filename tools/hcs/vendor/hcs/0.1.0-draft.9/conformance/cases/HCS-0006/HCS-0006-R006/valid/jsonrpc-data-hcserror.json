@@ -1,0 +1,31 @@
+{
+  "description": "The client takes the error from error.data.hcsError.",
+  "requirements": [
+    "HCS-0006-R006"
+  ],
+  "level": "client",
+  "input": {
+    "response": {
+      "jsonrpc": "2.0",
+      "id": 7,
+      "error": {
+        "code": -32002,
+        "message": "plugin failed",
+        "data": {
+          "hcsError": {
+            "code": "plugin_failed",
+            "message": "dev.example.notes exited with status 1",
+            "entry": "dev.example.notes"
+          }
+        }
+      }
+    }
+  },
+  "expect": {
+    "hcsError": {
+      "code": "plugin_failed",
+      "message": "dev.example.notes exited with status 1",
+      "entry": "dev.example.notes"
+    }
+  }
+}

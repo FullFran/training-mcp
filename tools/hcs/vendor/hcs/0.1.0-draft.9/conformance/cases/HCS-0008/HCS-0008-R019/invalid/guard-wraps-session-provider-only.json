@@ -1,0 +1,13 @@
+{
+  "description": "Wrapping the session's provider object does not meet R019.",
+  "requirements": [
+    "HCS-0008-R019"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The guard wraps only the engine session's provider object; provider keys are in the run's environment and outbound traffic is unrestricted. A code-execution tool resolves a model through its own provider lookup and sends a request containing CANARY-7f3a-SECRET."
+  },
+  "expect": {
+    "behaviour": "This placement does not meet R019: the mock provider receives the canary unmasked. A conforming host confines credentials or network so the request cannot bypass the guard."
+  }
+}

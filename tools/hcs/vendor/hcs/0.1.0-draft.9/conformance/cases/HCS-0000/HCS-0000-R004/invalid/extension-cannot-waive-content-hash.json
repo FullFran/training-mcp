@@ -1,0 +1,35 @@
+{
+  "description": "An x- flag cannot make an entry without contentHash valid.",
+  "requirements": [
+    "HCS-0000-R004"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1",
+  "input": {
+    "hcsVersion": "0.1",
+    "id": "dev.example.desktop",
+    "version": "2026.11.06-1",
+    "entries": [
+      {
+        "id": "dev.example.notes",
+        "version": "1.0.0",
+        "size": 10,
+        "contributions": [
+          {
+            "kind": "skill",
+            "path": "skills/notes"
+          }
+        ],
+        "x-example-skip-integrity": true
+      }
+    ]
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

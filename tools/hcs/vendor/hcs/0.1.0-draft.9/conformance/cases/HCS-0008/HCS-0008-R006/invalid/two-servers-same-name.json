@@ -1,0 +1,62 @@
+{
+  "description": "Two packages ship MCP servers with the same server.json name.",
+  "requirements": [
+    "HCS-0008-R006"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "skill",
+      "mcp-server"
+    ],
+    "hostOwned": [],
+    "grantedSecrets": {},
+    "activationPolicy": "all-or-nothing",
+    "generation": {
+      "id": "gen-0042",
+      "entries": [
+        {
+          "id": "dev.example.a",
+          "contributions": [
+            {
+              "kind": "mcp-server",
+              "path": "mcp/notes/server.json",
+              "descriptor": {
+                "name": "io.example/search",
+                "description": "Notes server",
+                "version": "1.0.0"
+              }
+            }
+          ]
+        },
+        {
+          "id": "dev.example.b",
+          "contributions": [
+            {
+              "kind": "mcp-server",
+              "path": "mcp/notes/server.json",
+              "descriptor": {
+                "name": "io.example/search",
+                "description": "Notes server",
+                "version": "1.0.0"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "errors": [
+      {
+        "code": "ambiguous_provider",
+        "entry": "dev.example.a"
+      },
+      {
+        "code": "ambiguous_provider",
+        "entry": "dev.example.b"
+      }
+    ],
+    "selected": []
+  }
+}

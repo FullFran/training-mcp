@@ -1,0 +1,13 @@
+{
+  "description": "Activate a then b (b requires a), then stop the set.",
+  "requirements": [
+    "HCS-0004-R004"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Activate a then b (b requires a), then stop the set."
+  },
+  "expect": {
+    "behaviour": "b is stopped before a."
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "A pending proposal changes nothing.",
+  "requirements": [
+    "HCS-0010-R002"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "An agent proposes logging a set. The person has not answered."
+  },
+  "expect": {
+    "behaviour": "The target is unchanged and the agent's result says the change is waiting, not done."
+  }
+}

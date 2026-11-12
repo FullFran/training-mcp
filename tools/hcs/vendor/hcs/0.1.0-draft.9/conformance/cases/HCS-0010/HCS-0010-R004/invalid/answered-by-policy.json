@@ -1,0 +1,30 @@
+{
+  "description": "No answer is recorded as given by a host rule or an agent.",
+  "requirements": [
+    "HCS-0010-R004"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0010:proposal:0.1",
+  "input": {
+    "id": "p-1",
+    "actionType": "dev.example.sets.log",
+    "proposedBy": "dev.example.coach",
+    "target": "session-7",
+    "payloadDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "time": "2026-11-12T10:00:00Z",
+    "state": "accepted",
+    "answer": {
+      "decision": "d-1",
+      "by": "agent",
+      "time": "2026-11-12T10:05:00Z"
+    }
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

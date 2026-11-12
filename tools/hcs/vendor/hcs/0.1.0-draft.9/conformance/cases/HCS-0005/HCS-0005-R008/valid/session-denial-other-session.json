@@ -1,0 +1,33 @@
+{
+  "description": "A session denial does not deny checks from another session.",
+  "requirements": [
+    "HCS-0005-R008"
+  ],
+  "level": "authority",
+  "input": {
+    "requests": [],
+    "grants": [
+      {
+        "entry": "dev.example.a",
+        "permission": "dev.example.mail.send"
+      }
+    ],
+    "check": {
+      "entry": "dev.example.a",
+      "permission": "dev.example.mail.send",
+      "session": "s2"
+    },
+    "denials": [
+      {
+        "entry": "dev.example.a",
+        "permission": "dev.example.mail.send",
+        "session": "s1"
+      }
+    ]
+  },
+  "expect": {
+    "decision": {
+      "allow": true
+    }
+  }
+}

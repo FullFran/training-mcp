@@ -1,0 +1,13 @@
+{
+  "description": "Every request of the run, the engine's own included, passes the guard.",
+  "requirements": [
+    "HCS-0008-R019"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The host declares a masking guard on model requests and points the engine at a mock model provider that logs every request body. A tool returns the canary string CANARY-7f3a-SECRET, which the guard masks. The run continues until the engine compacts its context and writes a branch summary."
+  },
+  "expect": {
+    "behaviour": "The mock provider receives requests for the turn, the compaction and the summary; none contains CANARY-7f3a-SECRET."
+  }
+}

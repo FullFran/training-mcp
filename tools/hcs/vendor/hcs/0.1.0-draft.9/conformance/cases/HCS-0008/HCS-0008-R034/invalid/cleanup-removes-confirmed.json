@@ -1,0 +1,26 @@
+{
+  "description": "A cleanup that does not retain the confirmed generation.",
+  "requirements": [
+    "HCS-0008-R034"
+  ],
+  "level": "recovery",
+  "input": {
+    "persisted": {
+      "active": 42,
+      "confirmed": 41,
+      "pending": 42,
+      "failed": []
+    },
+    "onDisk": [
+      40,
+      41,
+      42
+    ]
+  },
+  "expect": {
+    "retain": [
+      42
+    ],
+    "action": "health-check"
+  }
+}

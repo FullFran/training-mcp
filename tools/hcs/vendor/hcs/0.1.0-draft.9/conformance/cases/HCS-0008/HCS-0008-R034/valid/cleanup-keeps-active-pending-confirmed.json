@@ -1,0 +1,33 @@
+{
+  "description": "A cleanup keeps the active, pending and confirmed generations and every failed record.",
+  "requirements": [
+    "HCS-0008-R034"
+  ],
+  "level": "recovery",
+  "input": {
+    "persisted": {
+      "active": 42,
+      "confirmed": 41,
+      "pending": 42,
+      "failed": [
+        39
+      ]
+    },
+    "onDisk": [
+      39,
+      40,
+      41,
+      42
+    ]
+  },
+  "expect": {
+    "action": "health-check",
+    "retain": [
+      41,
+      42
+    ],
+    "failed": [
+      39
+    ]
+  }
+}

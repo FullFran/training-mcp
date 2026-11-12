@@ -1,0 +1,13 @@
+{
+  "description": "A link inside the folder that resolves outside it.",
+  "requirements": [
+    "HCS-0008-R021"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The contribution folder holds server.mjs as a symbolic link to a file outside the folder; the identifier is server.mjs."
+  },
+  "expect": {
+    "behaviour": "The adapter reports manifest_invalid for the entry and does not start the server."
+  }
+}

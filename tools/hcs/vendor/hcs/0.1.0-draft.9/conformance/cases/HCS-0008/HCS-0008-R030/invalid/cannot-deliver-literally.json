@@ -1,0 +1,13 @@
+{
+  "description": "An adapter that cannot deliver a value literally to an engine reports the entry.",
+  "requirements": [
+    "HCS-0008-R030"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The engine interprets '$' in MCP environment values and offers no escape and no uninterpreted channel; a generation entry's server.json has an environment value containing '$'."
+  },
+  "expect": {
+    "behaviour": "The adapter reports unsupported_contribution for that entry and does not project its server to that engine; the rest of the generation proceeds (R017)."
+  }
+}

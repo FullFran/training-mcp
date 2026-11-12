@@ -1,0 +1,13 @@
+{
+  "description": "A preparation step exceeds the host deadline.",
+  "requirements": [
+    "HCS-0004-R007"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "A preparation step exceeds the host deadline."
+  },
+  "expect": {
+    "behaviour": "The entry is failed with code timeout."
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "Values with characters an engine may interpret reach the server unchanged.",
+  "requirements": [
+    "HCS-0008-R030"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "A generation's server.json gives the stdio server the environment values A='!touch /tmp/hcs-canary', B='$HOME', C='${PATH}', and a header-style value D='Bearer {token}' with token a granted secret 's3cr$t'. The server echoes its environment."
+  },
+  "expect": {
+    "behaviour": "The server receives A, B and C exactly as written and D as 'Bearer s3cr$t'; /tmp/hcs-canary does not exist."
+  }
+}

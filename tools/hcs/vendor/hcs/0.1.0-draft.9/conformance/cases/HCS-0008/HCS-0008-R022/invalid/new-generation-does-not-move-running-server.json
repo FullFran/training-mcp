@@ -1,0 +1,13 @@
+{
+  "description": "A new generation does not change the running server's code.",
+  "requirements": [
+    "HCS-0008-R022"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "While an engine run of gen-0050 is active, the host prepares gen-0051 with a different server.mjs and moves its active pointer."
+  },
+  "expect": {
+    "behaviour": "The running server keeps executing gen-0050's file; only a new engine run uses gen-0051."
+  }
+}

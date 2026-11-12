@@ -1,0 +1,25 @@
+{
+  "description": "An undeclared tool presented as read-only.",
+  "requirements": [
+    "HCS-0009-R004"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0009:tool-effects:0.1#/$defs/classification",
+  "input": {
+    "tool": "mystery",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

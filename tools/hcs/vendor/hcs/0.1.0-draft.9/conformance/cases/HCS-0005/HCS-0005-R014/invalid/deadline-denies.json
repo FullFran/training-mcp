@@ -1,0 +1,13 @@
+{
+  "description": "No answer before the deadline denies.",
+  "requirements": [
+    "HCS-0005-R014"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "dev.example.a has no grant for dev.example.mail.send; the engine asks to send mail and the host asks the person over ACP session/request_permission with a 30 s deadline. The person never answers."
+  },
+  "expect": {
+    "behaviour": "The call does not run; permission_denied after 30 s; record outcome timeout, decider {kind: policy, id: HCS-0005-R014}."
+  }
+}

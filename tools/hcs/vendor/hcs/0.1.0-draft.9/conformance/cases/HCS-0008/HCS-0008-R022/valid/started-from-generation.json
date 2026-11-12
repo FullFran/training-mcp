@@ -1,0 +1,13 @@
+{
+  "description": "The server runs from the generation, unchanged.",
+  "requirements": [
+    "HCS-0008-R022"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Generation gen-0050 contains a file server mcp/echo/server.mjs. The host starts an engine run from it."
+  },
+  "expect": {
+    "behaviour": "The process runs <generation path>/<entry>/mcp/echo/server.mjs with that folder as working directory; the path names gen-0050, not a moving pointer; no file is copied or modified."
+  }
+}

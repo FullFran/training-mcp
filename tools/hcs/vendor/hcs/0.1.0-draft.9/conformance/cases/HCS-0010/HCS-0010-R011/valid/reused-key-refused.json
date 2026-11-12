@@ -1,0 +1,13 @@
+{
+  "description": "A key reused with different content is refused.",
+  "requirements": [
+    "HCS-0010-R011"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "An agent sends key k-1 with payload A, then key k-1 with payload B."
+  },
+  "expect": {
+    "behaviour": "The second call is refused and the first proposal is unchanged."
+  }
+}

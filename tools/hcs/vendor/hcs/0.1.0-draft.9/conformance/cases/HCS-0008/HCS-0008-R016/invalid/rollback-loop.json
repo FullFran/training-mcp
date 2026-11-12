@@ -1,0 +1,13 @@
+{
+  "description": "The host alternates between generations.",
+  "requirements": [
+    "HCS-0008-R016"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "gen-0042 failed; the rollback to gen-0041 also failed; the host starts gen-0042 again, then gen-0041 again."
+  },
+  "expect": {
+    "behaviour": "Non-conforming: a rollback loop."
+  }
+}

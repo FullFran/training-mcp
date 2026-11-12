@@ -1,0 +1,13 @@
+{
+  "description": "The failed mark is on disk before the return starts.",
+  "requirements": [
+    "HCS-0008-R032"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Confirmed gen-0041. gen-0042 fails its health check. A fault kills the host after it records gen-0042 as failed and before it changes the active generation. The host restarts."
+  },
+  "expect": {
+    "behaviour": "On restart the host sees gen-0042 active and recorded as failed, completes the return to gen-0041 and does not start gen-0042."
+  }
+}

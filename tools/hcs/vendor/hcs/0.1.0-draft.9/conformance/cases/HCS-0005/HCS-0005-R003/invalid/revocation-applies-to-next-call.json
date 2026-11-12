@@ -1,0 +1,13 @@
+{
+  "description": "Revoke between two calls.",
+  "requirements": [
+    "HCS-0005-R003"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Grant fs.read, make a call, revoke the grant, make a second call."
+  },
+  "expect": {
+    "behaviour": "The second call is denied with permission_denied."
+  }
+}

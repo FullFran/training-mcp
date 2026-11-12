@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hcs:schema:hcs-0008:client-limits:0.1",
+  "title": "HCS MCP client limits",
+  "description": "Limits a host declares for one MCP client it projects to (HCS-0008 section 6.9, R036). Units are in the member names; HCS defines no default value.",
+  "type": "object",
+  "required": ["client"],
+  "properties": {
+    "client": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "instructionsPrefix": { "description": "Characters of the server instructions the client is known to keep, counted from the start.", "type": "integer", "minimum": 1 },
+    "toolListBytes": { "description": "Largest tools/list result the client takes, as the UTF-8 bytes of the compact JSON `tools` array (R037).", "type": "integer", "minimum": 1 }
+  },
+  "anyOf": [{ "required": ["instructionsPrefix"] }, { "required": ["toolListBytes"] }],
+  "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+  "additionalProperties": false
+}

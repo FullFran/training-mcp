@@ -1,0 +1,28 @@
+{
+  "description": "Top-level members that disagree with hcsError are ignored.",
+  "requirements": [
+    "HCS-0006-R006"
+  ],
+  "level": "client",
+  "input": {
+    "problem": {
+      "type": "urn:hcs:error:unsupported_contribution",
+      "title": "unsupported_contribution",
+      "status": 422,
+      "reason": "plugin_failed",
+      "code": "plugin_failed",
+      "hcsError": {
+        "code": "unsupported_contribution",
+        "message": "no adapter projects x-example-theme",
+        "entry": "dev.example.theme"
+      }
+    }
+  },
+  "expect": {
+    "hcsError": {
+      "code": "unsupported_contribution",
+      "message": "no adapter projects x-example-theme",
+      "entry": "dev.example.theme"
+    }
+  }
+}

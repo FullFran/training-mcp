@@ -1,0 +1,13 @@
+{
+  "description": "A retry gets the existing proposal.",
+  "requirements": [
+    "HCS-0010-R010"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "An agent sends the same proposal twice with the same identity, action type, target and payload; the first one is already accepted."
+  },
+  "expect": {
+    "behaviour": "The second call returns the first proposal with its state; no new proposal exists."
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "session/resume follows the same rule as session/load.",
+  "requirements": [
+    "HCS-0008-R028"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Session s1 was created on gen-0060; the host sends session/resume for s1 with generation.id gen-0061."
+  },
+  "expect": {
+    "behaviour": "The agent answers a JSON-RPC error whose data.hcsError.code is generation_mismatch; the host starts a new session."
+  }
+}

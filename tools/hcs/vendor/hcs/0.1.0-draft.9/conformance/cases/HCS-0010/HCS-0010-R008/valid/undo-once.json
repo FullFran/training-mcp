@@ -1,0 +1,13 @@
+{
+  "description": "A proposal is undone once.",
+  "requirements": [
+    "HCS-0010-R008"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Proposal p-1 was undone by p-2; the person asks to undo p-1 again."
+  },
+  "expect": {
+    "behaviour": "The second undo is refused."
+  }
+}

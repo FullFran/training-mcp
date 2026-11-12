@@ -1,0 +1,13 @@
+{
+  "description": "A skill is placed by link, its files unchanged.",
+  "requirements": [
+    "HCS-0008-R008"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The engine discovers skills only under <dir>/.claude/skills/<name>/SKILL.md; the adapter builds a per-run directory of links to the generation's skill directories."
+  },
+  "expect": {
+    "behaviour": "The engine reads byte-identical SKILL.md and supporting files."
+  }
+}

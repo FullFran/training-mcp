@@ -1,0 +1,21 @@
+{
+  "description": "Members other than the declared ones and x- extensions are refused.",
+  "requirements": [
+    "HCS-0008-R036"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0008:client-limits:0.1",
+  "input": {
+    "client": "chatgpt",
+    "toolListBytes": 36000,
+    "maxTools": 40
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

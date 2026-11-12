@@ -1,0 +1,46 @@
+{
+  "description": "With only an instructions prefix declared, a large tool list is not checked.",
+  "requirements": [
+    "HCS-0008-R037"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "skill",
+      "mcp-server"
+    ],
+    "hostOwned": [],
+    "grantedSecrets": {},
+    "activationPolicy": "partial",
+    "generation": {
+      "id": "gen-0070",
+      "entries": [
+        {
+          "id": "dev.example.large",
+          "contributions": [
+            {
+              "kind": "mcp-server",
+              "path": "mcp/large/server.json",
+              "descriptor": {
+                "name": "io.example/large",
+                "description": "Example server",
+                "version": "1.0.0"
+              },
+              "toolListBytes": 900000
+            }
+          ]
+        }
+      ]
+    },
+    "clientLimits": {
+      "client": "chatgpt",
+      "instructionsPrefix": 512
+    }
+  },
+  "expect": {
+    "errors": [],
+    "selected": [
+      "dev.example.large"
+    ]
+  }
+}

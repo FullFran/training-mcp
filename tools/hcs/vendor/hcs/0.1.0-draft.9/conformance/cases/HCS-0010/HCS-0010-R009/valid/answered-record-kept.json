@@ -1,0 +1,13 @@
+{
+  "description": "An answered record stays as it was.",
+  "requirements": [
+    "HCS-0010-R009"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Proposal p-1 is accepted, then undone, then the person's account is audited."
+  },
+  "expect": {
+    "behaviour": "p-1 is still readable with its original answer and decision link; the undo is a separate record."
+  }
+}

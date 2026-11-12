@@ -1,0 +1,13 @@
+{
+  "description": "A host that applies without a record does not conform.",
+  "requirements": [
+    "HCS-0010-R005"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The person accepts a proposal while the host's decision log is not writable."
+  },
+  "expect": {
+    "behaviour": "A conforming host applies nothing and the proposal is not accepted; applying anyway violates R005."
+  }
+}

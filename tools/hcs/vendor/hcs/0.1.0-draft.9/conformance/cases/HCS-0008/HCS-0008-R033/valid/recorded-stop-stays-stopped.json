@@ -1,0 +1,29 @@
+{
+  "description": "A stop recorded after the engine run from the confirmed generation failed too: after a restart the host stays stopped and reports (item 5).",
+  "requirements": [
+    "HCS-0008-R033"
+  ],
+  "level": "recovery",
+  "input": {
+    "persisted": {
+      "active": 41,
+      "confirmed": 41,
+      "pending": null,
+      "failed": [
+        42
+      ],
+      "stopped": {
+        "generation": 41,
+        "reason": "return-failed"
+      }
+    },
+    "onDisk": [
+      40,
+      41,
+      42
+    ]
+  },
+  "expect": {
+    "action": "stop-and-report"
+  }
+}

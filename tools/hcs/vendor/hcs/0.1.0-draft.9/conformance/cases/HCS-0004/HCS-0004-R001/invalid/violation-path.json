@@ -1,0 +1,13 @@
+{
+  "description": "Stop the host right after authorization of an entry.",
+  "requirements": [
+    "HCS-0004-R001"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Stop the host right after authorization of an entry."
+  },
+  "expect": {
+    "behaviour": "No package process has been started for that entry."
+  }
+}

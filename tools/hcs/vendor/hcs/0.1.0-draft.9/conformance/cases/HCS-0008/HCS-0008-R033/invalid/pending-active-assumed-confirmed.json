@@ -1,0 +1,23 @@
+{
+  "description": "The host starts a pending active generation without checking it.",
+  "requirements": [
+    "HCS-0008-R033"
+  ],
+  "level": "recovery",
+  "input": {
+    "persisted": {
+      "active": 42,
+      "confirmed": 41,
+      "pending": 42,
+      "failed": []
+    },
+    "onDisk": [
+      40,
+      41,
+      42
+    ]
+  },
+  "expect": {
+    "action": "start"
+  }
+}

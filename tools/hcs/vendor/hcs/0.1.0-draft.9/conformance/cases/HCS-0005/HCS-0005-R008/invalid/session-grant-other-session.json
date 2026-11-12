@@ -1,0 +1,31 @@
+{
+  "description": "A session grant does not allow checks from another session.",
+  "requirements": [
+    "HCS-0005-R008"
+  ],
+  "level": "authority",
+  "input": {
+    "requests": [],
+    "grants": [
+      {
+        "entry": "dev.example.a",
+        "permission": "dev.example.mail.send",
+        "session": "s1"
+      }
+    ],
+    "check": {
+      "entry": "dev.example.a",
+      "permission": "dev.example.mail.send",
+      "session": "s2"
+    }
+  },
+  "expect": {
+    "decision": {
+      "allow": false,
+      "error": {
+        "code": "permission_denied",
+        "message": "denied"
+      }
+    }
+  }
+}

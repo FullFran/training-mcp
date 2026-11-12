@@ -1,0 +1,13 @@
+{
+  "description": "A passing health check confirms the new set.",
+  "requirements": [
+    "HCS-0007-R018"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Active set {a@1}. Move to {a@2}; the post-start health check of a@2 passes."
+  },
+  "expect": {
+    "behaviour": "a@2 stays active and the previous set is released."
+  }
+}

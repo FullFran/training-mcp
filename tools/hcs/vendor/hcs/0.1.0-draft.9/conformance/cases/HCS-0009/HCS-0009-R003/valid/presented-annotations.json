@@ -1,0 +1,16 @@
+{
+  "description": "A projected server lists a declared read tool.",
+  "requirements": [
+    "HCS-0009-R003"
+  ],
+  "level": "host",
+  "input": {
+    "tool": "list_notes",
+    "declared": {
+      "effect": "read"
+    }
+  },
+  "expect": {
+    "behaviour": "The tool the host presents carries readOnlyHint true, destructiveHint false, idempotentHint true and openWorldHint true."
+  }
+}

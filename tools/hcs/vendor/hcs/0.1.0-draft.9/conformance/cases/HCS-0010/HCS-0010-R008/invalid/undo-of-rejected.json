@@ -1,0 +1,13 @@
+{
+  "description": "Undoing a proposal that never applied does not conform.",
+  "requirements": [
+    "HCS-0010-R008"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Proposal p-1 was rejected; an undo of p-1 is requested."
+  },
+  "expect": {
+    "behaviour": "A host that accepts and 'restores' a state that was never changed violates R008."
+  }
+}

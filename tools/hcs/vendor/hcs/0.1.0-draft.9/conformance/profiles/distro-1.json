@@ -1,0 +1,40 @@
+{
+  "profile": "DISTRO-1",
+  "status": "Draft",
+  "hcsVersion": "0.1",
+  "builds_on": "CORE-0",
+  "description": "Signed catalog distribution (HCS-0007): signed envelope, root-signed key set, verification order, all-or-nothing transitions. A host claims DISTRO-1 by passing CORE-0 and every case of the requirements below. Not part of CORE-0.",
+  "hostProperties": {
+    "activationPolicy": "all-or-nothing"
+  },
+  "requirements": [
+    "HCS-0007-R001",
+    "HCS-0007-R002",
+    "HCS-0007-R003",
+    "HCS-0007-R004",
+    "HCS-0007-R005",
+    "HCS-0007-R006",
+    "HCS-0007-R007",
+    "HCS-0007-R008",
+    "HCS-0007-R009",
+    "HCS-0007-R010",
+    "HCS-0007-R011",
+    "HCS-0007-R012",
+    "HCS-0007-R013",
+    "HCS-0007-R014",
+    "HCS-0007-R015",
+    "HCS-0007-R016",
+    "HCS-0007-R017",
+    "HCS-0007-R018",
+    "HCS-0007-R019",
+    "HCS-0007-R020",
+    "HCS-0007-R021",
+    "HCS-0007-R024",
+    "HCS-0007-R025",
+    "HCS-0007-R026",
+    "HCS-0007-R027",
+    "HCS-0007-R028",
+    "HCS-0007-R029",
+    "HCS-0006-R002"
+  ]
+}

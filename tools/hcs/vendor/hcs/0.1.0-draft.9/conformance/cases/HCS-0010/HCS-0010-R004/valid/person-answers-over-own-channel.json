@@ -1,0 +1,13 @@
+{
+  "description": "The person answers over the host's own channel.",
+  "requirements": [
+    "HCS-0010-R004"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "An agent proposes a change. The host asks the person over its own channel; the person accepts."
+  },
+  "expect": {
+    "behaviour": "The proposal becomes accepted with answer.by subject and the change is applied."
+  }
+}

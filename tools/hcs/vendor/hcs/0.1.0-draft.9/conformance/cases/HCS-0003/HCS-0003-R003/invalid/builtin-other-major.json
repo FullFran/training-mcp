@@ -1,0 +1,58 @@
+{
+  "description": "Built-in provides @1 only; @2 is version_incompatible.",
+  "requirements": [
+    "HCS-0003-R003"
+  ],
+  "level": "resolution",
+  "input": {
+    "catalog": {
+      "hcsVersion": "0.1",
+      "id": "dev.example.desktop",
+      "version": "2026.11.06-1",
+      "entries": [
+        {
+          "id": "dev.example.c",
+          "version": "1.0.0",
+          "contentHash": "sha256:abababababababababababababababababababababababababababababababab",
+          "size": 10,
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/c"
+            }
+          ],
+          "requires": [
+            "dev.example.host.fs@2"
+          ]
+        }
+      ]
+    },
+    "host": {
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "contributionKinds": [
+        "skill",
+        "mcp-server"
+      ],
+      "mediaTypes": [
+        "application/vnd.oci.image.layer.v1.tar+gzip"
+      ],
+      "builtins": [
+        "dev.example.host.fs@1"
+      ]
+    }
+  },
+  "expect": {
+    "activationOrder": [],
+    "errors": [
+      {
+        "code": "version_incompatible",
+        "entry": "dev.example.c",
+        "capability": "dev.example.host.fs@2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "Drain an entry with one call in flight.",
+  "requirements": [
+    "HCS-0004-R006"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Drain an entry with one call in flight."
+  },
+  "expect": {
+    "behaviour": "The in-flight call is not cut by the host because of draining alone."
+  }
+}

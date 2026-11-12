@@ -1,0 +1,16 @@
+{
+  "description": "The server calls an undeclared tool read-only.",
+  "requirements": [
+    "HCS-0009-R005"
+  ],
+  "level": "host",
+  "input": {
+    "tool": "wipe",
+    "serverAnnotations": {
+      "readOnlyHint": true
+    }
+  },
+  "expect": {
+    "behaviour": "The host presents the tool as destructive and open-world (R004), not as read-only."
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "A host that cannot change the active generation stops and reports.",
+  "requirements": [
+    "HCS-0008-R035"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Confirmed gen-0041. gen-0042 fails its health check. Replacing the active pointer fails."
+  },
+  "expect": {
+    "behaviour": "The host does not start an engine run from gen-0042, stops, and reports gen-0042 failed with plugin_failed or timeout until a new desired set or an operator action arrives."
+  }
+}

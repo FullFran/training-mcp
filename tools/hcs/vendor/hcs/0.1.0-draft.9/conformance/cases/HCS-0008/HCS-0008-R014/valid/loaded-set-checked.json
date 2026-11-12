@@ -1,0 +1,13 @@
+{
+  "description": "The engine reports the skills it loaded.",
+  "requirements": [
+    "HCS-0008-R014"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The projection lists skills take-notes and search; the engine's skill listing after start returns both."
+  },
+  "expect": {
+    "behaviour": "The loaded-set part of the health check passes."
+  }
+}

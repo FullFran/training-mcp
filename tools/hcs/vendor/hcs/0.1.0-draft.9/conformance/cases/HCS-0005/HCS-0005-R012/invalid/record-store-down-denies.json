@@ -1,0 +1,13 @@
+{
+  "description": "A decision that cannot be recorded is a deny.",
+  "requirements": [
+    "HCS-0005-R012"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Grant send-mail to dev.example.a; the record store fails every write; the engine sends mail."
+  },
+  "expect": {
+    "behaviour": "The call is denied with permission_denied."
+  }
+}

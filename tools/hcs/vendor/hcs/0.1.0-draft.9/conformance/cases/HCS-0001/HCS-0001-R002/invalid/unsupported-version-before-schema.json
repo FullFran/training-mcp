@@ -1,0 +1,20 @@
+{
+  "description": "Version is checked first: an otherwise malformed 1.0 document still yields unsupported_hcs_version.",
+  "requirements": [
+    "HCS-0001-R002"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1",
+  "input": {
+    "hcsVersion": "1.0",
+    "whatever": true
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "unsupported_hcs_version"
+      }
+    ]
+  }
+}

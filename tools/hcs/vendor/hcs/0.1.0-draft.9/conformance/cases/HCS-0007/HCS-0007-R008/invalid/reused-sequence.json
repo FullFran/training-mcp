@@ -1,0 +1,93 @@
+{
+  "description": "sequence 42 again with a different catalog.",
+  "requirements": [
+    "HCS-0007-R008"
+  ],
+  "level": "distribution",
+  "input": {
+    "check": "envelope",
+    "now": "2026-11-06T12:00:00Z",
+    "trustAnchor": {
+      "keys": [
+        {
+          "keyid": "root-1",
+          "keytype": "ed25519",
+          "public": "LWB8cicdNrnQPkwy2jC4f24oJ6JOv49Apy61kpnIRsU="
+        }
+      ],
+      "threshold": 1
+    },
+    "keySet": {
+      "hcsVersion": "0.1",
+      "version": 3,
+      "keys": [
+        {
+          "keyid": "online-1",
+          "keytype": "ed25519",
+          "public": "oNkoBdUQ0xTyv7u+lLzrl8w7lkU/9tOfYLgHuY8YZDs=",
+          "notBefore": "2026-01-01T00:00:00Z",
+          "notAfter": "2027-01-01T00:00:00Z"
+        }
+      ],
+      "signatures": [
+        {
+          "keyid": "root-1",
+          "sig": "tx4NEICY/AHXoefq8kWHBDb9t9jM+wur3eIWBIpMiEs6mKr/4KyuQGk4IGsjOHJ6jJYUbYiFL0BAQP+zOnu8CA=="
+        }
+      ]
+    },
+    "envelope": {
+      "hcsVersion": "0.1",
+      "sequence": 42,
+      "expires": "2026-11-13T00:00:00Z",
+      "binding": {
+        "tenant": "t-0001",
+        "profile": "desktop",
+        "channel": "stable"
+      },
+      "catalog": {
+        "hcsVersion": "0.1",
+        "id": "dev.example.desktop",
+        "version": "2026.11.06-1",
+        "entries": [
+          {
+            "id": "dev.example.other",
+            "version": "1",
+            "contentHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "size": 1,
+            "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+            "contributions": [
+              {
+                "kind": "skill",
+                "path": "s"
+              }
+            ]
+          }
+        ]
+      },
+      "signatures": [
+        {
+          "keyid": "online-1",
+          "sig": "uTh+TnPuFXvbkLk/HmQFuZ2qSYy7lbFrnzWr9f9NiXKYeeJoivxZXEaLJ8VM3eugVmvOYrpXNLxnd4Ji1/qLDA=="
+        }
+      ]
+    },
+    "assignment": {
+      "tenant": "t-0001",
+      "profile": "desktop",
+      "channel": "stable"
+    },
+    "lastAccepted": {
+      "sequence": 42,
+      "digest": "sha256:b6bfa556e1c6dc9bcf1a117f96e01c4f1ee97bb073b8be0eefca0dfba69982b5"
+    }
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "rollback_rejected"
+      }
+    ]
+  }
+}

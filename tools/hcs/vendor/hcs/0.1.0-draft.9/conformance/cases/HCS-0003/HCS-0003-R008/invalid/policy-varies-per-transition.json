@@ -1,0 +1,13 @@
+{
+  "description": "A host that switches policy between transitions is non-conforming.",
+  "requirements": [
+    "HCS-0003-R008"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Same two transitions as the valid case on a host that activates a alone in the first transition and refuses the second."
+  },
+  "expect": {
+    "behaviour": "A conforming host treats both transitions under the one declared policy; mixed outcomes for the same kind of failure fail this case."
+  }
+}

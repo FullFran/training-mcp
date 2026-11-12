@@ -1,0 +1,13 @@
+{
+  "description": "A proposal whose base still matches is applied.",
+  "requirements": [
+    "HCS-0010-R006"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "An agent proposes an edit with base rev-1; the target is still rev-1 when the person accepts."
+  },
+  "expect": {
+    "behaviour": "The change is applied."
+  }
+}

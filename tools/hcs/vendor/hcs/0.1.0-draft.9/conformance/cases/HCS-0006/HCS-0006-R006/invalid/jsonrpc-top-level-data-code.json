@@ -1,0 +1,24 @@
+{
+  "description": "error.data.code is not an HCS error.",
+  "requirements": [
+    "HCS-0006-R006"
+  ],
+  "level": "client",
+  "input": {
+    "response": {
+      "jsonrpc": "2.0",
+      "id": 8,
+      "error": {
+        "code": -32603,
+        "message": "internal error",
+        "data": {
+          "code": "plugin_failed",
+          "message": "crashed"
+        }
+      }
+    }
+  },
+  "expect": {
+    "hcsError": null
+  }
+}

@@ -1,0 +1,5729 @@
+{
+  "indexFormat": 1,
+  "release": "0.1.0-draft.9",
+  "hcsVersion": "0.1",
+  "documents": [
+    {
+      "id": "HCS-0000",
+      "title": "Conventions",
+      "path": "spec/HCS-0000-conventions.md",
+      "status": "Draft",
+      "version": "0.1.0-draft",
+      "provisional": false
+    },
+    {
+      "id": "HCS-0001",
+      "title": "Catalog manifest",
+      "path": "spec/HCS-0001-catalog-manifest.md",
+      "status": "Draft",
+      "version": "0.1.0-draft",
+      "provisional": false
+    },
+    {
+      "id": "HCS-0002",
+      "title": "Capability identifiers",
+      "path": "spec/HCS-0002-capability-ids.md",
+      "status": "Draft",
+      "version": "0.1.0-draft",
+      "provisional": false
+    },
+    {
+      "id": "HCS-0003",
+      "title": "Resolution",
+      "path": "spec/HCS-0003-resolution.md",
+      "status": "Draft",
+      "version": "0.1.0-draft",
+      "provisional": false
+    },
+    {
+      "id": "HCS-0004",
+      "title": "Lifecycle",
+      "path": "spec/HCS-0004-lifecycle.md",
+      "status": "Draft",
+      "version": "0.1.0-draft",
+      "provisional": false
+    },
+    {
+      "id": "HCS-0005",
+      "title": "Authority: requests and grants",
+      "path": "spec/HCS-0005-authority.md",
+      "status": "Draft",
+      "version": "0.1.0-draft",
+      "provisional": false
+    },
+    {
+      "id": "HCS-0006",
+      "title": "Typed errors",
+      "path": "spec/HCS-0006-errors.md",
+      "status": "Draft",
+      "version": "0.1.0-draft",
+      "provisional": false
+    },
+    {
+      "id": "HCS-0007",
+      "title": "Signed catalog distribution (DISTRO-1)",
+      "path": "spec/HCS-0007-signed-catalog.md",
+      "status": "Draft",
+      "version": "0.1.0-draft",
+      "provisional": false
+    },
+    {
+      "id": "HCS-0008",
+      "title": "Host adapter: projecting a generation into an engine",
+      "path": "spec/HCS-0008-host-adapter.md",
+      "status": "Draft",
+      "version": "0.1.0-draft",
+      "provisional": true,
+      "supersededWhen": "a neutral body (for example an AAIF project) publishes an engine-neutral format for installing skills, MCP servers and instructions into an agent runtime, or MCP and Agent Skills define client-side installation; this document then profiles that format or is withdrawn"
+    },
+    {
+      "id": "HCS-0009",
+      "title": "Tool surface: effect classes of package tools",
+      "path": "spec/HCS-0009-tool-surface.md",
+      "status": "Draft",
+      "version": "0.1.0-draft",
+      "provisional": false
+    },
+    {
+      "id": "HCS-0010",
+      "title": "Proposals: agent writes that a person answers",
+      "path": "spec/HCS-0010-proposals.md",
+      "status": "Draft",
+      "version": "0.1.0-draft",
+      "provisional": false
+    }
+  ],
+  "schemas": [
+    {
+      "$id": "urn:hcs:schema:conformance:case:0.1",
+      "path": "conformance/case.schema.json"
+    },
+    {
+      "$id": "urn:hcs:schema:hcs-0000:common:0.1",
+      "path": "schemas/hcs-0000/common/v0.1/common.schema.json"
+    },
+    {
+      "$id": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1",
+      "path": "schemas/hcs-0001/catalog-manifest/v0.1/catalog-manifest.schema.json"
+    },
+    {
+      "$id": "urn:hcs:schema:hcs-0002:capability:0.1",
+      "path": "schemas/hcs-0002/capability/v0.1/capability.schema.json"
+    },
+    {
+      "$id": "urn:hcs:schema:hcs-0003:resolution:0.1",
+      "path": "schemas/hcs-0003/resolution/v0.1/resolution.schema.json"
+    },
+    {
+      "$id": "urn:hcs:schema:hcs-0004:lifecycle:0.1",
+      "path": "schemas/hcs-0004/lifecycle/v0.1/lifecycle.schema.json"
+    },
+    {
+      "$id": "urn:hcs:schema:hcs-0005:authority:0.1",
+      "path": "schemas/hcs-0005/authority/v0.1/authority.schema.json"
+    },
+    {
+      "$id": "urn:hcs:schema:hcs-0006:error:0.1",
+      "path": "schemas/hcs-0006/error/v0.1/error.schema.json"
+    },
+    {
+      "$id": "urn:hcs:schema:hcs-0007:signed-catalog:0.1",
+      "path": "schemas/hcs-0007/signed-catalog/v0.1/signed-catalog.schema.json"
+    },
+    {
+      "$id": "urn:hcs:schema:hcs-0008:acp:0.1",
+      "path": "schemas/hcs-0008/acp/v0.1/acp.schema.json"
+    },
+    {
+      "$id": "urn:hcs:schema:hcs-0008:client-limits:0.1",
+      "path": "schemas/hcs-0008/client-limits/v0.1/client-limits.schema.json"
+    },
+    {
+      "$id": "urn:hcs:schema:hcs-0009:tool-effects:0.1",
+      "path": "schemas/hcs-0009/tool-effects/v0.1/tool-effects.schema.json"
+    },
+    {
+      "$id": "urn:hcs:schema:hcs-0010:proposal:0.1",
+      "path": "schemas/hcs-0010/proposal/v0.1/proposal.schema.json"
+    }
+  ],
+  "requirements": {
+    "path": "requirements/requirements.json",
+    "items": [
+      {
+        "id": "HCS-0000-R001",
+        "document": "HCS-0000",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0000-R002",
+        "document": "HCS-0000",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0000-R003",
+        "document": "HCS-0000",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0000-R004",
+        "document": "HCS-0000",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0001-R001",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 7
+      },
+      {
+        "id": "HCS-0001-R002",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0001-R003",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0001-R004",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 5
+      },
+      {
+        "id": "HCS-0001-R017",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0001-R005",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 5
+      },
+      {
+        "id": "HCS-0001-R006",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0001-R011",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0001-R007",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0001-R018",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 5
+      },
+      {
+        "id": "HCS-0001-R019",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 10
+      },
+      {
+        "id": "HCS-0001-R020",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 8
+      },
+      {
+        "id": "HCS-0001-R021",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 6
+      },
+      {
+        "id": "HCS-0001-R022",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 4
+      },
+      {
+        "id": "HCS-0001-R023",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 7
+      },
+      {
+        "id": "HCS-0001-R008",
+        "document": "HCS-0001",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0001-R009",
+        "document": "HCS-0001",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0001-R010",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0001-R016",
+        "document": "HCS-0001",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 4
+      },
+      {
+        "id": "HCS-0001-R012",
+        "document": "HCS-0001",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0001-R013",
+        "document": "HCS-0001",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0001-R014",
+        "document": "HCS-0001",
+        "keyword": "SHOULD",
+        "profiles": [],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0001-R015",
+        "document": "HCS-0001",
+        "keyword": "SHOULD",
+        "profiles": [],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0002-R001",
+        "document": "HCS-0002",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 5
+      },
+      {
+        "id": "HCS-0002-R002",
+        "document": "HCS-0002",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0002-R003",
+        "document": "HCS-0002",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0002-R004",
+        "document": "HCS-0002",
+        "keyword": "SHOULD",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0002-R005",
+        "document": "HCS-0002",
+        "keyword": "SHOULD",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0003-R001",
+        "document": "HCS-0003",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0003-R002",
+        "document": "HCS-0003",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0003-R003",
+        "document": "HCS-0003",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0003-R004",
+        "document": "HCS-0003",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0003-R005",
+        "document": "HCS-0003",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0003-R006",
+        "document": "HCS-0003",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0003-R007",
+        "document": "HCS-0003",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0003-R008",
+        "document": "HCS-0003",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0003-R009",
+        "document": "HCS-0003",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0003-R010",
+        "document": "HCS-0003",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0004-R001",
+        "document": "HCS-0004",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0004-R002",
+        "document": "HCS-0004",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 4
+      },
+      {
+        "id": "HCS-0004-R003",
+        "document": "HCS-0004",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0004-R004",
+        "document": "HCS-0004",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0004-R005",
+        "document": "HCS-0004",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0004-R006",
+        "document": "HCS-0004",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0004-R007",
+        "document": "HCS-0004",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0005-R001",
+        "document": "HCS-0005",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0005-R002",
+        "document": "HCS-0005",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0005-R003",
+        "document": "HCS-0005",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0005-R004",
+        "document": "HCS-0005",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0005-R005",
+        "document": "HCS-0005",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0005-R006",
+        "document": "HCS-0005",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0005-R007",
+        "document": "HCS-0005",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0005-R008",
+        "document": "HCS-0005",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 4
+      },
+      {
+        "id": "HCS-0005-R009",
+        "document": "HCS-0005",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0005-R014",
+        "document": "HCS-0005",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 6
+      },
+      {
+        "id": "HCS-0005-R015",
+        "document": "HCS-0005",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0005-R010",
+        "document": "HCS-0005",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0005-R011",
+        "document": "HCS-0005",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 7
+      },
+      {
+        "id": "HCS-0005-R012",
+        "document": "HCS-0005",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0005-R013",
+        "document": "HCS-0005",
+        "keyword": "SHOULD",
+        "profiles": [],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0006-R001",
+        "document": "HCS-0006",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0006-R002",
+        "document": "HCS-0006",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "CORE-0",
+          "DISTRO-1"
+        ],
+        "cases": 6
+      },
+      {
+        "id": "HCS-0006-R003",
+        "document": "HCS-0006",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0006-R004",
+        "document": "HCS-0006",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0006-R005",
+        "document": "HCS-0006",
+        "keyword": "MUST",
+        "profiles": [
+          "CORE-0"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0006-R006",
+        "document": "HCS-0006",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 7
+      },
+      {
+        "id": "HCS-0006-R007",
+        "document": "HCS-0006",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 5
+      },
+      {
+        "id": "HCS-0006-R008",
+        "document": "HCS-0006",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0006-R009",
+        "document": "HCS-0006",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 4
+      },
+      {
+        "id": "HCS-0007-R001",
+        "document": "HCS-0007",
+        "keyword": "MUST",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 8
+      },
+      {
+        "id": "HCS-0007-R002",
+        "document": "HCS-0007",
+        "keyword": "MUST",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 8
+      },
+      {
+        "id": "HCS-0007-R003",
+        "document": "HCS-0007",
+        "keyword": "MUST",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 11
+      },
+      {
+        "id": "HCS-0007-R004",
+        "document": "HCS-0007",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 14
+      },
+      {
+        "id": "HCS-0007-R005",
+        "document": "HCS-0007",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 7
+      },
+      {
+        "id": "HCS-0007-R006",
+        "document": "HCS-0007",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0007-R007",
+        "document": "HCS-0007",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0007-R008",
+        "document": "HCS-0007",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 4
+      },
+      {
+        "id": "HCS-0007-R009",
+        "document": "HCS-0007",
+        "keyword": "MUST",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0007-R010",
+        "document": "HCS-0007",
+        "keyword": "MUST",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0007-R022",
+        "document": "HCS-0007",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 6
+      },
+      {
+        "id": "HCS-0007-R023",
+        "document": "HCS-0007",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 4
+      },
+      {
+        "id": "HCS-0007-R011",
+        "document": "HCS-0007",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0007-R012",
+        "document": "HCS-0007",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0007-R013",
+        "document": "HCS-0007",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0007-R014",
+        "document": "HCS-0007",
+        "keyword": "MUST",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0007-R024",
+        "document": "HCS-0007",
+        "keyword": "MUST",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 6
+      },
+      {
+        "id": "HCS-0007-R025",
+        "document": "HCS-0007",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0007-R026",
+        "document": "HCS-0007",
+        "keyword": "MUST",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0007-R015",
+        "document": "HCS-0007",
+        "keyword": "MUST",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0007-R016",
+        "document": "HCS-0007",
+        "keyword": "MUST",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0007-R017",
+        "document": "HCS-0007",
+        "keyword": "MUST NOT",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0007-R018",
+        "document": "HCS-0007",
+        "keyword": "MUST",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0007-R019",
+        "document": "HCS-0007",
+        "keyword": "SHOULD",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0007-R020",
+        "document": "HCS-0007",
+        "keyword": "SHOULD",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0007-R021",
+        "document": "HCS-0007",
+        "keyword": "SHOULD",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0007-R027",
+        "document": "HCS-0007",
+        "keyword": "SHOULD",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0007-R028",
+        "document": "HCS-0007",
+        "keyword": "SHOULD",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0007-R029",
+        "document": "HCS-0007",
+        "keyword": "SHOULD NOT",
+        "profiles": [
+          "DISTRO-1"
+        ],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0008-R001",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0008-R002",
+        "document": "HCS-0008",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0008-R003",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0008-R004",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0008-R005",
+        "document": "HCS-0008",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0008-R017",
+        "document": "HCS-0008",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0008-R006",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0008-R007",
+        "document": "HCS-0008",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 4
+      },
+      {
+        "id": "HCS-0008-R008",
+        "document": "HCS-0008",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0008-R009",
+        "document": "HCS-0008",
+        "keyword": "SHOULD",
+        "profiles": [],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0008-R010",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0008-R011",
+        "document": "HCS-0008",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0008-R012",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0008-R030",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0008-R021",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 10
+      },
+      {
+        "id": "HCS-0008-R022",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0008-R023",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 6
+      },
+      {
+        "id": "HCS-0008-R024",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0008-R019",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 5
+      },
+      {
+        "id": "HCS-0008-R020",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 4
+      },
+      {
+        "id": "HCS-0008-R025",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0008-R026",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0008-R027",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 7
+      },
+      {
+        "id": "HCS-0008-R028",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 4
+      },
+      {
+        "id": "HCS-0008-R029",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0008-R036",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 6
+      },
+      {
+        "id": "HCS-0008-R037",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 5
+      },
+      {
+        "id": "HCS-0008-R038",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0008-R039",
+        "document": "HCS-0008",
+        "keyword": "SHOULD",
+        "profiles": [],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0008-R013",
+        "document": "HCS-0008",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0008-R014",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0008-R015",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0008-R016",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0008-R018",
+        "document": "HCS-0008",
+        "keyword": "SHOULD",
+        "profiles": [],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0008-R031",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0008-R032",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 4
+      },
+      {
+        "id": "HCS-0008-R033",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 11
+      },
+      {
+        "id": "HCS-0008-R034",
+        "document": "HCS-0008",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0008-R035",
+        "document": "HCS-0008",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0009-R001",
+        "document": "HCS-0009",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 9
+      },
+      {
+        "id": "HCS-0009-R002",
+        "document": "HCS-0009",
+        "keyword": "SHOULD",
+        "profiles": [],
+        "cases": 0
+      },
+      {
+        "id": "HCS-0009-R003",
+        "document": "HCS-0009",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 12
+      },
+      {
+        "id": "HCS-0009-R004",
+        "document": "HCS-0009",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 6
+      },
+      {
+        "id": "HCS-0009-R005",
+        "document": "HCS-0009",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 4
+      },
+      {
+        "id": "HCS-0009-R006",
+        "document": "HCS-0009",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0010-R001",
+        "document": "HCS-0010",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 4
+      },
+      {
+        "id": "HCS-0010-R002",
+        "document": "HCS-0010",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0010-R003",
+        "document": "HCS-0010",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 6
+      },
+      {
+        "id": "HCS-0010-R004",
+        "document": "HCS-0010",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 4
+      },
+      {
+        "id": "HCS-0010-R005",
+        "document": "HCS-0010",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 4
+      },
+      {
+        "id": "HCS-0010-R006",
+        "document": "HCS-0010",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0010-R007",
+        "document": "HCS-0010",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 4
+      },
+      {
+        "id": "HCS-0010-R008",
+        "document": "HCS-0010",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 3
+      },
+      {
+        "id": "HCS-0010-R009",
+        "document": "HCS-0010",
+        "keyword": "MUST NOT",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0010-R010",
+        "document": "HCS-0010",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0010-R011",
+        "document": "HCS-0010",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 2
+      },
+      {
+        "id": "HCS-0010-R012",
+        "document": "HCS-0010",
+        "keyword": "MUST",
+        "profiles": [],
+        "cases": 5
+      }
+    ]
+  },
+  "profiles": [
+    {
+      "profile": "CORE-0",
+      "status": "Draft",
+      "hcsVersion": "0.1",
+      "path": "conformance/profiles/core-0.json",
+      "requirements": [
+        "HCS-0000-R001",
+        "HCS-0000-R002",
+        "HCS-0000-R003",
+        "HCS-0000-R004",
+        "HCS-0001-R001",
+        "HCS-0001-R002",
+        "HCS-0001-R003",
+        "HCS-0001-R004",
+        "HCS-0001-R005",
+        "HCS-0001-R006",
+        "HCS-0001-R007",
+        "HCS-0001-R008",
+        "HCS-0001-R009",
+        "HCS-0001-R010",
+        "HCS-0001-R011",
+        "HCS-0001-R012",
+        "HCS-0001-R013",
+        "HCS-0001-R016",
+        "HCS-0002-R001",
+        "HCS-0002-R002",
+        "HCS-0002-R003",
+        "HCS-0002-R004",
+        "HCS-0002-R005",
+        "HCS-0003-R001",
+        "HCS-0003-R002",
+        "HCS-0003-R003",
+        "HCS-0003-R004",
+        "HCS-0003-R005",
+        "HCS-0003-R006",
+        "HCS-0003-R007",
+        "HCS-0003-R008",
+        "HCS-0003-R009",
+        "HCS-0003-R010",
+        "HCS-0006-R001",
+        "HCS-0006-R002",
+        "HCS-0006-R003",
+        "HCS-0006-R004",
+        "HCS-0006-R005"
+      ]
+    },
+    {
+      "profile": "DISTRO-1",
+      "status": "Draft",
+      "hcsVersion": "0.1",
+      "path": "conformance/profiles/distro-1.json",
+      "requirements": [
+        "HCS-0007-R001",
+        "HCS-0007-R002",
+        "HCS-0007-R003",
+        "HCS-0007-R004",
+        "HCS-0007-R005",
+        "HCS-0007-R006",
+        "HCS-0007-R007",
+        "HCS-0007-R008",
+        "HCS-0007-R009",
+        "HCS-0007-R010",
+        "HCS-0007-R011",
+        "HCS-0007-R012",
+        "HCS-0007-R013",
+        "HCS-0007-R014",
+        "HCS-0007-R015",
+        "HCS-0007-R016",
+        "HCS-0007-R017",
+        "HCS-0007-R018",
+        "HCS-0007-R019",
+        "HCS-0007-R020",
+        "HCS-0007-R021",
+        "HCS-0007-R024",
+        "HCS-0007-R025",
+        "HCS-0007-R026",
+        "HCS-0007-R027",
+        "HCS-0007-R028",
+        "HCS-0007-R029",
+        "HCS-0006-R002"
+      ]
+    }
+  ],
+  "unprofiled": [
+    "HCS-0001-R017",
+    "HCS-0001-R018",
+    "HCS-0001-R019",
+    "HCS-0001-R020",
+    "HCS-0001-R021",
+    "HCS-0001-R022",
+    "HCS-0001-R023",
+    "HCS-0004-R001",
+    "HCS-0004-R002",
+    "HCS-0004-R003",
+    "HCS-0004-R004",
+    "HCS-0004-R005",
+    "HCS-0004-R006",
+    "HCS-0004-R007",
+    "HCS-0005-R001",
+    "HCS-0005-R002",
+    "HCS-0005-R003",
+    "HCS-0005-R004",
+    "HCS-0005-R005",
+    "HCS-0005-R006",
+    "HCS-0005-R007",
+    "HCS-0005-R008",
+    "HCS-0005-R009",
+    "HCS-0005-R014",
+    "HCS-0005-R015",
+    "HCS-0005-R010",
+    "HCS-0005-R011",
+    "HCS-0005-R012",
+    "HCS-0006-R006",
+    "HCS-0006-R007",
+    "HCS-0006-R008",
+    "HCS-0006-R009",
+    "HCS-0007-R022",
+    "HCS-0007-R023",
+    "HCS-0008-R001",
+    "HCS-0008-R002",
+    "HCS-0008-R003",
+    "HCS-0008-R004",
+    "HCS-0008-R005",
+    "HCS-0008-R017",
+    "HCS-0008-R006",
+    "HCS-0008-R007",
+    "HCS-0008-R008",
+    "HCS-0008-R010",
+    "HCS-0008-R011",
+    "HCS-0008-R012",
+    "HCS-0008-R030",
+    "HCS-0008-R021",
+    "HCS-0008-R022",
+    "HCS-0008-R023",
+    "HCS-0008-R024",
+    "HCS-0008-R019",
+    "HCS-0008-R020",
+    "HCS-0008-R025",
+    "HCS-0008-R026",
+    "HCS-0008-R027",
+    "HCS-0008-R028",
+    "HCS-0008-R029",
+    "HCS-0008-R036",
+    "HCS-0008-R037",
+    "HCS-0008-R038",
+    "HCS-0008-R013",
+    "HCS-0008-R014",
+    "HCS-0008-R015",
+    "HCS-0008-R016",
+    "HCS-0008-R031",
+    "HCS-0008-R032",
+    "HCS-0008-R033",
+    "HCS-0008-R034",
+    "HCS-0008-R035",
+    "HCS-0009-R001",
+    "HCS-0009-R003",
+    "HCS-0009-R004",
+    "HCS-0009-R005",
+    "HCS-0009-R006",
+    "HCS-0010-R001",
+    "HCS-0010-R002",
+    "HCS-0010-R003",
+    "HCS-0010-R004",
+    "HCS-0010-R005",
+    "HCS-0010-R006",
+    "HCS-0010-R007",
+    "HCS-0010-R008",
+    "HCS-0010-R009",
+    "HCS-0010-R010",
+    "HCS-0010-R011",
+    "HCS-0010-R012"
+  ],
+  "conformance": {
+    "caseSchema": "urn:hcs:schema:conformance:case:0.1",
+    "cases": [
+      {
+        "path": "conformance/cases/HCS-0000/HCS-0000-R003/invalid/underscore-extension-name.json",
+        "requirements": [
+          "HCS-0000-R003"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0000/HCS-0000-R003/invalid/uppercase-extension-name.json",
+        "requirements": [
+          "HCS-0000-R003"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0000/HCS-0000-R003/valid/unknown-extension-members.json",
+        "requirements": [
+          "HCS-0000-R003"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0000/HCS-0000-R004/invalid/extension-cannot-waive-content-hash.json",
+        "requirements": [
+          "HCS-0000-R004"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0000/HCS-0000-R004/valid/extension-does-not-change-valid-verdict.json",
+        "requirements": [
+          "HCS-0000-R004"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R001/invalid/missing-entries.json",
+        "requirements": [
+          "HCS-0001-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R001/invalid/negative-size.json",
+        "requirements": [
+          "HCS-0001-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R001/invalid/no-contributions.json",
+        "requirements": [
+          "HCS-0001-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R001/invalid/single-segment-id.json",
+        "requirements": [
+          "HCS-0001-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R001/invalid/unknown-core-member.json",
+        "requirements": [
+          "HCS-0001-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R001/valid/full-example.json",
+        "requirements": [
+          "HCS-0001-R001"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R001/valid/minimal-empty-catalog.json",
+        "requirements": [
+          "HCS-0001-R001"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R002/invalid/unsupported-version-before-schema.json",
+        "requirements": [
+          "HCS-0001-R002"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R002/invalid/unsupported-version.json",
+        "requirements": [
+          "HCS-0001-R002"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R002/valid/supported-version.json",
+        "requirements": [
+          "HCS-0001-R002"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R003/invalid/duplicate-id.json",
+        "requirements": [
+          "HCS-0001-R003"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R003/valid/distinct-ids.json",
+        "requirements": [
+          "HCS-0001-R003"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R004/invalid/md5-algorithm.json",
+        "requirements": [
+          "HCS-0001-R004"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R004/invalid/missing-algorithm.json",
+        "requirements": [
+          "HCS-0001-R004"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R004/invalid/short-sha256.json",
+        "requirements": [
+          "HCS-0001-R004"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R004/invalid/uppercase-hex.json",
+        "requirements": [
+          "HCS-0001-R004"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R004/valid/sha512-digest.json",
+        "requirements": [
+          "HCS-0001-R004"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R005/invalid/absolute.json",
+        "requirements": [
+          "HCS-0001-R005"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R005/invalid/backslash.json",
+        "requirements": [
+          "HCS-0001-R005"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R005/invalid/inner-parent-segment.json",
+        "requirements": [
+          "HCS-0001-R005"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R005/invalid/parent-segment.json",
+        "requirements": [
+          "HCS-0001-R005"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R005/valid/nested-relative-path.json",
+        "requirements": [
+          "HCS-0001-R005"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R006/invalid/bare-x-kind.json",
+        "requirements": [
+          "HCS-0001-R006"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R006/invalid/unknown-core-kind.json",
+        "requirements": [
+          "HCS-0001-R006"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R006/valid/extension-kind.json",
+        "requirements": [
+          "HCS-0001-R006"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R007/invalid/hash-mismatch.json",
+        "requirements": [
+          "HCS-0001-R007"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R007/invalid/size-mismatch.json",
+        "requirements": [
+          "HCS-0001-R007"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R007/valid/matching-size-and-hash.json",
+        "requirements": [
+          "HCS-0001-R007"
+        ],
+        "level": "integrity",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R008/invalid/unsupported-kind.json",
+        "requirements": [
+          "HCS-0001-R008"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R008/valid/supported-kind.json",
+        "requirements": [
+          "HCS-0001-R008"
+        ],
+        "level": "resolution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R009/invalid/architecture-mismatch.json",
+        "requirements": [
+          "HCS-0001-R009"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R009/invalid/variant-mismatch.json",
+        "requirements": [
+          "HCS-0001-R009"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R009/valid/platform-matches.json",
+        "requirements": [
+          "HCS-0001-R009"
+        ],
+        "level": "resolution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R010/invalid/validation-runs-package-code.json",
+        "requirements": [
+          "HCS-0001-R010"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R010/valid/validate-without-execution.json",
+        "requirements": [
+          "HCS-0001-R010"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R011/invalid/media-type-missing.json",
+        "requirements": [
+          "HCS-0001-R011"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R011/valid/media-type-declared.json",
+        "requirements": [
+          "HCS-0001-R011"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R012/invalid/rejects-oci-layer.json",
+        "requirements": [
+          "HCS-0001-R012"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R012/valid/unpacks-oci-layer.json",
+        "requirements": [
+          "HCS-0001-R012"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R013/invalid/unknown-media-type.json",
+        "requirements": [
+          "HCS-0001-R013"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R013/valid/known-media-type.json",
+        "requirements": [
+          "HCS-0001-R013"
+        ],
+        "level": "resolution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R016/invalid/host-without-identity.json",
+        "requirements": [
+          "HCS-0001-R016"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R016/invalid/other-host-id.json",
+        "requirements": [
+          "HCS-0001-R016"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R016/invalid/version-not-listed.json",
+        "requirements": [
+          "HCS-0001-R016"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R016/valid/exact-version-listed.json",
+        "requirements": [
+          "HCS-0001-R016"
+        ],
+        "level": "resolution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R017/invalid/content-id.json",
+        "requirements": [
+          "HCS-0001-R017"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R017/valid/content-id.json",
+        "requirements": [
+          "HCS-0001-R017"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R018/invalid/decompression-limit.json",
+        "requirements": [
+          "HCS-0001-R018"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R018/invalid/not-gzip.json",
+        "requirements": [
+          "HCS-0001-R018"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R018/invalid/wrong-tar.json",
+        "requirements": [
+          "HCS-0001-R018"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R018/valid/decompression-boundary.json",
+        "requirements": [
+          "HCS-0001-R018"
+        ],
+        "level": "integrity",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R018/valid/matching-tar.json",
+        "requirements": [
+          "HCS-0001-R018"
+        ],
+        "level": "integrity",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R019/invalid/absolute.json",
+        "requirements": [
+          "HCS-0001-R019"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R019/invalid/backslash.json",
+        "requirements": [
+          "HCS-0001-R019"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R019/invalid/dotdot-leading.json",
+        "requirements": [
+          "HCS-0001-R019"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R019/invalid/dotdot.json",
+        "requirements": [
+          "HCS-0001-R019"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R019/invalid/empty.json",
+        "requirements": [
+          "HCS-0001-R019"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R019/invalid/nul.json",
+        "requirements": [
+          "HCS-0001-R019"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R019/invalid/opaque-whiteout.json",
+        "requirements": [
+          "HCS-0001-R019"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R019/invalid/root-dot.json",
+        "requirements": [
+          "HCS-0001-R019"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R019/invalid/whiteout.json",
+        "requirements": [
+          "HCS-0001-R019"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R019/valid/ordinary-paths.json",
+        "requirements": [
+          "HCS-0001-R019"
+        ],
+        "level": "integrity",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R020/invalid/block-device.json",
+        "requirements": [
+          "HCS-0001-R020"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R020/invalid/char-device.json",
+        "requirements": [
+          "HCS-0001-R020"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R020/invalid/directory-data.json",
+        "requirements": [
+          "HCS-0001-R020"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R020/invalid/fifo.json",
+        "requirements": [
+          "HCS-0001-R020"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R020/invalid/hardlink.json",
+        "requirements": [
+          "HCS-0001-R020"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R020/invalid/pax-header.json",
+        "requirements": [
+          "HCS-0001-R020"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R020/invalid/symlink.json",
+        "requirements": [
+          "HCS-0001-R020"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R020/valid/files-and-directories.json",
+        "requirements": [
+          "HCS-0001-R020"
+        ],
+        "level": "integrity",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R021/invalid/below-file-reversed.json",
+        "requirements": [
+          "HCS-0001-R021"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R021/invalid/below-file.json",
+        "requirements": [
+          "HCS-0001-R021"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R021/invalid/duplicate-after-dot.json",
+        "requirements": [
+          "HCS-0001-R021"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R021/invalid/duplicate-directory-and-file.json",
+        "requirements": [
+          "HCS-0001-R021"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R021/invalid/duplicate-file.json",
+        "requirements": [
+          "HCS-0001-R021"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R021/valid/distinct-paths.json",
+        "requirements": [
+          "HCS-0001-R021"
+        ],
+        "level": "integrity",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R022/invalid/content-id-mismatch-first.json",
+        "requirements": [
+          "HCS-0001-R022"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R022/invalid/hash-mismatch-first.json",
+        "requirements": [
+          "HCS-0001-R022"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R022/invalid/size-mismatch-first.json",
+        "requirements": [
+          "HCS-0001-R022"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R022/valid/safe-package-with-content-id.json",
+        "requirements": [
+          "HCS-0001-R022"
+        ],
+        "level": "integrity",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R023/invalid/bad-checksum.json",
+        "requirements": [
+          "HCS-0001-R023"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R023/invalid/member-limit.json",
+        "requirements": [
+          "HCS-0001-R023"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R023/invalid/missing-terminator.json",
+        "requirements": [
+          "HCS-0001-R023"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R023/invalid/not-gzip-or-tar.json",
+        "requirements": [
+          "HCS-0001-R023"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R023/invalid/size-limit.json",
+        "requirements": [
+          "HCS-0001-R023"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R023/invalid/truncated.json",
+        "requirements": [
+          "HCS-0001-R023"
+        ],
+        "level": "integrity",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0001/HCS-0001-R023/valid/at-limits.json",
+        "requirements": [
+          "HCS-0001-R023"
+        ],
+        "level": "integrity",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0002/HCS-0002-R001/invalid/leading-zero-major.json",
+        "requirements": [
+          "HCS-0002-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0002/HCS-0002-R001/invalid/missing-major.json",
+        "requirements": [
+          "HCS-0002-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0002/HCS-0002-R001/invalid/single-segment.json",
+        "requirements": [
+          "HCS-0002-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0002/HCS-0002-R001/invalid/uppercase.json",
+        "requirements": [
+          "HCS-0002-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0002/HCS-0002-R001/valid/major-zero.json",
+        "requirements": [
+          "HCS-0002-R001"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0002/HCS-0002-R002/invalid/package-id-is-not-a-capability.json",
+        "requirements": [
+          "HCS-0002-R002"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0002/HCS-0002-R002/valid/provider-package-id-differs.json",
+        "requirements": [
+          "HCS-0002-R002"
+        ],
+        "level": "resolution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0002/HCS-0002-R003/invalid/other-major-does-not-satisfy.json",
+        "requirements": [
+          "HCS-0002-R003"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0002/HCS-0002-R003/valid/majors-are-separate-contracts.json",
+        "requirements": [
+          "HCS-0002-R003"
+        ],
+        "level": "resolution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R001/invalid/runtime-probe-forbidden.json",
+        "requirements": [
+          "HCS-0003-R001"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R001/valid/resolve-without-execution.json",
+        "requirements": [
+          "HCS-0003-R001"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R002/invalid/nothing-provides.json",
+        "requirements": [
+          "HCS-0003-R002"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R002/invalid/self-does-not-satisfy.json",
+        "requirements": [
+          "HCS-0003-R002"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R002/valid/builtin-satisfies.json",
+        "requirements": [
+          "HCS-0003-R002"
+        ],
+        "level": "resolution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R003/invalid/builtin-other-major.json",
+        "requirements": [
+          "HCS-0003-R003"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R003/valid/exact-major-among-several.json",
+        "requirements": [
+          "HCS-0003-R003"
+        ],
+        "level": "resolution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R004/invalid/builtin-and-entry-provide.json",
+        "requirements": [
+          "HCS-0003-R004"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R004/invalid/two-entries-provide.json",
+        "requirements": [
+          "HCS-0003-R004"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R004/valid/single-provider.json",
+        "requirements": [
+          "HCS-0003-R004"
+        ],
+        "level": "resolution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R005/invalid/failure-propagates.json",
+        "requirements": [
+          "HCS-0003-R005"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R005/valid/chain-resolves.json",
+        "requirements": [
+          "HCS-0003-R005"
+        ],
+        "level": "resolution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R006/invalid/two-entry-cycle.json",
+        "requirements": [
+          "HCS-0003-R006"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R006/valid/diamond-is-not-a-cycle.json",
+        "requirements": [
+          "HCS-0003-R006"
+        ],
+        "level": "resolution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R007/invalid/dependency-beats-alphabetical.json",
+        "requirements": [
+          "HCS-0003-R007"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R007/valid/tie-break-by-id.json",
+        "requirements": [
+          "HCS-0003-R007"
+        ],
+        "level": "resolution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R008/invalid/policy-varies-per-transition.json",
+        "requirements": [
+          "HCS-0003-R008"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R008/valid/declared-policy-applied.json",
+        "requirements": [
+          "HCS-0003-R008"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R009/invalid/one-error-blocks-the-set.json",
+        "requirements": [
+          "HCS-0003-R009"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R009/valid/no-errors.json",
+        "requirements": [
+          "HCS-0003-R009"
+        ],
+        "level": "resolution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R010/invalid/failed-entry-not-selected.json",
+        "requirements": [
+          "HCS-0003-R010"
+        ],
+        "level": "resolution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0003/HCS-0003-R010/valid/no-errors.json",
+        "requirements": [
+          "HCS-0003-R010"
+        ],
+        "level": "resolution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0004/HCS-0004-R001/invalid/violation-path.json",
+        "requirements": [
+          "HCS-0004-R001"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0004/HCS-0004-R001/valid/satisfied.json",
+        "requirements": [
+          "HCS-0004-R001"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0004/HCS-0004-R002/invalid/failed-without-error.json",
+        "requirements": [
+          "HCS-0004-R002"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0004/HCS-0004-R002/invalid/unknown-state.json",
+        "requirements": [
+          "HCS-0004-R002"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0004/HCS-0004-R002/valid/active-status.json",
+        "requirements": [
+          "HCS-0004-R002"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0004/HCS-0004-R002/valid/failed-with-error.json",
+        "requirements": [
+          "HCS-0004-R002"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0004/HCS-0004-R003/invalid/violation-path.json",
+        "requirements": [
+          "HCS-0004-R003"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0004/HCS-0004-R003/valid/satisfied.json",
+        "requirements": [
+          "HCS-0004-R003"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0004/HCS-0004-R004/invalid/violation-path.json",
+        "requirements": [
+          "HCS-0004-R004"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0004/HCS-0004-R004/valid/satisfied.json",
+        "requirements": [
+          "HCS-0004-R004"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0004/HCS-0004-R005/invalid/violation-path.json",
+        "requirements": [
+          "HCS-0004-R005"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0004/HCS-0004-R005/valid/satisfied.json",
+        "requirements": [
+          "HCS-0004-R005"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0004/HCS-0004-R006/invalid/violation-path.json",
+        "requirements": [
+          "HCS-0004-R006"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0004/HCS-0004-R006/valid/satisfied.json",
+        "requirements": [
+          "HCS-0004-R006"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0004/HCS-0004-R007/invalid/violation-path.json",
+        "requirements": [
+          "HCS-0004-R007"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0004/HCS-0004-R007/valid/satisfied.json",
+        "requirements": [
+          "HCS-0004-R007"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R001/invalid/grant-for-other-entry.json",
+        "requirements": [
+          "HCS-0005-R001"
+        ],
+        "level": "authority",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R001/invalid/no-grant-denies.json",
+        "requirements": [
+          "HCS-0005-R001"
+        ],
+        "level": "authority",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R001/valid/granted.json",
+        "requirements": [
+          "HCS-0005-R001"
+        ],
+        "level": "authority",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R002/invalid/request-alone-denies.json",
+        "requirements": [
+          "HCS-0005-R002"
+        ],
+        "level": "authority",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R002/valid/request-plus-grant.json",
+        "requirements": [
+          "HCS-0005-R002"
+        ],
+        "level": "authority",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R003/invalid/revocation-applies-to-next-call.json",
+        "requirements": [
+          "HCS-0005-R003"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R003/valid/grant-checked-per-call.json",
+        "requirements": [
+          "HCS-0005-R003"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R004/invalid/extension-autogrant-ignored.json",
+        "requirements": [
+          "HCS-0005-R004"
+        ],
+        "level": "authority",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R004/valid/extension-member-on-request-with-grant.json",
+        "requirements": [
+          "HCS-0005-R004"
+        ],
+        "level": "authority",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R005/invalid/allow-once-not-remembered.json",
+        "requirements": [
+          "HCS-0005-R005"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R005/valid/allow-once-covers-one-operation.json",
+        "requirements": [
+          "HCS-0005-R005"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R006/invalid/allow-always-grant-is-revocable.json",
+        "requirements": [
+          "HCS-0005-R006"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R006/valid/allow-always-becomes-session-grant.json",
+        "requirements": [
+          "HCS-0005-R006"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R007/invalid/denial-wins-over-grant.json",
+        "requirements": [
+          "HCS-0005-R007"
+        ],
+        "level": "authority",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R007/invalid/session-denial-wins-in-its-session.json",
+        "requirements": [
+          "HCS-0005-R007"
+        ],
+        "level": "authority",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R007/valid/denial-for-other-permission.json",
+        "requirements": [
+          "HCS-0005-R007"
+        ],
+        "level": "authority",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R008/invalid/session-grant-check-without-session.json",
+        "requirements": [
+          "HCS-0005-R008"
+        ],
+        "level": "authority",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R008/invalid/session-grant-other-session.json",
+        "requirements": [
+          "HCS-0005-R008"
+        ],
+        "level": "authority",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R008/valid/session-denial-other-session.json",
+        "requirements": [
+          "HCS-0005-R008"
+        ],
+        "level": "authority",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R008/valid/session-grant-same-session.json",
+        "requirements": [
+          "HCS-0005-R008"
+        ],
+        "level": "authority",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R009/invalid/engine-memory-ignored-after-revocation.json",
+        "requirements": [
+          "HCS-0005-R009"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R009/valid/engine-asks-host-each-time.json",
+        "requirements": [
+          "HCS-0005-R009"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R010/invalid/revocation-recorded.json",
+        "requirements": [
+          "HCS-0005-R010"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R010/valid/allow-and-deny-recorded.json",
+        "requirements": [
+          "HCS-0005-R010"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R011/invalid/carries-arguments.json",
+        "requirements": [
+          "HCS-0005-R011"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R011/invalid/decision-without-operation.json",
+        "requirements": [
+          "HCS-0005-R011"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R011/invalid/impossible-time.json",
+        "requirements": [
+          "HCS-0005-R011"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R011/invalid/unknown-decider-kind.json",
+        "requirements": [
+          "HCS-0005-R011"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R011/valid/answer-recorded.json",
+        "requirements": [
+          "HCS-0005-R011"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R011/valid/grant-decision-recorded.json",
+        "requirements": [
+          "HCS-0005-R011"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R011/valid/revocation-without-operation.json",
+        "requirements": [
+          "HCS-0005-R011"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R012/invalid/record-store-down-denies.json",
+        "requirements": [
+          "HCS-0005-R012"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R012/valid/record-written-operation-decided.json",
+        "requirements": [
+          "HCS-0005-R012"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R014/invalid/cancelled-denies.json",
+        "requirements": [
+          "HCS-0005-R014"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R014/invalid/deadline-denies.json",
+        "requirements": [
+          "HCS-0005-R014"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R014/invalid/handler-error-denies.json",
+        "requirements": [
+          "HCS-0005-R014"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R014/invalid/lost-client-denies.json",
+        "requirements": [
+          "HCS-0005-R014"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R014/invalid/reject-denies.json",
+        "requirements": [
+          "HCS-0005-R014"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R014/valid/allow-in-time-runs.json",
+        "requirements": [
+          "HCS-0005-R014"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R015/invalid/model-text-is-not-an-answer.json",
+        "requirements": [
+          "HCS-0005-R015"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0005/HCS-0005-R015/valid/answer-from-client-channel.json",
+        "requirements": [
+          "HCS-0005-R015"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R001/invalid/details-non-extension-key.json",
+        "requirements": [
+          "HCS-0006-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R001/invalid/missing-message.json",
+        "requirements": [
+          "HCS-0006-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R001/valid/full-error.json",
+        "requirements": [
+          "HCS-0006-R001"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R002/invalid/code-outside-set.json",
+        "requirements": [
+          "HCS-0006-R002"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R002/invalid/extension-code.json",
+        "requirements": [
+          "HCS-0006-R002"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R002/valid/closed-set-code.json",
+        "requirements": [
+          "HCS-0006-R002"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R002/valid/generation-mismatch-in-registry.json",
+        "requirements": [
+          "HCS-0006-R002"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R002/valid/package-invalid-in-registry.json",
+        "requirements": [
+          "HCS-0006-R002"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R002/valid/profile-code-in-registry.json",
+        "requirements": [
+          "HCS-0006-R002"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R003/invalid/jsonrpc-data-is-error.json",
+        "requirements": [
+          "HCS-0006-R003"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R003/valid/jsonrpc-data-hcserror.json",
+        "requirements": [
+          "HCS-0006-R003"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R004/invalid/about-blank-type.json",
+        "requirements": [
+          "HCS-0006-R004"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R004/invalid/type-code-mismatch.json",
+        "requirements": [
+          "HCS-0006-R004"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R004/valid/type-matches-code.json",
+        "requirements": [
+          "HCS-0006-R004"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R005/invalid/flattened-members.json",
+        "requirements": [
+          "HCS-0006-R005"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R005/valid/hcserror-member.json",
+        "requirements": [
+          "HCS-0006-R005"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R006/invalid/jsonrpc-top-level-data-code.json",
+        "requirements": [
+          "HCS-0006-R006"
+        ],
+        "level": "client",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R006/invalid/top-level-only-is-not-hcs.json",
+        "requirements": [
+          "HCS-0006-R006"
+        ],
+        "level": "client",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R006/invalid/top-level-reason-ignored.json",
+        "requirements": [
+          "HCS-0006-R006"
+        ],
+        "level": "client",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R006/invalid/type-code-mismatch-is-not-hcs.json",
+        "requirements": [
+          "HCS-0006-R006"
+        ],
+        "level": "client",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R006/valid/jsonrpc-data-hcserror.json",
+        "requirements": [
+          "HCS-0006-R006"
+        ],
+        "level": "client",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R006/valid/mistyped-member-ignored.json",
+        "requirements": [
+          "HCS-0006-R006"
+        ],
+        "level": "client",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R006/valid/problem-hcserror.json",
+        "requirements": [
+          "HCS-0006-R006"
+        ],
+        "level": "client",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R007/invalid/error-flattened-in-structured-content.json",
+        "requirements": [
+          "HCS-0006-R007"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R007/invalid/is-error-false.json",
+        "requirements": [
+          "HCS-0006-R007"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R007/invalid/no-text-content.json",
+        "requirements": [
+          "HCS-0006-R007"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R007/valid/host-members-beside-hcserror.json",
+        "requirements": [
+          "HCS-0006-R007"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R007/valid/tool-result-error.json",
+        "requirements": [
+          "HCS-0006-R007"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R008/invalid/output-schema-rejects-error.json",
+        "requirements": [
+          "HCS-0006-R008"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R008/valid/no-output-schema.json",
+        "requirements": [
+          "HCS-0006-R008"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R008/valid/output-schema-accepts-error.json",
+        "requirements": [
+          "HCS-0006-R008"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R009/invalid/error-only-in-text.json",
+        "requirements": [
+          "HCS-0006-R009"
+        ],
+        "level": "client",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R009/invalid/is-error-not-true.json",
+        "requirements": [
+          "HCS-0006-R009"
+        ],
+        "level": "client",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R009/invalid/top-level-code-not-read.json",
+        "requirements": [
+          "HCS-0006-R009"
+        ],
+        "level": "client",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0006/HCS-0006-R009/valid/tool-result-hcserror.json",
+        "requirements": [
+          "HCS-0006-R009"
+        ],
+        "level": "client",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R001/invalid/binding-member-at-top-level.json",
+        "requirements": [
+          "HCS-0007-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R001/invalid/expires-with-offset.json",
+        "requirements": [
+          "HCS-0007-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R001/invalid/missing-sequence.json",
+        "requirements": [
+          "HCS-0007-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R001/invalid/short-signature.json",
+        "requirements": [
+          "HCS-0007-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R001/invalid/text-other-version-with-fraction.json",
+        "requirements": [
+          "HCS-0007-R001"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R001/invalid/text-other-version-with-repeated-keyid.json",
+        "requirements": [
+          "HCS-0007-R001"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R001/invalid/unsupported-hcs-version.json",
+        "requirements": [
+          "HCS-0007-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R001/valid/full-envelope.json",
+        "requirements": [
+          "HCS-0007-R001"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R002/invalid/duplicate-keyid.json",
+        "requirements": [
+          "HCS-0007-R002"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R002/invalid/no-keys.json",
+        "requirements": [
+          "HCS-0007-R002"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R002/invalid/rsa-key.json",
+        "requirements": [
+          "HCS-0007-R002"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R002/invalid/text-key-set-no-keys-same-version.json",
+        "requirements": [
+          "HCS-0007-R002"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R002/invalid/text-key-set-other-hcs-version.json",
+        "requirements": [
+          "HCS-0007-R002"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R002/invalid/text-key-set-other-version-with-fraction.json",
+        "requirements": [
+          "HCS-0007-R002"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R002/invalid/text-key-set-version-before-shape.json",
+        "requirements": [
+          "HCS-0007-R002"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R002/valid/full-key-set.json",
+        "requirements": [
+          "HCS-0007-R002"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R003/invalid/signed-over-pretty-json.json",
+        "requirements": [
+          "HCS-0007-R003"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R003/invalid/text-duplicate-member-name.json",
+        "requirements": [
+          "HCS-0007-R003"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R003/invalid/text-duplicate-name-in-catalog.json",
+        "requirements": [
+          "HCS-0007-R003"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R003/invalid/text-key-set-other-version-with-duplicate-name.json",
+        "requirements": [
+          "HCS-0007-R003"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R003/invalid/text-other-version-with-duplicate-name.json",
+        "requirements": [
+          "HCS-0007-R003"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R003/invalid/text-unpaired-surrogate.json",
+        "requirements": [
+          "HCS-0007-R003"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R003/invalid/utf16-key-order.json",
+        "requirements": [
+          "HCS-0007-R003"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R003/invalid/wrong-payload-type.json",
+        "requirements": [
+          "HCS-0007-R003"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R003/valid/signing-input.json",
+        "requirements": [
+          "HCS-0007-R003"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R003/valid/text-no-duplicate-names.json",
+        "requirements": [
+          "HCS-0007-R003"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R003/valid/text-surrogate-pair.json",
+        "requirements": [
+          "HCS-0007-R003"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R004/invalid/beyond-safe-range.json",
+        "requirements": [
+          "HCS-0007-R004"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R004/invalid/fraction.json",
+        "requirements": [
+          "HCS-0007-R004"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R004/invalid/text-beyond-safe-range.json",
+        "requirements": [
+          "HCS-0007-R004"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R004/invalid/text-document-level-exponent.json",
+        "requirements": [
+          "HCS-0007-R004"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R004/invalid/text-exponent-negative.json",
+        "requirements": [
+          "HCS-0007-R004"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R004/invalid/text-exponent.json",
+        "requirements": [
+          "HCS-0007-R004"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R004/invalid/text-fraction-zero.json",
+        "requirements": [
+          "HCS-0007-R004"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R004/invalid/text-fraction.json",
+        "requirements": [
+          "HCS-0007-R004"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R004/invalid/text-key-set-fraction-zero.json",
+        "requirements": [
+          "HCS-0007-R004"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R004/invalid/text-key-set-fraction.json",
+        "requirements": [
+          "HCS-0007-R004"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R004/invalid/text-negative-zero.json",
+        "requirements": [
+          "HCS-0007-R004"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R004/valid/max-safe-integer.json",
+        "requirements": [
+          "HCS-0007-R004"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R004/valid/text-key-set-plain-integer.json",
+        "requirements": [
+          "HCS-0007-R004"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R004/valid/text-plain-integers.json",
+        "requirements": [
+          "HCS-0007-R004"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R005/invalid/content-changed-after-signing.json",
+        "requirements": [
+          "HCS-0007-R005"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R005/invalid/root-key-signs-catalog.json",
+        "requirements": [
+          "HCS-0007-R005"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R005/invalid/same-key-twice.json",
+        "requirements": [
+          "HCS-0007-R005"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R005/invalid/unknown-key.json",
+        "requirements": [
+          "HCS-0007-R005"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R005/invalid/unsigned.json",
+        "requirements": [
+          "HCS-0007-R005"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R005/valid/one-of-one.json",
+        "requirements": [
+          "HCS-0007-R005"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R005/valid/two-of-two.json",
+        "requirements": [
+          "HCS-0007-R005"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R006/invalid/missing-member.json",
+        "requirements": [
+          "HCS-0007-R006"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R006/invalid/other-channel.json",
+        "requirements": [
+          "HCS-0007-R006"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R006/valid/binding-matches.json",
+        "requirements": [
+          "HCS-0007-R006"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R007/invalid/expires-now.json",
+        "requirements": [
+          "HCS-0007-R007"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R007/invalid/frozen-catalog.json",
+        "requirements": [
+          "HCS-0007-R007"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R007/valid/one-second-left.json",
+        "requirements": [
+          "HCS-0007-R007"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R008/invalid/older.json",
+        "requirements": [
+          "HCS-0007-R008"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R008/invalid/reused-sequence.json",
+        "requirements": [
+          "HCS-0007-R008"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R008/valid/newer.json",
+        "requirements": [
+          "HCS-0007-R008"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R008/valid/same-content-again.json",
+        "requirements": [
+          "HCS-0007-R008"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R009/invalid/signature-before-sequence.json",
+        "requirements": [
+          "HCS-0007-R009"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R009/valid/binding-before-expiry.json",
+        "requirements": [
+          "HCS-0007-R009"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R010/invalid/signed-duplicate-entry.json",
+        "requirements": [
+          "HCS-0007-R010"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R010/invalid/signed-invalid-catalog.json",
+        "requirements": [
+          "HCS-0007-R010"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R010/valid/catalog-valid.json",
+        "requirements": [
+          "HCS-0007-R010"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R011/invalid/online-key-signs-key-set.json",
+        "requirements": [
+          "HCS-0007-R011"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R011/invalid/root-threshold-not-met.json",
+        "requirements": [
+          "HCS-0007-R011"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R011/valid/root-signed.json",
+        "requirements": [
+          "HCS-0007-R011"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R012/invalid/older-key-set.json",
+        "requirements": [
+          "HCS-0007-R012"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R012/invalid/same-version-new-keys.json",
+        "requirements": [
+          "HCS-0007-R012"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R012/valid/rotation.json",
+        "requirements": [
+          "HCS-0007-R012"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R013/invalid/all-keys-expired.json",
+        "requirements": [
+          "HCS-0007-R013"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R013/valid/one-key-valid.json",
+        "requirements": [
+          "HCS-0007-R013"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R014/invalid/not-after-exclusive.json",
+        "requirements": [
+          "HCS-0007-R014"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R014/invalid/not-yet-valid.json",
+        "requirements": [
+          "HCS-0007-R014"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R014/valid/not-before-inclusive.json",
+        "requirements": [
+          "HCS-0007-R014"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R015/invalid/rejected-catalog-does-not-advance.json",
+        "requirements": [
+          "HCS-0007-R015"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R015/valid/state-after-acceptance.json",
+        "requirements": [
+          "HCS-0007-R015"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R016/invalid/partial-host-claims-distro-1.json",
+        "requirements": [
+          "HCS-0007-R016"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R016/valid/refuses-partial-set.json",
+        "requirements": [
+          "HCS-0007-R016"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R017/invalid/interrupted-in-place-update.json",
+        "requirements": [
+          "HCS-0007-R017"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R017/valid/new-generation-alongside.json",
+        "requirements": [
+          "HCS-0007-R017"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R018/invalid/health-check-fails.json",
+        "requirements": [
+          "HCS-0007-R018"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R018/valid/health-check-passes.json",
+        "requirements": [
+          "HCS-0007-R018"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R022/invalid/invalid-signature-first.json",
+        "requirements": [
+          "HCS-0007-R022"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R022/invalid/key-set-invalid-signature-first.json",
+        "requirements": [
+          "HCS-0007-R022"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R022/invalid/key-set-valid-signature-first.json",
+        "requirements": [
+          "HCS-0007-R022"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R022/invalid/same-signature-twice.json",
+        "requirements": [
+          "HCS-0007-R022"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R022/invalid/valid-signature-first.json",
+        "requirements": [
+          "HCS-0007-R022"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R022/valid/distinct-keyids.json",
+        "requirements": [
+          "HCS-0007-R022"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R023/invalid/keys-over-limit.json",
+        "requirements": [
+          "HCS-0007-R023"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R023/invalid/signatures-over-limit.json",
+        "requirements": [
+          "HCS-0007-R023"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R023/valid/keys-at-limit.json",
+        "requirements": [
+          "HCS-0007-R023"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R023/valid/signatures-at-limit.json",
+        "requirements": [
+          "HCS-0007-R023"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R024/invalid/ignored-signature-does-not-count.json",
+        "requirements": [
+          "HCS-0007-R024"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R024/invalid/key-set-only-new-root.json",
+        "requirements": [
+          "HCS-0007-R024"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R024/valid/envelope-extra-signature-expired-key.json",
+        "requirements": [
+          "HCS-0007-R024"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R024/valid/envelope-extra-signature-fails.json",
+        "requirements": [
+          "HCS-0007-R024"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R024/valid/envelope-unknown-signer.json",
+        "requirements": [
+          "HCS-0007-R024"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R024/valid/key-set-old-and-new-root.json",
+        "requirements": [
+          "HCS-0007-R024"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R025/invalid/anchor-from-document.json",
+        "requirements": [
+          "HCS-0007-R025"
+        ],
+        "level": "distribution",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R025/valid/anchor-claim-ignored.json",
+        "requirements": [
+          "HCS-0007-R025"
+        ],
+        "level": "distribution",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R026/invalid/refused-key-set-drops-accepted.json",
+        "requirements": [
+          "HCS-0007-R026"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0007/HCS-0007-R026/valid/refused-key-set-keeps-accepted.json",
+        "requirements": [
+          "HCS-0007-R026"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R001/invalid/projection-follows-pointer.json",
+        "requirements": [
+          "HCS-0008-R001"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R001/valid/projection-names-generation.json",
+        "requirements": [
+          "HCS-0008-R001"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R002/invalid/projection-rewritten-in-place.json",
+        "requirements": [
+          "HCS-0008-R002"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R002/valid/new-run-for-new-generation.json",
+        "requirements": [
+          "HCS-0008-R002"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R003/invalid/ignored-kind-is-reported.json",
+        "requirements": [
+          "HCS-0008-R003"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R003/valid/all-projected.json",
+        "requirements": [
+          "HCS-0008-R003"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R004/invalid/mcp-on-skills-only-engine.json",
+        "requirements": [
+          "HCS-0008-R004"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R004/valid/kind-projectable.json",
+        "requirements": [
+          "HCS-0008-R004"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R005/invalid/all-or-nothing-one-unprojected.json",
+        "requirements": [
+          "HCS-0008-R005"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R005/valid/partial-keeps-projected-entries.json",
+        "requirements": [
+          "HCS-0008-R005"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R006/invalid/two-packages-same-skill-name.json",
+        "requirements": [
+          "HCS-0008-R006"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R006/invalid/two-servers-same-name.json",
+        "requirements": [
+          "HCS-0008-R006"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R006/valid/generation-replaces-host-default.json",
+        "requirements": [
+          "HCS-0008-R006"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R007/invalid/policy-removes-host-component.json",
+        "requirements": [
+          "HCS-0008-R007"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R007/invalid/policy-widens-host-permission.json",
+        "requirements": [
+          "HCS-0008-R007"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R007/invalid/server-replaces-safety-proxy.json",
+        "requirements": [
+          "HCS-0008-R007"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R007/valid/policy-narrows-host-permission.json",
+        "requirements": [
+          "HCS-0008-R007"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R008/invalid/skill-frontmatter-rewritten.json",
+        "requirements": [
+          "HCS-0008-R008"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R008/valid/skill-linked-unchanged.json",
+        "requirements": [
+          "HCS-0008-R008"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R010/invalid/server-json-without-version.json",
+        "requirements": [
+          "HCS-0008-R010"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R010/valid/minimal-server-json.json",
+        "requirements": [
+          "HCS-0008-R010"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R011/invalid/secret-with-default.json",
+        "requirements": [
+          "HCS-0008-R011"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R011/invalid/secret-with-literal-value.json",
+        "requirements": [
+          "HCS-0008-R011"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R011/valid/secret-declared-without-value.json",
+        "requirements": [
+          "HCS-0008-R011"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R012/invalid/required-secret-granted-to-other-entry.json",
+        "requirements": [
+          "HCS-0008-R012"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R012/valid/optional-secret-not-granted.json",
+        "requirements": [
+          "HCS-0008-R012"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R013/invalid/confirm-on-sync.json",
+        "requirements": [
+          "HCS-0008-R013"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R013/valid/confirm-after-health.json",
+        "requirements": [
+          "HCS-0008-R013"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R014/invalid/skill-missing-from-engine.json",
+        "requirements": [
+          "HCS-0008-R014"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R014/valid/loaded-set-checked.json",
+        "requirements": [
+          "HCS-0008-R014"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R015/invalid/retries-failed-generation.json",
+        "requirements": [
+          "HCS-0008-R015"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R015/valid/one-rollback.json",
+        "requirements": [
+          "HCS-0008-R015"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R016/invalid/rollback-loop.json",
+        "requirements": [
+          "HCS-0008-R016"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R016/valid/stop-after-failed-rollback.json",
+        "requirements": [
+          "HCS-0008-R016"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R017/invalid/unsupported-fails-switch.json",
+        "requirements": [
+          "HCS-0008-R017"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R017/valid/other-errors-still-fail.json",
+        "requirements": [
+          "HCS-0008-R017"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R017/valid/unsupported-does-not-fail-switch.json",
+        "requirements": [
+          "HCS-0008-R017"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R019/invalid/credential-confinement-alone.json",
+        "requirements": [
+          "HCS-0008-R019"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R019/invalid/guard-only-in-engine-hooks.json",
+        "requirements": [
+          "HCS-0008-R019"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R019/invalid/guard-wraps-session-provider-only.json",
+        "requirements": [
+          "HCS-0008-R019"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R019/valid/canary-masked-in-every-request.json",
+        "requirements": [
+          "HCS-0008-R019"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R019/valid/extension-own-client-confined.json",
+        "requirements": [
+          "HCS-0008-R019"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R020/invalid/guard-stopped-extension-request.json",
+        "requirements": [
+          "HCS-0008-R020"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R020/invalid/guard-throws-zero-requests.json",
+        "requirements": [
+          "HCS-0008-R020"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R020/invalid/guard-unreachable-zero-requests.json",
+        "requirements": [
+          "HCS-0008-R020"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R020/valid/guard-healthy-requests-flow.json",
+        "requirements": [
+          "HCS-0008-R020"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R021/invalid/identifier-absolute.json",
+        "requirements": [
+          "HCS-0008-R021"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R021/invalid/identifier-empty-segment.json",
+        "requirements": [
+          "HCS-0008-R021"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R021/invalid/identifier-escapes-folder.json",
+        "requirements": [
+          "HCS-0008-R021"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R021/invalid/identifier-missing-file.json",
+        "requirements": [
+          "HCS-0008-R021"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R021/invalid/link-escapes-folder.json",
+        "requirements": [
+          "HCS-0008-R021"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R021/invalid/non-stdio-transport.json",
+        "requirements": [
+          "HCS-0008-R021"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R021/invalid/two-file-packages.json",
+        "requirements": [
+          "HCS-0008-R021"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R021/valid/dot-segment-identifier.json",
+        "requirements": [
+          "HCS-0008-R021"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R021/valid/file-package-in-folder.json",
+        "requirements": [
+          "HCS-0008-R021"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R021/valid/file-package-in-subfolder.json",
+        "requirements": [
+          "HCS-0008-R021"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R022/invalid/new-generation-does-not-move-running-server.json",
+        "requirements": [
+          "HCS-0008-R022"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R022/valid/started-from-generation.json",
+        "requirements": [
+          "HCS-0008-R022"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R023/invalid/runtime-arguments.json",
+        "requirements": [
+          "HCS-0008-R023"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R023/invalid/runtime-control-variable.json",
+        "requirements": [
+          "HCS-0008-R023"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R023/invalid/runtime-not-provided-all-or-nothing.json",
+        "requirements": [
+          "HCS-0008-R023"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R023/invalid/runtime-not-provided.json",
+        "requirements": [
+          "HCS-0008-R023"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R023/invalid/unstartable-before-authority.json",
+        "requirements": [
+          "HCS-0008-R023"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R023/valid/host-provides-runtime.json",
+        "requirements": [
+          "HCS-0008-R023"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R024/invalid/secret-argument.json",
+        "requirements": [
+          "HCS-0008-R024"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R024/invalid/secret-in-argument-variable.json",
+        "requirements": [
+          "HCS-0008-R024"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R024/valid/secret-through-environment.json",
+        "requirements": [
+          "HCS-0008-R024"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R025/invalid/planted-files-ignored.json",
+        "requirements": [
+          "HCS-0008-R025"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R025/valid/empty-home-loads-projection.json",
+        "requirements": [
+          "HCS-0008-R025"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R025/valid/workspace-instructions-by-host-setting.json",
+        "requirements": [
+          "HCS-0008-R025"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R026/invalid/agent-without-capability.json",
+        "requirements": [
+          "HCS-0008-R026"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R026/invalid/capability-unknown-version.json",
+        "requirements": [
+          "HCS-0008-R026"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R026/valid/capability-advertised.json",
+        "requirements": [
+          "HCS-0008-R026"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R027/invalid/dotdot-skill-path.json",
+        "requirements": [
+          "HCS-0008-R027"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R027/invalid/missing-generation-id.json",
+        "requirements": [
+          "HCS-0008-R027"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R027/invalid/relative-skill-path.json",
+        "requirements": [
+          "HCS-0008-R027"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R027/invalid/skill-path-outside-generation.json",
+        "requirements": [
+          "HCS-0008-R027"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R027/valid/host-default-skill-sent.json",
+        "requirements": [
+          "HCS-0008-R027"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R027/valid/session-meta.json",
+        "requirements": [
+          "HCS-0008-R027"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R027/valid/unc-skill-path.json",
+        "requirements": [
+          "HCS-0008-R027"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R028/invalid/load-other-generation-refused.json",
+        "requirements": [
+          "HCS-0008-R028"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R028/invalid/load-without-generation-refused.json",
+        "requirements": [
+          "HCS-0008-R028"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R028/invalid/resume-other-generation-refused.json",
+        "requirements": [
+          "HCS-0008-R028"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R028/valid/load-same-generation.json",
+        "requirements": [
+          "HCS-0008-R028"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R029/invalid/loaded-result-missing-servers.json",
+        "requirements": [
+          "HCS-0008-R029"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R029/invalid/missing-server-fails-health.json",
+        "requirements": [
+          "HCS-0008-R029"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R029/valid/loaded-result.json",
+        "requirements": [
+          "HCS-0008-R029"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R030/invalid/cannot-deliver-literally.json",
+        "requirements": [
+          "HCS-0008-R030"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R030/invalid/engine-interprets-unescaped-value.json",
+        "requirements": [
+          "HCS-0008-R030"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R030/valid/values-reach-server-literally.json",
+        "requirements": [
+          "HCS-0008-R030"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R031/invalid/pointer-moved-without-record.json",
+        "requirements": [
+          "HCS-0008-R031"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R031/valid/records-before-pointer-move.json",
+        "requirements": [
+          "HCS-0008-R031"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R032/invalid/failed-mark-lost-on-restart.json",
+        "requirements": [
+          "HCS-0008-R032"
+        ],
+        "level": "recovery",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R032/valid/failed-generation-not-started-after-restart.json",
+        "requirements": [
+          "HCS-0008-R032"
+        ],
+        "level": "recovery",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R032/valid/failed-mark-written-before-return.json",
+        "requirements": [
+          "HCS-0008-R032"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R032/valid/identifier-not-reused.json",
+        "requirements": [
+          "HCS-0008-R032"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R033/invalid/failed-active-started.json",
+        "requirements": [
+          "HCS-0008-R033"
+        ],
+        "level": "recovery",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R033/invalid/orphan-active-started-unchecked.json",
+        "requirements": [
+          "HCS-0008-R033"
+        ],
+        "level": "recovery",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R033/invalid/pending-active-assumed-confirmed.json",
+        "requirements": [
+          "HCS-0008-R033"
+        ],
+        "level": "recovery",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R033/invalid/recorded-stop-forgotten-on-restart.json",
+        "requirements": [
+          "HCS-0008-R033"
+        ],
+        "level": "recovery",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R033/invalid/stale-pending-kept.json",
+        "requirements": [
+          "HCS-0008-R033"
+        ],
+        "level": "recovery",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R033/valid/confirmed-active-starts.json",
+        "requirements": [
+          "HCS-0008-R033"
+        ],
+        "level": "recovery",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R033/valid/failed-active-returns.json",
+        "requirements": [
+          "HCS-0008-R033"
+        ],
+        "level": "recovery",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R033/valid/orphan-active-is-rescued.json",
+        "requirements": [
+          "HCS-0008-R033"
+        ],
+        "level": "recovery",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R033/valid/pending-active-is-health-checked.json",
+        "requirements": [
+          "HCS-0008-R033"
+        ],
+        "level": "recovery",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R033/valid/recorded-stop-stays-stopped.json",
+        "requirements": [
+          "HCS-0008-R033"
+        ],
+        "level": "recovery",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R033/valid/stale-pending-dropped.json",
+        "requirements": [
+          "HCS-0008-R033"
+        ],
+        "level": "recovery",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R034/invalid/cleanup-removes-confirmed.json",
+        "requirements": [
+          "HCS-0008-R034"
+        ],
+        "level": "recovery",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R034/invalid/cleanup-removes-failed-record.json",
+        "requirements": [
+          "HCS-0008-R034"
+        ],
+        "level": "recovery",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R034/valid/cleanup-keeps-active-pending-confirmed.json",
+        "requirements": [
+          "HCS-0008-R034"
+        ],
+        "level": "recovery",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R035/invalid/pointer-cannot-move-starts-failed.json",
+        "requirements": [
+          "HCS-0008-R035"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R035/valid/no-confirmed-stops.json",
+        "requirements": [
+          "HCS-0008-R035"
+        ],
+        "level": "recovery",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R035/valid/pointer-cannot-move-stops.json",
+        "requirements": [
+          "HCS-0008-R035"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R036/invalid/fractional-prefix.json",
+        "requirements": [
+          "HCS-0008-R036"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R036/invalid/no-limit.json",
+        "requirements": [
+          "HCS-0008-R036"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R036/invalid/unknown-member.json",
+        "requirements": [
+          "HCS-0008-R036"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R036/invalid/zero-bytes.json",
+        "requirements": [
+          "HCS-0008-R036"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R036/valid/both-limits.json",
+        "requirements": [
+          "HCS-0008-R036"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R036/valid/prefix-only.json",
+        "requirements": [
+          "HCS-0008-R036"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R037/invalid/over-limit-all-or-nothing.json",
+        "requirements": [
+          "HCS-0008-R037"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R037/invalid/over-the-limit.json",
+        "requirements": [
+          "HCS-0008-R037"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R037/valid/at-the-limit.json",
+        "requirements": [
+          "HCS-0008-R037"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R037/valid/no-limits-at-all.json",
+        "requirements": [
+          "HCS-0008-R037"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R037/valid/no-tool-limit-declared.json",
+        "requirements": [
+          "HCS-0008-R037"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R038/invalid/unmeasured.json",
+        "requirements": [
+          "HCS-0008-R038"
+        ],
+        "level": "projection",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R038/valid/measured.json",
+        "requirements": [
+          "HCS-0008-R038"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0008/HCS-0008-R038/valid/unmeasured-without-limit.json",
+        "requirements": [
+          "HCS-0008-R038"
+        ],
+        "level": "projection",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R001/invalid/empty-effect.json",
+        "requirements": [
+          "HCS-0009-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R001/invalid/empty-tool-name.json",
+        "requirements": [
+          "HCS-0009-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R001/invalid/flag-not-boolean.json",
+        "requirements": [
+          "HCS-0009-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R001/invalid/missing-effect.json",
+        "requirements": [
+          "HCS-0009-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R001/invalid/missing-tools.json",
+        "requirements": [
+          "HCS-0009-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R001/invalid/unknown-member.json",
+        "requirements": [
+          "HCS-0009-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R001/valid/flags-and-extensions.json",
+        "requirements": [
+          "HCS-0009-R001"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R001/valid/minimal.json",
+        "requirements": [
+          "HCS-0009-R001"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R001/valid/unknown-class-is-a-valid-document.json",
+        "requirements": [
+          "HCS-0009-R001"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R003/invalid/additive-destructive.json",
+        "requirements": [
+          "HCS-0009-R003"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R003/invalid/annotations-omitted.json",
+        "requirements": [
+          "HCS-0009-R003"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R003/invalid/declared-closed-presented-open.json",
+        "requirements": [
+          "HCS-0009-R003"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R003/invalid/destructive-as-additive.json",
+        "requirements": [
+          "HCS-0009-R003"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R003/invalid/idempotent-dropped.json",
+        "requirements": [
+          "HCS-0009-R003"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R003/invalid/read-not-read-only.json",
+        "requirements": [
+          "HCS-0009-R003"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R003/valid/additive-default.json",
+        "requirements": [
+          "HCS-0009-R003"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R003/valid/additive-idempotent.json",
+        "requirements": [
+          "HCS-0009-R003"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R003/valid/destructive-idempotent.json",
+        "requirements": [
+          "HCS-0009-R003"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R003/valid/presented-annotations.json",
+        "requirements": [
+          "HCS-0009-R003"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R003/valid/read-closed-world.json",
+        "requirements": [
+          "HCS-0009-R003"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R003/valid/read.json",
+        "requirements": [
+          "HCS-0009-R003"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R004/invalid/undeclared-as-additive.json",
+        "requirements": [
+          "HCS-0009-R004"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R004/invalid/undeclared-as-read.json",
+        "requirements": [
+          "HCS-0009-R004"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R004/invalid/unknown-class-keeps-flags.json",
+        "requirements": [
+          "HCS-0009-R004"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R004/valid/declaration-not-an-object.json",
+        "requirements": [
+          "HCS-0009-R004"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R004/valid/undeclared.json",
+        "requirements": [
+          "HCS-0009-R004"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R004/valid/unknown-class.json",
+        "requirements": [
+          "HCS-0009-R004"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R005/invalid/server-self-report-trusted.json",
+        "requirements": [
+          "HCS-0009-R005"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R005/invalid/undeclared-trusts-server.json",
+        "requirements": [
+          "HCS-0009-R005"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R005/valid/declaration-wins.json",
+        "requirements": [
+          "HCS-0009-R005"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R005/valid/undeclared-ignores-server.json",
+        "requirements": [
+          "HCS-0009-R005"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R006/invalid/read-class-no-grant.json",
+        "requirements": [
+          "HCS-0009-R006"
+        ],
+        "level": "authority",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0009/HCS-0009-R006/valid/granted-tool.json",
+        "requirements": [
+          "HCS-0009-R006"
+        ],
+        "level": "authority",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R001/invalid/missing-digest.json",
+        "requirements": [
+          "HCS-0010-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R001/invalid/payload-inline.json",
+        "requirements": [
+          "HCS-0010-R001"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R001/valid/accepted-undo-with-extension.json",
+        "requirements": [
+          "HCS-0010-R001"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R001/valid/pending.json",
+        "requirements": [
+          "HCS-0010-R001"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R002/invalid/rejected-applied.json",
+        "requirements": [
+          "HCS-0010-R002"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R002/valid/pending-not-applied.json",
+        "requirements": [
+          "HCS-0010-R002"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R003/invalid/accepted-without-answer.json",
+        "requirements": [
+          "HCS-0010-R003"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R003/invalid/answer-flips-state.json",
+        "requirements": [
+          "HCS-0010-R003"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R003/invalid/pending-with-answer.json",
+        "requirements": [
+          "HCS-0010-R003"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R003/invalid/state-outside-the-set.json",
+        "requirements": [
+          "HCS-0010-R003"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R003/valid/rejected-with-answer.json",
+        "requirements": [
+          "HCS-0010-R003"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R003/valid/second-answer-refused.json",
+        "requirements": [
+          "HCS-0010-R003"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R004/invalid/agent-tool-approves.json",
+        "requirements": [
+          "HCS-0010-R004"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R004/invalid/answered-by-policy.json",
+        "requirements": [
+          "HCS-0010-R004"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R004/valid/answered-by-grant.json",
+        "requirements": [
+          "HCS-0010-R004"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R004/valid/person-answers-over-own-channel.json",
+        "requirements": [
+          "HCS-0010-R004"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R005/invalid/decision-missing.json",
+        "requirements": [
+          "HCS-0010-R005"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R005/invalid/record-cannot-be-written.json",
+        "requirements": [
+          "HCS-0010-R005"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R005/valid/decision-linked.json",
+        "requirements": [
+          "HCS-0010-R005"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R005/valid/record-before-apply.json",
+        "requirements": [
+          "HCS-0010-R005"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R006/invalid/overwrites-later-change.json",
+        "requirements": [
+          "HCS-0010-R006"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R006/valid/changed-target-refused.json",
+        "requirements": [
+          "HCS-0010-R006"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R006/valid/unchanged-target-applied.json",
+        "requirements": [
+          "HCS-0010-R006"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R007/invalid/marked-undone.json",
+        "requirements": [
+          "HCS-0010-R007"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R007/invalid/undo-edits-history.json",
+        "requirements": [
+          "HCS-0010-R007"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R007/valid/undo-adds-a-record.json",
+        "requirements": [
+          "HCS-0010-R007"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R007/valid/undo-record.json",
+        "requirements": [
+          "HCS-0010-R007"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R008/invalid/undo-of-rejected.json",
+        "requirements": [
+          "HCS-0010-R008"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R008/valid/later-change-blocks-undo.json",
+        "requirements": [
+          "HCS-0010-R008"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R008/valid/undo-once.json",
+        "requirements": [
+          "HCS-0010-R008"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R009/invalid/answered-record-rewritten.json",
+        "requirements": [
+          "HCS-0010-R009"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R009/valid/answered-record-kept.json",
+        "requirements": [
+          "HCS-0010-R009"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R010/invalid/retry-duplicates.json",
+        "requirements": [
+          "HCS-0010-R010"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R010/valid/retry-returns-existing.json",
+        "requirements": [
+          "HCS-0010-R010"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R011/invalid/reused-key-returns-first.json",
+        "requirements": [
+          "HCS-0010-R011"
+        ],
+        "level": "host",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R011/valid/reused-key-refused.json",
+        "requirements": [
+          "HCS-0010-R011"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R012/invalid/grant-for-other-action-type.json",
+        "requirements": [
+          "HCS-0010-R012"
+        ],
+        "level": "authority",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R012/invalid/tool-name-as-action-type.json",
+        "requirements": [
+          "HCS-0010-R012"
+        ],
+        "level": "document",
+        "polarity": "invalid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R012/valid/dotted-action-type.json",
+        "requirements": [
+          "HCS-0010-R012"
+        ],
+        "level": "document",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R012/valid/grant-covers-action-type.json",
+        "requirements": [
+          "HCS-0010-R012"
+        ],
+        "level": "authority",
+        "polarity": "valid"
+      },
+      {
+        "path": "conformance/cases/HCS-0010/HCS-0010-R012/valid/one-answer-several-tools.json",
+        "requirements": [
+          "HCS-0010-R012"
+        ],
+        "level": "host",
+        "polarity": "valid"
+      }
+    ]
+  },
+  "runner": {
+    "path": "conformance/runner/run.py",
+    "requires": [
+      "python>=3.10",
+      "jsonschema>=4.18"
+    ],
+    "command": "python3 conformance/runner/run.py [--report PATH] [-v]"
+  }
+}

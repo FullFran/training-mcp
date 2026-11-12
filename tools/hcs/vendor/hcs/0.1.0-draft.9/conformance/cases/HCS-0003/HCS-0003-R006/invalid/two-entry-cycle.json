@@ -1,0 +1,117 @@
+{
+  "description": "a and b require each other; d depends on a and fails as a consequence.",
+  "requirements": [
+    "HCS-0003-R006"
+  ],
+  "level": "resolution",
+  "input": {
+    "catalog": {
+      "hcsVersion": "0.1",
+      "id": "dev.example.desktop",
+      "version": "2026.11.06-1",
+      "entries": [
+        {
+          "id": "dev.example.a",
+          "version": "1.0.0",
+          "contentHash": "sha256:abababababababababababababababababababababababababababababababab",
+          "size": 10,
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/a",
+              "provides": [
+                "dev.example.cap-a@1"
+              ]
+            }
+          ],
+          "requires": [
+            "dev.example.cap-b@1"
+          ]
+        },
+        {
+          "id": "dev.example.b",
+          "version": "1.0.0",
+          "contentHash": "sha256:abababababababababababababababababababababababababababababababab",
+          "size": 10,
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/b",
+              "provides": [
+                "dev.example.cap-b@1"
+              ]
+            }
+          ],
+          "requires": [
+            "dev.example.cap-a@1"
+          ]
+        },
+        {
+          "id": "dev.example.d",
+          "version": "1.0.0",
+          "contentHash": "sha256:abababababababababababababababababababababababababababababababab",
+          "size": 10,
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/d"
+            }
+          ],
+          "requires": [
+            "dev.example.cap-a@1"
+          ]
+        },
+        {
+          "id": "dev.example.e",
+          "version": "1.0.0",
+          "contentHash": "sha256:abababababababababababababababababababababababababababababababab",
+          "size": 10,
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/e"
+            }
+          ]
+        }
+      ]
+    },
+    "host": {
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "contributionKinds": [
+        "skill",
+        "mcp-server"
+      ],
+      "mediaTypes": [
+        "application/vnd.oci.image.layer.v1.tar+gzip"
+      ],
+      "builtins": []
+    }
+  },
+  "expect": {
+    "activationOrder": [
+      "dev.example.e"
+    ],
+    "errors": [
+      {
+        "code": "dependency_cycle",
+        "entry": "dev.example.a"
+      },
+      {
+        "code": "dependency_cycle",
+        "entry": "dev.example.b"
+      },
+      {
+        "code": "missing_dependency",
+        "entry": "dev.example.d",
+        "capability": "dev.example.cap-a@1"
+      }
+    ]
+  }
+}

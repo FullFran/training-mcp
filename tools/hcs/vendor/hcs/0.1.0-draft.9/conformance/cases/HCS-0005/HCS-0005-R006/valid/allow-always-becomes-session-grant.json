@@ -1,0 +1,13 @@
+{
+  "description": "allow_always is stored as a session grant with its origin.",
+  "requirements": [
+    "HCS-0005-R006"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "No grant. In session s1 the person answers allow_always to send mail; the engine sends mail again in s1."
+  },
+  "expect": {
+    "behaviour": "The host stores a grant {entry, permission, session: s1, origin: <id of the answer's decision record>}; the second call is allowed by that grant without asking."
+  }
+}

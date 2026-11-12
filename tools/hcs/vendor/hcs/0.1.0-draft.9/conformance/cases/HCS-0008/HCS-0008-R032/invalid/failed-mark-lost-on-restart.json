@@ -1,0 +1,26 @@
+{
+  "description": "The host forgets the failed mark across a restart and health-checks the failed generation again.",
+  "requirements": [
+    "HCS-0008-R032"
+  ],
+  "level": "recovery",
+  "input": {
+    "persisted": {
+      "active": 42,
+      "confirmed": 41,
+      "pending": 42,
+      "failed": [
+        42
+      ]
+    },
+    "onDisk": [
+      40,
+      41,
+      42
+    ]
+  },
+  "expect": {
+    "action": "health-check",
+    "generation": 42
+  }
+}

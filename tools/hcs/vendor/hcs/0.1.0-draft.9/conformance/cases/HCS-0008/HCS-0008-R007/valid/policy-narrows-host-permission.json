@@ -1,0 +1,45 @@
+{
+  "description": "A policy contribution that makes a host-owned permission stricter is projected.",
+  "requirements": [
+    "HCS-0008-R007"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "skill",
+      "x-example-policy"
+    ],
+    "hostOwned": [
+      "permission/bash",
+      "mcp/io.example/safety-proxy"
+    ],
+    "grantedSecrets": {},
+    "activationPolicy": "all-or-nothing",
+    "generation": {
+      "id": "gen-0042",
+      "entries": [
+        {
+          "id": "dev.example.guard",
+          "contributions": [
+            {
+              "kind": "x-example-policy",
+              "path": "policies/guard.json",
+              "settings": [
+                {
+                  "name": "permission/bash",
+                  "effect": "narrow"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "errors": [],
+    "selected": [
+      "dev.example.guard"
+    ]
+  }
+}

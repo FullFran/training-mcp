@@ -1,0 +1,26 @@
+{
+  "description": "An answered proposal names its decision record.",
+  "requirements": [
+    "HCS-0010-R005"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0010:proposal:0.1",
+  "input": {
+    "id": "p-1",
+    "actionType": "dev.example.sets.log",
+    "proposedBy": "dev.example.coach",
+    "target": "session-7",
+    "payloadDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "time": "2026-11-12T10:00:00Z",
+    "state": "accepted",
+    "answer": {
+      "decision": "d-1",
+      "by": "subject",
+      "time": "2026-11-12T10:05:00Z"
+    }
+  },
+  "expect": {
+    "outcome": "valid",
+    "errors": []
+  }
+}

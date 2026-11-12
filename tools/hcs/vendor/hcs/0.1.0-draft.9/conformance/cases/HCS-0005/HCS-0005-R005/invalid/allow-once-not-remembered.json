@@ -1,0 +1,13 @@
+{
+  "description": "allow_once is not stored as a grant.",
+  "requirements": [
+    "HCS-0005-R005"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "No grant. Call 1 is answered allow_once. The engine then asks to send mail again (call 2) in the same session."
+  },
+  "expect": {
+    "behaviour": "Call 2 is not allowed by the earlier answer: the host asks again or denies it with permission_denied."
+  }
+}

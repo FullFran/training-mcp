@@ -1,0 +1,13 @@
+{
+  "description": "Activate an entry and record when package processes start.",
+  "requirements": [
+    "HCS-0004-R001"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Activate an entry and record when package processes start."
+  },
+  "expect": {
+    "behaviour": "No package process starts before the entry is reported prepared."
+  }
+}

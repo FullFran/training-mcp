@@ -1,0 +1,13 @@
+{
+  "description": "The adapter rewrites a skill to fit an engine.",
+  "requirements": [
+    "HCS-0008-R008"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The adapter copies a skill and rewrites the name in SKILL.md frontmatter to add a package prefix."
+  },
+  "expect": {
+    "behaviour": "Non-conforming: the projected skill differs from the signed package content."
+  }
+}

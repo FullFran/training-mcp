@@ -1,0 +1,25 @@
+{
+  "description": "A tool declared additive with a grant is allowed.",
+  "requirements": [
+    "HCS-0009-R006"
+  ],
+  "level": "authority",
+  "input": {
+    "requests": [],
+    "grants": [
+      {
+        "entry": "dev.example.notes",
+        "permission": "dev.example.notes.read"
+      }
+    ],
+    "check": {
+      "entry": "dev.example.notes",
+      "permission": "dev.example.notes.read"
+    }
+  },
+  "expect": {
+    "decision": {
+      "allow": true
+    }
+  }
+}

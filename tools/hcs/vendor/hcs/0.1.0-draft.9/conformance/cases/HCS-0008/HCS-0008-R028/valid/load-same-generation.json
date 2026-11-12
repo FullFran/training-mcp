@@ -1,0 +1,13 @@
+{
+  "description": "A session reopens on the generation it was created with.",
+  "requirements": [
+    "HCS-0008-R028"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Session s1 was created on gen-0060; the host sends session/load for s1 with generation.id gen-0060."
+  },
+  "expect": {
+    "behaviour": "The agent reopens s1."
+  }
+}

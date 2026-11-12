@@ -1,0 +1,24 @@
+{
+  "description": "A pending record for a generation that is not active is discarded and the active generation is kept (item 2).",
+  "requirements": [
+    "HCS-0008-R033"
+  ],
+  "level": "recovery",
+  "input": {
+    "persisted": {
+      "active": 41,
+      "confirmed": 41,
+      "pending": 42,
+      "failed": []
+    },
+    "onDisk": [
+      40,
+      41,
+      42
+    ]
+  },
+  "expect": {
+    "action": "discard-pending",
+    "generation": 42
+  }
+}

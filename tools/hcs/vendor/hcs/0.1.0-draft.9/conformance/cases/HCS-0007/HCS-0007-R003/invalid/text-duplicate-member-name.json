@@ -1,0 +1,54 @@
+{
+  "description": "A member name written twice in one object has no canonical form, whatever the signature says.",
+  "requirements": [
+    "HCS-0007-R003"
+  ],
+  "level": "distribution",
+  "documentBase64": "eyJoY3NWZXJzaW9uIjoiMC4xIiwic2VxdWVuY2UiOjQyLCJleHBpcmVzIjoiMjAyNi0xMS0xM1QwMDowMDowMFoiLCJiaW5kaW5nIjp7InRlbmFudCI6InQtMDAwMSIsInByb2ZpbGUiOiJkZXNrdG9wIiwiY2hhbm5lbCI6InN0YWJsZSJ9LCJjYXRhbG9nIjp7Imhjc1ZlcnNpb24iOiIwLjEiLCJpZCI6ImRldi5leGFtcGxlLmRlc2t0b3AiLCJ2ZXJzaW9uIjoiMjAyNi4xMS4wNi0xIiwiZW50cmllcyI6W3siaWQiOiJkZXYuZXhhbXBsZS5ub3RlcyIsInZlcnNpb24iOiIxLjQuMCIsImNvbnRlbnRIYXNoIjoic2hhMjU2OjRmNGY0ZjRmNGY0ZjRmNGY0ZjRmNGY0ZjRmNGY0ZjRmNGY0ZjRmNGY0ZjRmNGY0ZjRmNGY0ZjRmNGY0ZjRmNGYiLCJzaXplIjoxODM0MiwibWVkaWFUeXBlIjoiYXBwbGljYXRpb24vdm5kLm9jaS5pbWFnZS5sYXllci52MS50YXIrZ3ppcCIsImNvbnRyaWJ1dGlvbnMiOlt7ImtpbmQiOiJza2lsbCIsInBhdGgiOiJza2lsbHMvdGFrZS1ub3RlcyJ9XX1dfSwieC1leGFtcGxlLW4iOjEsIngtZXhhbXBsZS1uIjoxLCJ4LWV4YW1wbGUtbSI6LTEyLCJ4LWV4YW1wbGUtcyI6ImEiLCJzaWduYXR1cmVzIjpbeyJrZXlpZCI6Im9ubGluZS0xIiwic2lnIjoiV1N4cnp4NWtTSDRqeXRxR251akNZbldoVDREVk5aRHJVSnBmNi9GQ0paNzRMTHM4MEhhYmcxZHZzTmVDcldJaGUxQmlueGl3b09PK1luZDZLSmR1Q1E9PSJ9XX0=",
+  "input": {
+    "check": "envelope",
+    "now": "2026-11-06T12:00:00Z",
+    "trustAnchor": {
+      "keys": [
+        {
+          "keyid": "root-1",
+          "keytype": "ed25519",
+          "public": "LWB8cicdNrnQPkwy2jC4f24oJ6JOv49Apy61kpnIRsU="
+        }
+      ],
+      "threshold": 1
+    },
+    "keySet": {
+      "hcsVersion": "0.1",
+      "version": 3,
+      "keys": [
+        {
+          "keyid": "online-1",
+          "keytype": "ed25519",
+          "public": "oNkoBdUQ0xTyv7u+lLzrl8w7lkU/9tOfYLgHuY8YZDs=",
+          "notBefore": "2026-01-01T00:00:00Z",
+          "notAfter": "2027-01-01T00:00:00Z"
+        }
+      ],
+      "signatures": [
+        {
+          "keyid": "root-1",
+          "sig": "tx4NEICY/AHXoefq8kWHBDb9t9jM+wur3eIWBIpMiEs6mKr/4KyuQGk4IGsjOHJ6jJYUbYiFL0BAQP+zOnu8CA=="
+        }
+      ]
+    },
+    "assignment": {
+      "tenant": "t-0001",
+      "profile": "desktop",
+      "channel": "stable"
+    }
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

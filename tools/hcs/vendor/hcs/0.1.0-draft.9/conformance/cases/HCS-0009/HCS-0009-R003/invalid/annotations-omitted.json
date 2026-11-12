@@ -1,0 +1,16 @@
+{
+  "description": "A host that presents the tool without annotations.",
+  "requirements": [
+    "HCS-0009-R003"
+  ],
+  "level": "host",
+  "input": {
+    "tool": "list_notes",
+    "declared": {
+      "effect": "read"
+    }
+  },
+  "expect": {
+    "behaviour": "The tool is presented with no annotations, which a client reads as destructive and open-world."
+  }
+}

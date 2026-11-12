@@ -1,0 +1,60 @@
+{
+  "description": "arm64-only entry on an amd64 host.",
+  "requirements": [
+    "HCS-0001-R009"
+  ],
+  "level": "resolution",
+  "input": {
+    "catalog": {
+      "hcsVersion": "0.1",
+      "id": "dev.example.desktop",
+      "version": "2026.11.06-1",
+      "entries": [
+        {
+          "id": "dev.example.a",
+          "version": "1.0.0",
+          "contentHash": "sha256:abababababababababababababababababababababababababababababababab",
+          "size": 10,
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/a"
+            }
+          ],
+          "compatibility": {
+            "platforms": [
+              {
+                "os": "linux",
+                "architecture": "arm64"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "host": {
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "contributionKinds": [
+        "skill",
+        "mcp-server"
+      ],
+      "mediaTypes": [
+        "application/vnd.oci.image.layer.v1.tar+gzip"
+      ],
+      "builtins": []
+    }
+  },
+  "expect": {
+    "activationOrder": [],
+    "errors": [
+      {
+        "code": "platform_incompatible",
+        "entry": "dev.example.a"
+      }
+    ]
+  }
+}

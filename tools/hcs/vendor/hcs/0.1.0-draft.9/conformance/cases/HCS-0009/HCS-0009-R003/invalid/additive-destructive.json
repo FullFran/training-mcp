@@ -1,0 +1,28 @@
+{
+  "description": "An additive tool presented as destructive.",
+  "requirements": [
+    "HCS-0009-R003"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0009:tool-effects:0.1#/$defs/classification",
+  "input": {
+    "tool": "add_note",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "declared": {
+      "effect": "additive"
+    }
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

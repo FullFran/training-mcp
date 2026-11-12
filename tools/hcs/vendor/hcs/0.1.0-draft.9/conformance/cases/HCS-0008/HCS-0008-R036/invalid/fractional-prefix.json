@@ -1,0 +1,20 @@
+{
+  "description": "A prefix is a whole number of characters.",
+  "requirements": [
+    "HCS-0008-R036"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0008:client-limits:0.1",
+  "input": {
+    "client": "chatgpt",
+    "instructionsPrefix": 512.5
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

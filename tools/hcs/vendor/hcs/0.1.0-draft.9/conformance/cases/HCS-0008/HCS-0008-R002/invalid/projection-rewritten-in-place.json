@@ -1,0 +1,13 @@
+{
+  "description": "The projection of a running engine is rewritten.",
+  "requirements": [
+    "HCS-0008-R002"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "An engine run reads a configuration file; the host overwrites that file with the gen-0042 projection while the run continues and the engine reloads it."
+  },
+  "expect": {
+    "behaviour": "Non-conforming: one run sees two generations."
+  }
+}

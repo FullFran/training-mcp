@@ -1,0 +1,14 @@
+{
+  "description": "The agent's capability object for the HCS extension.",
+  "requirements": [
+    "HCS-0008-R026"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0008:acp:0.1#/$defs/capability",
+  "input": {
+    "projection": "0.1"
+  },
+  "expect": {
+    "outcome": "valid"
+  }
+}

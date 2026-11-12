@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hcs:schema:hcs-0009:tool-effects:0.1",
+  "title": "HCS tool effect declarations",
+  "description": "Effect classes of the tools of an MCP server a package contributes (HCS-0009). `serverMeta` is the value of the member `io.github.fullfran.hcs` of the `_meta` object of the server's server.json.",
+  "$defs": {
+    "toolName": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "effectClass": { "enum": ["read", "additive", "destructive"] },
+    "effectDeclaration": {
+      "description": "The declaration of one tool. `effect` is any non-empty string so that a class added by a later version is a valid document; a host treats a class it does not know as `destructive` (HCS-0009-R003).",
+      "type": "object",
+      "required": ["effect"],
+      "properties": {
+        "effect": { "type": "string", "minLength": 1 },
+        "idempotent": { "type": "boolean" },
+        "openWorld": { "type": "boolean" }
+      },
+      "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+      "additionalProperties": false
+    },
+    "serverMeta": {
+      "type": "object",
+      "required": ["tools"],
+      "properties": {
+        "tools": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/toolName" },
+          "additionalProperties": { "$ref": "#/$defs/effectDeclaration" }
+        }
+      },
+      "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+      "additionalProperties": false
+    },
+    "toolAnnotations": {
+      "description": "The four MCP ToolAnnotations hints a host presents for a tool.",
+      "type": "object",
+      "required": ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"],
+      "properties": {
+        "readOnlyHint": { "type": "boolean" },
+        "destructiveHint": { "type": "boolean" },
+        "idempotentHint": { "type": "boolean" },
+        "openWorldHint": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "knownDeclaration": {
+      "description": "A declaration whose class is one this version defines.",
+      "allOf": [
+        { "$ref": "#/$defs/effectDeclaration" },
+        { "properties": { "effect": { "$ref": "#/$defs/effectClass" } } }
+      ]
+    },
+    "classification": {
+      "description": "What a host presents for one tool of a server: the annotations that follow from `declared` (absent when the server's descriptor has no entry for the tool). Used by document-level conformance cases for HCS-0009-R002 and R003.",
+      "type": "object",
+      "required": ["tool", "annotations"],
+      "properties": {
+        "tool": { "$ref": "#/$defs/toolName" },
+        "declared": true,
+        "annotations": { "$ref": "#/$defs/toolAnnotations" }
+      },
+      "additionalProperties": false,
+      "if": { "required": ["declared"], "properties": { "declared": { "$ref": "#/$defs/knownDeclaration" } } },
+      "then": {
+        "allOf": [
+          {
+            "if": { "properties": { "declared": { "properties": { "effect": { "const": "read" } } } } },
+            "then": { "properties": { "annotations": { "properties": { "readOnlyHint": { "const": true }, "destructiveHint": { "const": false }, "idempotentHint": { "const": true } } } } },
+            "else": {
+              "allOf": [
+                { "properties": { "annotations": { "properties": { "readOnlyHint": { "const": false } } } } },
+                {
+                  "if": { "properties": { "declared": { "properties": { "effect": { "const": "destructive" } } } } },
+                  "then": { "properties": { "annotations": { "properties": { "destructiveHint": { "const": true } } } } },
+                  "else": { "properties": { "annotations": { "properties": { "destructiveHint": { "const": false } } } } }
+                },
+                {
+                  "if": { "properties": { "declared": { "required": ["idempotent"], "properties": { "idempotent": { "const": true } } } } },
+                  "then": { "properties": { "annotations": { "properties": { "idempotentHint": { "const": true } } } } },
+                  "else": { "properties": { "annotations": { "properties": { "idempotentHint": { "const": false } } } } }
+                }
+              ]
+            }
+          },
+          {
+            "if": { "properties": { "declared": { "required": ["openWorld"], "properties": { "openWorld": { "const": false } } } } },
+            "then": { "properties": { "annotations": { "properties": { "openWorldHint": { "const": false } } } } },
+            "else": { "properties": { "annotations": { "properties": { "openWorldHint": { "const": true } } } } }
+          }
+        ]
+      },
+      "else": {
+        "properties": { "annotations": { "const": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": true } } }
+      }
+    }
+  }
+}

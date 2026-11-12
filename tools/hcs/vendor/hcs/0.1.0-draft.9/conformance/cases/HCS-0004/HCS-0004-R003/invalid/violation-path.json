@@ -1,0 +1,13 @@
+{
+  "description": "Move from set {a@1} to {a@2, b}; b fails during activation.",
+  "requirements": [
+    "HCS-0004-R003"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Move from set {a@1} to {a@2, b}; b fails during activation."
+  },
+  "expect": {
+    "behaviour": "a@1 is active again and b is not active; no entry is left in a mixed state."
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "A host that reports unsupported_contribution for the core package format is non-conforming.",
+  "requirements": [
+    "HCS-0001-R012"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Same catalog as the valid case, given to a host whose own distribution uses a vendor package media type."
+  },
+  "expect": {
+    "behaviour": "The host still unpacks the core-format entry and the entry reaches prepared; it does not report unsupported_contribution for it."
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "description": "A top-level code in structuredContent, or an hcsError outside the closed set, carries no HCS error.",
+  "requirements": ["HCS-0006-R009"],
+  "level": "client",
+  "input": {
+    "response": {
+      "jsonrpc": "2.0",
+      "id": 9,
+      "result": {
+        "content": [{ "type": "text", "text": "failed" }],
+        "isError": true,
+        "structuredContent": {
+          "code": "timeout",
+          "hcsError": { "code": "x-example-timeout", "message": "Slow" }
+        }
+      }
+    }
+  },
+  "expect": { "hcsError": null }
+}

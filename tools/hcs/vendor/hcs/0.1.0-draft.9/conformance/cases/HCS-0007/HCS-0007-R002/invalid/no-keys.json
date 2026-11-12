@@ -1,0 +1,27 @@
+{
+  "description": "A key set lists at least one key.",
+  "requirements": [
+    "HCS-0007-R002"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0007:signed-catalog:0.1#/$defs/keySet",
+  "input": {
+    "hcsVersion": "0.1",
+    "version": 3,
+    "keys": [],
+    "signatures": [
+      {
+        "keyid": "root-1",
+        "sig": "tx4NEICY/AHXoefq8kWHBDb9t9jM+wur3eIWBIpMiEs6mKr/4KyuQGk4IGsjOHJ6jJYUbYiFL0BAQP+zOnu8CA=="
+      }
+    ]
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

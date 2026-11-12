@@ -1,0 +1,24 @@
+{
+  "description": "A tool declared read (readOnlyHint true) is still denied without a grant.",
+  "requirements": [
+    "HCS-0009-R006"
+  ],
+  "level": "authority",
+  "input": {
+    "requests": [],
+    "grants": [],
+    "check": {
+      "entry": "dev.example.notes",
+      "permission": "dev.example.notes.read"
+    }
+  },
+  "expect": {
+    "decision": {
+      "allow": false,
+      "error": {
+        "code": "permission_denied",
+        "message": "denied"
+      }
+    }
+  }
+}

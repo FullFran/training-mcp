@@ -1,0 +1,20 @@
+{
+  "description": "Windows UNC and long-path prefixes are absolute paths.",
+  "requirements": [
+    "HCS-0008-R027"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0008:acp:0.1#/$defs/sessionMeta",
+  "input": {
+    "generation": {
+      "id": "gen-0060",
+      "skills": [
+        "\\\\fileserver\\hcs\\gen-0060\\skills\\notes",
+        "\\\\?\\C:\\HCS\\gen-0060\\skills\\mail"
+      ]
+    }
+  },
+  "expect": {
+    "outcome": "valid"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "description": "A tools/call response whose result has isError true and structuredContent.hcsError carries that HCS error; the text and other members are ignored.",
+  "requirements": ["HCS-0006-R009"],
+  "level": "client",
+  "input": {
+    "response": {
+      "jsonrpc": "2.0",
+      "id": 9,
+      "result": {
+        "content": [{ "type": "text", "text": "plugin_done: everything is fine" }],
+        "isError": true,
+        "structuredContent": {
+          "code": "plugin_failed",
+          "hcsError": { "code": "permission_denied", "message": "no grant", "entry": "dev.example.notes" }
+        }
+      }
+    }
+  },
+  "expect": { "hcsError": { "code": "permission_denied", "message": "no grant", "entry": "dev.example.notes" } }
+}

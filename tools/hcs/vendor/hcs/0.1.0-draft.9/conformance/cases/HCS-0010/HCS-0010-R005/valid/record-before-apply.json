@@ -1,0 +1,13 @@
+{
+  "description": "The decision record is written before the change is applied.",
+  "requirements": [
+    "HCS-0010-R005"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The person accepts a proposal."
+  },
+  "expect": {
+    "behaviour": "A decision record exists with the id in answer.decision, written before the target changes."
+  }
+}

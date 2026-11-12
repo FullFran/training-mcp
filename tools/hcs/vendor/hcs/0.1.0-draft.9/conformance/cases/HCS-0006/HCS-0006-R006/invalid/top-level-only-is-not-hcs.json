@@ -1,0 +1,19 @@
+{
+  "description": "A problem with only top-level code and reason carries no HCS error.",
+  "requirements": [
+    "HCS-0006-R006"
+  ],
+  "level": "client",
+  "input": {
+    "problem": {
+      "type": "https://example.com/problems/nothing-published",
+      "title": "Nothing published",
+      "status": 404,
+      "code": "timeout",
+      "reason": "nothing_published"
+    }
+  },
+  "expect": {
+    "hcsError": null
+  }
+}

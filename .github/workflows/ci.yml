@@ -57,6 +57,12 @@ jobs:
         if: matrix.shard == 'rest'
         run: go vet ./...
 
+      # The HCS release vendored in tools/hcs is pinned by digest. Fail when
+      # any vendored file was edited, removed or added since `sync`.
+      - name: HCS vendored release unchanged
+        if: matrix.shard == 'rest'
+        run: python3 tools/hcs/hcs_kit.py verify --root tools/hcs
+
       - name: packages in this shard
         run: |
           case "${{ matrix.shard }}" in

@@ -1,0 +1,13 @@
+{
+  "description": "A new generation reaches the engine only through a new run.",
+  "requirements": [
+    "HCS-0008-R002"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "An engine run is serving from gen-0041 when gen-0042 is prepared."
+  },
+  "expect": {
+    "behaviour": "The host starts a new engine run from the gen-0042 projection; the running engine keeps reading gen-0041 until it stops."
+  }
+}

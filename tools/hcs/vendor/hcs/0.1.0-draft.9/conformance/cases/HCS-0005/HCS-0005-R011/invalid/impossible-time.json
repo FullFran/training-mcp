@@ -1,0 +1,31 @@
+{
+  "description": "time is a real RFC 3339 UTC instant.",
+  "requirements": [
+    "HCS-0005-R011"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0005:authority:0.1#/$defs/decisionRecord",
+  "input": {
+    "id": "rec-42",
+    "time": "2026-13-45T99:99:99Z",
+    "entry": "dev.example.a",
+    "permission": "dev.example.mail.send",
+    "outcome": "allow",
+    "operation": "toolu_01",
+    "session": "s1",
+    "decider": {
+      "kind": "subject",
+      "id": "sub-7f3a"
+    },
+    "channel": "acp:session/request_permission",
+    "answer": "allow_always"
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

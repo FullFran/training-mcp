@@ -1,0 +1,13 @@
+{
+  "description": "The rollback itself fails.",
+  "requirements": [
+    "HCS-0008-R016"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "gen-0042 failed its health check; the engine run started from confirmed gen-0041 also fails its health check."
+  },
+  "expect": {
+    "behaviour": "The host stops, reports both failures and waits for a new desired set or an operator action."
+  }
+}

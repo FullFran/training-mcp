@@ -1,0 +1,25 @@
+{
+  "description": "An active generation recorded as neither confirmed, pending nor failed is treated as pending and health-checked (item 3).",
+  "requirements": [
+    "HCS-0008-R033"
+  ],
+  "level": "recovery",
+  "input": {
+    "persisted": {
+      "active": 42,
+      "confirmed": 41,
+      "pending": null,
+      "failed": []
+    },
+    "onDisk": [
+      40,
+      41,
+      42
+    ]
+  },
+  "expect": {
+    "action": "health-check",
+    "generation": 42,
+    "returnTo": 41
+  }
+}

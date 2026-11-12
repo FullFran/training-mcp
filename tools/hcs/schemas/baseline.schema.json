@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hcs:consumer-kit:baseline:0.1",
+  "title": "HCS consumer conformance baseline",
+  "description": "The status of every case at the last accepted run, after divergences.json is applied. Non-normative.",
+  "type": "object",
+  "required": ["hcsVersion", "cases"],
+  "properties": {
+    "hcsVersion": {"type": "string"},
+    "cases": {
+      "type": "object",
+      "propertyNames": {"pattern": "^HCS-[0-9]{4}/HCS-[0-9]{4}-R[0-9]{3}/(valid|invalid)/[^/]+\\.json$"},
+      "additionalProperties": {
+        "enum": ["pass", "pending", "not-applicable", "divergence", "not-implemented", "fail", "crash", "malformed"]
+      }
+    }
+  },
+  "additionalProperties": false
+}

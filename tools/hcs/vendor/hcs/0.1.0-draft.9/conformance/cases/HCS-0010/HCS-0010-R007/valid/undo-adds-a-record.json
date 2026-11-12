@@ -1,0 +1,13 @@
+{
+  "description": "Undoing adds a record and leaves the undone one as it was.",
+  "requirements": [
+    "HCS-0010-R007"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Proposal p-1 is accepted; the person undoes it."
+  },
+  "expect": {
+    "behaviour": "A new record p-2 with undoes p-1 is accepted and applied; p-1 stays accepted with its answer untouched."
+  }
+}

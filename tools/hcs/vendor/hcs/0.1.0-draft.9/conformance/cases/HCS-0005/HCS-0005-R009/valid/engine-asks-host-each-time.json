@@ -1,0 +1,13 @@
+{
+  "description": "The host, not the engine, holds the remembered answer.",
+  "requirements": [
+    "HCS-0005-R009"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The engine is configured so every tool call needing a permission goes to the host. In s1 the person answers allow_always, then the engine sends mail twice more."
+  },
+  "expect": {
+    "behaviour": "Both later calls are decided by the host's grant; each produces a decision record whose decider kind is grant."
+  }
+}

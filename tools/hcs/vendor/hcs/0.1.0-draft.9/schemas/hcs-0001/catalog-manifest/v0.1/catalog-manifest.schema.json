@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1",
+  "title": "HCS catalog manifest",
+  "description": "Desired state of a harness distribution (HCS-0001).",
+  "type": "object",
+  "required": ["hcsVersion", "id", "version", "entries"],
+  "properties": {
+    "hcsVersion": { "const": "0.1" },
+    "id": { "$ref": "urn:hcs:schema:hcs-0000:common:0.1#/$defs/dottedId" },
+    "version": { "$ref": "#/$defs/opaqueVersion" },
+    "entries": { "type": "array", "items": { "$ref": "#/$defs/entry" } }
+  },
+  "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+  "additionalProperties": false,
+  "$defs": {
+    "packageId": { "$ref": "urn:hcs:schema:hcs-0000:common:0.1#/$defs/dottedId" },
+    "opaqueVersion": {
+      "description": "Opaque version string, compared for equality only (ADR-0004).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\s]+$"
+    },
+    "contentHash": {
+      "description": "OCI digest grammar restricted to sha256/sha512 with lowercase hex (HCS-0001-R004).",
+      "type": "string",
+      "pattern": "^(sha256:[a-f0-9]{64}|sha512:[a-f0-9]{128})$"
+    },
+    "relativePath": {
+      "description": "Relative POSIX path without '..' segments (HCS-0001-R005).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!.*\\\\)(?!(.*/)?\\.\\.(/|$))[^\\u0000]+$"
+    },
+    "platform": {
+      "description": "OCI image index platform subset.",
+      "type": "object",
+      "required": ["os", "architecture"],
+      "properties": {
+        "os": { "type": "string", "minLength": 1 },
+        "architecture": { "type": "string", "minLength": 1 },
+        "variant": { "type": "string", "minLength": 1 }
+      },
+      "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+      "additionalProperties": false
+    },
+    "hostCompatibility": {
+      "description": "A host id and the exact host versions an entry runs on (HCS-0001-R016).",
+      "type": "object",
+      "required": ["id", "versions"],
+      "properties": {
+        "id": { "$ref": "urn:hcs:schema:hcs-0000:common:0.1#/$defs/dottedId" },
+        "versions": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/opaqueVersion" } }
+      },
+      "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+      "additionalProperties": false
+    },
+    "contribution": {
+      "type": "object",
+      "required": ["kind", "path"],
+      "properties": {
+        "kind": {
+          "anyOf": [
+            { "enum": ["skill", "mcp-server"] },
+            { "$ref": "urn:hcs:schema:hcs-0000:common:0.1#/$defs/extensionName" }
+          ]
+        },
+        "path": { "$ref": "#/$defs/relativePath" },
+        "provides": { "$ref": "urn:hcs:schema:hcs-0002:capability:0.1#/$defs/capabilityRefList" }
+      },
+      "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+      "additionalProperties": false
+    },
+    "entry": {
+      "type": "object",
+      "required": ["id", "version", "contentHash", "size", "mediaType", "contributions"],
+      "properties": {
+        "id": { "$ref": "#/$defs/packageId" },
+        "version": { "$ref": "#/$defs/opaqueVersion" },
+        "contentHash": { "$ref": "#/$defs/contentHash" },
+        "contentId": { "$ref": "#/$defs/contentHash", "not": { "pattern": "\\n" }, "description": "Optional digest of the exact uncompressed tar stream, not the extracted tree (HCS-0001-R017/R018)." },
+        "size": { "type": "integer", "minimum": 0 },
+        "mediaType": {
+          "description": "Media type of the package bytes (HCS-0001-R011, section 3.4).",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,126}/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,126}$"
+        },
+        "locations": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:[^\\s]+$" },
+          "uniqueItems": true
+        },
+        "contributions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/contribution" } },
+        "requires": { "$ref": "urn:hcs:schema:hcs-0002:capability:0.1#/$defs/capabilityRefList" },
+        "compatibility": {
+          "type": "object",
+          "properties": {
+            "platforms": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/platform" } },
+            "hosts": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/hostCompatibility" } }
+          },
+          "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+          "additionalProperties": false
+        }
+      },
+      "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+      "additionalProperties": false
+    }
+  }
+}

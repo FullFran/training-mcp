@@ -1,0 +1,13 @@
+{
+  "description": "A grant created by allow_always is revoked like any grant.",
+  "requirements": [
+    "HCS-0005-R006"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "In session s1 the person answers allow_always; the operator then revokes that grant; the engine sends mail again in s1."
+  },
+  "expect": {
+    "behaviour": "The call after the revocation is denied with permission_denied (or the person is asked again)."
+  }
+}

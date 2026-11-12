@@ -1,0 +1,17 @@
+{
+  "description": "The spelling rule at document level: 1e2 for sequence.",
+  "requirements": [
+    "HCS-0007-R004"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0007:signed-catalog:0.1#/$defs/envelope",
+  "documentBase64": "eyJoY3NWZXJzaW9uIjoiMC4xIiwic2VxdWVuY2UiOjFlMiwiZXhwaXJlcyI6IjIwMjYtMTEtMTNUMDA6MDA6MDBaIiwiYmluZGluZyI6eyJ0ZW5hbnQiOiJ0LTAwMDEiLCJwcm9maWxlIjoiZGVza3RvcCIsImNoYW5uZWwiOiJzdGFibGUifSwiY2F0YWxvZyI6eyJoY3NWZXJzaW9uIjoiMC4xIiwiaWQiOiJkZXYuZXhhbXBsZS5kZXNrdG9wIiwidmVyc2lvbiI6IjIwMjYuMTEuMDYtMSIsImVudHJpZXMiOlt7ImlkIjoiZGV2LmV4YW1wbGUubm90ZXMiLCJ2ZXJzaW9uIjoiMS40LjAiLCJjb250ZW50SGFzaCI6InNoYTI1Njo0ZjRmNGY0ZjRmNGY0ZjRmNGY0ZjRmNGY0ZjRmNGY0ZjRmNGY0ZjRmNGY0ZjRmNGY0ZjRmNGY0ZjRmNGY0ZjRmIiwic2l6ZSI6MTgzNDIsIm1lZGlhVHlwZSI6ImFwcGxpY2F0aW9uL3ZuZC5vY2kuaW1hZ2UubGF5ZXIudjEudGFyK2d6aXAiLCJjb250cmlidXRpb25zIjpbeyJraW5kIjoic2tpbGwiLCJwYXRoIjoic2tpbGxzL3Rha2Utbm90ZXMifV19XX0sInNpZ25hdHVyZXMiOlt7ImtleWlkIjoib25saW5lLTEiLCJzaWciOiJwWkZkUHJSbDg0Y3pKbnNTM1JacjJqTXVPczFwVGdzWmNOQVoxTUZieVZCQTlmUUxObUN2WDFRellXTnZGL1F1d2E3Q3BGYkhMMC9FWlRGUkVKbk1CUT09In1dfQ==",
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "An undo is refused when a later change touched the target.",
+  "requirements": [
+    "HCS-0010-R008"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Proposal p-1 is accepted and applied; a later change edits the same part of the target; the person asks to undo p-1."
+  },
+  "expect": {
+    "behaviour": "The undo is refused and the target keeps its state."
+  }
+}

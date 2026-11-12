@@ -1,0 +1,15 @@
+{
+  "description": "rollback_rejected is in the closed set; it is defined by HCS-0007.",
+  "requirements": [
+    "HCS-0006-R002"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0006:error:0.1",
+  "input": {
+    "code": "rollback_rejected",
+    "message": "catalog sequence 41 is older than the last accepted 42"
+  },
+  "expect": {
+    "outcome": "valid"
+  }
+}

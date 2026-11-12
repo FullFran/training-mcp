@@ -1,0 +1,13 @@
+{
+  "description": "The host declares all-or-nothing and applies it to every transition.",
+  "requirements": [
+    "HCS-0003-R008"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The host's conformance report declares activationPolicy all-or-nothing. Apply desired set {a, b} where b has a missing dependency, then desired set {a, c} where c has a missing dependency."
+  },
+  "expect": {
+    "behaviour": "Both transitions are refused as a whole and the previous set stays active each time."
+  }
+}

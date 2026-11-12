@@ -1,0 +1,66 @@
+{
+  "description": "Two packages ship a skill with the same Agent Skills name; neither is projected.",
+  "requirements": [
+    "HCS-0008-R006"
+  ],
+  "level": "projection",
+  "input": {
+    "projectableKinds": [
+      "skill",
+      "mcp-server"
+    ],
+    "hostOwned": [],
+    "grantedSecrets": {},
+    "activationPolicy": "partial",
+    "generation": {
+      "id": "gen-0042",
+      "entries": [
+        {
+          "id": "dev.example.a",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/review",
+              "name": "review"
+            }
+          ]
+        },
+        {
+          "id": "dev.example.b",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/review",
+              "name": "review"
+            }
+          ]
+        },
+        {
+          "id": "dev.example.c",
+          "contributions": [
+            {
+              "kind": "skill",
+              "path": "skills/notes",
+              "name": "notes"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "errors": [
+      {
+        "code": "ambiguous_provider",
+        "entry": "dev.example.a"
+      },
+      {
+        "code": "ambiguous_provider",
+        "entry": "dev.example.b"
+      }
+    ],
+    "selected": [
+      "dev.example.c"
+    ]
+  }
+}

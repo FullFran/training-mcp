@@ -1,0 +1,48 @@
+{
+  "description": "Every online key has expired.",
+  "requirements": [
+    "HCS-0007-R013"
+  ],
+  "level": "distribution",
+  "input": {
+    "check": "key-set",
+    "now": "2026-11-06T12:00:00Z",
+    "trustAnchor": {
+      "keys": [
+        {
+          "keyid": "root-1",
+          "keytype": "ed25519",
+          "public": "LWB8cicdNrnQPkwy2jC4f24oJ6JOv49Apy61kpnIRsU="
+        }
+      ],
+      "threshold": 1
+    },
+    "keySet": {
+      "hcsVersion": "0.1",
+      "version": 3,
+      "keys": [
+        {
+          "keyid": "online-old",
+          "keytype": "ed25519",
+          "public": "pF9ue5ivLUdkTZfTtyTazLdMmVt4R+AZZgydK701ixo=",
+          "notBefore": "2025-01-01T00:00:00Z",
+          "notAfter": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "signatures": [
+        {
+          "keyid": "root-1",
+          "sig": "yWCb/XAsQFYeWk4BzG6bnClleJ8nFrsbekaKhNISkAvhxux1wVNTWs94pvMPsj6MzdScqgyr/4kAzpuvPoUgBQ=="
+        }
+      ]
+    }
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "signature_invalid"
+      }
+    ]
+  }
+}

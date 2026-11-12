@@ -1,0 +1,25 @@
+{
+  "description": "First start: the pending generation fails and there is nothing to return to.",
+  "requirements": [
+    "HCS-0008-R035"
+  ],
+  "level": "recovery",
+  "input": {
+    "persisted": {
+      "active": 1,
+      "confirmed": null,
+      "pending": 1,
+      "failed": [
+        1
+      ]
+    },
+    "onDisk": [
+      1
+    ]
+  },
+  "expect": {
+    "action": "stop-and-report",
+    "generation": 1,
+    "returnTo": null
+  }
+}

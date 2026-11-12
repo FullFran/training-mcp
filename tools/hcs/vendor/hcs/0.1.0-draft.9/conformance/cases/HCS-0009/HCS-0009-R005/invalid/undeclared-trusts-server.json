@@ -1,0 +1,16 @@
+{
+  "description": "A host that trusts the server for an undeclared tool.",
+  "requirements": [
+    "HCS-0009-R005"
+  ],
+  "level": "host",
+  "input": {
+    "tool": "wipe",
+    "serverAnnotations": {
+      "readOnlyHint": true
+    }
+  },
+  "expect": {
+    "behaviour": "The host presents the tool as read-only."
+  }
+}

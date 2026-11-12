@@ -1,0 +1,31 @@
+{
+  "description": "A denial for another permission leaves the grant in force.",
+  "requirements": [
+    "HCS-0005-R007"
+  ],
+  "level": "authority",
+  "input": {
+    "requests": [],
+    "grants": [
+      {
+        "entry": "dev.example.a",
+        "permission": "dev.example.mail.send"
+      }
+    ],
+    "check": {
+      "entry": "dev.example.a",
+      "permission": "dev.example.mail.send"
+    },
+    "denials": [
+      {
+        "entry": "dev.example.a",
+        "permission": "dev.example.fs.write"
+      }
+    ]
+  },
+  "expect": {
+    "decision": {
+      "allow": true
+    }
+  }
+}

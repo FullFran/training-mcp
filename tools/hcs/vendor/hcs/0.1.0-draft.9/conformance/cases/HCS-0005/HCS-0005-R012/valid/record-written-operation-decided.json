@@ -1,0 +1,13 @@
+{
+  "description": "With a working record store, the grant decides.",
+  "requirements": [
+    "HCS-0005-R012"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Grant send-mail to dev.example.a; the record store is available; the engine sends mail."
+  },
+  "expect": {
+    "behaviour": "The call is allowed and one record is written."
+  }
+}

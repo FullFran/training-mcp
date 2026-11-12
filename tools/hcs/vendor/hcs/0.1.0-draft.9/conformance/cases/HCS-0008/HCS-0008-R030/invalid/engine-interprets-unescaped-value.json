@@ -1,0 +1,13 @@
+{
+  "description": "An adapter that hands values to an interpreting engine without escaping them breaks R030.",
+  "requirements": [
+    "HCS-0008-R030"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "The engine runs a value that starts with '!' as a shell command and expands '$VAR'; the adapter writes the server.json values into the engine's MCP configuration unchanged."
+  },
+  "expect": {
+    "behaviour": "This placement does not meet R030: the canary file is created and the server receives the expanded $HOME. A conforming adapter escapes the values ('$' as '$$', a leading '!' as '$!' for this engine) or uses a channel the engine does not interpret."
+  }
+}

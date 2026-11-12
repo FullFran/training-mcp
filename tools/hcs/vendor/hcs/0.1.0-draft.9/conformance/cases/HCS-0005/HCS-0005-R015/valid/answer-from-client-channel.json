@@ -1,0 +1,13 @@
+{
+  "description": "The answer that counts comes from the host's channel to the person.",
+  "requirements": [
+    "HCS-0005-R015"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "No grant for dev.example.mail.send; the host asks over the ACP client connection; the person answers allow_once there."
+  },
+  "expect": {
+    "behaviour": "The call runs."
+  }
+}

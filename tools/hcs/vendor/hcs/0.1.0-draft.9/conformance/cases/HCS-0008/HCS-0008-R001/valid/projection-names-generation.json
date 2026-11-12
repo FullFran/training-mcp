@@ -1,0 +1,13 @@
+{
+  "description": "The projection names the resolved generation directory.",
+  "requirements": [
+    "HCS-0008-R001"
+  ],
+  "level": "host",
+  "input": {
+    "scenario": "Confirmed generation gen-0041; the active pointer is switched to gen-0042 and a new engine run starts."
+  },
+  "expect": {
+    "behaviour": "The engine's skill and MCP configuration name paths under gen-0042 itself; resolving the active pointer again during the run gives no new paths."
+  }
+}

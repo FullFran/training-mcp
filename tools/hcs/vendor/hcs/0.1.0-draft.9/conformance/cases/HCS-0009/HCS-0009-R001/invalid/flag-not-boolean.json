@@ -1,0 +1,24 @@
+{
+  "description": "idempotent is a string.",
+  "requirements": [
+    "HCS-0009-R001"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0009:tool-effects:0.1#/$defs/serverMeta",
+  "input": {
+    "tools": {
+      "add_note": {
+        "effect": "additive",
+        "idempotent": "yes"
+      }
+    }
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

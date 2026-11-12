@@ -1,0 +1,19 @@
+{
+  "description": "An unknown extension version.",
+  "requirements": [
+    "HCS-0008-R026"
+  ],
+  "level": "document",
+  "target": "urn:hcs:schema:hcs-0008:acp:0.1#/$defs/capability",
+  "input": {
+    "projection": "0.2"
+  },
+  "expect": {
+    "outcome": "invalid",
+    "errors": [
+      {
+        "code": "manifest_invalid"
+      }
+    ]
+  }
+}

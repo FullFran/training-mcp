@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hcs:schema:hcs-0010:proposal:0.1",
+  "title": "HCS proposal record",
+  "description": "The host's record of one change an agent asked for and a person answers (HCS-0010). It holds the digest of the change, never the change.",
+  "type": "object",
+  "required": ["id", "actionType", "proposedBy", "target", "payloadDigest", "time", "state"],
+  "properties": {
+    "id": { "$ref": "#/$defs/identifier" },
+    "actionType": { "description": "An HCS-0005 permission id (HCS-0010-R012).", "$ref": "urn:hcs:schema:hcs-0005:authority:0.1#/$defs/permissionId" },
+    "proposedBy": { "$ref": "#/$defs/identifier" },
+    "entry": { "$ref": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1#/$defs/packageId" },
+    "target": { "$ref": "#/$defs/identifier" },
+    "payloadDigest": { "$ref": "urn:hcs:schema:hcs-0001:catalog-manifest:0.1#/$defs/contentHash" },
+    "base": { "$ref": "#/$defs/identifier" },
+    "key": { "$ref": "#/$defs/identifier" },
+    "session": { "$ref": "#/$defs/identifier" },
+    "time": { "$ref": "#/$defs/timestamp" },
+    "state": { "enum": ["pending", "accepted", "rejected"] },
+    "answer": {
+      "description": "Present exactly when the state is not pending (HCS-0010-R003). `by` is never an agent or a host rule (HCS-0010-R004); `decision` is the id of the HCS-0005 decision record (HCS-0010-R005).",
+      "type": "object",
+      "required": ["decision", "by", "time"],
+      "properties": {
+        "decision": { "$ref": "#/$defs/identifier" },
+        "by": { "enum": ["subject", "grant", "denial"] },
+        "time": { "$ref": "#/$defs/timestamp" }
+      },
+      "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+      "additionalProperties": false
+    },
+    "undoes": { "description": "The id of the accepted proposal this one undoes (HCS-0010-R007).", "$ref": "#/$defs/identifier" }
+  },
+  "patternProperties": { "^x-[a-z0-9]+(-[a-z0-9]+)*$": true },
+  "additionalProperties": false,
+  "if": { "properties": { "state": { "const": "pending" } } },
+  "then": { "not": { "required": ["answer"] } },
+  "else": { "required": ["answer"] },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "timestamp": { "description": "RFC 3339 UTC, same pattern as HCS-0005 decisionRecord time.", "type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,9})?Z$" }
+  }
+}
