@@ -476,6 +476,19 @@ func (m *memoryStore) ClaimWorkoutSummary(context.Context, int64, time.Time) (bo
 	return false, ErrNotFound
 }
 func (m *memoryStore) RestTarget(context.Context) (int, error) { return m.restSeconds, nil }
+func (m *memoryStore) RecordRest(_ context.Context, id int64, seconds int) error {
+	set, ok := m.sets[id]
+	switch {
+	case !ok:
+		return ErrNotFound
+	case set.RestAfterSeconds != nil:
+		return ErrRestRecorded
+	}
+	set.RestAfterSeconds = &seconds
+	m.sets[id] = set
+	return nil
+}
+
 func (m *memoryStore) SetRestTarget(_ context.Context, seconds int) error {
 	m.restSeconds = seconds
 	return nil

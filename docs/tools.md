@@ -175,7 +175,9 @@ and OQ-0005-7).
 | `exercise.group.set` | `set_exercise_group` |
 | `feedback.record` | `record_feedback` |
 | `landmarks.set` | `set_volume_landmarks` |
-| `rest.set` | `set_rest_target` |
+| `rest.set` | `stop_rest` | Stop the rest between sets and store how long the person rested, on the set the rest followed. With no arguments it stops the rest running now at the seconds elapsed; `set_id` with `rest_seconds` (0 to 1200) records a rest the person reports. Stored once per set. |
+| `set_rest_target` |
+| `rest.stop` | `stop_rest` |
 | `set.correct_lb` | `correct_lb_sets` |
 | `memory.save` / `memory.forget` | `memory_save` / `memory_forget` |
 | `memory.judge` / `memory.confirm` / `memory.consolidate` | `memory_judge` / `memory_confirm` / `memory_consolidate` |
@@ -241,7 +243,7 @@ Starting a session from a plan **copies** it. From then on the session owns its 
 
 ### Live workout and rest
 
-`live_workout` is what a coach watching the session would see. Rest is derived from the timestamp of the most recently logged set, never stored: `rest.state` is `none` (no set yet today), `resting` (with `remaining_seconds`), `ready` (target reached, with `over_by_seconds`), `superset` (the next exercise of the same round follows without rest; after the last exercise of a round the state is `resting` before the next round) or `idle` (more than 20 minutes since the last set, so not a rest). `next` is the exercise to do next: the next unfinished one of a superset round, else the exercise just worked while it has sets to go, else the first unfinished one in plan order. The target is one value per person, shared with the phone's ±30 s buttons. The session in `get_session` and `live_workout` carries `started_at` (RFC 3339, UTC), when it was started here; the app's workout clock and finish summary time the workout from it, so every device shows the same duration. Imported workouts omit it, as their start is in the source app's own clock.
+`live_workout` is what a coach watching the session would see. Rest is derived from the timestamp of the most recently logged set, never stored: `rest.state` is `none` (no set yet today), `resting` (with `remaining_seconds`), `ready` (target reached, with `over_by_seconds`), `superset` (the next exercise of the same round follows without rest; after the last exercise of a round the state is `resting` before the next round) `idle` (more than 20 minutes since the last set, so not a rest) or `stopped` (the person stopped the rest, with `rested_seconds`). Stopping the rest is the only way a rest is stored (migration 028 `sets.rest_after_seconds`, shown as the set's `rest_after_seconds`): with `stop_rest`, the phone's skip button or the chat's rest timer, on the set the rest followed, never inferred from the gap between sets. `stop_rest` with no arguments fixes the elapsed seconds when it is called, so a proposal accepted later stores what the timer showed. `next` is the exercise to do next: the next unfinished one of a superset round, else the exercise just worked while it has sets to go, else the first unfinished one in plan order. The target is one value per person, shared with the phone's ±30 s buttons. The session in `get_session` and `live_workout` carries `started_at` (RFC 3339, UTC), when it was started here; the app's workout clock and finish summary time the workout from it, so every device shows the same duration. Imported workouts omit it, as their start is in the source app's own clock.
 
 ## Weight units
 

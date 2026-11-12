@@ -98,3 +98,39 @@ func TestCoachPreferencesAreUnsetUntilChosenAndPerUser(t *testing.T) {
 		t.Fatal("unknown person accepted")
 	}
 }
+
+func TestRecordRestIsStoredOnceAndPerUser(t *testing.T) {
+	ctx := context.Background()
+	store := openTwoUsers(t)
+	one, two := store.ForUser(1), store.ForUser(2)
+	session, err := one.Start(ctx, training.Session{Date: "2026-08-07"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	set, _, err := one.AddSet(ctx, training.AddSetInput{SessionID: session.ID, Exercise: "banca", WeightKG: 60, Reps: 10, RPE: 6})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := one.GetSession(ctx, session.ID); got.Sets[0].RestAfterSeconds != nil {
+		t.Fatalf("new set rest_after_seconds = %v, want nil", *got.Sets[0].RestAfterSeconds)
+	}
+	if err := two.RecordRest(ctx, set.ID, 40); !errors.Is(err, training.ErrNotFound) {
+		t.Fatalf("another user's RecordRest() = %v, want not found", err)
+	}
+	if err := one.RecordRest(ctx, set.ID, 45); err != nil {
+		t.Fatal(err)
+	}
+	if err := one.RecordRest(ctx, set.ID, 60); !errors.Is(err, training.ErrRestRecorded) {
+		t.Fatalf("second RecordRest() = %v, want ErrRestRecorded", err)
+	}
+	got, err := one.GetSession(ctx, session.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := got.Sets[0].RestAfterSeconds; r == nil || *r != 45 {
+		t.Fatalf("rest_after_seconds = %v, want 45", r)
+	}
+	if err := one.RecordRest(ctx, set.ID+99, 30); !errors.Is(err, training.ErrNotFound) {
+		t.Fatalf("missing set RecordRest() = %v, want not found", err)
+	}
+}

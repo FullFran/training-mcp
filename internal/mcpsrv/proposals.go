@@ -83,6 +83,15 @@ func addWriteBy[In, Out any, PO interface {
 		var out Out
 		svc := w.service(ctx)
 		ctx = training.WithAgentSession(ctx, agentSession(req, w.coachSessions.Load()))
+		// An input that depends on the moment of the call (stop_rest's
+		// elapsed seconds) is fixed before it becomes the proposal's payload.
+		if r, ok := any(&in).(interface {
+			resolve(context.Context, *training.Service) error
+		}); ok {
+			if err := r.resolve(ctx, svc); err != nil {
+				return nil, out, toolError(err)
+			}
+		}
 		payload, err := json.Marshal(in)
 		if err != nil {
 			return nil, out, toolError(err)

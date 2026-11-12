@@ -37,6 +37,7 @@ var actionLabels = map[string]string{
 	"feedback.record":         "Valorar grupo muscular",
 	"landmarks.set":           "Fijar MEV/MRV",
 	"rest.set":                "Cambiar descanso objetivo",
+	"rest.stop":               "Parar descanso",
 	"memory.save":             "Recordar",
 	"memory.forget":           "Olvidar recuerdo",
 	"memory.judge":            "Relacionar recuerdos",

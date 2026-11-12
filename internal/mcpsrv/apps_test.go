@@ -198,6 +198,8 @@ func TestRestTimerTextCoversEveryState(t *testing.T) {
 		{RestTimerOut{Rest: training.Rest{TargetSeconds: 120, State: training.RestSuperset}, NextExercise: "dominadas", NextSuperset: true},
 			"Superset: go straight to dominadas, no rest."},
 		{RestTimerOut{Rest: training.Rest{TargetSeconds: 120, State: training.RestSuperset}}, "Superset: next exercise, no rest."},
+		{RestTimerOut{Rest: training.Rest{TargetSeconds: 120, State: training.RestStopped, RestedSeconds: 75}, LastSet: &RestTimerSet{Exercise: "banca"}, NextExercise: "banca"},
+			"Rest stopped: rested 1:15 after banca. Next: banca."},
 		{RestTimerOut{Rest: training.Rest{TargetSeconds: 120, State: training.RestIdle}}, "No rest running: the last set was over 20 minutes ago."},
 	} {
 		if got := restTimerText(tc.out); got != tc.want {

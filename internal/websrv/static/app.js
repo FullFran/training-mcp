@@ -459,9 +459,32 @@
     restBar.hidden = true;
   }
 
+  // The set this rest follows and when it began, so stopping it can store
+  // how long the person really rested.
+  let restSet = 0;
+  let restBegan = 0;
+
+  // The person stopped the rest: keep how long it was, on the set it followed.
+  // Best effort, like the target: offline, the timer still stops.
+  function recordRest() {
+    if (!restSet || !ticker) return;
+    const seconds = Math.max(0, Math.round((Date.now() - restBegan) / 1000));
+    fetch(base + '/rest/stop', {
+      method: 'POST',
+      headers: Object.assign(
+        { 'Content-Type': 'application/x-www-form-urlencoded' },
+        csrf ? { 'X-CSRF-Token': csrf } : {}
+      ),
+      body: 'set_id=' + restSet + '&seconds=' + seconds
+    }).catch(() => {});
+    restSet = 0;
+  }
+
   // elapsed is how long ago the last set was logged, by the server's clock.
   function startRest(elapsed) {
     if (!restBar) return;
+    restSet = lastSetId();
+    restBegan = Date.now() - (elapsed || 0) * 1000;
     remaining = restDefault - (elapsed || 0);
     restBar.hidden = false;
     paintNext();
@@ -498,6 +521,7 @@
         buzz(8);
         return;
       }
+      recordRest();
       stopRest();
     });
   }

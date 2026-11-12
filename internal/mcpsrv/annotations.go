@@ -86,6 +86,7 @@ var toolBehaviors = map[string]toolBehavior{
 	"set_volume_landmarks":    overwriting("Set volume landmarks"),
 	"set_exercise_group":      overwriting("Set exercise group"),
 	"set_rest_target":         overwriting("Set rest target"),
+	"stop_rest":               keyed("Stop rest"),
 	"memory_save":             overwriting("Save memory"),
 	"memory_forget":           overwriting("Forget memory"),
 	"memory_judge":            overwriting("Judge memory relation"),

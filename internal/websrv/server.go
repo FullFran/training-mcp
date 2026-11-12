@@ -419,6 +419,7 @@ func (s *Server) routes() {
 	s.handle("POST "+b+"/landmarks", s.setLandmarks)
 	s.handle("POST "+b+"/note", s.saveNote)
 	s.handle("POST "+b+"/rest", s.setRest)
+	s.handle("POST "+b+"/rest/stop", s.stopRest)
 	s.handle("POST "+b+"/units", s.setUnits)
 	s.handle("GET "+b+"/units/fix", s.lbFixPage)
 	s.handle("POST "+b+"/units/fix", s.applyLbFix)
@@ -1432,6 +1433,34 @@ func formFloat(r *http.Request, name string, bad bool) (float64, bool) {
 	}
 	f, err := strconv.ParseFloat(v, 64)
 	return f, bad || err != nil
+}
+
+// stopRest stores how long the person rested after a set, when they stop the
+// timer. The phone sends the seconds it showed; it answers in JSON like setRest.
+func (s *Server) stopRest(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	setID, err := strconv.ParseInt(strings.TrimSpace(r.FormValue("set_id")), 10, 64)
+	seconds, err2 := strconv.Atoi(strings.TrimSpace(r.FormValue("seconds")))
+	if err == nil && err2 == nil {
+		err = s.service(r.Context()).RecordRest(r.Context(), setID, seconds)
+	} else {
+		err = training.ErrValidation
+	}
+	switch {
+	case err == nil:
+		json.NewEncoder(w).Encode(map[string]int{"rested_seconds": seconds})
+	case errors.Is(err, training.ErrRestRecorded):
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]string{"error": "the rest after this set was already recorded"})
+	case errors.Is(err, training.ErrNotFound):
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "set not found"})
+	case errors.Is(err, training.ErrValidation):
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "set_id and seconds (0 to 1200) are required"})
+	default:
+		s.fail(w, err)
+	}
 }
 
 // setRest stores the rest target chosen with the timer's buttons. It answers in

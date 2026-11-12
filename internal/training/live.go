@@ -31,7 +31,16 @@ const (
 	RestSuperset = "superset"
 	// RestIdle: too long since the last set to call it a rest.
 	RestIdle = "idle"
+	// RestStopped: the person stopped the rest; RestedSeconds is how long it was.
+	RestStopped = "stopped"
 )
+
+// ErrNoRest is stopping a rest when none is running: no set today, the last
+// one inside a superset round or too long ago, or its rest already stopped.
+var ErrNoRest = fmt.Errorf("%w: no rest is running", ErrValidation)
+
+// ErrRestRecorded is storing the rest after a set a second time.
+var ErrRestRecorded = fmt.Errorf("%w: the rest after this set was already recorded", ErrValidation)
 
 // Rest is the rest between sets, derived from when the last set was logged.
 type Rest struct {
@@ -42,6 +51,8 @@ type Rest struct {
 	ElapsedSeconds   int    `json:"elapsed_seconds,omitempty"`
 	RemainingSeconds int    `json:"remaining_seconds,omitempty"`
 	OverBySeconds    int    `json:"over_by_seconds,omitempty"`
+	// RestedSeconds is the rest the person stopped, in state stopped.
+	RestedSeconds int `json:"rested_seconds,omitempty"`
 }
 
 // LastSet is the most recently logged set of the session and when it was logged.
@@ -221,6 +232,33 @@ func (s *Service) LiveWorkout(ctx context.Context) (LiveWorkout, error) {
 	out.Rest = RestState(lastAt, now, target, superset)
 	if out.LastSet != nil {
 		out.LastSet.SecondsAgo = out.Rest.ElapsedSeconds
+		if r := out.LastSet.Set.RestAfterSeconds; r != nil {
+			out.Rest = Rest{TargetSeconds: target, State: RestStopped, Since: out.Rest.Since,
+				ElapsedSeconds: out.Rest.ElapsedSeconds, RestedSeconds: *r}
+		}
 	}
 	return out, nil
+}
+
+// RunningRest is the rest running now: the set it follows and the seconds
+// since that set. Only a resting or ready rest runs; anything else is
+// ErrNoRest.
+func (s *Service) RunningRest(ctx context.Context) (int64, int, error) {
+	live, err := s.LiveWorkout(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	if live.LastSet == nil || (live.Rest.State != RestResting && live.Rest.State != RestReady) {
+		return 0, 0, ErrNoRest
+	}
+	return live.LastSet.Set.ID, live.Rest.ElapsedSeconds, nil
+}
+
+// RecordRest stores how long the person rested after a set, as observed when
+// the rest was stopped. It is stored once per set.
+func (s *Service) RecordRest(ctx context.Context, setID int64, seconds int) error {
+	if limit := int(RestIdleAfter / time.Second); seconds < 0 || seconds > limit {
+		return fmt.Errorf("%w: rest must be 0 to %d seconds", ErrValidation, limit)
+	}
+	return s.store.RecordRest(ctx, setID, seconds)
 }

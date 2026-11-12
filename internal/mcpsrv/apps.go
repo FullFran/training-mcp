@@ -91,6 +91,8 @@ func restTimerText(out RestTimerOut) string {
 			return fmt.Sprintf("Superset: go straight to %s, no rest.", out.NextExercise)
 		}
 		return "Superset: next exercise, no rest."
+	case training.RestStopped:
+		text = fmt.Sprintf("Rest stopped: rested %s%s.", clock(r.RestedSeconds), after)
 	case training.RestIdle:
 		return fmt.Sprintf("No rest running: the last set was over %d minutes ago.", int(training.RestIdleAfter/time.Minute))
 	default:

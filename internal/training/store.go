@@ -72,6 +72,10 @@ type UserStore interface {
 	// RestTarget is the stored target rest in seconds; 0 when never set.
 	RestTarget(context.Context) (int, error)
 	SetRestTarget(context.Context, int) error
+	// RecordRest stores the seconds rested after one of the user's sets, once:
+	// a set that is not the user's is ErrNotFound, one already recorded is
+	// ErrRestRecorded.
+	RecordRest(ctx context.Context, setID int64, seconds int) error
 	// WeightUnit is the stored default unit, "" when never chosen (kg).
 	WeightUnit(context.Context) (string, error)
 	SetWeightUnit(context.Context, string) error

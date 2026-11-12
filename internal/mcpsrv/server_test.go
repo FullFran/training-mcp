@@ -39,7 +39,7 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_session_exercise", "add_set", "adjust_session_exercise", "correct_lb_sets", "create_plan", "delete_plan", "delete_session", "delete_set", "exercise_history", "get_plan", "get_session", "list_exercise_groups", "list_exercise_notes", "list_plans", "list_sessions", "list_volume_landmarks", "live_workout", "log_set", "log_sets", "memory_confirm", "memory_consolidate", "memory_consolidate_preview", "memory_context", "memory_forget", "memory_get", "memory_judge", "memory_save", "memory_search", "move_plan_exercise", "performance_dropoff", "preview_lb_correction", "record_feedback", "remove_plan_exercise", "remove_session_exercise", "render_rest_timer", "save_session_as_plan", "session_progress", "set_exercise_group", "set_exercise_note", "set_plan_exercise", "set_rest_target", "set_volume_landmarks", "simulate_plan", "start_session", "suggest_load", "swap_session_exercise", "update_plan", "update_set", "volume_by_muscle", "volume_recommendation", "weekly_volume"}) {
+	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_session_exercise", "add_set", "adjust_session_exercise", "correct_lb_sets", "create_plan", "delete_plan", "delete_session", "delete_set", "exercise_history", "get_plan", "get_session", "list_exercise_groups", "list_exercise_notes", "list_plans", "list_sessions", "list_volume_landmarks", "live_workout", "log_set", "log_sets", "memory_confirm", "memory_consolidate", "memory_consolidate_preview", "memory_context", "memory_forget", "memory_get", "memory_judge", "memory_save", "memory_search", "move_plan_exercise", "performance_dropoff", "preview_lb_correction", "record_feedback", "remove_plan_exercise", "remove_session_exercise", "render_rest_timer", "save_session_as_plan", "session_progress", "set_exercise_group", "set_exercise_note", "set_plan_exercise", "set_rest_target", "set_volume_landmarks", "simulate_plan", "start_session", "stop_rest", "suggest_load", "swap_session_exercise", "update_plan", "update_set", "volume_by_muscle", "volume_recommendation", "weekly_volume"}) {
 		t.Fatalf("tools=%v", toolNames(tools))
 	}
 	for _, tool := range tools.Tools {
@@ -117,9 +117,9 @@ func TestServerToolsDeclareHowTheyBehave(t *testing.T) {
 		"start_session": true, "add_set": true, "log_set": true, "create_plan": true,
 		"move_plan_exercise": true, "save_session_as_plan": true,
 	}
-	nonDestructive := func(name string) bool { return additive[name] || name == "log_sets" }
-	if len(result.Tools) != 51 {
-		t.Fatalf("got %d tools, want 51", len(result.Tools))
+	nonDestructive := func(name string) bool { return additive[name] || name == "log_sets" || name == "stop_rest" }
+	if len(result.Tools) != 52 {
+		t.Fatalf("got %d tools, want 52", len(result.Tools))
 	}
 	for _, tool := range result.Tools {
 		a := tool.Annotations
@@ -536,10 +536,11 @@ func (testStore) LastSetAt(context.Context, int64) (int64, time.Time, error) {
 func (testStore) ClaimWorkoutSummary(context.Context, int64, time.Time) (bool, error) {
 	return false, training.ErrNotFound
 }
-func (testStore) RestTarget(context.Context) (int, error)     { return 0, nil }
-func (testStore) SetRestTarget(context.Context, int) error    { return nil }
-func (testStore) WeightUnit(context.Context) (string, error)  { return "", nil }
-func (testStore) SetWeightUnit(context.Context, string) error { return nil }
+func (testStore) RestTarget(context.Context) (int, error)      { return 0, nil }
+func (testStore) SetRestTarget(context.Context, int) error     { return nil }
+func (testStore) RecordRest(context.Context, int64, int) error { return nil }
+func (testStore) WeightUnit(context.Context) (string, error)   { return "", nil }
+func (testStore) SetWeightUnit(context.Context, string) error  { return nil }
 func (testStore) LbSets(context.Context, training.LbScope) ([]training.LbSet, error) {
 	return nil, nil
 }

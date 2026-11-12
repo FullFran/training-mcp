@@ -93,6 +93,10 @@ type Set struct {
 	// never counts: its SI is zero and it is left out of set counts, volume,
 	// planned-versus-done progress, best set, e1RM and every estimate.
 	Category string `json:"category"`
+	// RestAfterSeconds is how long the person rested after this set, stored
+	// only when they stopped the rest timer. Nil when never stopped: a rest is
+	// never inferred from the gap between two sets.
+	RestAfterSeconds *int `json:"rest_after_seconds,omitempty"`
 }
 
 // Set categories. Working is the default; a warm-up only prepares for the

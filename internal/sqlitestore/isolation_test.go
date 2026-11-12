@@ -297,6 +297,9 @@ var idCases = map[string]func(context.Context, training.UserStore, seeded) (any,
 	"ClaimWorkoutSummary": func(c context.Context, u training.UserStore, id seeded) (any, error) {
 		return u.ClaimWorkoutSummary(c, id.session, time.Unix(0, 0))
 	},
+	"RecordRest": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return nil, u.RecordRest(c, id.set, 40)
+	},
 	"LastSetAt": func(c context.Context, u training.UserStore, id seeded) (any, error) {
 		set, at, err := u.LastSetAt(c, id.session)
 		return []any{set, at}, err
