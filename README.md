@@ -175,7 +175,23 @@ shared with the MCP tools and cannot drift apart.
   to the same point. **Planificar** is the chat with the coach and the panels
   (history, plans, review, progress); the plan of the day, pending proposals
   (accept or reject) and logged sets appear there as cards rendered by the
-  server. The screen is kept in the URL (`/?modo=entrenar`, `/?modo=planificar`).
+  server. The screen is kept in the URL (`/?modo=entrenar`, `/?modo=planificar`,
+  `/?modo=progreso`, `/?modo=tu`).
+- **Progreso** has three views. **Historial**: this week's training days as
+  dots with the sessions and kilos moved, then every session by month; each
+  opens its detail. **Ejercicios**: every exercise with its best e1RM, best set
+  and a sparkline of the best e1RM per session, plus next week's volume advice
+  and volume per muscle group; each opens a detail with the chart, the best
+  sets, the fatigue between sets last time and every session's sets.
+  **Cuerpo**: body weight and measurements are not recorded yet, and it says so.
+  The old `/history` URL redirects here.
+- **Tú** holds the profile and the coach's memory, connectors, model, account
+  and conversations (kept 90 days), the default rest between sets, and the
+  data: import from Hevy or Strong and the database export.
+- **+ Añadir ejercicio** and **Sustituir** in the workout open an exercise
+  picker: search (accents ignored), recent exercises, filters by muscle group,
+  each with its last set; several can be added at once, and a name that does
+  not exist yet can be created.
 - `/review` lists the agent's pending proposals with what each would change
   (one sentence per write tool, the exact payload one tap away),
   accepts or rejects them (once, or always in that session), shows the answer history
@@ -187,7 +203,7 @@ shared with the MCP tools and cannot drift apart.
   change its set count, skip it, or substitute it when a machine is taken.
   Sets already logged are never touched by any of this — an exercise removed
   from the plan simply reappears as off-plan work.
-- `/import` (linked from the history page) imports a Hevy or Strong workout
+- `/import` (linked from Tú) imports a Hevy or Strong workout
   CSV: a preview of sessions, sets, exercise names to map and duplicates first,
   then one all-or-nothing import on confirmation. See [docs/import.md](docs/import.md).
 - Sets are grouped by exercise, the way a workout is performed and read back.
