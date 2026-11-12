@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -169,7 +170,9 @@ type Event struct {
 }
 
 const (
-	killGrace     = 2 * time.Second
+	killGrace = 2 * time.Second
+	// drainGrace bounds how long an exited engine's output is still read.
+	drainGrace    = 2 * time.Second
 	subBuffer     = 512
 	outBuffer     = 64
 	originUser    = "user"
@@ -873,7 +876,9 @@ func (m *Manager) Notify(userID int64, ev WorkoutEvent) {
 	if over := len(p.events) - m.s.MaxPendingEvents; over > 0 {
 		p.events = append([]WorkoutEvent(nil), p.events[over:]...)
 	}
-	canStart := func(p *person) bool { return len(p.subs) > 0 && (p.proc == nil || p.proc.turn == nil) }
+	canStart := func(p *person) bool {
+		return len(p.subs) > 0 && p.login == nil && (p.proc == nil || p.proc.turn == nil)
+	}
 	if !canStart(p) {
 		m.mu.Unlock()
 		return
@@ -1011,6 +1016,11 @@ func (m *Manager) startTurn(p *person, r turnRequest) error {
 	if p.proc != nil && p.proc.turn != nil {
 		return fail(CodeTurnInProgress)
 	}
+	// A pending device login holds the person's process without a credential;
+	// a turn would run on it with the old one. The person finishes connecting first.
+	if p.login != nil {
+		return fail(CodeLoginPending)
+	}
 	if err := m.connected(p); err != nil {
 		return err
 	}
@@ -1074,13 +1084,24 @@ func (m *Manager) ensureProc(p *person, forTurn bool) (*proc, error) {
 	if err != nil {
 		return nil, fail(CodeEngineUnavailable)
 	}
-	stdout, err := cmd.StdoutPipe()
+	// stdout is a pipe the host owns, not cmd.StdoutPipe: Wait closes that one
+	// even while it is still being read, which loses what the engine wrote just
+	// before it exited. This one is closed only once its reader is done.
+	stdout, stdoutW, err := os.Pipe()
 	if err != nil {
+		stdin.Close()
 		return nil, fail(CodeEngineUnavailable)
 	}
+	cmd.Stdout = stdoutW
 	// stderr is discarded: provider errors can quote response bodies.
 	cmd.Stderr = nil
-	if err := cmd.Start(); err != nil {
+	err = cmd.Start()
+	// The child has its own copy now; the host keeps only the read end, so the
+	// reader sees end of file once the engine is gone.
+	stdoutW.Close()
+	if err != nil {
+		stdin.Close()
+		stdout.Close()
 		m.log("start_failed", "spawn_error")
 		return nil, fail(CodeEngineUnavailable)
 	}
@@ -1092,9 +1113,24 @@ func (m *Manager) ensureProc(p *person, forTurn bool) (*proc, error) {
 	m.people[p.id] = p
 	m.alive[pr] = true
 	go writeLoop(stdin, pr.out)
-	go m.readLoop(p, pr, stdout)
+	read := make(chan struct{})
+	go func() {
+		defer close(read)
+		m.readLoop(p, pr, stdout)
+	}()
 	go func() {
 		cmd.Wait()
+		// Everything the engine wrote before it exited is handled before its
+		// exit is: a crash mid-turn delivers the answer so far, then one error.
+		// Something the engine left running could hold the pipe open; the
+		// reader then gets a bounded grace and is cut off.
+		select {
+		case <-read:
+		case <-time.After(drainGrace):
+			stdout.Close()
+			<-read
+		}
+		stdout.Close()
 		m.mu.Lock()
 		defer m.mu.Unlock()
 		pr.exited = true

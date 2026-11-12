@@ -4,22 +4,108 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"hash/crc32"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"strings"
 	"testing"
 )
 
-// Smallest byte strings that the content sniffer takes for each format.
-func jpegBytes(n int) []byte {
-	return append([]byte("\xff\xd8\xff\xe0"), bytes.Repeat([]byte{'j'}, n-4)...)
+// imageOf is a real image header of the given format that declares w x h
+// pixels, padded to n bytes (or left as is when shorter). The pixel data is
+// never needed: only the header is read.
+func imageOf(mime string, w, h, n int) []byte {
+	var b []byte
+	switch mime {
+	case "image/jpeg":
+		var buf bytes.Buffer
+		if err := jpeg.Encode(&buf, image.NewGray(image.Rect(0, 0, 8, 8)), nil); err != nil {
+			panic(err)
+		}
+		b = buf.Bytes()
+		sof := bytes.Index(b, []byte{0xff, 0xc0})
+		binary.BigEndian.PutUint16(b[sof+5:], uint16(h))
+		binary.BigEndian.PutUint16(b[sof+7:], uint16(w))
+	case "image/png":
+		var buf bytes.Buffer
+		if err := png.Encode(&buf, image.NewGray(image.Rect(0, 0, 1, 1))); err != nil {
+			panic(err)
+		}
+		b = buf.Bytes()
+		binary.BigEndian.PutUint32(b[16:], uint32(w))
+		binary.BigEndian.PutUint32(b[20:], uint32(h))
+		binary.BigEndian.PutUint32(b[29:], crc32.ChecksumIEEE(b[12:29]))
+	case "image/webp":
+		b = webpVP8X(w, h)
+	default:
+		panic(mime)
+	}
+	if n > len(b) {
+		b = append(b, bytes.Repeat([]byte{0}, n-len(b))...)
+	}
+	return b
 }
 
-func pngBytes(n int) []byte {
-	return append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{'p'}, n-8)...)
+// webpVP8X is an extended-format WebP header for w x h.
+func webpVP8X(w, h int) []byte {
+	b := []byte("RIFF\x00\x00\x00\x00WEBPVP8X\x0a\x00\x00\x00\x00\x00\x00\x00")
+	b = append(b, byte(w-1), byte((w-1)>>8), byte((w-1)>>16), byte(h-1), byte((h-1)>>8), byte((h-1)>>16))
+	binary.LittleEndian.PutUint32(b[4:], uint32(len(b)-8))
+	return b
 }
 
-func webpBytes() []byte { return []byte("RIFF\x00\x00\x00\x00WEBPVP8 xxxx") }
+// webpVP8L is a lossless WebP header for w x h.
+func webpVP8L(w, h int) []byte {
+	b := []byte("RIFF\x00\x00\x00\x00WEBPVP8L\x0a\x00\x00\x00\x2f")
+	b = binary.LittleEndian.AppendUint32(b, uint32(w-1)|uint32(h-1)<<14)
+	return append(b, 0, 0, 0, 0, 0)
+}
+
+// webpVP8 is a lossy WebP header for w x h.
+func webpVP8(w, h int) []byte {
+	b := []byte("RIFF\x00\x00\x00\x00WEBPVP8 \x0a\x00\x00\x00\x00\x00\x00\x9d\x01\x2a")
+	b = binary.LittleEndian.AppendUint16(b, uint16(w))
+	return binary.LittleEndian.AppendUint16(b, uint16(h))
+}
+
+func jpegBytes(n int) []byte { return imageOf("image/jpeg", 64, 48, n) }
+func pngBytes(n int) []byte  { return imageOf("image/png", 64, 48, n) }
+func webpBytes() []byte      { return imageOf("image/webp", 64, 48, 0) }
+
+// A decompression bomb is small in bytes and huge in pixels: each format is
+// refused from its header, before anything decodes it.
+func TestValidImagesRefusesTooManyPixels(t *testing.T) {
+	side := 1
+	for side*side <= MaxImagePixels {
+		side *= 2
+	}
+	for _, c := range []struct {
+		name string
+		im   Image
+		ok   bool
+	}{
+		{"jpeg at the cap", Image{"image/jpeg", imageOf("image/jpeg", MaxImagePixels/1000, 1000, 0)}, true},
+		{"jpeg over the cap", Image{"image/jpeg", imageOf("image/jpeg", side, side, 0)}, false},
+		{"png over the cap", Image{"image/png", imageOf("image/png", side, side, 0)}, false},
+		{"png one pixel too wide", Image{"image/png", imageOf("image/png", MaxImagePixels+1, 1, 0)}, false},
+		{"webp extended over the cap", Image{"image/webp", webpVP8X(side, side)}, false},
+		{"webp lossless within the cap", Image{"image/webp", webpVP8L(3000, 3000)}, true},
+		{"webp lossless over the cap", Image{"image/webp", webpVP8L(side, side)}, false},
+		{"webp lossy within the cap", Image{"image/webp", webpVP8(3000, 3000)}, true},
+		{"webp lossy over the cap", Image{"image/webp", webpVP8(side, side)}, false},
+		{"jpeg with a broken header", Image{"image/jpeg", []byte("\xff\xd8\xff\xe0jjjjjjjj")}, false},
+		{"png with a broken header", Image{"image/png", []byte("\x89PNG\r\n\x1a\nIHDR")}, false},
+		{"webp with a broken header", Image{"image/webp", []byte("RIFF\x00\x00\x00\x00WEBPVP8 xxxx")}, false},
+	} {
+		if got := ValidImages([]Image{c.im}); got != c.ok {
+			t.Errorf("%s: ValidImages = %v, want %v", c.name, got, c.ok)
+		}
+	}
+}
 
 func TestValidImages(t *testing.T) {
 	cases := []struct {

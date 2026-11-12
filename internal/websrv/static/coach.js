@@ -41,6 +41,7 @@
     turn_in_progress: 'El coach todavía está respondiendo.',
     turn_limit: 'La respuesta era demasiado larga y se ha cortado.',
     not_connected: 'Conecta ChatGPT para hablar con el coach.',
+    login_pending: 'Termina de conectar ChatGPT antes de escribir al coach.',
     engine_unavailable: 'El coach no está disponible ahora mismo.',
     login_failed: 'No se pudo conectar ChatGPT.',
     bad_request: 'Mensaje vacío o demasiado largo.',
@@ -297,7 +298,7 @@
   function failure(code, where) {
     if (code === 'turn_in_progress') { note(MESSAGES[code]); return; }
     runCard(where, MESSAGES[code] || MESSAGES.provider_error, RETRY.has(code) ? retryAction() : null);
-    if (code === 'reconnect' || code === 'not_connected') refresh();
+    if (code === 'reconnect' || code === 'not_connected' || code === 'login_pending') refresh();
   }
 
   function endTurn() {

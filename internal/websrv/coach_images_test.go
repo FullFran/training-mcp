@@ -3,7 +3,11 @@ package websrv_test
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"net/http"
 	"strings"
 	"testing"
@@ -11,7 +15,24 @@ import (
 	"github.com/fullfran/training-mcp/internal/engine"
 )
 
-func jpeg(n int) []byte { return append([]byte("\xff\xd8\xff\xe0"), bytes.Repeat([]byte{'j'}, n-4)...) }
+// jpegOf is a real JPEG header declaring w x h pixels, padded to n bytes. Only
+// the header is ever read, so no pixel data is needed.
+func jpegOf(w, h, n int) []byte {
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, image.NewGray(image.Rect(0, 0, 8, 8)), nil); err != nil {
+		panic(err)
+	}
+	b := buf.Bytes()
+	sof := bytes.Index(b, []byte{0xff, 0xc0})
+	binary.BigEndian.PutUint16(b[sof+5:], uint16(h))
+	binary.BigEndian.PutUint16(b[sof+7:], uint16(w))
+	if n > len(b) {
+		b = append(b, bytes.Repeat([]byte{0}, n-len(b))...)
+	}
+	return b
+}
+
+func jpegBytes(n int) []byte { return jpegOf(1200, 900, n) }
 
 type photo struct {
 	Type string `json:"type"`
@@ -32,8 +53,12 @@ func b64(b []byte) string { return base64.StdEncoding.EncodeToString(b) }
 func TestCoachPromptCarriesPhotos(t *testing.T) {
 	coach := newFakeCoach()
 	world := newCoachWorld(t, coach)
-	a := jpeg(engine.MaxImageBytes)
-	png := append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{'p'}, 100)...)
+	a := jpegBytes(engine.MaxImageBytes)
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, image.NewGray(image.Rect(0, 0, 4, 3))); err != nil {
+		t.Fatal(err)
+	}
+	png := buf.Bytes()
 	body := photoBody(t, " mira mi sentadilla ", photo{"image/jpeg", b64(a)}, photo{"image/png", b64(png)})
 	w := coachRequest(t, world.as(2), "POST", "/coach/prompt", body, true)
 	if w.Code != http.StatusAccepted {
@@ -50,7 +75,7 @@ func TestCoachPromptCarriesPhotos(t *testing.T) {
 func TestCoachPromptWithOnlyAPhoto(t *testing.T) {
 	coach := newFakeCoach()
 	world := newCoachWorld(t, coach)
-	if w := coachRequest(t, world.as(1), "POST", "/coach/prompt", photoBody(t, "", photo{"image/jpeg", b64(jpeg(50))}), true); w.Code != http.StatusAccepted {
+	if w := coachRequest(t, world.as(1), "POST", "/coach/prompt", photoBody(t, "", photo{"image/jpeg", b64(jpegBytes(50))}), true); w.Code != http.StatusAccepted {
 		t.Fatalf("photo only: %d %s", w.Code, w.Body)
 	}
 	if len(coach.images) != 1 {
@@ -61,7 +86,7 @@ func TestCoachPromptWithOnlyAPhoto(t *testing.T) {
 func TestCoachPromptRejectsBadPhotos(t *testing.T) {
 	coach := newFakeCoach()
 	world := newCoachWorld(t, coach)
-	small := photo{"image/jpeg", b64(jpeg(50))}
+	small := photo{"image/jpeg", b64(jpegBytes(50))}
 	cases := []struct {
 		name   string
 		body   string
@@ -73,9 +98,11 @@ func TestCoachPromptRejectsBadPhotos(t *testing.T) {
 		{"svg", photoBody(t, "x", photo{"image/svg+xml", b64([]byte("<svg/>"))}), http.StatusBadRequest, "bad_image"},
 		{"declared jpeg, bytes html", photoBody(t, "x", photo{"image/jpeg", b64([]byte("<html><script>x</script>"))}), http.StatusBadRequest, "bad_image"},
 		{"empty photo", photoBody(t, "x", photo{"image/jpeg", ""}), http.StatusBadRequest, "bad_image"},
-		{"one photo over its limit", photoBody(t, "x", photo{"image/jpeg", b64(jpeg(engine.MaxImageBytes + 1))}), http.StatusBadRequest, "bad_image"},
-		{"photos over the turn limit", photoBody(t, "x", photo{"image/jpeg", b64(jpeg(engine.MaxImageBytes))}, photo{"image/jpeg", b64(jpeg(engine.MaxImageBytes))}, photo{"image/jpeg", b64(jpeg(engine.MaxImageBytes))}, photo{"image/jpeg", b64(jpeg(100 << 10))}), http.StatusRequestEntityTooLarge, "images_too_large"},
-		{"body over the request limit", photoBody(t, "x", photo{"image/jpeg", b64(jpeg(9 << 20))}), http.StatusRequestEntityTooLarge, "images_too_large"},
+		{"one photo over its limit", photoBody(t, "x", photo{"image/jpeg", b64(jpegBytes(engine.MaxImageBytes + 1))}), http.StatusBadRequest, "bad_image"},
+		{"decompression bomb", photoBody(t, "x", photo{"image/jpeg", b64(jpegOf(20000, 20000, 0))}), http.StatusBadRequest, "bad_image"},
+		{"header only claims to be a jpeg", photoBody(t, "x", photo{"image/jpeg", b64(append([]byte("\xff\xd8\xff\xe0"), bytes.Repeat([]byte{'j'}, 60)...))}), http.StatusBadRequest, "bad_image"},
+		{"photos over the turn limit", photoBody(t, "x", photo{"image/jpeg", b64(jpegBytes(engine.MaxImageBytes))}, photo{"image/jpeg", b64(jpegBytes(engine.MaxImageBytes))}, photo{"image/jpeg", b64(jpegBytes(engine.MaxImageBytes))}, photo{"image/jpeg", b64(jpegBytes(100 << 10))}), http.StatusRequestEntityTooLarge, "images_too_large"},
+		{"body over the request limit", photoBody(t, "x", photo{"image/jpeg", b64(jpegBytes(9 << 20))}), http.StatusRequestEntityTooLarge, "images_too_large"},
 		{"not base64", `{"text":"x","images":[{"type":"image/jpeg","data":"%%%"}]}`, http.StatusBadRequest, "bad_request"},
 		{"unknown photo field", `{"text":"x","images":[{"type":"image/jpeg","data":"","url":"http://x"}]}`, http.StatusBadRequest, "bad_request"},
 		{"no text, no photo", `{"text":"  ","images":[]}`, http.StatusBadRequest, "bad_request"},
@@ -95,7 +122,7 @@ func TestCoachPromptRejectsBadPhotos(t *testing.T) {
 func TestCoachPhotosNeedTheCoachHeader(t *testing.T) {
 	coach := newFakeCoach()
 	world := newCoachWorld(t, coach)
-	if w := coachRequest(t, world.as(1), "POST", "/coach/prompt", photoBody(t, "x", photo{"image/jpeg", b64(jpeg(50))}), false); w.Code != http.StatusForbidden {
+	if w := coachRequest(t, world.as(1), "POST", "/coach/prompt", photoBody(t, "x", photo{"image/jpeg", b64(jpegBytes(50))}), false); w.Code != http.StatusForbidden {
 		t.Fatalf("without the header: %d", w.Code)
 	}
 	if len(coach.calls) != 0 {
