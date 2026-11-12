@@ -214,6 +214,9 @@ func runFakeEngine(mode string) {
 				send(map[string]any{"type": "delta", "text": fmt.Sprintf("refreshes=%d access=%v\n", r, replies[0]["access"] != nil)})
 				send(map[string]any{"type": "thinking", "text": "pensando en tu sesión"})
 				send(map[string]any{"type": "delta", "text": "CONTEXT<" + ctx + ">TEXT<" + text + ">IMAGES" + photos + choice})
+				if mode == "learnings" {
+					send(map[string]any{"type": "delta", "text": "\n\n## Aprendizajes\n- limitation: Hombro derecho molesta en press\n- Prefiere mancuernas\n"})
+				}
 				send(map[string]any{"type": "done", "aborted": false})
 			}()
 		case "approval":

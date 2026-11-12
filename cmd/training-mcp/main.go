@@ -101,7 +101,7 @@ func runWithContext(ctx context.Context, args []string) error {
 	logger := log.Default()
 	httpsrv.WarningIfDisabled(cfg.AuthDisabled, logger)
 
-	coach, engineTokens, connectors, proxy, err := startCoach(cfg.Coach, cfg.WebPublicURL, store, logger)
+	coach, engineTokens, connectors, proxy, err := startCoach(cfg.Coach, cfg.WebPublicURL, store, training.HostMemory{ForUser: services.ForUser, Apply: mcpServer.Apply}, logger)
 	if err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func runWithContext(ctx context.Context, args []string) error {
 
 // startCoach builds the in-app coach when it is enabled. Disabled, it returns
 // nils and nothing of the coach exists: no connectors and no proxy either.
-func startCoach(c config.Coach, publicURL string, store *sqlitestore.Store, logger *log.Logger) (*engine.Manager, httpsrv.EngineTokens, *connector.Service, http.Handler, error) {
+func startCoach(c config.Coach, publicURL string, store *sqlitestore.Store, memory engine.MemoryHooks, logger *log.Logger) (*engine.Manager, httpsrv.EngineTokens, *connector.Service, http.Handler, error) {
 	if !c.Enabled {
 		return nil, nil, nil, nil, nil
 	}
@@ -198,7 +198,7 @@ func startCoach(c config.Coach, publicURL string, store *sqlitestore.Store, logg
 		Vault: vault, Tokens: tokens, Command: engine.NodeCommand(c.Node, c.Engine),
 		MCPURL: c.MCPURL, SystemPrompt: engine.SystemPrompt, Preferences: store, Conversations: store,
 		MaxProcesses: c.MaxProcesses, Idle: time.Duration(c.IdleSeconds) * time.Second, Logger: logger,
-		Connectors: connectors,
+		Connectors: connectors, Memory: memory,
 	})
 	if err != nil {
 		return nil, nil, nil, nil, err
