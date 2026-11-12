@@ -42,6 +42,9 @@ type webWorld struct {
 	plan          string
 	// proposal is the owner's pending proposal to create a plan named secretPlan+" 2".
 	proposal string
+	// accepted is the owner's accepted proposal setting the rest target, which
+	// the owner can undo.
+	accepted string
 	memory   string
 	// rule is the owner's stored grant.
 	rule string
@@ -113,6 +116,18 @@ func newWebWorld(t *testing.T) webWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
+	restPayload := []byte(`{"rest_seconds":95}`)
+	restProposal, err := owner.Propose(training.WithAgentSession(ctx, training.ExternalSession), training.ProposalInput{Tool: "set_rest_target", ActionType: "rest.set", Payload: restPayload},
+		func(context.Context) (json.RawMessage, error) { return nil, errors.New("not applied while pending") })
+	if err != nil {
+		t.Fatal(err)
+	}
+	accepted, err := owner.AcceptProposal(ctx, restProposal.ID, training.AnswerAllowOnce, func(ctx context.Context, svc *training.Service, _ string, _ json.RawMessage) (json.RawMessage, error) {
+		return json.RawMessage(`{}`), svc.SetRestTarget(ctx, 95)
+	})
+	if err != nil || !accepted.Undoable {
+		t.Fatalf("accepted = %+v, %v", accepted, err)
+	}
 	origin, err := store.ForUser(1).RecordDecision(ctx, training.DecisionRecord{Time: time.Unix(0, 0), Permission: "set.log", Outcome: training.OutcomeAllow,
 		DeciderKind: training.DeciderSubject, DeciderID: training.AccountHolder, Channel: training.ChannelWeb})
 	if err != nil {
@@ -147,7 +162,7 @@ func newWebWorld(t *testing.T) webWorld {
 	}
 	return webWorld{
 		db: db, owner: webHandler(t, services, 1), second: webHandler(t, services, 2),
-		set: itoa(set.ID), session: itoa(session.ID), plan: itoa(plan.ID), proposal: itoa(proposal.ID), rule: itoa(rule),
+		set: itoa(set.ID), session: itoa(session.ID), plan: itoa(plan.ID), proposal: itoa(proposal.ID), accepted: itoa(accepted.ID), rule: itoa(rule),
 		memory: itoa(memory.Memory.ID), conflict: itoa(rival.Candidates[0].RelationID),
 	}
 }
@@ -225,6 +240,10 @@ var webRoutes = map[string]func(*testing.T){
 	"POST /review/{id}/reject": idRoute(func(w webWorld) string { return w.proposal }, func(id string) (string, url.Values) {
 		return "/review/" + id + "/reject", url.Values{"answer": {"reject_always"}}
 	}),
+	"POST /review/{id}/undo": idRoute(func(w webWorld) string { return w.accepted }, func(id string) (string, url.Values) {
+		return "/review/" + id + "/undo", url.Values{}
+	}),
+	"GET /review/undoable": pageRoute("/review/undoable", "/undo"),
 	"POST /review/accept-all": writeRoute("/review/accept-all", url.Values{"on": {"0"}},
 		`agent_permissions WHERE user_id=2 AND accept_all=0`),
 	"POST /review/forget": testForgettingTouchesOnlyTheUsersOwnRules,

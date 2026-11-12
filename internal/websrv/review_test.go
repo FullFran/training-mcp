@@ -20,13 +20,15 @@ type reviewFixture struct {
 	services *training.Services
 	mcp      *mcpsrv.Server
 	store    *sqlitestore.Store
+	path     string
 }
 
 // newReviewFixture is a user created after migration 14 (asks for everything),
 // served with the CSRF token a signed-in mount carries.
 func newReviewFixture(t *testing.T) reviewFixture {
 	t.Helper()
-	store, err := sqlitestore.Open(t.TempDir() + "/training.db")
+	path := t.TempDir() + "/training.db"
+	store, err := sqlitestore.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +47,7 @@ func newReviewFixture(t *testing.T) reviewFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return reviewFixture{handler: server.Handler(), service: service, services: services, mcp: mcp, store: store}
+	return reviewFixture{handler: server.Handler(), service: service, services: services, mcp: mcp, store: store, path: path}
 }
 
 const coachSession = training.CoachSessionPrefix + "chat"

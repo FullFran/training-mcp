@@ -87,6 +87,10 @@
     <li>
       <span><strong>{{.Label}}</strong> · {{.Status}}{{if .DecidedBy}} <span class="muted">({{.DecidedBy}})</span>{{end}}</span>
       <span class="muted">{{.When}}{{if .Error}} · {{.Error}}{{end}}</span>
+      {{if .Undoable}}<form method="post" action="{{$.Base}}/review/{{.ID}}/undo">{{if $.CSRF}}
+        <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+        <button type="submit" class="ghost">Deshacer</button>
+      </form>{{end}}
     </li>
     {{end}}
   </ul>

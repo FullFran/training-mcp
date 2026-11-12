@@ -106,6 +106,7 @@ func (s *userStore) ImportMappings(ctx context.Context, source string) (map[stri
 // both reading the keys as new. A set is recorded only when its key is claimed
 // here; a workout gets a session only once one of its sets is.
 func (s *userStore) ApplyImport(ctx context.Context, in training.ImportRecord) (training.ImportSummary, error) {
+	defer s.writing(ctx)()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return training.ImportSummary{}, err

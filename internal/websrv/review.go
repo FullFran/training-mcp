@@ -41,6 +41,7 @@ var actionLabels = map[string]string{
 	"memory.judge":            "Relacionar recuerdos",
 	"memory.confirm":          "Confirmar recuerdo",
 	"memory.consolidate":      "Fusionar recuerdos",
+	training.UndoAction:       "Deshacer",
 }
 
 func actionLabel(actionType string) string {
@@ -106,6 +107,9 @@ type ProposalView struct {
 	// InSession says the proposal was asked inside an agent session, so the
 	// always answers, which last for that session, can be offered.
 	InSession bool
+	// Undoable says the person can undo it; Undone that they already did.
+	Undoable bool
+	Undone   bool
 }
 
 // RuleView is a stored always answer as the review page shows it.
@@ -158,11 +162,25 @@ func (s *Server) proposalView(p training.Proposal) ProposalView {
 	if !p.DecidedAt.IsZero() {
 		when = p.DecidedAt
 	}
+	summary := proposalSummary(p.Tool, p.Payload)
+	if p.Tool == training.UndoTool {
+		var undone struct {
+			ProposalID int64 `json:"proposal_id"`
+		}
+		if json.Unmarshal(p.Payload, &undone) == nil && undone.ProposalID > 0 {
+			summary = "Deshizo la propuesta " + strconv.FormatInt(undone.ProposalID, 10) + "."
+		}
+	}
+	status := statusLabels[p.Status]
+	if p.UndoneBy != 0 {
+		status += ", deshecha"
+	}
 	return ProposalView{
-		ID: p.ID, ActionType: p.ActionType, Label: actionLabel(p.ActionType), Summary: proposalSummary(p.Tool, p.Payload),
+		ID: p.ID, ActionType: p.ActionType, Label: actionLabel(p.ActionType), Summary: summary,
 		Fields: proposalFields(p.Payload),
-		Status: statusLabels[p.Status], DecidedBy: decidedByLabels[p.DecidedBy],
+		Status: status, DecidedBy: decidedByLabels[p.DecidedBy],
 		When: when.In(s.clock().Location()).Format("02/01 15:04"), Error: p.Error, InSession: p.Session != "",
+		Undoable: p.Undoable, Undone: p.UndoneBy != 0,
 	}
 }
 
@@ -300,6 +318,104 @@ func (s *Server) rejectProposal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.reviewDone(w, r)
+}
+
+// undoRows names, in the app's language, the kind of row a refused undo points
+// at.
+var undoRows = map[string]string{
+	"sets":                   "una serie",
+	"sessions":               "la sesión",
+	"plans":                  "la rutina",
+	"plan_items":             "un ejercicio de la rutina",
+	"session_items":          "un ejercicio de la sesión",
+	"session_feedback":       "una valoración",
+	"exercise_notes":         "una nota de ejercicio",
+	"exercise_groups":        "un grupo muscular",
+	"volume_landmarks":       "un MEV/MRV",
+	"users":                  "el descanso objetivo",
+	"idempotency_keys":       "un registro de series",
+	"imported_sets":          "una serie importada",
+	"coach_memory":           "un recuerdo",
+	"coach_memory_revisions": "un recuerdo",
+	"coach_memory_relations": "una relación entre recuerdos",
+}
+
+// undoRefusal explains why an undo was refused.
+func undoRefusal(c *training.UndoConflict) string {
+	row := undoRows[c.Table]
+	if row == "" {
+		row = "un dato"
+	}
+	switch c.Reason {
+	case training.UndoDepended:
+		return "No se puede deshacer: algo que hiciste después depende de " + row + " que quitaría."
+	case training.UndoOccupied:
+		return "No se puede deshacer: " + row + " que volvería ocupa ya el sitio de otra cosa que hiciste después."
+	}
+	return "No se puede deshacer: " + row + " cambió después."
+}
+
+// undoProposal is the person undoing an accepted proposal. It is their own
+// action, so it applies at once and goes to the history.
+func (s *Server) undoProposal(w http.ResponseWriter, r *http.Request) {
+	id, ok := s.proposalID(w, r)
+	if !ok {
+		return
+	}
+	_, err := s.service(r.Context()).UndoProposal(r.Context(), id)
+	var conflict *training.UndoConflict
+	switch {
+	case err == nil:
+		s.reviewDone(w, r)
+	case errors.As(err, &conflict):
+		s.renderReview(w, r, http.StatusConflict, undoRefusal(conflict))
+	case errors.Is(err, training.ErrUndone):
+		s.renderReview(w, r, http.StatusConflict, "Esa propuesta ya estaba deshecha.")
+	case errors.Is(err, training.ErrNotUndoable):
+		s.renderReview(w, r, http.StatusConflict, "Esa propuesta no se puede deshacer.")
+	default:
+		s.reviewFailed(w, r, err)
+	}
+}
+
+// UndoableView is a proposal the chat can offer to undo.
+type UndoableView struct {
+	ID      int64  `json:"id"`
+	Label   string `json:"label"`
+	Summary string `json:"summary"`
+	When    string `json:"when"`
+	UndoURL string `json:"undo_url"`
+}
+
+// undoableLimit is how many undoable proposals the chat offers at once.
+const undoableLimit = 5
+
+// undoableProposals lists, as JSON for the chat, the proposals the person can
+// still undo that were accepted within the session window: newest first, at
+// most undoableLimit. Undoing goes through POST /review/{id}/undo.
+func (s *Server) undoableProposals(w http.ResponseWriter, r *http.Request) {
+	answered, err := s.service(r.Context()).ListProposals(r.Context(), training.ProposalFilter{Limit: 100})
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	since := s.clock().Add(-training.SessionWindow)
+	out := struct {
+		Proposals []UndoableView `json:"proposals"`
+	}{Proposals: []UndoableView{}}
+	for _, p := range answered {
+		if len(out.Proposals) == undoableLimit {
+			break
+		}
+		if !p.Undoable || p.DecidedAt.Before(since) {
+			continue
+		}
+		v := s.proposalView(p)
+		out.Proposals = append(out.Proposals, UndoableView{ID: p.ID, Label: v.Label, Summary: v.Summary, When: v.When,
+			UndoURL: s.base + "/review/" + strconv.FormatInt(p.ID, 10) + "/undo"})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
 }
 
 func (s *Server) setAcceptAll(w http.ResponseWriter, r *http.Request) {
