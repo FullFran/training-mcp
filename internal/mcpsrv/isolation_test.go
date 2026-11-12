@@ -79,8 +79,9 @@ var isolationCases = map[string]isolationCase{
 	"performance_dropoff": {byID: true, args: func(id toolIDs) map[string]any {
 		return map[string]any{"session_id": id.session}
 	}},
-	"get_plan":    {byID: true, args: func(id toolIDs) map[string]any { return map[string]any{"plan_id": id.plan} }},
-	"delete_plan": {byID: true, args: func(id toolIDs) map[string]any { return map[string]any{"plan_id": id.plan} }},
+	"simulate_plan": {byID: true, args: func(id toolIDs) map[string]any { return map[string]any{"plan_id": id.plan} }},
+	"get_plan":      {byID: true, args: func(id toolIDs) map[string]any { return map[string]any{"plan_id": id.plan} }},
+	"delete_plan":   {byID: true, args: func(id toolIDs) map[string]any { return map[string]any{"plan_id": id.plan} }},
 	"update_plan": {byID: true, args: func(id toolIDs) map[string]any {
 		return map[string]any{"plan_id": id.plan, "name": "robado"}
 	}},

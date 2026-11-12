@@ -113,6 +113,8 @@ type ProposalView struct {
 	// Draft is set for a routine the coach proposes: Planificar shows it as
 	// a draft to review and save.
 	Draft *DraftView
+	// Simulation is the week a pending plan proposal would prescribe.
+	Simulation *SimulationView
 }
 
 // RuleView is a stored always answer as the review page shows it.
@@ -205,7 +207,9 @@ func (s *Server) reviewData(r *http.Request) (ReviewData, error) {
 	}
 	data := ReviewData{AcceptAll: perms.AcceptAll, Answers: answerLabels}
 	for _, p := range pending {
-		data.Pending = append(data.Pending, s.proposalView(p))
+		v := s.proposalView(p)
+		v.Simulation = s.planSimulation(ctx, p)
+		data.Pending = append(data.Pending, v)
 	}
 	for _, p := range answered {
 		data.Answered = append(data.Answered, s.proposalView(p))
@@ -466,7 +470,9 @@ func (s *Server) pendingProposals(r *http.Request) []ProposalView {
 	}
 	views := make([]ProposalView, 0, len(pending))
 	for _, p := range pending {
-		views = append(views, s.proposalView(p))
+		v := s.proposalView(p)
+		v.Simulation = s.planSimulation(r.Context(), p)
+		views = append(views, v)
 	}
 	return views
 }

@@ -49,6 +49,7 @@
     </details>{{else}}<dl>{{range .Fields}}
       <dt>{{.Name}}</dt><dd>{{.Value}}</dd>{{end}}
     </dl>{{end}}
+    {{with .Simulation}}{{template "simulation" .}}{{end}}
     <form method="post" action="{{$.Base}}/review/{{.ID}}/accept">{{if $.CSRF}}
       <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
       <button type="submit" name="answer" value="allow_once" class="primary wide">{{index $.Review.Answers "allow_once"}}</button>

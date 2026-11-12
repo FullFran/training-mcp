@@ -253,6 +253,7 @@ Rate a trained muscle group 0-3 on fatigue, pump and recovery, and get next week
 | `volume_recommendation` | Set-count change per muscle group for next week. Weights recent feedback over older rather than reading only the last, reports how many rated sessions it is based on and the resulting confidence, declines to advise on a single rating, and never pushes volume past a recorded MEV or MRV. |
 | `set_volume_landmarks` | Record a muscle group's personal weekly-set boundaries: MEV below which it stops growing, MRV above which fatigue outpaces recovery. These are individual, and `volume_recommendation` refuses to push past them. Leave a value at 0 if unknown. |
 | `list_volume_landmarks` | List the muscle groups that have personal volume landmarks recorded. |
+| `simulate_plan` | What a plan would do to a week of training, before it is created or changed. Give a saved plan_id or unsaved items, and sessions_per_week. Returns weekly working sets and SI per muscle group, each compared with the person's MEV and MRV (below_mev, within, above_mrv, no_landmarks), the weekly totals, and exercises with no muscle group. Deterministic and read-only: it stores nothing and creates no proposal. Call it before proposing create_plan or set_plan_exercise. |
 
 ## Catalogue
 
@@ -362,5 +363,25 @@ The recommendation is deliberately cautious about its own certainty:
   anchors were legible in the source sheet (magnitude 0 → "sube 3 series",
   7 → "mantén o reduce 1"); the bands between them are an interpolation, and the
   code says so.
+
+`simulate_plan` shows what a plan would prescribe before anyone accepts it (#46), the way Liftosaur's `run_playground` lets an agent try a program. It is arithmetic in `training.SimulatePlan`, so it costs no model tokens and writes nothing:
+
+- Every plan item is working sets (a plan prescribes no warm-ups), counted one
+  per target set exactly as `weekly_volume` counts logged working sets, and
+  weighted with the same `SetSI` of its target RPE, or of the imputed RPE 8 when
+  none is prescribed.
+- A plan is one session; `sessions_per_week` (1 to 7, default 1) multiplies it
+  into a week. Only muscle groups the plan trains are reported, in catalogue
+  order, through the person's own exercise groups. Exercises with no group still
+  count in the totals and are listed in `unmapped_exercises`.
+- Each group's weekly sets are compared with that person's landmarks using the
+  same boundaries `volume_recommendation` clamps to: under MEV is `below_mev`,
+  over MRV is `above_mrv`, on or between them is `within`, and a group with no
+  landmarks is `no_landmarks`. There is no MAV landmark stored, so none is
+  compared.
+- The app shows the same simulation, computed by the server, on pending
+  `create_plan`, `set_plan_exercise` and `remove_plan_exercise` proposals: on
+  the review page, and on the routine draft in Planificar. An edit is simulated
+  on top of the saved plan without changing it.
 
 `set_exercise_group`, `list_exercise_groups`, and `volume_by_muscle` add per-muscle-group volume. Each exercise maps to exactly one muscle group, so group SI is a true partition of session SI — every set counts once and the group totals add up to the session total. Sets whose exercise has no mapping are reported under an empty group rather than dropped, so gaps in the catalogue stay visible.
