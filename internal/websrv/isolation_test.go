@@ -227,6 +227,17 @@ var webRoutes = map[string]func(*testing.T){
 	"POST /s/{id}/cancel": idRoute(func(w webWorld) string { return w.session }, func(id string) (string, url.Values) {
 		return "/s/" + id + "/cancel", url.Values{"sets": {"1"}}
 	}),
+	"POST /s/{id}/sets": idRoute(func(w webWorld) string { return w.session }, func(id string) (string, url.Values) {
+		return "/s/" + id + "/sets", url.Values{"exercise": {"remo"}, "weight_kg": {"50"}, "reps": {"10"}, "rpe": {"8"}}
+	}),
+	"POST /s/{id}/sets/{set}/update": idRoute(sessionSet, func(id string) (string, url.Values) {
+		return "/s/" + pathOfSet(id) + "/update", url.Values{"weight_kg": {"1"}}
+	}),
+	"POST /s/{id}/sets/{set}/delete": idRoute(sessionSet, func(id string) (string, url.Values) {
+		return "/s/" + pathOfSet(id) + "/delete", url.Values{}
+	}),
+	"GET /sessions/past":  pageRoute("/sessions/past", secretPlan),
+	"POST /sessions/past": testStartingAPastSessionFromAnotherUsersPlanIsRefused,
 
 	"GET /{$}":               pageRoute("/", secretExercise),
 	"GET /history":           testHistoryRedirectIsTheSameForEveryone,
@@ -608,4 +619,36 @@ func testRestTargetBelongsToWhoSetsIt(t *testing.T) {
 	if body := get(t, world.second, base+"/").Body.String(); !strings.Contains(body, `data-rest-target="75"`) {
 		t.Fatalf("second user's page should show their own target")
 	}
+}
+
+// sessionSet names the owner's set through its session, as the set editor's URLs do.
+func sessionSet(w webWorld) string { return w.session + "/sets/" + w.set }
+
+// pathOfSet turns an id from idRoute into the session and set parts of a set
+// editor URL; a bare missing id stands for both.
+func pathOfSet(id string) string {
+	if strings.Contains(id, "/") {
+		return id
+	}
+	return id + "/sets/" + id
+}
+
+// A past session following another user's routine is refused exactly like a
+// missing routine, and nothing is written; without a routine the session is the
+// second user's own.
+func testStartingAPastSessionFromAnotherUsersPlanIsRefused(t *testing.T) {
+	world := newWebWorld(t)
+	before := dumpDatabase(t, world.db)
+	foreign := post(t, world.second, base+"/sessions/past", url.Values{"date": {"2026-08-01"}, "plan_id": {world.plan}}, false)
+	missing := post(t, world.second, base+"/sessions/past", url.Values{"date": {"2026-08-01"}, "plan_id": {missingWebID}}, false)
+	if foreign.Code != http.StatusBadRequest || foreign.Code != missing.Code || foreign.Body.String() != missing.Body.String() {
+		t.Fatalf("foreign: %d %q, missing: %d %q", foreign.Code, foreign.Body, missing.Code, missing.Body)
+	}
+	if strings.Contains(foreign.Body.String(), secretPlan) {
+		t.Fatalf("response carries the owner's routine:\n%s", foreign.Body)
+	}
+	if after := dumpDatabase(t, world.db); after != before {
+		t.Fatalf("rows changed:\nbefore\n%s\nafter\n%s", before, after)
+	}
+	writeRoute("/sessions/past", url.Values{"date": {"2026-08-01"}}, "sessions WHERE user_id=2 AND date='2026-08-01'")(t)
 }

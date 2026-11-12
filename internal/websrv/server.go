@@ -108,6 +108,9 @@ type pageData struct {
 	InfoJSON template.JS
 	// ReadOnly renders a past session without the editing controls.
 	ReadOnly bool
+	// EditSets shows a session's page as plain forms to add, correct and
+	// delete its sets, the way a session on a past date is filled in.
+	EditSets bool
 	Error    string
 	// CSRF is the session's token, empty where the mount has no sessions.
 	CSRF string
@@ -413,6 +416,11 @@ func (s *Server) routes() {
 	s.handle("POST "+b+"/s/{id}/plan", s.saveSessionAsPlan)
 	s.handle("POST "+b+"/s/{id}/delete", s.deleteSession)
 	s.handle("POST "+b+"/s/{id}/cancel", s.cancelWorkout)
+	s.handle("POST "+b+"/s/{id}/sets", s.addPastSet)
+	s.handle("POST "+b+"/s/{id}/sets/{set}/update", s.updatePastSet)
+	s.handle("POST "+b+"/s/{id}/sets/{set}/delete", s.deletePastSet)
+	s.handle("GET "+b+"/sessions/past", s.pastSessionForm)
+	s.handle("POST "+b+"/sessions/past", s.startPastSession)
 	s.handle("GET "+b+"/review", s.reviewPage)
 	s.handle("POST "+b+"/review/{id}/accept", s.acceptProposal)
 	s.handle("POST "+b+"/review/{id}/reject", s.rejectProposal)
@@ -904,8 +912,13 @@ func (s *Server) saveSessionAsPlan(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, to, http.StatusSeeOther)
 }
 
-// sessionPage renders one session read-only, with message shown above it.
+// sessionPage renders one session read-only, with message shown above it;
+// ?editar=1 opens its set editor instead.
 func (s *Server) sessionPage(w http.ResponseWriter, r *http.Request, id int64, status int, message string) {
+	s.renderSession(w, r, id, status, message, r.URL.Query().Get("editar") == "1")
+}
+
+func (s *Server) renderSession(w http.ResponseWriter, r *http.Request, id int64, status int, message string, edit bool) {
 	session, err := s.service(r.Context()).GetSession(r.Context(), id)
 	if errors.Is(err, training.ErrNotFound) || errors.Is(err, training.ErrValidation) {
 		http.NotFound(w, r)
@@ -915,7 +928,7 @@ func (s *Server) sessionPage(w http.ResponseWriter, r *http.Request, id int64, s
 		s.fail(w, err)
 		return
 	}
-	data := pageData{Base: s.base, Today: session.Date, Session: session, ReadOnly: true, Error: message}
+	data := pageData{Base: s.base, Today: session.Date, Session: session, ReadOnly: true, EditSets: edit, Error: message}
 	if data.Progress, err = s.service(r.Context()).SessionProgress(r.Context(), session.ID); err != nil {
 		s.fail(w, err)
 		return
@@ -1261,6 +1274,8 @@ func (s *Server) adjustItem(w http.ResponseWriter, r *http.Request) {
 			message = "Ajuste inválido."
 			break
 		}
+		// Optional, as in add_session_exercise: blank keeps what is already there.
+		it.Superset, it.Notes = r.PostFormValue("superset"), r.PostFormValue("notes")
 		err = s.service(r.Context()).SetSessionItem(r.Context(), session.ID, it)
 	case "rx":
 		// Rep range and RPE; the set count has its own buttons. Blank fields stay.

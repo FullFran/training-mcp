@@ -22,7 +22,10 @@
 
 <main>
   {{if .Session.Notes}}<p class="muted session-notes">{{.Session.Notes}}</p>{{end}}
+  {{if .EditSets}}{{template "set-editor" .}}{{else}}
   {{template "panel.html" .}}
+  <a class="btn wide" href="{{.Base}}/s/{{.Session.ID}}?editar=1">Editar series</a>
+  {{end}}
   {{if .Session.Sets}}<form class="card save-plan" method="post" action="{{.Base}}/s/{{.Session.ID}}/plan" autocomplete="off">{{if .CSRF}}
     <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
     <label class="field">
@@ -44,3 +47,43 @@
 </body>
 </html>
 {{end}}
+
+{{/* set-editor fills in or corrects a session's sets with plain forms, the
+     way a session on a past date is logged after the fact. */}}
+{{define "set-editor"}}<section class="set-editor" aria-label="Series de la sesión">
+  {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
+  {{$id := .Session.ID}}
+  {{range .Blocks}}
+  <article class="card block">
+    <header><span class="ex">{{.Exercise}}</span></header>
+    {{range .Sets}}
+    <div class="edit-set">
+      <form class="edit-form" method="post" action="{{$.Base}}/s/{{$id}}/sets/{{.ID}}/update" autocomplete="off">{{if $.CSRF}}
+        <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+        <input name="weight_kg" type="number" inputmode="decimal" step="0.25" min="0.5" value="{{num .WeightKG}}" aria-label="Peso (kg)">
+        <input name="reps" type="number" inputmode="numeric" step="1" min="1" value="{{.Reps}}" aria-label="Reps">
+        <input name="rpe" type="number" inputmode="decimal" step="0.5" min="1" max="10" value="{{if not .RPEImputed}}{{num .RPE}}{{end}}" aria-label="RPE">
+        <input type="hidden" name="category" value="working">
+        <label class="warmup-toggle"><input type="checkbox" name="category" value="warmup"{{if eq .Category "warmup"}} checked{{end}}> W</label>
+        <button type="submit" class="ok">Guardar</button>
+      </form>
+      <form method="post" action="{{$.Base}}/s/{{$id}}/sets/{{.ID}}/delete">{{if $.CSRF}}
+        <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+        <button type="submit" class="del" aria-label="Borrar serie">✕</button>
+      </form>
+    </div>
+    {{end}}
+  </article>
+  {{end}}
+  <form class="card add-set" method="post" action="{{.Base}}/s/{{.Session.ID}}/sets" autocomplete="off">{{if .CSRF}}
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
+    <input name="exercise" type="text" required autocapitalize="none" spellcheck="false" placeholder="ejercicio" aria-label="Ejercicio"{{with .Blocks}}{{with index . (add (len .) -1)}} value="{{.Exercise}}"{{end}}{{end}}>
+    <div class="rx-edit">
+      <input name="weight_kg" type="number" inputmode="decimal" step="0.25" min="0.5" required placeholder="kg" aria-label="Peso (kg)">
+      <input name="reps" type="number" inputmode="numeric" step="1" min="1" required placeholder="reps" aria-label="Reps">
+      <input name="rpe" type="number" inputmode="decimal" step="0.5" min="1" max="10" required placeholder="RPE" aria-label="RPE">
+    </div>
+    <button type="submit" class="primary wide">Añadir serie</button>
+  </form>
+  <a class="btn wide" href="{{.Base}}/s/{{.Session.ID}}">Listo</a>
+</section>{{end}}

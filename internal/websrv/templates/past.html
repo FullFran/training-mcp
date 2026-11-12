@@ -1,0 +1,41 @@
+{{define "past.html"}}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Añadir sesión pasada</title>
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="{{.Base}}/manifest.webmanifest">
+<link rel="icon" href="{{.Base}}/static/icon-192.png">
+<link rel="stylesheet" href="{{.Base}}/static/app.css">
+</head>
+<body data-base="{{.Base}}">
+
+<header class="bar back-only">
+  <div><strong>Añadir sesión pasada</strong></div>
+  <a class="ghost" href="{{.Base}}/?modo=progreso">Progreso</a>
+</header>
+
+<main>
+  {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
+  <form class="card past-session" method="post" action="{{.Base}}/sessions/past" autocomplete="off">{{if .CSRF}}
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
+    <p class="muted">Para un entreno que no registraste ese día. No cambia el entreno de hoy.</p>
+    <label class="field">
+      <span>Fecha</span>
+      <input type="date" name="date" value="{{.Session.Date}}" max="{{.Today}}" required>
+    </label>
+    <label class="field">
+      <span>Rutina <span class="muted">(opcional)</span></span>
+      <select name="plan_id">
+        <option value="">Entreno libre</option>
+        {{range .Plans}}<option value="{{.ID}}">{{.Name}}</option>
+        {{end}}
+      </select>
+    </label>
+    <button type="submit" class="primary wide">Crear y añadir series</button>
+  </form>
+</main>
+</body>
+</html>
+{{end}}

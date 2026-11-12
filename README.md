@@ -196,7 +196,11 @@ shared with the MCP tools and cannot drift apart.
   opens its detail, where **Guardar como rutina** turns it into a routine
   (the same call as `save_session_as_plan`: adjustments and off-plan work
   kept, skipped exercises left out) and **Borrar sesión** deletes it with
-  every set in it (the same call as `delete_session`). **Ejercicios**: every exercise with its best e1RM, best set
+  every set in it (the same call as `delete_session`); **Editar series** opens
+  plain forms to add, correct and delete its sets. **Añadir sesión pasada**
+  creates a session on an earlier date, optionally following a routine (the
+  same call as `start_session`), and opens it there for its sets; today and
+  later dates are refused, so it never becomes today's workout. **Ejercicios**: every exercise with its best e1RM, best set
   and a sparkline of the best e1RM per session, plus next week's volume advice,
   volume per muscle group, and **Series por semana**: working sets and SI per
   muscle group for the last four Monday-to-Sunday weeks (the call
@@ -214,7 +218,9 @@ shared with the MCP tools and cannot drift apart.
 - **+ Añadir ejercicio** and **Sustituir** in the workout open an exercise
   picker: search (accents ignored), recent exercises, filters by muscle group,
   each with its last set; several can be added at once, and a name that does
-  not exist yet can be created. While adding, one **Sugerido por el coach** row
+  not exist yet can be created. **Superserie y notas**, collapsed under the
+  list, sends the optional superset label and notes `add_session_exercise`
+  takes. While adding, one **Sugerido por el coach** row
   comes first, worked out from stored data with no model call: the muscle
   group the volume recommendation raises most, else the one with the fewest
   working sets this week, and that group's most recently logged exercise not

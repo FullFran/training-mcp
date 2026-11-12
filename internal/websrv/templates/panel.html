@@ -169,6 +169,11 @@
         <input name="rep_max" type="number" inputmode="numeric" min="0" step="1" placeholder="máx" aria-label="Reps máximas">
         <input name="target_rpe" type="number" inputmode="decimal" min="1" max="10" step="0.5" placeholder="RPE" aria-label="RPE objetivo">
       </div>
+      <details class="add-extra">
+        <summary class="muted">Superserie y notas</summary>
+        <input name="superset" type="text" maxlength="40" autocapitalize="characters" placeholder="superserie (A, B…)" aria-label="Superserie">
+        <input name="notes" type="text" maxlength="2000" placeholder="notas (tempo, técnica…)" aria-label="Notas">
+      </details>
       <button type="submit" class="mini">Añadir al plan de hoy</button>
     </form>
   </details>

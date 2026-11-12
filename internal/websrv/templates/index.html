@@ -498,7 +498,14 @@
   <label class="picker-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg><input id="picker-q" type="search" placeholder="Buscar ejercicio…" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" aria-label="Buscar ejercicio"></label>
   <div id="picker-chips" class="picker-chips" role="toolbar" aria-label="Filtrar"></div>
   <ul id="picker-list" class="picker-list" aria-live="polite"></ul>
-  <div class="picker-foot"><button type="button" id="picker-done" class="btn primary big" disabled>Añadir</button></div>
+  <div class="picker-foot">
+    <details id="picker-extra" class="add-extra">
+      <summary class="muted">Superserie y notas</summary>
+      <input id="picker-superset" type="text" maxlength="40" autocapitalize="characters" placeholder="superserie (A, B…)" aria-label="Superserie">
+      <input id="picker-notes" type="text" maxlength="2000" placeholder="notas (tempo, técnica…)" aria-label="Notas">
+    </details>
+    <button type="button" id="picker-done" class="btn primary big" disabled>Añadir</button>
+  </div>
 </section>
 
 <!-- One panel at a time over the chat; closing it returns to the same chat. -->

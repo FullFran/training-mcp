@@ -23,6 +23,7 @@
     </ol>
     <p class="week-sum">Esta semana: <span class="num">{{.WeekSessions}} sesi{{if eq .WeekSessions 1}}ón{{else}}ones{{end}}</span>{{if .WeekKG}} · <span class="num">{{kilos .WeekKG}} kg</span>{{end}}</p>
   </div>
+  <a class="list-row" href="{{$.Base}}/sessions/past" data-panel data-title="Añadir sesión pasada"><span class="row-main"><strong>Añadir sesión pasada</strong><span class="muted">Un entreno que no registraste ese día</span></span><span class="chev" aria-hidden="true">›</span></a>
   {{range .Months}}
   <h2 class="section-label">{{.Name}}</h2>
   <nav class="list" aria-label="{{.Name}}">{{range .Sessions}}
