@@ -48,7 +48,9 @@ type Server struct {
 	// JavaScript documents, so html/template's contextual escaping would be
 	// wrong for them.
 	txt *texttemplate.Template
-	mux *http.ServeMux
+	// assets fingerprints the static files and the service worker.
+	assets assets
+	mux    *http.ServeMux
 	// patterns lists what is registered on mux, which cannot list itself.
 	patterns []string
 }
@@ -158,6 +160,9 @@ type pageData struct {
 	Cards []TrainCard
 	// Records are today's sets that match their exercise's best estimated 1RM.
 	Records map[int64]bool
+
+	// AssetVersion names the service worker's caches; see assets.
+	AssetVersion string
 }
 
 // LastSet returns the session's final working set, used to power "repeat last
@@ -350,9 +355,13 @@ func NewWithOptions(service training.ServiceFor, snapshot func(context.Context, 
 	if err != nil {
 		return nil, err
 	}
+	files, err := fingerprint(staticFS, templateFS)
+	if err != nil {
+		return nil, err
+	}
 	s := &Server{
 		service: service, snapshot: snapshot, clock: clock, base: strings.TrimSuffix(basePath, "/"), opts: opts,
-		tpl: tpl, txt: txt, mux: http.NewServeMux(),
+		tpl: tpl, txt: txt, assets: files, mux: http.NewServeMux(),
 	}
 	s.routes()
 	return s, nil
@@ -429,7 +438,7 @@ func (s *Server) routes() {
 	if err != nil {
 		panic(err)
 	}
-	s.handle("GET "+b+"/static/", http.StripPrefix(b+"/static/", cacheStatic(http.FileServerFS(sub))).ServeHTTP)
+	s.handle("GET "+b+"/static/", http.StripPrefix(b+"/static/", s.assets.serveStatic(http.FileServerFS(sub))).ServeHTTP)
 
 	// Bare prefix with no trailing slash: send it to the app root so a typed or
 	// shared URL still lands somewhere useful.
@@ -1003,7 +1012,7 @@ func (s *Server) serviceWorker(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/javascript")
 	// The worker must not be cached or clients would keep an outdated shell.
 	w.Header().Set("Cache-Control", "no-cache")
-	s.txt.ExecuteTemplate(w, "sw.js.tmpl", pageData{Base: s.base})
+	s.txt.ExecuteTemplate(w, "sw.js.tmpl", pageData{Base: s.base, AssetVersion: s.assets.version})
 }
 
 func (s *Server) todayData(ctx context.Context, message string) (pageData, error) {
@@ -1490,13 +1499,6 @@ func (s *Server) renderTo(w http.ResponseWriter, name string, data pageData) {
 
 func (s *Server) fail(w http.ResponseWriter, _ error) {
 	http.Error(w, "internal error", http.StatusInternalServerError)
-}
-
-func cacheStatic(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "public, max-age=604800")
-		next.ServeHTTP(w, r)
-	})
 }
 
 // formatNumber trims trailing zeros so 36.0 renders as "36" and 2.5 stays "2.5".

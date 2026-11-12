@@ -264,6 +264,11 @@ shared with the MCP tools and cannot drift apart.
   leaves an empty session behind.
 - The service worker caches the shell and the last viewed pages for offline
   *reading*. Writes always require the network — a set only counts once stored.
+- The worker's cache version is a hash of the static files and the worker
+  itself, computed at startup, so it is never bumped by hand: any change to them
+  makes browsers install a new worker and refetch the shell, and an unchanged
+  build keeps the installed one. Static files are served `no-cache` with an
+  ETag, so a browser revalidates them instead of keeping a copy for a week.
 
 `scripts/backup.sh` takes a consistent snapshot of the whole database straight
 from the Docker volume that holds it, with `VACUUM INTO`, so it is safe while the

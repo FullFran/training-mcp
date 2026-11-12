@@ -268,9 +268,40 @@ func TestStaticAssetsAreServedAndCached(t *testing.T) {
 		if w.Code != http.StatusOK || w.Body.Len() == 0 {
 			t.Fatalf("%s status = %d, len = %d", name, w.Code, w.Body.Len())
 		}
-		if cc := w.Header().Get("Cache-Control"); !strings.Contains(cc, "max-age") {
-			t.Fatalf("%s Cache-Control = %q", name, cc)
+		// The URLs carry no version, so a browser must revalidate every time
+		// instead of keeping a week-old copy across a deploy; the ETag makes an
+		// unchanged file cost an empty 304.
+		if cc := w.Header().Get("Cache-Control"); cc != "no-cache" {
+			t.Fatalf("%s Cache-Control = %q, want no-cache", name, cc)
 		}
+		tag := w.Header().Get("ETag")
+		if tag == "" {
+			t.Fatalf("%s has no ETag", name)
+		}
+		req := httptest.NewRequest(http.MethodGet, base+"/static/"+name, nil)
+		req.Header.Set("If-None-Match", tag)
+		again := httptest.NewRecorder()
+		h.ServeHTTP(again, req)
+		if again.Code != http.StatusNotModified || again.Body.Len() != 0 {
+			t.Fatalf("%s revalidated with its ETag: status = %d, len = %d", name, again.Code, again.Body.Len())
+		}
+		req = httptest.NewRequest(http.MethodGet, base+"/static/"+name, nil)
+		req.Header.Set("If-None-Match", `"stale"`)
+		changed := httptest.NewRecorder()
+		h.ServeHTTP(changed, req)
+		if changed.Code != http.StatusOK || changed.Body.Len() != w.Body.Len() {
+			t.Fatalf("%s with a stale ETag: status = %d, len = %d", name, changed.Code, changed.Body.Len())
+		}
+	}
+}
+
+// A new worker fills its shell from the network, never from copies the
+// browser's HTTP cache kept from before the deploy.
+func TestServiceWorkerInstallSkipsTheHTTPCache(t *testing.T) {
+	h, _ := newServer(t)
+	body := get(t, h, base+"/sw.js").Body.String()
+	if !strings.Contains(body, "{ cache: 'reload' }") || !strings.Contains(body, "cache.addAll(fresh)") {
+		t.Fatalf("install does not bypass the HTTP cache:\n%s", body)
 	}
 }
 
