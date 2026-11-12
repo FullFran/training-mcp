@@ -1091,9 +1091,9 @@ func (s *Server) recordFeedback(w http.ResponseWriter, r *http.Request) {
 	s.renderPanel(w, r, message)
 }
 
-// choosePlan starts today's session from a plan. It refuses once sets exist,
-// because the plan is snapshotted at session start and switching afterwards
-// would silently reinterpret work already logged.
+// choosePlan starts today's session from a plan. With nothing logged yet it
+// replaces today's session; once sets exist they stay and the plan's exercises
+// are added to the session, so work already logged is never reinterpreted.
 func (s *Server) choosePlan(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		s.fail(w, err)

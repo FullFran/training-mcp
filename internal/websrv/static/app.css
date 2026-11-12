@@ -1901,3 +1901,6 @@ body.coach-open .plan-today { display: none; }
 .weekly td small { display: block; font-size: 11px; }
 .weekly tr:last-child > * { border-bottom: 0; }
 .weekly > p { margin: 8px 4px 0; font-size: 13px; }
+
+/* Cambiar de rutina, under Continuar while a workout runs. */
+.switch-note { margin: 6px 2px 0; font-size: 13px; }

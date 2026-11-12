@@ -129,6 +129,18 @@ func (p pageData) PlannedSets() int {
 	return n
 }
 
+// OtherPlans are the routines that can replace or join today's workout: every
+// one but the routine it was started from.
+func (p pageData) OtherPlans() []training.Plan {
+	var out []training.Plan
+	for _, plan := range p.Plans {
+		if plan.ID != p.Session.PlanID {
+			out = append(out, plan)
+		}
+	}
+	return out
+}
+
 // Active reports a workout in progress: a plan chosen or a set logged today.
 func (p pageData) Active() bool { return len(p.Progress) > 0 || len(p.Session.Sets) > 0 }
 

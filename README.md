@@ -165,7 +165,10 @@ shared with the MCP tools and cannot drift apart.
   it. Without those settings it is not served at all. It never serves the
   database export, which holds every user's data.
 - The home offers two modes. **Entrenar** is a training logger: start a plan
-  or an empty session, then each exercise is a card with its set table
+  or an empty session (while one runs, **Cambiar de rutina** under
+  **Continuar** offers the other routines: with nothing logged the choice
+  replaces it, with sets logged they stay and its exercises are added), then
+  each exercise is a card with its set table
   (Serie, Anterior, kg, Reps, RPE), pre-filled from the plan, the set before
   and last session; tapping a row's number marks it as a warm-up (an amber
   **W** that never counts); one check logs a set and starts the rest timer, supersets
