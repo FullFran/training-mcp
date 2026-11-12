@@ -23,6 +23,15 @@
 <main>
   {{if .Session.Notes}}<p class="muted session-notes">{{.Session.Notes}}</p>{{end}}
   {{template "panel.html" .}}
+  {{if .Session.Sets}}<form class="card save-plan" method="post" action="{{.Base}}/s/{{.Session.ID}}/plan" autocomplete="off">{{if .CSRF}}
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
+    <label class="field">
+      <span>Guardar como rutina</span>
+      <input type="text" name="name" value="{{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Entreno {{.Session.Date}}{{end}}" maxlength="80" required>
+    </label>
+    <p class="muted">Con los cambios que hiciste en la sesión y lo que hiciste fuera del plan. Lo saltado no se copia.</p>
+    <button type="submit" class="primary wide">Guardar</button>
+  </form>{{end}}
 </main>
 </body>
 </html>

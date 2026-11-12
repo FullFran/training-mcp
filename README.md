@@ -183,7 +183,9 @@ shared with the MCP tools and cannot drift apart.
   `/?modo=progreso`, `/?modo=tu`).
 - **Progreso** has three views. **Historial**: this week's training days as
   dots with the sessions and kilos moved, then every session by month; each
-  opens its detail. **Ejercicios**: every exercise with its best e1RM, best set
+  opens its detail, where **Guardar como rutina** turns it into a routine
+  (the same call as `save_session_as_plan`: adjustments and off-plan work
+  kept, skipped exercises left out). **Ejercicios**: every exercise with its best e1RM, best set
   and a sparkline of the best e1RM per session, plus next week's volume advice
   and volume per muscle group; each opens a detail with the chart, the best
   sets, the fatigue between sets last time and every session's sets.

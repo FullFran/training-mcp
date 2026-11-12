@@ -514,6 +514,7 @@ func TestEveryStateChangingRequestNeedsTheSessionsCSRFToken(t *testing.T) {
 		"plan form without token":  f.do(http.MethodPost, "/plan", url.Values{"plan_id": {"1"}}, []*http.Cookie{owner}, nil),
 		"delete without token":     f.do(http.MethodPost, "/sets/1/delete", url.Values{}, []*http.Cookie{owner}, nil),
 		"plans without token":      f.do(http.MethodPost, "/plans/create", url.Values{"name": {"x"}}, []*http.Cookie{owner}, nil),
+		"save as plan no token":    f.do(http.MethodPost, "/s/1/plan", url.Values{"name": {"x"}}, []*http.Cookie{owner}, nil),
 		"other method no token":    f.do(http.MethodPut, "/sets", url.Values{}, []*http.Cookie{owner}, nil),
 	}
 	for name, w := range refused {

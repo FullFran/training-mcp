@@ -1853,3 +1853,7 @@ body.coach-open .plan-today { display: none; }
 }
 .undo-card.undone { opacity: .6; }
 /* === end U8 undo ========================================================== */
+
+/* Saving a past session as a routine, below its sets. */
+.save-plan { margin-top: 16px; display: grid; gap: 12px; }
+.save-plan p { margin: 0; }
