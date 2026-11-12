@@ -83,8 +83,7 @@ func newOAuthFixture(t *testing.T) *oauthFixture {
 		f.reached.Store(true)
 		w.WriteHeader(http.StatusOK)
 	})
-	web := &WebUI{Handler: mcp, BasePath: "/app"}
-	f.handler = RoutesWithOAuth(mcp, false, "static-token", web, oauth)
+	f.handler = RoutesWithOAuth(mcp, false, "static-token", oauth)
 	return f
 }
 
@@ -268,19 +267,22 @@ func TestProtectedResourceMetadataIsPublic(t *testing.T) {
 	}
 }
 
-func TestOAuthTokensDoNotOpenTheWebApp(t *testing.T) {
+// Bearers open /mcp alone: the former secret web prefix is no route at all.
+func TestBearersOpenNothingButMCP(t *testing.T) {
 	f := newOAuthFixture(t)
-	if got := f.post("/app", f.sign(goodClaims())); got.Code != http.StatusUnauthorized || f.reached.Load() {
-		t.Fatalf("status = %d, reached = %v", got.Code, f.reached.Load())
+	for name, token := range map[string]string{"oauth": f.sign(goodClaims()), "static": "static-token"} {
+		if got := f.post("/app", token); got.Code != http.StatusNotFound || f.reached.Load() {
+			t.Fatalf("%s token on /app: status = %d, reached = %v", name, got.Code, f.reached.Load())
+		}
 	}
-	if got := f.post("/app", "static-token"); got.Code != http.StatusOK {
-		t.Fatalf("static token on the web app: status = %d", got.Code)
+	if got := f.post("/mcp", "static-token"); got.Code != http.StatusOK {
+		t.Fatalf("static token on /mcp: status = %d", got.Code)
 	}
 }
 
 func TestOAuthOffBehavesAsBefore(t *testing.T) {
 	mcp := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-	h := Routes(mcp, false, "static-token", nil)
+	h := Routes(mcp, false, "static-token")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader("{}")))
 	if w.Code != http.StatusUnauthorized || w.Header().Get("WWW-Authenticate") != "Bearer" {

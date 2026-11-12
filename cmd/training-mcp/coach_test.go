@@ -87,26 +87,26 @@ func fakeNodeEngine() {
 func TestCoachEndToEnd(t *testing.T) {
 	dataDir := t.TempDir()
 	key := make([]byte, 32)
-	t.Setenv("MCP_OAUTH_ISSUER", "")
-	t.Setenv("MCP_OAUTH_RESOURCE", "")
-	t.Setenv("MCP_OAUTH_SUBJECT", "")
-	t.Setenv("MCP_OAUTH_PROVISION", "")
-	t.Setenv("WEB_OAUTH_CLIENT_ID", "")
-	t.Setenv("WEB_OAUTH_CLIENT_SECRET", "")
-	t.Setenv("WEB_BASE_PATH", "app")
-	t.Setenv("TRAINING_DB_PATH", filepath.Join(dataDir, "training.db"))
-	t.Setenv("TRAINING_COACH", "1")
-	t.Setenv("TRAINING_COACH_KEY", base64.StdEncoding.EncodeToString(key))
-	t.Setenv("TRAINING_COACH_NODE", os.Args[0])
-	t.Setenv("TRAINING_COACH_ENGINE", "-test.run=^TestFakeNodeEngine$")
-	t.Setenv("TRAINING_COACH_MAX_PROCESSES", "")
-	t.Setenv("TRAINING_COACH_IDLE_SECONDS", "")
-
-	base, token := startServer(t)
+	srv := startRootServer(t, map[string]string{
+		"TRAINING_DB_PATH":             filepath.Join(dataDir, "training.db"),
+		"TRAINING_COACH":               "1",
+		"TRAINING_COACH_KEY":           base64.StdEncoding.EncodeToString(key),
+		"TRAINING_COACH_NODE":          os.Args[0],
+		"TRAINING_COACH_ENGINE":        "-test.run=^TestFakeNodeEngine$",
+		"TRAINING_COACH_MAX_PROCESSES": "",
+		"TRAINING_COACH_IDLE_SECONDS":  "",
+	})
+	owner := srv.login()
+	// The app is the signed-in owner's; /mcp and the engines' proxy take bearers.
 	do := func(method, path, body string) (int, string) {
 		t.Helper()
-		req, _ := http.NewRequest(method, base+path, strings.NewReader(body))
-		req.Header.Set("Authorization", "Bearer "+token)
+		var req *http.Request
+		if strings.HasPrefix(path, "/mcp") || strings.HasPrefix(path, "/engine/") {
+			req, _ = http.NewRequest(method, srv.base+path, strings.NewReader(body))
+			req.Header.Set("Authorization", "Bearer "+srv.token)
+		} else {
+			req = owner.request(method, path, "", body)
+		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json, text/event-stream")
 		req.Header.Set("X-Coach", "1")
@@ -122,15 +122,15 @@ func TestCoachEndToEnd(t *testing.T) {
 	if code, body := do("POST", "/mcp", plan); code != http.StatusOK {
 		t.Fatalf("create_plan: %d %s", code, body)
 	}
-	if code, body := do("GET", "/app/coach/status", ""); code != http.StatusOK || !strings.Contains(body, `"disconnected"`) {
+	if code, body := do("GET", "/coach/status", ""); code != http.StatusOK || !strings.Contains(body, `"disconnected"`) {
 		t.Fatalf("status before login: %d %s", code, body)
 	}
-	if code, body := do("POST", "/app/coach/login", "{}"); code != http.StatusOK || !strings.Contains(body, "WXYZ-9876") {
+	if code, body := do("POST", "/coach/login", "{}"); code != http.StatusOK || !strings.Contains(body, "WXYZ-9876") {
 		t.Fatalf("login: %d %s", code, body)
 	}
 	connected := false
 	for i := 0; i < 100 && !connected; i++ {
-		_, body := do("GET", "/app/coach/status", "")
+		_, body := do("GET", "/coach/status", "")
 		connected = strings.Contains(body, `"connected"`)
 		time.Sleep(20 * time.Millisecond)
 	}
@@ -147,8 +147,7 @@ func TestCoachEndToEnd(t *testing.T) {
 		t.Fatalf("credential file mode %v, clear text %v", info.Mode().Perm(), strings.Contains(string(raw), "e2e-"))
 	}
 
-	req, _ := http.NewRequest("GET", base+"/app/coach/stream", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+	req := owner.request("GET", "/coach/stream", "", "")
 	streamCtx, stopStream := context.WithCancel(t.Context())
 	defer stopStream()
 	res, err := http.DefaultClient.Do(req.WithContext(streamCtx))
@@ -168,7 +167,7 @@ func TestCoachEndToEnd(t *testing.T) {
 	if line := <-lines; line != ": open" {
 		t.Fatalf("stream opened with %q", line)
 	}
-	if code, body := do("POST", "/app/coach/prompt", `{"text":"¿qué rutinas tengo?"}`); code != http.StatusAccepted {
+	if code, body := do("POST", "/coach/prompt", `{"text":"¿qué rutinas tengo?"}`); code != http.StatusAccepted {
 		t.Fatalf("prompt: %d %s", code, body)
 	}
 	var got strings.Builder
@@ -194,17 +193,17 @@ func TestCoachEndToEnd(t *testing.T) {
 	// Connectors: the production guard refuses internal addresses, and the
 	// engines' proxy door admits no other bearer.
 	for _, target := range []string{"https://127.0.0.1/mcp", "https://169.254.169.254/latest", "https://localhost:8080/mcp", "http://example.com/mcp"} {
-		if code, body := do("POST", "/app/coach/connectors", `{"url":"`+target+`","label":"x"}`); code != http.StatusBadRequest {
+		if code, body := do("POST", "/coach/connectors", `{"url":"`+target+`","label":"x"}`); code != http.StatusBadRequest {
 			t.Fatalf("connector %s: %d %s", target, code, body)
 		}
 	}
-	if code, body := do("GET", "/app/coach/connectors/list", ""); code != http.StatusOK || !strings.Contains(body, `"connectors":[]`) {
+	if code, body := do("GET", "/coach/connectors/list", ""); code != http.StatusOK || !strings.Contains(body, `"connectors":[]`) {
 		t.Fatalf("connector list: %d %s", code, body)
 	}
 	if code, _ := do("POST", "/engine/connectors/notion/mcp", `{"jsonrpc":"2.0","id":1,"method":"initialize"}`); code != http.StatusUnauthorized {
 		t.Fatalf("proxy with a non-engine bearer: %d", code)
 	}
-	if code, _ := do("POST", "/app/coach/disconnect", "{}"); code != http.StatusOK {
+	if code, _ := do("POST", "/coach/disconnect", "{}"); code != http.StatusOK {
 		t.Fatalf("disconnect: %d", code)
 	}
 	if files, _ := os.ReadDir(filepath.Join(dataDir, "coach", "credentials")); len(files) != 0 {
@@ -213,18 +212,8 @@ func TestCoachEndToEnd(t *testing.T) {
 }
 
 func TestCoachOffLeavesTheAppUnchanged(t *testing.T) {
-	t.Setenv("WEB_BASE_PATH", "app")
-	t.Setenv("TRAINING_DB_PATH", t.TempDir()+"/training.db")
-	t.Setenv("TRAINING_COACH", "")
-	base, token := startServer(t)
-	req, _ := http.NewRequest("GET", base+"/app/coach/status", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	res.Body.Close()
-	if res.StatusCode != http.StatusNotFound {
-		t.Fatalf("coach status with the coach off: %d", res.StatusCode)
+	srv := startRootServer(t, nil)
+	if code, _ := srv.login().do("GET", "/coach/status", "", ""); code != http.StatusNotFound {
+		t.Fatalf("coach status with the coach off: %d", code)
 	}
 }

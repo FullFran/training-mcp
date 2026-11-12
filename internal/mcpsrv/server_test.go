@@ -25,7 +25,7 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 	}
 	defer store.Close()
 	s := New(only(training.NewService(store.ForUser(1), time.Now)))
-	h := httptest.NewServer(httpsrv.Routes(s.Handler(), false, "secret", nil))
+	h := httptest.NewServer(httpsrv.Routes(s.Handler(), false, "secret"))
 	defer h.Close()
 	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "1.0.0"}, nil)
 	transport := &mcp.StreamableClientTransport{Endpoint: h.URL + "/mcp", HTTPClient: &http.Client{Transport: bearerTransport{base: http.DefaultTransport}}}

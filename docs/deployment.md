@@ -33,8 +33,8 @@ flowchart LR
    failure is retried on the next run and mailed to the owner once it has
    lasted about ten minutes.
 
-Runtime configuration (`MCP_BEARER_TOKEN`, `WEB_BASE_PATH`, the `MCP_OAUTH_*`
-settings) comes from an encrypted environment file in the infra repository.
+Runtime configuration (`MCP_BEARER_TOKEN`, the `MCP_OAUTH_*` and
+`WEB_OAUTH_*` settings) comes from an encrypted environment file in the infra repository.
 This repository holds no deployment secrets.
 
 ## CI must be green before merging

@@ -137,24 +137,30 @@ jobs:
           jq -e '.type == "ready" and .piVersion == "1.5.2"' <<<"$line" >/dev/null
 
       # Enabled, the coach must not stop the server from booting, and its routes
-      # answer behind the web app's guard. The key is a throwaway for this
-      # container only. No login is started: that would call OpenAI.
+      # answer behind the web login at the root, the app's only entrance. The
+      # key and the provider settings are throwaways for this container only;
+      # nobody signs in, as that would call the provider.
       - name: boot with the coach enabled
         run: |
           set -euo pipefail
           docker run -d --name "$CONTAINER-coach" -p 127.0.0.1:8081:8080 \
-            -e MCP_BEARER_TOKEN=ci-smoke-token -e WEB_BASE_PATH=app \
+            -e MCP_BEARER_TOKEN=ci-smoke-token \
+            -e MCP_OAUTH_ISSUER=https://auth.example.invalid -e MCP_OAUTH_RESOURCE=https://training.example.invalid/mcp \
+            -e MCP_OAUTH_SUBJECT=user_ci -e WEB_OAUTH_CLIENT_ID=ci-web -e WEB_OAUTH_CLIENT_SECRET=ci-web-secret \
             -e TRAINING_COACH=1 -e TRAINING_COACH_KEY="$(head -c 32 /dev/urandom | base64)" "$IMAGE"
           for _ in $(seq 1 30); do
             curl -fsS --max-time 2 http://127.0.0.1:8081/health >/dev/null 2>&1 && break
             sleep 1
           done
-          status="$(curl -fsS -H 'Authorization: Bearer ci-smoke-token' http://127.0.0.1:8081/app/coach/status)"
-          echo "/app/coach/status: $status"
-          jq -e '.state == "disconnected"' <<<"$status" >/dev/null
-          code="$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/app/coach/status)"
-          echo "/app/coach/status without the token: $code"
-          test "$code" = "401"
+          # Anonymous or with the static bearer, the app sends you to sign in.
+          for who in anonymous bearer; do
+            auth=()
+            [ "$who" = bearer ] && auth=(-H 'Authorization: Bearer ci-smoke-token')
+            read -r code location < <(curl -sS -o /dev/null "${auth[@]}" -w '%{http_code} %{redirect_url}\n' http://127.0.0.1:8081/coach/status)
+            echo "/coach/status ($who): $code $location"
+            test "$code" = "303"
+            test "${location##*/}" = "login"
+          done
 
       - name: container logs
         if: failure()

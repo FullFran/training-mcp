@@ -15,8 +15,9 @@ func Bearer(token string, disabled bool, next http.Handler) http.Handler {
 	return BearerWithPolicy(token, disabled, func(*http.Request) bool { return true }, next)
 }
 
-// BearerWithPolicy separates authentication from authorization. The production
-// single-user policy is allow-all, while callers can inject a scoped policy.
+// BearerWithPolicy separates authentication from authorization. The static
+// token identifies only the owner, so production allows all; callers can
+// inject a scoped policy.
 func BearerWithPolicy(token string, disabled bool, authorize func(*http.Request) bool, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if disabled {
@@ -49,7 +50,7 @@ func staticTokenMatches(r *http.Request, token string) bool {
 }
 
 // asOwner marks a request as the owner's. The static token and the auth bypass
-// identify nobody else, so everything behind them acts as the owner.
+// identify nobody else, so /mcp behind them acts as the owner.
 func asOwner(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		next.ServeHTTP(w, r.WithContext(training.WithUser(r.Context(), training.OwnerUserID)))
@@ -66,28 +67,22 @@ func WarningIfDisabled(disabled bool, logger *log.Logger) {
 	}
 }
 
-// WebUI mounts the PWA under its secret base path. It is optional: a nil value
-// serves MCP only.
-type WebUI struct {
-	Handler  http.Handler
-	BasePath string
+// Routes serves /mcp behind the static token and /health. No other path exists.
+func Routes(mcp http.Handler, authDisabled bool, token string) http.Handler {
+	return RoutesWithOAuth(mcp, authDisabled, token, nil)
 }
 
-func Routes(mcp http.Handler, authDisabled bool, token string, web *WebUI) http.Handler {
-	return RoutesWithOAuth(mcp, authDisabled, token, web, nil)
-}
-
-// RoutesWithOAuth also accepts access tokens on /mcp when oauth is set. The web UI
-// stays behind the static token: these tokens are issued for the MCP resource.
-func RoutesWithOAuth(mcp http.Handler, authDisabled bool, token string, web *WebUI, oauth *OAuth) http.Handler {
-	return RoutesWithLogin(mcp, authDisabled, token, web, oauth, nil)
+// RoutesWithOAuth also accepts access tokens on /mcp when oauth is set. These
+// tokens are issued for the MCP resource and open nothing else.
+func RoutesWithOAuth(mcp http.Handler, authDisabled bool, token string, oauth *OAuth) http.Handler {
+	return RoutesWithLogin(mcp, authDisabled, token, oauth, nil)
 }
 
 // RoutesWithLogin also serves the app at the root when root is set, to whoever
-// signs in with the provider, as their own user. Every route above keeps its own
-// guard: a browser session opens neither /mcp nor the secret mount.
-func RoutesWithLogin(mcp http.Handler, authDisabled bool, token string, web *WebUI, oauth *OAuth, root *RootWeb) http.Handler {
-	return RoutesWithEngine(mcp, authDisabled, token, web, oauth, root, nil)
+// signs in with the provider, as their own user. It is the web app's only
+// entrance: bearers never open it, and a browser session never opens /mcp.
+func RoutesWithLogin(mcp http.Handler, authDisabled bool, token string, oauth *OAuth, root *RootWeb) http.Handler {
+	return RoutesWithEngine(mcp, authDisabled, token, oauth, root, nil)
 }
 
 // EngineTokens resolves the bearers the in-app coach gives its own engine
@@ -98,7 +93,7 @@ type EngineTokens interface {
 
 // RoutesWithEngine also lets the coach's engine processes call /mcp, each as its
 // own person.
-func RoutesWithEngine(mcp http.Handler, authDisabled bool, token string, web *WebUI, oauth *OAuth, root *RootWeb, engineTokens EngineTokens) http.Handler {
+func RoutesWithEngine(mcp http.Handler, authDisabled bool, token string, oauth *OAuth, root *RootWeb, engineTokens EngineTokens) http.Handler {
 	mux := http.NewServeMux()
 	var door http.Handler
 	if oauth != nil && !authDisabled {
@@ -110,14 +105,6 @@ func RoutesWithEngine(mcp http.Handler, authDisabled bool, token string, web *We
 		door = Bearer(token, authDisabled, asOwner(mcp))
 	}
 	mux.Handle("/mcp", MaxBody(engineGuard(engineTokens, mcp, door)))
-	if web != nil && web.Handler != nil && web.BasePath != "" {
-		// The secret path is the outer gate, but the same bearer still guards
-		// these routes so the app is never reachable from inside the network
-		// without it. The reverse proxy supplies the header.
-		guarded := MaxBody(Bearer(token, authDisabled, asOwner(web.Handler)))
-		mux.Handle(web.BasePath, guarded)
-		mux.Handle(web.BasePath+"/", guarded)
-	}
 	if root != nil && root.Handler != nil && root.Login != nil {
 		mux.Handle("/", MaxBody(root.Login.Wrap(root.Handler)))
 		// Discovery probes and paths under /mcp keep answering 404, as they did

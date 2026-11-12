@@ -93,7 +93,7 @@ Full write-up: **[docs/architecture.md](docs/architecture.md)**.
 | **Prescription copying** | Starting a session from a plan copies it. Editing a template never rewrites history; adjusting today never edits the template. |
 | **Totals recalculated, never incremented** | A deleted or edited set cannot leave a session total wrong. |
 | **Advisory, never automatic** | `suggest_load`, `volume_recommendation` and `performance_dropoff` explain themselves and decline when they lack evidence. None ever edits a plan. |
-| **Config absence removes surface** | Unset `WEB_BASE_PATH` means the PWA is not mounted at all, rather than served on a default path. |
+| **Config absence removes surface** | Without `WEB_OAUTH_CLIENT_ID` the PWA is not mounted at all, rather than served without a login. |
 
 ## Development checks
 
@@ -112,7 +112,7 @@ Docker image the way the server does. Merging to `main` deploys; see
 | `MCP_AUTH_DISABLED=1` | disabled | Unsafe tunnel-only development bypass; never use in production |
 | `MCP_OAUTH_ISSUER`, `MCP_OAUTH_RESOURCE`, `MCP_OAUTH_SUBJECT` | off | Also accept OAuth access tokens on `/mcp`; set all three or none, see [connection paths](docs/connection-paths.md) |
 | `MCP_OAUTH_PROVISION` | off | `1` gives any subject the OAuth provider vouches for an account of its own; off, only the owner and existing accounts get in |
-| `WEB_BASE_PATH` | empty (web UI disabled) | Secret prefix the PWA is served from, e.g. `/a1b2c3…` |
+| `WEB_BASE_PATH` | ignored | Retired. It used to serve the PWA under a secret prefix; the PWA is now only served at the root behind the login. If still set, the server says so at startup and otherwise ignores it |
 | `WEB_OAUTH_CLIENT_ID`, `WEB_OAUTH_CLIENT_SECRET` | off | The provider's OAuth application for the web login; set both, with the `MCP_OAUTH_*` settings, to serve the PWA at the root behind a login, see [connection paths](docs/connection-paths.md) |
 | `TRAINING_COACH`, `TRAINING_COACH_KEY` | off | `1` and a 32-byte base64 key turn on the in-app coach, which chats with each person's own ChatGPT account; experimental, see [in-app coach](docs/coach.md) |
 
@@ -154,15 +154,16 @@ A few shapes worth knowing before reading it:
 
 ## Web UI (PWA)
 
-Setting `WEB_BASE_PATH` mounts an installable PWA for logging sets from a phone
+Setting `WEB_OAUTH_CLIENT_ID` and `WEB_OAUTH_CLIENT_SECRET` (with the
+`MCP_OAUTH_*` settings) serves an installable PWA for logging sets from a phone
 without going through ChatGPT. It is a driving adapter over the same
 `training.Service`, so validation, exercise normalization and SI calculation are
 shared with the MCP tools and cannot drift apart.
 
-- Served under the configured secret prefix as the owner, and, with
-  `WEB_OAUTH_CLIENT_ID` and `WEB_OAUTH_CLIENT_SECRET`, at the root to whoever
-  signs in with the OAuth provider, each seeing only their own data. Neither
-  set means not served at all. The database export is only on the secret prefix.
+- Served at the root to whoever signs in with the OAuth provider, each seeing
+  only their own data. That login is its only entrance: no bearer token opens
+  it. Without those settings it is not served at all. It never serves the
+  database export, which holds every user's data.
 - The home offers two modes. **Entrenar** is a training logger: start a plan
   or an empty session, then each exercise is a card with its set table
   (Serie, Anterior, kg, Reps, RPE), pre-filled from the plan, the set before
@@ -215,12 +216,11 @@ shared with the MCP tools and cannot drift apart.
 - The service worker caches the shell and the last viewed pages for offline
   *reading*. Writes always require the network — a set only counts once stored.
 
-`GET {base}/export.db` streams a consistent snapshot of the whole database,
-taken with `VACUUM INTO` so it is safe while the server is running. The result
-is a plain SQLite file: **restoring is copying it back into the data volume.**
-Nothing else in this deployment keeps a second copy, so this is the backup.
-`scripts/backup.sh` downloads one, verifies it opens and passes an integrity
-check, and keeps the last 30 daily copies. A failed run keeps the existing copy
+`scripts/backup.sh` takes a consistent snapshot of the whole database with
+`VACUUM INTO`, so it is safe while the server is running. The result is a plain
+SQLite file: **restoring is copying it back into the data volume.** The script
+verifies it opens and passes an integrity check, and keeps the last 30 daily
+copies. A failed run keeps the existing copy
 and raises a desktop notification.
 `scripts/install-backup-cron.sh` schedules it hourly with `--daily`, which stops
 after the day's first success, so a machine that was off at one hour still gets
@@ -242,7 +242,8 @@ the snapshot comes straight from the Docker volume on the same host (the same
 needs no web route; optional `DB_FILE` (default `training.db`) and `SNAPSHOT_IMAGE`
 (default a pinned `python:3.13-alpine`). Without it, the script reads `WEB_URL`
 from `.credentials/dokploy.env` (the file keeps its historical name; no Dokploy is
-involved) and downloads `/export.db` over the web. It needs `curl`, `gpg`, `sqlite3`
+involved) and downloads `/export.db` over the web, a route that only the retired
+secret mount served, so that fallback no longer works. It needs `curl`, `gpg`, `sqlite3`
 and `docker`, and cron runs it with `/bin/bash` hourly with `--daily`. On the VPS a
 failure only reaches `~/.local/state/training-mcp/backup.log`, as there is no
 desktop to notify. The VPS is the only uploader. The bucket expires objects after 90 days by age

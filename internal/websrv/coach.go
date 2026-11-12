@@ -40,7 +40,8 @@ const (
 	maxCoachBody    = engine.MaxImagesBytes/3*4 + 64<<10
 	coachUploadTime = 60 * time.Second
 	// coachHeader must accompany every coach write. A cross-site form cannot set
-	// it, which matters on the secret mount, where there is no session token.
+	// it, so it guards any mount without a session token, on top of the CSRF
+	// token the root's login checks.
 	coachHeader    = "X-Coach"
 	sseHeartbeat   = 20 * time.Second
 	coachNoStore   = "no-store"
