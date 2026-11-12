@@ -257,7 +257,10 @@
       {{end}}
     </details>
     {{end}}
-    <button type="button" id="finish-done" class="primary wide">Terminar entreno</button>
+    <form hx-post="{{.Base}}/finish" hx-swap="none">
+      <input type="hidden" name="session_id" value="{{.Session.ID}}">
+      <button type="submit" id="finish-done" class="primary wide">Terminar entreno</button>
+    </form>
   </section>
   {{end}}
 </section>

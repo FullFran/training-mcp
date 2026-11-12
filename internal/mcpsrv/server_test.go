@@ -532,6 +532,9 @@ func (testStore) DeleteSession(context.Context, int64) (int, error) { return 0, 
 func (testStore) LastSetAt(context.Context, int64) (int64, time.Time, error) {
 	return 0, time.Time{}, training.ErrNotFound
 }
+func (testStore) ClaimWorkoutSummary(context.Context, int64, time.Time) (bool, error) {
+	return false, training.ErrNotFound
+}
 func (testStore) RestTarget(context.Context) (int, error)  { return 0, nil }
 func (testStore) SetRestTarget(context.Context, int) error { return nil }
 func (testStore) ExerciseHistory(context.Context, string, int) (training.ExerciseHistory, error) {

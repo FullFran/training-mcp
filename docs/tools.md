@@ -278,6 +278,12 @@ asking never lets it forget, retire or merge facts without asking.
 No memory tool takes a user id: whose memory it is comes only from the
 authenticated request. A `user_id` sent as an argument is never read.
 
+The in-app coach also gets memory without calling a tool: the host writes
+`memory_context` into a fresh engine's first turn, proposes a deterministic
+summary when a workout ends, and proposes the items of a reply's closing
+`## Aprendizajes` block. All three are `memory_save` proposals, never direct
+writes; see [Memory hooks](coach.md#memory-hooks).
+
 ---
 
 ## Design notes

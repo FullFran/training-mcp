@@ -11,7 +11,7 @@ import (
 // Every memory write is its own action type, so letting the coach remember
 // without asking never lets it forget, retire or merge facts without asking.
 const (
-	memorySaveAction        = "memory.save"
+	memorySaveAction        = training.MemorySaveAction
 	memoryForgetAction      = "memory.forget"
 	memoryJudgeAction       = "memory.judge"
 	memoryConfirmAction     = "memory.confirm"

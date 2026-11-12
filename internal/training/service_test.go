@@ -468,6 +468,12 @@ func (m *memoryStore) LastSetAt(_ context.Context, sessionID int64) (int64, time
 	}
 	return id, at, nil
 }
+
+// ClaimWorkoutSummary is not exercised by these tests; the SQLite store's own
+// tests cover it.
+func (m *memoryStore) ClaimWorkoutSummary(context.Context, int64, time.Time) (bool, error) {
+	return false, ErrNotFound
+}
 func (m *memoryStore) RestTarget(context.Context) (int, error) { return m.restSeconds, nil }
 func (m *memoryStore) SetRestTarget(_ context.Context, seconds int) error {
 	m.restSeconds = seconds

@@ -69,6 +69,9 @@ type Settings struct {
 	Retention time.Duration
 	// PurgeEvery is how often conversations past their retention are deleted.
 	PurgeEvery time.Duration
+	// Memory runs the host's memory hooks: memory for a fresh engine and the
+	// learnings of a reply proposed as facts. Nil: none.
+	Memory MemoryHooks
 
 	Now    func() time.Time
 	Logger *log.Logger
@@ -210,6 +213,7 @@ type turnState struct {
 type turnRequest struct {
 	conv     int64
 	history  []ConversationMessage // stored messages, given to a fresh engine
+	memory   string                // the person's memory lines, given to a fresh engine
 	text     string                // what the engine gets
 	origin   string
 	images   []Image
@@ -518,9 +522,10 @@ func (m *Manager) Prompt(userID, conv int64, text string, images ...Image) (int6
 	if err != nil {
 		return 0, err
 	}
+	memory := m.memoryLines(userID)
 	m.mu.Lock()
 	err = m.startTurn(m.personOf(userID), turnRequest{
-		conv: conv, history: history, text: text, origin: originUser, images: images, model: model, thinking: thinking,
+		conv: conv, history: history, memory: memory, text: text, origin: originUser, images: images, model: model, thinking: thinking,
 		record: &ConversationMessage{Role: "user", Origin: originUser, Text: stored, Photos: len(images), At: at},
 	})
 	m.mu.Unlock()
@@ -880,12 +885,16 @@ func (m *Manager) Notify(userID int64, ev WorkoutEvent) {
 	if err != nil {
 		conv, history, created, err = m.prepareConversation(userID, 0, "Entreno del "+m.s.Now().Format("02/01"))
 	}
+	memory := ""
+	if err == nil {
+		memory = m.memoryLines(userID)
+	}
 	m.mu.Lock()
 	p = m.personOf(userID)
 	started := false
 	if err == nil && !m.closed && canStart(p) {
 		// A refusal (not connected, busy) leaves the event queued for later.
-		started = m.startTurn(p, turnRequest{conv: conv, history: history, text: reactionText, origin: originEvent, model: model, thinking: thinking}) == nil
+		started = m.startTurn(p, turnRequest{conv: conv, history: history, memory: memory, text: reactionText, origin: originEvent, model: model, thinking: thinking}) == nil
 	}
 	m.mu.Unlock()
 	if created && !started {
@@ -1028,9 +1037,14 @@ func (m *Manager) startTurn(p *person, r turnRequest) error {
 	})
 	pr.turn = t
 	m.dropStaleEvents(p)
+	// A fresh engine gets the person's memory, then the conversation so far,
+	// then this turn's lines.
 	contextLines := composeContext(m.s.Now(), p.events)
 	if fresh && len(r.history) > 0 {
 		contextLines = historyContext(r.history) + "\n" + contextLines
+	}
+	if fresh && r.memory != "" {
+		contextLines = r.memory + "\n" + contextLines
 	}
 	p.events = nil
 	if r.record != nil {
@@ -1425,6 +1439,10 @@ func (m *Manager) endTurn(p *person, pr *proc, name string, data map[string]any)
 	// What the coach said, even cut short, is kept with its steps.
 	if t.text.Len() > 0 || len(t.steps) > 0 {
 		m.persist(p.id, t.conv, ConversationMessage{Role: "assistant", Origin: t.origin, Text: t.text.String(), Steps: t.steps, At: m.s.Now()})
+	}
+	// Only a reply that ended on its own can close with learnings.
+	if name == "done" && !t.limited && data["aborted"] != true {
+		m.captureLearnings(p.id, t.conv, t.text.String())
 	}
 	if pr.cs.reload && p.proc == pr {
 		m.stop(p, "connectors_changed", pr)

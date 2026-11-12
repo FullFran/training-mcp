@@ -275,6 +275,9 @@ var idCases = map[string]func(context.Context, training.UserStore, seeded) (any,
 	"SupersetFor": func(c context.Context, u training.UserStore, id seeded) (any, error) {
 		return u.SupersetFor(c, id.session, "banca")
 	},
+	"ClaimWorkoutSummary": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return u.ClaimWorkoutSummary(c, id.session, time.Unix(0, 0))
+	},
 	"LastSetAt": func(c context.Context, u training.UserStore, id seeded) (any, error) {
 		set, at, err := u.LastSetAt(c, id.session)
 		return []any{set, at}, err
