@@ -195,7 +195,9 @@ shared with the MCP tools and cannot drift apart.
 - **Tú** holds the profile and the coach's memory, connectors, model, account
   and conversations (kept 90 days), **Ejercicios** (every exercise with its
   muscle group and setup note, editable: the calls `set_exercise_group` and
-  `set_exercise_note` make), the default rest between sets, and the data:
+  `set_exercise_note` make), **Límites de volumen** (each muscle group's MEV
+  and MRV in weekly sets, the call `set_volume_landmarks` makes; next week's
+  advice never crosses them), the default rest between sets, and the data:
   import from Hevy or Strong and the database export.
 - **+ Añadir ejercicio** and **Sustituir** in the workout open an exercise
   picker: search (accents ignored), recent exercises, filters by muscle group,
