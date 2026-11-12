@@ -51,7 +51,6 @@ while [ $# -gt 0 ]; do
   shift
 done
 case "$url" in
-  *export.db) echo "$url" >>"$HOME/downloads"; printf 'SQLite format 3 fresh' >"$out" ;;
   *list-type=2*) printf '<Key>training-2020-01-01.db.gpg</Key><Key>training-2020-01-02.db.gpg</Key>' ;;
   *)
     if [ -n "$up" ]; then
@@ -120,7 +119,7 @@ func TestFailedUploadKeepsLocalCopyNotifiesAndRetriesWithoutDownloading(t *testi
 	if err := os.Remove(filepath.Join(s.home, "upload-fails")); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Remove(filepath.Join(s.home, "downloads")); err != nil {
+	if err := os.Remove(filepath.Join(s.home, "docker-calls")); err != nil {
 		t.Fatal(err)
 	}
 	if out, err := s.run("backup.sh", "--daily"); err != nil {
@@ -129,24 +128,8 @@ func TestFailedUploadKeepsLocalCopyNotifiesAndRetriesWithoutDownloading(t *testi
 	if _, err := os.Stat(s.uploaded()); err != nil {
 		t.Fatalf("retry did not upload: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(s.home, "downloads")); err == nil {
-		t.Fatal("retry downloaded again although today's copy exists")
-	}
-}
-
-// The URL grants full access, and the VPS is shared with other shell users who
-// can read any process's arguments.
-func TestBackupKeepsTheSecretURLOutOfCurlArguments(t *testing.T) {
-	s := newSandbox(t)
-	s.configureOffsite()
-	if out, err := s.run("backup.sh"); err != nil {
-		t.Fatalf("backup failed: %v\n%s", err, out)
-	}
-	if strings.Contains(s.read(filepath.Join(s.home, "curl-args")), "example.invalid/app") {
-		t.Fatal("the secret URL reached curl's arguments, visible to any process")
-	}
-	if got := s.read(filepath.Join(s.home, "downloads")); !strings.Contains(got, "https://example.invalid/app/export.db") {
-		t.Fatalf("downloaded from %q", got)
+	if _, err := os.Stat(filepath.Join(s.home, "docker-calls")); err == nil {
+		t.Fatal("retry took a new snapshot although today's copy exists")
 	}
 }
 

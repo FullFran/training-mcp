@@ -41,14 +41,16 @@ func newSandbox(t *testing.T) *sandbox {
 			t.Fatal(err)
 		}
 	}
-	s.write(filepath.Join(s.root, ".credentials", "dokploy.env"), "WEB_URL=https://example.invalid/app\n", 0o600)
+	// The snapshot comes from a Docker volume on the same host; the fake docker
+	// prints the snapshot and records how it was run.
+	s.write(filepath.Join(s.root, ".credentials", "volume.env"), "DB_VOLUME=training-mcp-data\n", 0o600)
+	s.tool("docker", `echo "$@" >>"$HOME/docker-calls"; printf 'SQLite format 3 fresh'`)
 	s.tool("crontab", `if [ "$1" = -l ]; then cat "$HOME/crontab"; else cat >"$HOME/crontab"; fi`)
 	s.tool("notify-send", `echo "$@" >>"$HOME/notified"`)
 	s.tool("sqlite3", `case "$2" in *integrity_check*) echo ok ;; *) echo 7 ;; esac`)
-	// curl -K - reads its whole config from stdin before anything else. A fake
-	// that leaves it unread lets the script's printf write into a closed pipe,
-	// and under pipefail the SIGPIPE fails the backup (exit 141).
-	s.tool("curl", `cat >/dev/null; echo called >>"$HOME/curl-calls"; while [ $# -gt 1 ]; do [ "$1" = -o ] && out="$2"; shift; done; printf 'SQLite format 3 fresh' >"$out"`)
+	// Only the off-site upload uses curl; a backup that never configured one
+	// must never call it.
+	s.tool("curl", `cat >/dev/null; echo called >>"$HOME/curl-calls"`)
 	return s
 }
 
@@ -120,14 +122,14 @@ func TestBackupFindsItsToolsUnderCronPath(t *testing.T) {
 }
 
 func TestFailedBackupKeepsThePreviousCopyAndNotifies(t *testing.T) {
-	for name, curl := range map[string]string{
-		"download fails": `cat >/dev/null; exit 22`,
-		"not a database": `cat >/dev/null; while [ $# -gt 1 ]; do [ "$1" = -o ] && out="$2"; shift; done; printf 'garbage' >"$out"`,
+	for name, docker := range map[string]string{
+		"snapshot fails": `exit 1`,
+		"not a database": `printf 'garbage'`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			s := newSandbox(t)
 			s.write(s.today(), "good copy", 0o644)
-			s.tool("curl", curl)
+			s.tool("docker", docker)
 			if out, err := s.run("backup.sh"); err == nil {
 				t.Fatalf("backup reported success:\n%s", out)
 			}
@@ -158,8 +160,8 @@ func TestDailyModeSkipsOnceTodayIsBackedUp(t *testing.T) {
 	if out != "" {
 		t.Fatalf("a skipped run should be silent, got %q", out)
 	}
-	if _, err := os.Stat(filepath.Join(s.home, "curl-calls")); err == nil {
-		t.Fatal("daily mode downloaded although today's copy exists")
+	if _, err := os.Stat(filepath.Join(s.home, "docker-calls")); err == nil {
+		t.Fatal("daily mode took a snapshot although today's copy exists")
 	}
 }
 
@@ -223,25 +225,13 @@ func TestInstallerReplacesItsOwnEntriesAndNoOtherProjects(t *testing.T) {
 	}
 }
 
-// volumeSandbox reads the database from a Docker volume on the same host, with
-// no web URL configured at all.
-func volumeSandbox(t *testing.T) *sandbox {
-	s := newSandbox(t)
-	if err := os.Remove(filepath.Join(s.root, ".credentials", "dokploy.env")); err != nil {
-		t.Fatal(err)
-	}
-	s.write(filepath.Join(s.root, ".credentials", "volume.env"), "DB_VOLUME=training-mcp-data\n", 0o600)
-	s.tool("docker", `echo "$@" >>"$HOME/docker-calls"; printf 'SQLite format 3 volume'`)
-	return s
-}
-
 func TestBackupSnapshotsTheVolumeWithoutTheWeb(t *testing.T) {
-	s := volumeSandbox(t)
+	s := newSandbox(t)
 	out, err := s.run("backup.sh")
 	if err != nil {
 		t.Fatalf("backup failed: %v\n%s", err, out)
 	}
-	if got := s.read(s.today()); got != "SQLite format 3 volume" {
+	if got := s.read(s.today()); got != "SQLite format 3 fresh" {
 		t.Fatalf("today's copy = %q", got)
 	}
 	if _, err := os.Stat(filepath.Join(s.home, "curl-calls")); err == nil {
@@ -259,11 +249,39 @@ func TestBackupSnapshotsTheVolumeWithoutTheWeb(t *testing.T) {
 }
 
 func TestFailedVolumeSnapshotKeepsThePreviousCopy(t *testing.T) {
-	s := volumeSandbox(t)
+	s := newSandbox(t)
 	s.write(s.today(), "good copy", 0o644)
 	s.tool("docker", `exit 1`)
 	if out, err := s.run("backup.sh"); err == nil {
 		t.Fatalf("backup reported success:\n%s", out)
+	}
+	if got := s.read(s.today()); got != "good copy" {
+		t.Fatalf("failure overwrote today's copy with %q", got)
+	}
+	if !strings.Contains(s.read(filepath.Join(s.home, "notified")), "Training backup failed") {
+		t.Fatal("failure sent no notification")
+	}
+}
+
+// The web route the old fallback downloaded from is served by no production
+// mount, so without volume.env the backup fails loudly instead of reaching for
+// the web, even when a stale dokploy.env is still around.
+func TestBackupWithoutAVolumeFailsWithoutTheWeb(t *testing.T) {
+	s := newSandbox(t)
+	if err := os.Remove(filepath.Join(s.root, ".credentials", "volume.env")); err != nil {
+		t.Fatal(err)
+	}
+	s.write(filepath.Join(s.root, ".credentials", "dokploy.env"), "WEB_URL=https://example.invalid/app\n", 0o600)
+	s.write(s.today(), "good copy", 0o644)
+	out, err := s.run("backup.sh")
+	if err == nil {
+		t.Fatalf("backup reported success:\n%s", out)
+	}
+	if !strings.Contains(out, "volume.env") {
+		t.Fatalf("failure does not name the missing volume.env: %s", out)
+	}
+	if _, err := os.Stat(filepath.Join(s.home, "curl-calls")); err == nil {
+		t.Fatal("backup downloaded over the web")
 	}
 	if got := s.read(s.today()); got != "good copy" {
 		t.Fatalf("failure overwrote today's copy with %q", got)
