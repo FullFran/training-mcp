@@ -196,7 +196,8 @@ Every MCP write tool goes through `training.Service.Propose`, which records a
 proposal in the caller's own rows, in the agent session `mcpsrv` derives from
 the request's channel (one coach conversation, the external-client window, or
 none), and decides it as HCS-0005 does: a session-limited denial rejects it,
-the account's accept-all grant or a session-limited grant applies it, and
+the account's approval mode (accept-all, or accept-except-delete for a
+non-deleting action) or a session-limited grant applies it, and
 otherwise it waits for the person on `/review` or in the coach chat. Each
 decision writes a decision record first; see
 [Every write is a proposal](tools.md#every-write-is-a-proposal). Accepting replays the

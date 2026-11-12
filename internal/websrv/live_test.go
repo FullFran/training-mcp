@@ -148,3 +148,43 @@ func TestReAddingAnExerciseFromThePhoneKeepsItsSupersetAndNotes(t *testing.T) {
 		t.Fatalf("re-add from the phone clobbered superset or notes: %#v", got)
 	}
 }
+
+func TestStoppingTheRestStoresHowLongItWas(t *testing.T) {
+	h, service := newServer(t)
+	startPlan(t, h, service, training.PlanItem{Exercise: "banca", TargetSets: 3})
+	post(t, h, base+"/sets", setForm("banca", "60", "10", "6"), true)
+	live, err := service.LiveWorkout(t.Context())
+	if err != nil || live.LastSet == nil {
+		t.Fatalf("LiveWorkout() = %+v, %v", live, err)
+	}
+	id := itoa(live.LastSet.Set.ID)
+
+	for _, bad := range []url.Values{
+		{"set_id": {id}, "seconds": {"-1"}},
+		{"set_id": {id}, "seconds": {"1201"}},
+		{"set_id": {id}, "seconds": {"x"}},
+		{"set_id": {"x"}, "seconds": {"40"}},
+	} {
+		if w := post(t, h, base+"/rest/stop", bad, true); w.Code != http.StatusBadRequest {
+			t.Fatalf("POST /rest/stop %v = %d, want 400", bad, w.Code)
+		}
+	}
+	w := post(t, h, base+"/rest/stop", url.Values{"set_id": {id}, "seconds": {"45"}}, true)
+	var got struct {
+		RestedSeconds int `json:"rested_seconds"`
+	}
+	if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &got) != nil || got.RestedSeconds != 45 {
+		t.Fatalf("POST /rest/stop = %d %q", w.Code, w.Body)
+	}
+	if body := get(t, h, base+"/").Body.String(); !strings.Contains(body, `data-rest-state="stopped"`) {
+		t.Fatalf("after a stop the panel should not resume the timer: %q", body)
+	}
+	// Stored once: a second stop is refused and keeps the first.
+	if w := post(t, h, base+"/rest/stop", url.Values{"set_id": {id}, "seconds": {"90"}}, true); w.Code != http.StatusConflict {
+		t.Fatalf("second POST /rest/stop = %d, want 409", w.Code)
+	}
+	live, err = service.LiveWorkout(t.Context())
+	if err != nil || live.Rest.State != training.RestStopped || live.Rest.RestedSeconds != 45 {
+		t.Fatalf("rest = %+v, %v, want stopped at 45", live.Rest, err)
+	}
+}

@@ -23,7 +23,7 @@ import (
 
 const (
 	appMIMEType  = "text/html;profile=mcp-app"
-	restTimerURI = "ui://vibetraining/rest-timer/v1"
+	restTimerURI = "ui://vibetraining/rest-timer/v2"
 )
 
 //go:embed apps/rest-timer.html
@@ -36,8 +36,10 @@ func appToolMeta(uri string) mcp.Meta {
 	return mcp.Meta{"ui": map[string]any{"resourceUri": uri}, "ui/resourceUri": uri}
 }
 
-// RestTimerSet is the last logged set, as the timer shows it.
+// RestTimerSet is the last logged set, as the timer shows it. The view edits it
+// with update_set and stops the rest after it with stop_rest, by its id.
 type RestTimerSet struct {
+	ID       int64   `json:"id"`
 	Exercise string  `json:"exercise"`
 	WeightKG float64 `json:"weight_kg"`
 	Reps     int     `json:"reps"`
@@ -46,13 +48,47 @@ type RestTimerSet struct {
 // RestTimerOut is what the rest-timer view starts from. The view counts down
 // locally from Rest.ElapsedSeconds; the server's clock stays the truth.
 type RestTimerOut struct {
-	Now              string        `json:"now"`
-	Rest             training.Rest `json:"rest"`
-	IdleAfterSeconds int           `json:"idle_after_seconds"`
-	LastSet          *RestTimerSet `json:"last_set,omitempty"`
-	NextExercise     string        `json:"next_exercise,omitempty"`
-	NextSuperset     bool          `json:"next_superset,omitempty"`
-	WeightUnit       string        `json:"weight_unit"`
+	Now              string         `json:"now"`
+	Rest             training.Rest  `json:"rest"`
+	IdleAfterSeconds int            `json:"idle_after_seconds"`
+	LastSet          *RestTimerSet  `json:"last_set,omitempty"`
+	NextExercise     string         `json:"next_exercise,omitempty"`
+	NextSuperset     bool           `json:"next_superset,omitempty"`
+	NextSet          *RestTimerNext `json:"next_set,omitempty"`
+	WeightUnit       string         `json:"weight_unit"`
+}
+
+// RestTimerNext is the set the view offers to log next, which the person can
+// change before logging it with log_sets. Weight and reps start from the last
+// set of that exercise today; with none yet, from the top of the planned rep
+// range and no weight.
+type RestTimerNext struct {
+	Exercise   string  `json:"exercise"`
+	WeightKG   float64 `json:"weight_kg,omitempty"`
+	Reps       int     `json:"reps,omitempty"`
+	DoneSets   int     `json:"done_sets,omitempty"`
+	TargetSets int     `json:"target_sets,omitempty"`
+}
+
+func restTimerNext(live training.LiveWorkout) *RestTimerNext {
+	var next RestTimerNext
+	switch {
+	case live.Next != nil:
+		next = RestTimerNext{Exercise: live.Next.Exercise, Reps: live.Next.RepMax, DoneSets: live.Next.DoneSets, TargetSets: live.Next.TargetSets}
+	case live.LastSet != nil:
+		// No plan: another set of the exercise just done.
+		next = RestTimerNext{Exercise: live.LastSet.Set.Exercise}
+	default:
+		return nil
+	}
+	if live.Session != nil {
+		for _, set := range live.Session.Sets {
+			if set.Exercise == next.Exercise {
+				next.WeightKG, next.Reps = set.WeightKG, set.Reps
+			}
+		}
+	}
+	return &next
 }
 
 func restTimerOut(live training.LiveWorkout) RestTimerOut {
@@ -63,12 +99,13 @@ func restTimerOut(live training.LiveWorkout) RestTimerOut {
 		WeightUnit:       live.WeightUnit,
 	}
 	if live.LastSet != nil {
-		out.LastSet = &RestTimerSet{Exercise: live.LastSet.Set.Exercise, WeightKG: live.LastSet.Set.WeightKG, Reps: live.LastSet.Set.Reps}
+		out.LastSet = &RestTimerSet{ID: live.LastSet.Set.ID, Exercise: live.LastSet.Set.Exercise, WeightKG: live.LastSet.Set.WeightKG, Reps: live.LastSet.Set.Reps}
 	}
 	if live.Next != nil {
 		out.NextExercise = live.Next.Exercise
 		out.NextSuperset = live.Rest.State == training.RestSuperset
 	}
+	out.NextSet = restTimerNext(live)
 	return out
 }
 
@@ -91,6 +128,8 @@ func restTimerText(out RestTimerOut) string {
 			return fmt.Sprintf("Superset: go straight to %s, no rest.", out.NextExercise)
 		}
 		return "Superset: next exercise, no rest."
+	case training.RestStopped:
+		text = fmt.Sprintf("Rest stopped: rested %s%s.", clock(r.RestedSeconds), after)
 	case training.RestIdle:
 		return fmt.Sprintf("No rest running: the last set was over %d minutes ago.", int(training.RestIdleAfter/time.Minute))
 	default:

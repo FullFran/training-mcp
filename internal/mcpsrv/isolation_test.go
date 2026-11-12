@@ -67,6 +67,7 @@ var isolationCases = map[string]isolationCase{
 		return map[string]any{"session_id": id.session, "exercise": isolationExercise, "weight_kg": 1, "reps": 1, "rpe": 8}
 	}},
 	"update_set": {byID: true, args: func(id toolIDs) map[string]any { return map[string]any{"set_id": id.set, "reps": 1} }},
+	"stop_rest":  {byID: true, args: func(id toolIDs) map[string]any { return map[string]any{"set_id": id.set, "rest_seconds": 40} }},
 	"delete_set": {byID: true, args: func(id toolIDs) map[string]any { return map[string]any{"set_id": id.set} }},
 	"correct_lb_sets": {byID: true, args: func(id toolIDs) map[string]any {
 		return map[string]any{"set_ids": []int64{id.set}}

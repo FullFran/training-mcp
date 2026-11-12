@@ -37,6 +37,7 @@ var actionLabels = map[string]string{
 	"feedback.record":         "Valorar grupo muscular",
 	"landmarks.set":           "Fijar MEV/MRV",
 	"rest.set":                "Cambiar descanso objetivo",
+	"rest.stop":               "Parar descanso",
 	"memory.save":             "Recordar",
 	"memory.forget":           "Olvidar recuerdo",
 	"memory.judge":            "Relacionar recuerdos",
@@ -60,10 +61,11 @@ var statusLabels = map[string]string{
 }
 
 var decidedByLabels = map[string]string{
-	training.DecidedByPerson:       "tú",
-	training.DecidedBySessionGrant: "aceptado siempre en esa sesión",
-	training.DecidedByDenial:       "rechazado siempre en esa sesión",
-	training.DecidedByAcceptAll:    "aceptar todo",
+	training.DecidedByPerson:             "tú",
+	training.DecidedBySessionGrant:       "aceptado siempre en esa sesión",
+	training.DecidedByDenial:             "rechazado siempre en esa sesión",
+	training.DecidedByAcceptAll:          "aceptar todo",
+	training.DecidedByAcceptExceptDelete: "aceptar todo salvo borrar",
 	// Proposals decided before answers became session-limited.
 	training.DecidedBySession: "recordado 12 h",
 	training.DecidedByAlways:  "recordado siempre",
@@ -127,11 +129,12 @@ type RuleView struct {
 
 // ReviewData is what the review page shows.
 type ReviewData struct {
-	Pending   []ProposalView
-	Answered  []ProposalView
-	AcceptAll bool
-	Rules     []RuleView
-	Answers   map[string]string
+	Pending  []ProposalView
+	Answered []ProposalView
+	Mode     string
+	Modes    []ModeOption
+	Rules    []RuleView
+	Answers  map[string]string
 }
 
 // proposalFields lists the payload's values, nested ones as compact JSON, so the
@@ -207,7 +210,7 @@ func (s *Server) reviewData(r *http.Request) (ReviewData, error) {
 	if err != nil {
 		return ReviewData{}, err
 	}
-	data := ReviewData{AcceptAll: perms.AcceptAll, Answers: answerLabels}
+	data := ReviewData{Mode: perms.Mode, Modes: modeOptions, Answers: answerLabels}
 	for _, p := range pending {
 		v := s.proposalView(p, unit)
 		v.Simulation = s.planSimulation(ctx, p)
@@ -429,17 +432,29 @@ func (s *Server) undoableProposals(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(out)
 }
 
-func (s *Server) setAcceptAll(w http.ResponseWriter, r *http.Request) {
-	var on bool
-	switch r.PostFormValue("on") {
-	case "1":
-		on = true
-	case "0":
-	default:
-		s.renderReview(w, r, http.StatusBadRequest, "Valor inválido para aceptar todo.")
+// ModeOption is one choice of the approval mode selector.
+type ModeOption struct {
+	Value   string
+	Label   string
+	Details string
+	Risky   bool
+}
+
+// modeOptions are the approval modes in the order the selector shows them,
+// from the most to the least careful. The mode is only ever set from this page.
+var modeOptions = []ModeOption{
+	{training.ApprovalReviewAll, "Revisar todo", "El agente te pregunta antes de cada cambio.", false},
+	{training.ApprovalAcceptExceptDelete, "Aceptar todo salvo borrar", "Aplica los cambios al momento; borrar siempre te lo pregunta.", false},
+	{training.ApprovalAcceptAll, "Aceptar todo", "Aplica cualquier cambio sin preguntar, también borrar.", true},
+}
+
+func (s *Server) setApprovalMode(w http.ResponseWriter, r *http.Request) {
+	mode := r.PostFormValue("mode")
+	if !training.ValidApprovalMode(mode) {
+		s.renderReview(w, r, http.StatusBadRequest, "Modo de aprobación inválido.")
 		return
 	}
-	if err := s.service(r.Context()).SetAcceptAll(r.Context(), on); err != nil {
+	if err := s.service(r.Context()).SetApprovalMode(r.Context(), mode); err != nil {
 		s.fail(w, err)
 		return
 	}

@@ -60,6 +60,7 @@
     session_progress: ['Mirando cómo va la sesión', 'Mirado cómo va la sesión'],
     live_workout: ['Mirando el entreno en marcha', 'Mirado el entreno en marcha'],
     render_rest_timer: ['Mirando tu descanso', 'Mirado tu descanso'],
+    stop_rest: ['Parando el descanso', 'Descanso parado'],
     exercise_history: ['Consultando tu historial', 'Consultado tu historial'],
     list_plans: ['Consultando tus rutinas', 'Consultadas tus rutinas'],
     get_plan: ['Consultando la rutina', 'Consultada la rutina'],

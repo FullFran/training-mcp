@@ -134,9 +134,10 @@ A few shapes worth knowing before reading it:
   `pending` (waiting on the `/review` page or the coach chat) or `rejected`,
   plus a `proposal_id`. Answers follow HCS-0005: allow or reject once, or
   always for that action type in this session only (one coach conversation,
-  or 12 hours for external MCP clients), and an accept-all switch per account
-  skips the questions. Accounts that existed
-  before migration 014 keep accept-all on; new accounts ask for everything.
+  or 12 hours for external MCP clients). Each account has an approval mode:
+  `review_all` asks for everything, `accept_except_delete` applies every write
+  except deletes, and `accept_all` applies everything. New accounts start in
+  `accept_except_delete`; existing accounts keep what they had (migration 027).
   See [Every write is a proposal](docs/tools.md#every-write-is-a-proposal).
 
 - `log_set` needs no session id. It finds or creates today's session, so
@@ -249,7 +250,7 @@ shared with the MCP tools and cannot drift apart.
 - `/review` lists the agent's pending proposals with what each would change
   (one sentence per write tool, the exact payload one tap away),
   accepts or rejects them (once, or always in that session), shows the answer history
-  and holds the accept-all switch. The person's own changes in the app apply
+  and holds the approval mode selector. The person's own changes in the app apply
   directly.
 - A plan can be started for the day; its exercises become the cards of
   Entrenar, each showing done/target sets.

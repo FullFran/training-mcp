@@ -508,14 +508,14 @@ FROM sessions WHERE id=? AND user_id=?`, s.userID, id, s.userID).
 	if !imported {
 		out.StartedAt = sessionStart(startedAt)
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,session_id,position,exercise,weight_kg,reps,rpe,rpe_imputed,si,technique,superset,category FROM sets WHERE session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?) ORDER BY position`, id, s.userID)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,session_id,position,exercise,weight_kg,reps,rpe,rpe_imputed,si,technique,superset,category,rest_after_seconds FROM sets WHERE session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?) ORDER BY position`, id, s.userID)
 	if err != nil {
 		return out, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var v training.Set
-		if err = rows.Scan(&v.ID, &v.SessionID, &v.Position, &v.Exercise, &v.WeightKG, &v.Reps, &v.RPE, &v.RPEImputed, &v.SI, &v.Technique, &v.Superset, &v.Category); err != nil {
+		if err = rows.Scan(&v.ID, &v.SessionID, &v.Position, &v.Exercise, &v.WeightKG, &v.Reps, &v.RPE, &v.RPEImputed, &v.SI, &v.Technique, &v.Superset, &v.Category, &v.RestAfterSeconds); err != nil {
 			return out, err
 		}
 		v.SI = training.NormalizeSI(v.SI)
@@ -1421,4 +1421,25 @@ func (s *Store) SetCoachPreferences(ctx context.Context, userID int64, model, th
 		return fmt.Errorf("coach preferences: no user %d", userID)
 	}
 	return nil
+}
+
+func (s *userStore) RecordRest(ctx context.Context, setID int64, seconds int) error {
+	defer s.writing(ctx)()
+	res, err := s.db.ExecContext(ctx, `UPDATE sets SET rest_after_seconds=? WHERE id=? AND rest_after_seconds IS NULL
+AND session_id IN (SELECT id FROM sessions WHERE user_id=?)`, seconds, setID, s.userID)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil || n == 1 {
+		return err
+	}
+	var one int
+	err = s.db.QueryRowContext(ctx, `SELECT 1 FROM sets st JOIN sessions se ON se.id=st.session_id WHERE st.id=? AND se.user_id=?`, setID, s.userID).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return training.ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	return training.ErrRestRecorded
 }

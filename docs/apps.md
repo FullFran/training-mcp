@@ -10,7 +10,7 @@ without MCP Apps gets that tool's text instead.
 ## How a view reaches the chat
 
 1. The tool lists `_meta.ui.resourceUri`, for example
-   `ui://vibetraining/rest-timer/v1`. It also sends the deprecated flat
+   `ui://vibetraining/rest-timer/v2`. It also sends the deprecated flat
    `_meta["ui/resourceUri"]`, as the official `registerAppTool` does.
 2. A host that supports MCP Apps reads that resource (`resources/read`,
    MIME `text/html;profile=mcp-app`) and renders it in a sandboxed iframe.
@@ -29,7 +29,18 @@ before registering UI-enabled tools" is the one rule this does not meet.
 
 | View | Tool | What it shows |
 |---|---|---|
-| `ui://vibetraining/rest-timer/v1` | `render_rest_timer` | The rest since the last logged set: a countdown while `resting`, time over the target when `ready`, the next exercise in a `superset`, and nothing running when `none` or `idle`. |
+| `ui://vibetraining/rest-timer/v2` | `render_rest_timer` | The rest since the last logged set: a countdown while `resting`, time over the target when `ready`, the seconds rested once `stopped`, the next exercise in a `superset`, and nothing running when `none` or `idle`. Below it, the next set (weight and reps prefilled from the last one of that exercise today, editable, with a warm-up box) and the last set (editable). |
+
+The view's buttons call the same tools the agent uses, so the person's
+approval mode decides each one, and the view says when a write waits on the
+review page: **Stop rest** calls `stop_rest` with the set and the seconds on
+screen, **Done** calls `log_sets` (one idempotency key per set, reused on a
+retry), and editing the last set calls `update_set` with only the changed
+fields. **+30 s** only extends the countdown on screen; it never changes the
+person's target. After each write the view tells the model what happened
+(`ui/update-model-context`) and re-reads the timer. There is no app-only
+write tool: a tool hidden from the model is hidden by the host, not the
+server, so it would not be a boundary (#125).
 
 The rest timer counts locally from the server's `rest.elapsed_seconds` plus
 the time measured on the device since the result arrived. It never compares

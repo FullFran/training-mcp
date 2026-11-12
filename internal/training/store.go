@@ -72,6 +72,10 @@ type UserStore interface {
 	// RestTarget is the stored target rest in seconds; 0 when never set.
 	RestTarget(context.Context) (int, error)
 	SetRestTarget(context.Context, int) error
+	// RecordRest stores the seconds rested after one of the user's sets, once:
+	// a set that is not the user's is ErrNotFound, one already recorded is
+	// ErrRestRecorded.
+	RecordRest(ctx context.Context, setID int64, seconds int) error
 	// WeightUnit is the stored default unit, "" when never chosen (kg).
 	WeightUnit(context.Context) (string, error)
 	SetWeightUnit(context.Context, string) error
@@ -97,9 +101,13 @@ type ProposalStore interface {
 	// RejectProposal answers a pending proposal with no, decided by decidedBy;
 	// ErrNotPending if it is not pending.
 	RejectProposal(ctx context.Context, id int64, decidedBy string, at time.Time) (Proposal, error)
-	// Permissions are the standing answers. An account without a stored setting asks for everything.
+	// Permissions are the standing answers. An account without a stored
+	// setting accepts everything except deletes (ApprovalAcceptExceptDelete).
 	Permissions(context.Context) (Permissions, error)
 	SetAcceptAll(context.Context, bool) error
+	// SetApprovalMode stores the account's approval mode, one of the
+	// Approval* constants.
+	SetApprovalMode(context.Context, string) error
 	// AddRule stores a session-limited grant or denial and returns its id.
 	AddRule(context.Context, AnswerRule) (int64, error)
 	// ForgetRule removes a grant or denial and returns it; ErrNotFound if this

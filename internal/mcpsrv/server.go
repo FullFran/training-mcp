@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/fullfran/training-mcp/internal/training"
 	"github.com/google/jsonschema-go/jsonschema"
@@ -264,6 +265,34 @@ type RestTargetOut struct {
 	RestSeconds int `json:"rest_seconds"`
 	ProposalRef
 }
+type StopRestInput struct {
+	SetID       int64 `json:"set_id,omitempty" jsonschema:"The set the rest followed. Give it with rest_seconds, or omit both to stop the rest running now."`
+	RestSeconds *int  `json:"rest_seconds,omitempty" jsonschema:"Seconds rested after that set. Give it with set_id."`
+}
+
+// resolve fills in the rest running now when the call names neither the set
+// nor the seconds, so the proposal stores what the timer showed when it was
+// stopped, not what it would show once someone accepts it.
+func (in *StopRestInput) resolve(ctx context.Context, svc *training.Service) error {
+	switch {
+	case in.SetID == 0 && in.RestSeconds == nil:
+		id, elapsed, err := svc.RunningRest(ctx)
+		if err != nil {
+			return err
+		}
+		in.SetID, in.RestSeconds = id, &elapsed
+		return nil
+	case in.SetID == 0 || in.RestSeconds == nil:
+		return fmt.Errorf("%w: give set_id and rest_seconds together, or neither", training.ErrValidation)
+	}
+	return nil
+}
+
+type StopRestOut struct {
+	SetID         int64 `json:"set_id"`
+	RestedSeconds int   `json:"rested_seconds"`
+	ProposalRef
+}
 type NotesOut struct {
 	Notes []training.ExerciseNote `json:"notes"`
 }
@@ -514,6 +543,18 @@ func New(service training.ServiceFor) *Server {
 		}
 		v, err := svc.RestTarget(ctx)
 		return RestTargetOut{RestSeconds: v}, err
+	})
+
+	stopSchema := mustInputSchema[StopRestInput]()
+	setPositiveID(stopSchema.Properties["set_id"])
+	stopSchema.Properties["rest_seconds"].Minimum = jsonschema.Ptr(float64(0))
+	stopSchema.Properties["rest_seconds"].Maximum = jsonschema.Ptr(float64(training.RestIdleAfter / time.Second))
+	addWrite(w, &mcp.Tool{Name: "stop_rest", Description: "Stop the rest between sets and store how long the person rested, on the set the rest followed. With no arguments it stops the rest running now (state resting or ready in live_workout) at the seconds elapsed. To record a rest the person reports, give set_id and rest_seconds. A rest is stored once per set; live_workout then shows state stopped with rested_seconds.", InputSchema: stopSchema}, "rest.stop", func(ctx context.Context, svc *training.Service, in StopRestInput) (StopRestOut, error) {
+		if in.RestSeconds == nil {
+			return StopRestOut{}, training.ErrValidation
+		}
+		err := svc.RecordRest(ctx, in.SetID, *in.RestSeconds)
+		return StopRestOut{SetID: in.SetID, RestedSeconds: *in.RestSeconds}, err
 	})
 
 	setItemSchema := mustInputSchema[SessionItemInput]()

@@ -264,6 +264,7 @@ var webRoutes = map[string]func(*testing.T){
 
 	"POST /finish":    testFinishingAnotherUsersSessionProposesNothing,
 	"POST /rest":      testRestTargetBelongsToWhoSetsIt,
+	"POST /rest/stop": testRestStopsOnlyOnOwnSets,
 	"POST /units":     testWeightUnitBelongsToWhoSetsIt,
 	"GET /units/fix":  testLbFixPreviewIsThePersonsOwn,
 	"POST /units/fix": testLbFixApplyIsThePersonsOwn,
@@ -278,8 +279,8 @@ var webRoutes = map[string]func(*testing.T){
 		return "/review/" + id + "/undo", url.Values{}
 	}),
 	"GET /review/undoable": pageRoute("/review/undoable", "/undo"),
-	"POST /review/accept-all": writeRoute("/review/accept-all", url.Values{"on": {"0"}},
-		`agent_permissions WHERE user_id=2 AND accept_all=0`),
+	"POST /review/mode": writeRoute("/review/mode", url.Values{"mode": {"review_all"}},
+		`agent_permissions WHERE user_id=2 AND mode='review_all' AND accept_all=0`),
 	"POST /review/forget": testForgettingTouchesOnlyTheUsersOwnRules,
 
 	"GET /memory": pageRoute("/memory", secretMemory),
@@ -621,6 +622,21 @@ func testRestTargetBelongsToWhoSetsIt(t *testing.T) {
 	}
 	if body := get(t, world.second, base+"/").Body.String(); !strings.Contains(body, `data-rest-target="75"`) {
 		t.Fatalf("second user's page should show their own target")
+	}
+}
+
+// Stopping a rest names a set: another user's set is not found and keeps no rest.
+func testRestStopsOnlyOnOwnSets(t *testing.T) {
+	world := newWebWorld(t)
+	if w := post(t, world.second, base+"/rest/stop", url.Values{"set_id": {world.set}, "seconds": {"40"}}, true); w.Code != http.StatusNotFound {
+		t.Fatalf("second user stopping the owner's rest: %d %s", w.Code, w.Body)
+	}
+	var stored sql.NullInt64
+	if err := world.db.QueryRow(`SELECT rest_after_seconds FROM sets WHERE id=?`, world.set).Scan(&stored); err != nil || stored.Valid {
+		t.Fatalf("owner's set rest = %v, %v, want none", stored, err)
+	}
+	if w := post(t, world.owner, base+"/rest/stop", url.Values{"set_id": {world.set}, "seconds": {"40"}}, true); w.Code != http.StatusOK {
+		t.Fatalf("owner: %d %s", w.Code, w.Body)
 	}
 }
 

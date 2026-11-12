@@ -87,3 +87,57 @@ func TestLiveWorkoutShowsTheSessionTheLastSetAndTheRest(t *testing.T) {
 		t.Fatalf("a rejected call changed the target: %d, %v", v, err)
 	}
 }
+
+func TestStopRestStoresTheRestTheTimerShowed(t *testing.T) {
+	ctx := context.Background()
+	path := sqlitestoretest.Path(t)
+	store, err := sqlitestore.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { store.Close() })
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	service := training.NewService(store.ForUser(1), liveClock)
+	session := mustConnect(t, New(only(service)).Handler())
+
+	if result := call(t, session, "stop_rest", map[string]any{}); !result.IsError {
+		t.Fatal("stop_rest without a set today succeeded")
+	}
+	started, err := service.StartSession(ctx, "2026-08-07")
+	if err != nil {
+		t.Fatal(err)
+	}
+	set, _, err := service.AddSet(ctx, training.AddSetInput{SessionID: started.ID, Exercise: "banca", WeightKG: 60, Reps: 10, RPE: 6})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(`UPDATE sets SET created_at='2026-08-07 09:59:20' WHERE id=?`, set.ID); err != nil {
+		t.Fatal(err)
+	}
+	// set_id and rest_seconds go together.
+	if result := call(t, session, "stop_rest", map[string]any{"set_id": set.ID}); !result.IsError {
+		t.Fatal("stop_rest with set_id alone succeeded")
+	}
+
+	var stopped StopRestOut
+	decode(t, call(t, session, "stop_rest", map[string]any{}), &stopped)
+	if stopped.SetID != set.ID || stopped.RestedSeconds != 40 || stopped.Status != "accepted" {
+		t.Fatalf("stop_rest = %+v, want set %d rested 40 accepted", stopped, set.ID)
+	}
+	var live LiveWorkoutOut
+	decode(t, call(t, session, "live_workout", map[string]any{}), &live)
+	if live.Live.Rest.State != training.RestStopped || live.Live.Rest.RestedSeconds != 40 {
+		t.Fatalf("rest after stop_rest = %+v", live.Live.Rest)
+	}
+	if result := call(t, session, "stop_rest", map[string]any{}); !result.IsError {
+		t.Fatal("stopping a stopped rest succeeded")
+	}
+	var stored sql.NullInt64
+	if err := db.QueryRow(`SELECT rest_after_seconds FROM sets WHERE id=?`, set.ID).Scan(&stored); err != nil || stored.Int64 != 40 {
+		t.Fatalf("stored rest = %v, %v, want 40", stored, err)
+	}
+}

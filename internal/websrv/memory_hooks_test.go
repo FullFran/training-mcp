@@ -43,6 +43,9 @@ func newHookWeb(t *testing.T) hookWeb {
 		t.Fatal(err)
 	}
 	service := services.ForUser(id)
+	if err := service.SetApprovalMode(context.Background(), training.ApprovalReviewAll); err != nil {
+		t.Fatal(err)
+	}
 	serviceFor := func(context.Context) *training.Service { return service }
 	logs := &bytes.Buffer{}
 	server, err := websrv.NewWithOptions(serviceFor, services.Snapshot, clock, base, websrv.Options{Apply: mcpsrv.New(serviceFor).Apply, Logger: log.New(logs, "", 0)})

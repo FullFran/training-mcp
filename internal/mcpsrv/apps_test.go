@@ -31,7 +31,7 @@ func TestRenderRestTimerDeclaresItsView(t *testing.T) {
 		t.Fatal("render_rest_timer is not listed")
 	}
 	meta, _ := json.Marshal(tool.Meta)
-	if string(meta) != `{"ui":{"resourceUri":"ui://vibetraining/rest-timer/v1"},"ui/resourceUri":"ui://vibetraining/rest-timer/v1"}` {
+	if string(meta) != `{"ui":{"resourceUri":"ui://vibetraining/rest-timer/v2"},"ui/resourceUri":"ui://vibetraining/rest-timer/v2"}` {
 		t.Fatalf("_meta = %s", meta)
 	}
 	if props := tool.InputSchema.(map[string]any)["properties"]; props != nil && len(props.(map[string]any)) != 0 {
@@ -140,6 +140,12 @@ func TestRenderRestTimerReportsTheRealRemainingTime(t *testing.T) {
 		resting.NextExercise != "banca" || resting.NextSuperset || resting.WeightUnit != "kg" {
 		t.Fatalf("timer = %+v", resting)
 	}
+	if resting.LastSet.ID != set.ID {
+		t.Fatalf("last set id = %d, want %d", resting.LastSet.ID, set.ID)
+	}
+	if n := resting.NextSet; n == nil || *n != (RestTimerNext{Exercise: "banca", WeightKG: 80, Reps: 9, DoneSets: 1, TargetSets: 3}) {
+		t.Fatalf("next set = %+v", n)
+	}
 	if got := stringContent(result); got != "Resting: 0:55 left of 1:30 after banca. Next: banca." {
 		t.Fatalf("text = %q", got)
 	}
@@ -198,10 +204,42 @@ func TestRestTimerTextCoversEveryState(t *testing.T) {
 		{RestTimerOut{Rest: training.Rest{TargetSeconds: 120, State: training.RestSuperset}, NextExercise: "dominadas", NextSuperset: true},
 			"Superset: go straight to dominadas, no rest."},
 		{RestTimerOut{Rest: training.Rest{TargetSeconds: 120, State: training.RestSuperset}}, "Superset: next exercise, no rest."},
+		{RestTimerOut{Rest: training.Rest{TargetSeconds: 120, State: training.RestStopped, RestedSeconds: 75}, LastSet: &RestTimerSet{Exercise: "banca"}, NextExercise: "banca"},
+			"Rest stopped: rested 1:15 after banca. Next: banca."},
 		{RestTimerOut{Rest: training.Rest{TargetSeconds: 120, State: training.RestIdle}}, "No rest running: the last set was over 20 minutes ago."},
 	} {
 		if got := restTimerText(tc.out); got != tc.want {
 			t.Errorf("%s: %q, want %q", tc.out.Rest.State, got, tc.want)
 		}
+	}
+}
+
+// The next set starts from the last one done of that exercise today, or from
+// the plan's top of the rep range when there is none yet.
+func TestRestTimerNextSetStartsFromWhatWasLastDone(t *testing.T) {
+	live := training.LiveWorkout{
+		Session: &training.Session{Sets: []training.Set{
+			{ID: 1, Exercise: "remo", WeightKG: 50, Reps: 12},
+			{ID: 2, Exercise: "remo", WeightKG: 55, Reps: 10},
+			{ID: 3, Exercise: "banca", WeightKG: 80, Reps: 8},
+		}},
+		LastSet: &training.LastSet{Set: training.Set{ID: 3, Exercise: "banca", WeightKG: 80, Reps: 8}},
+	}
+	live.Next = &training.PlanProgress{Exercise: "remo", TargetSets: 4, DoneSets: 2, RepMin: 8, RepMax: 12}
+	if got := restTimerOut(live).NextSet; got == nil || *got != (RestTimerNext{Exercise: "remo", WeightKG: 55, Reps: 10, DoneSets: 2, TargetSets: 4}) {
+		t.Fatalf("next set from today's last remo = %+v", got)
+	}
+	live.Next = &training.PlanProgress{Exercise: "dominadas", TargetSets: 3, RepMin: 6, RepMax: 10}
+	if got := restTimerOut(live).NextSet; got == nil || *got != (RestTimerNext{Exercise: "dominadas", Reps: 10, TargetSets: 3}) {
+		t.Fatalf("next set with nothing done yet = %+v", got)
+	}
+	// Without a plan the next set repeats the last exercise.
+	live.Next = nil
+	if got := restTimerOut(live).NextSet; got == nil || *got != (RestTimerNext{Exercise: "banca", WeightKG: 80, Reps: 8}) {
+		t.Fatalf("next set without a plan = %+v", got)
+	}
+	live.LastSet, live.Session = nil, nil
+	if got := restTimerOut(live).NextSet; got != nil {
+		t.Fatalf("next set with nothing done or planned = %+v, want none", got)
 	}
 }

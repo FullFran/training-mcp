@@ -193,3 +193,88 @@ func TestLiveWorkoutRestsAfterASupersetRound(t *testing.T) {
 		t.Fatalf("rest state = %q after the last exercise of the round, want a rest", got.Rest.State)
 	}
 }
+
+func TestStoppingARestStoresHowLongThePersonRested(t *testing.T) {
+	ctx := context.Background()
+	store := newMemoryStore()
+	svc := NewService(store, func() time.Time { return liveNow })
+	if _, _, err := svc.RunningRest(ctx); !errors.Is(err, ErrNoRest) {
+		t.Fatalf("RunningRest() without a session = %v, want ErrNoRest", err)
+	}
+	session, _ := store.Start(ctx, Session{Date: "2026-08-07"})
+	store.listResults = []SessionSummary{{ID: session.ID, Date: session.Date}}
+	set, _, _ := store.AddSet(ctx, AddSetInput{SessionID: session.ID, Exercise: "banca", WeightKG: 60, Reps: 10, RPE: 6})
+	store.setTimes = map[int64]time.Time{set.ID: liveNow.Add(-45 * time.Second)}
+
+	id, elapsed, err := svc.RunningRest(ctx)
+	if err != nil || id != set.ID || elapsed != 45 {
+		t.Fatalf("RunningRest() = %d, %d, %v, want %d, 45", id, elapsed, err, set.ID)
+	}
+	if err := svc.RecordRest(ctx, id, elapsed); err != nil {
+		t.Fatal(err)
+	}
+	got, err := svc.LiveWorkout(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Rest{TargetSeconds: DefaultRestSeconds, State: RestStopped, Since: liveNow.Add(-45 * time.Second).Format(time.RFC3339), ElapsedSeconds: 45, RestedSeconds: 45}
+	if got.Rest != want {
+		t.Fatalf("rest after stopping = %+v, want %+v", got.Rest, want)
+	}
+	if r := got.LastSet.Set.RestAfterSeconds; r == nil || *r != 45 {
+		t.Fatalf("last set rest_after_seconds = %v, want 45", r)
+	}
+	// A stopped rest is not running any more, and is stored once.
+	if _, _, err := svc.RunningRest(ctx); !errors.Is(err, ErrNoRest) {
+		t.Fatalf("RunningRest() after a stop = %v, want ErrNoRest", err)
+	}
+	if err := svc.RecordRest(ctx, id, 60); !errors.Is(err, ErrRestRecorded) {
+		t.Fatalf("RecordRest() twice = %v, want ErrRestRecorded", err)
+	}
+}
+
+func TestOnlyARunningRestCanBeStopped(t *testing.T) {
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name     string
+		ago      time.Duration
+		superset bool
+	}{
+		{"idle past the rest window", RestIdleAfter + time.Minute, false},
+		{"inside a superset round", 20 * time.Second, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			store := newMemoryStore()
+			svc := NewService(store, func() time.Time { return liveNow })
+			session, _ := store.Start(ctx, Session{Date: "2026-08-07"})
+			store.listResults = []SessionSummary{{ID: session.ID, Date: session.Date}}
+			set, _, _ := store.AddSet(ctx, AddSetInput{SessionID: session.ID, Exercise: "banca", WeightKG: 60, Reps: 10, RPE: 6})
+			store.setTimes = map[int64]time.Time{set.ID: liveNow.Add(-tc.ago)}
+			if tc.superset {
+				store.progress = []PlanProgress{
+					{Exercise: "banca", TargetSets: 3, DoneSets: 1, Superset: "A"},
+					{Exercise: "remo", TargetSets: 3, Superset: "A"},
+				}
+			}
+			if _, _, err := svc.RunningRest(ctx); !errors.Is(err, ErrNoRest) {
+				t.Fatalf("RunningRest() = %v, want ErrNoRest", err)
+			}
+		})
+	}
+}
+
+func TestRecordRestValidatesTheSeconds(t *testing.T) {
+	ctx := context.Background()
+	store := newMemoryStore()
+	svc := NewService(store, func() time.Time { return liveNow })
+	session, _ := store.Start(ctx, Session{Date: "2026-08-07"})
+	set, _, _ := store.AddSet(ctx, AddSetInput{SessionID: session.ID, Exercise: "banca", WeightKG: 60, Reps: 10, RPE: 6})
+	for _, seconds := range []int{-1, int(RestIdleAfter/time.Second) + 1} {
+		if err := svc.RecordRest(ctx, set.ID, seconds); !errors.Is(err, ErrValidation) {
+			t.Fatalf("RecordRest(%d) = %v, want a validation error", seconds, err)
+		}
+	}
+	if err := svc.RecordRest(ctx, set.ID+99, 30); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("RecordRest() on a missing set = %v, want not found", err)
+	}
+}
