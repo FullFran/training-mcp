@@ -215,10 +215,13 @@ var webRoutes = map[string]func(*testing.T){
 	"POST /plan":              testChoosingAnotherUsersPlanKeepsTheDaysEmptySession,
 	"GET /s/{id}":             testWebSessionPageTreatsAnotherUsersIDAsMissing,
 
-	"GET /{$}":           pageRoute("/", secretExercise),
-	"GET /history":       pageRoute("/history", ""),
-	"GET /plans":         pageRoute("/plans", secretPlan),
-	"GET /exercise-info": pageRoute("/exercise-info?name="+url.QueryEscape(secretExercise), secretNote),
+	"GET /{$}":               pageRoute("/", secretExercise),
+	"GET /history":           testHistoryRedirectIsTheSameForEveryone,
+	"GET /progress":          pageRoute("/progress", secretExercise),
+	"GET /progress/exercise": pageRoute("/progress/exercise?name="+url.QueryEscape(secretExercise), secretExercise),
+	"GET /exercises":         pageRoute("/exercises", secretExercise),
+	"GET /plans":             pageRoute("/plans", secretPlan),
+	"GET /exercise-info":     pageRoute("/exercise-info?name="+url.QueryEscape(secretExercise), secretNote),
 
 	"POST /sets": writeRoute("/sets", setForm(secretExercise, "50", "5", "8"),
 		`sets st JOIN sessions se ON se.id=st.session_id WHERE se.user_id=2 AND st.exercise='`+secretExercise+`'`),
@@ -458,6 +461,15 @@ func testChoosingAnotherUsersPlanKeepsTheDaysEmptySession(t *testing.T) {
 }
 
 // pageRoute requires a user beside the owner to get what an empty database shows.
+// The old history URL only redirects, so it carries nobody's data.
+func testHistoryRedirectIsTheSameForEveryone(t *testing.T) {
+	world := newWebWorld(t)
+	owner, second := get(t, world.owner, base+"/history"), get(t, world.second, base+"/history")
+	if owner.Code != http.StatusFound || owner.Body.String() != second.Body.String() || owner.Header().Get("Location") != second.Header().Get("Location") {
+		t.Fatalf("owner %d %q, second %d %q", owner.Code, owner.Header().Get("Location"), second.Code, second.Header().Get("Location"))
+	}
+}
+
 func pageRoute(path, marker string) func(*testing.T) {
 	return func(t *testing.T) {
 		world := newWebWorld(t)

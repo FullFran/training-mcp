@@ -166,11 +166,11 @@ func TestImportRefusesWhatItCannotRead(t *testing.T) {
 	}
 }
 
-// The history page links the import panel; nothing else on it changes.
-func TestHistoryLinksTheImportPanel(t *testing.T) {
+// Tú links the import panel, as the history page did before it moved.
+func TestYouLinksTheImportPanel(t *testing.T) {
 	world := newWebWorld(t)
-	if body := get(t, world.owner, base+"/history").Body.String(); !strings.Contains(body, base+"/import") {
-		t.Fatalf("history:\n%s", body)
+	if body := get(t, world.owner, base+"/?modo=tu").Body.String(); !strings.Contains(body, `href="`+base+`/import" data-panel`) {
+		t.Fatalf("Tú:\n%s", body)
 	}
 }
 

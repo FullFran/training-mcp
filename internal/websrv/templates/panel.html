@@ -157,7 +157,7 @@
 
   {{if not .ReadOnly}}
   <details class="add-item card">
-    <summary>Añadir ejercicio a hoy</summary>
+    <summary>+ Añadir ejercicio</summary>
     <form hx-post="{{.Base}}/plan/item" hx-target="#panel" hx-swap="outerHTML" autocomplete="off">
       <input type="hidden" name="action" value="add">
       <input name="exercise" type="text" required list="catalogue" autocapitalize="none" spellcheck="false" placeholder="ejercicio" aria-label="Ejercicio">

@@ -76,27 +76,57 @@
   {{if .CoachOn}}<a class="coach-bar" href="{{.Base}}/?modo=planificar" data-mode-go="plan" data-ask=""><span class="live-dot" aria-hidden="true"></span>Pregunta al coach…</a>{{end}}
 </section>
 
-<!-- Progreso and Tú: the existing panels, until they get screens of their own. -->
+<!-- Progreso: rendered here when the page opens on it, otherwise loaded from
+     /progress the first time the tab is shown (progress.js). -->
 <section id="progress" class="screen" aria-label="Progreso">
   <header class="screen-head"><h1>Progreso</h1></header>
-  <nav class="list" aria-label="Progreso">
-    <a class="list-row" href="{{.Base}}/history" data-panel><span class="row-main"><strong>Historial</strong><span class="muted">Sesiones y volumen por músculo</span></span><span class="chev" aria-hidden="true">›</span></a>
-    <a class="list-row" href="{{.Base}}/history#progreso" data-panel><span class="row-main"><strong>Ejercicios</strong><span class="muted">e1RM y mejores series</span></span><span class="chev" aria-hidden="true">›</span></a>
-  </nav>
+  <div id="progress-body" class="progress-body" hx-get="{{.Base}}/progress" hx-trigger="progress:load" hx-swap="innerHTML"{{if .StatsReady}} data-ready{{end}}>
+  {{if .StatsReady}}{{template "progress-body" .}}{{else}}<p class="muted pg-loading">Cargando…</p>{{end}}
+  </div>
 </section>
+
+<!-- Tú: the person, the coach's configuration, training settings and data.
+     Rows open the existing pages as pushed panels. -->
 <section id="you" class="screen" aria-label="Tú">
   <header class="screen-head"><h1>Tú</h1></header>
+  <a class="profile-card" href="{{.Base}}/memory" data-panel data-title="Perfil">
+    <span class="avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>
+    <span class="row-main"><strong>Perfil</strong><span class="muted">Objetivos, limitaciones y material · lo usa el coach</span></span>
+    <span class="chev" aria-hidden="true">›</span>
+  </a>
+
   <h2 class="section-label">Coach</h2>
   <nav class="list" aria-label="Coach">
-    <a class="list-row" href="{{.Base}}/memory" data-panel><span class="row-main"><strong>Memoria</strong><span class="muted">Lo que el coach recuerda de ti</span></span><span class="chev" aria-hidden="true">›</span></a>
-    {{if .ConnectorsOn}}<a class="list-row" href="{{.Base}}/coach/connectors"><span class="row-main"><strong>Conectores</strong><span class="muted">Servicios que el coach puede usar</span></span><span class="chev" aria-hidden="true">›</span></a>{{end}}
-    <a class="list-row" href="{{.Base}}/review" data-panel><span class="row-main"><strong>Revisión</strong><span class="muted">Cambios que propone el coach</span></span><span class="chev" aria-hidden="true">›</span></a>
+    <a class="list-row" href="{{.Base}}/memory" data-panel data-title="Memoria del coach"><span class="row-main"><strong>Memoria del coach</strong><span class="muted">Lo que recuerda de ti</span></span><span class="chev" aria-hidden="true">›</span></a>
+    {{if .ConnectorsOn}}<a class="list-row" href="{{.Base}}/coach/connectors" data-panel data-title="Conectores"><span class="row-main"><strong>Conectores</strong><span class="muted">Servicios que el coach puede usar</span></span><span class="chev" aria-hidden="true">›</span></a>{{end}}
+    {{if .CoachOn}}<button type="button" class="list-row" data-open-model><span class="row-main"><strong>Modelo del coach</strong><span class="muted" data-model-name>El que elijas para cada conversación</span></span><span class="chev" aria-hidden="true">›</span></button>{{end}}
   </nav>
+  {{if .CoachOn}}<!-- The account and the conversation list live in Planificar's menu. -->
+  <nav class="list" aria-label="Cuenta del coach">
+    <a class="list-row" href="{{.Base}}/?modo=planificar" data-open-drawer><span class="row-main"><strong>Cuenta y conversaciones</strong><span class="muted">Se guardan 90 días desde el último mensaje</span></span><span class="row-end num muted">90 días</span></a>
+  </nav>{{end}}
+
+  <h2 class="section-label">Entrenamiento</h2>
+  <div class="list" aria-label="Entrenamiento">
+    <div class="list-row static rest-setting">
+      <span class="row-main"><strong>Descanso por defecto</strong><span class="muted">Entre series, en el temporizador</span></span>
+      <span class="stepper">
+        <button type="button" class="step" data-rest-step="-15" aria-label="Quitar 15 segundos">−</button>
+        <output class="num" data-rest-value>{{restClock .RestTarget}}</output>
+        <button type="button" class="step" data-rest-step="15" aria-label="Añadir 15 segundos">+</button>
+      </span>
+    </div>
+  </div>
+
   <h2 class="section-label">Datos</h2>
   <nav class="list" aria-label="Datos">
-    <a class="list-row" href="{{.Base}}/plans" data-panel><span class="row-main"><strong>Rutinas</strong></span><span class="chev" aria-hidden="true">›</span></a>
-    <a class="list-row" href="{{.Base}}/import" data-panel><span class="row-main"><strong>Importar</strong><span class="muted">Hevy o Strong</span></span><span class="chev" aria-hidden="true">›</span></a>
+    <a class="list-row" href="{{.Base}}/import" data-panel data-title="Importar"><span class="row-main"><strong>Importar (Hevy, Strong)</strong><span class="muted">Tu historial desde un CSV</span></span><span class="chev" aria-hidden="true">›</span></a>
+    {{if .CanExport}}<a class="list-row" href="{{.Base}}/export.db" download><span class="row-main"><strong>Exportar base de datos</strong><span class="muted">Copia de seguridad completa</span></span><span class="chev" aria-hidden="true">↓</span></a>{{end}}
   </nav>
+  {{if .CSRF}}<form class="list signout" method="post" action="{{.Base}}/logout">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <button type="submit" class="list-row danger-text"><span class="row-main"><strong>Cerrar sesión</strong></span></button>
+  </form>{{end}}
 </section>
 
 <!-- The active workout: a full-screen layer over the tabs. Collapsing it
@@ -131,10 +161,10 @@
 <aside id="drawer" class="drawer" aria-label="Menú" hidden>
   {{if .CoachOn}}<button type="button" id="drawer-new" class="drawer-new">✎ Nueva conversación</button>{{end}}
   <nav class="panel-links" aria-label="Paneles">
-    <a href="{{.Base}}/history" data-panel>📅 Historial</a>
+    <a href="{{.Base}}/?modo=progreso" data-mode-go="progress">📅 Historial</a>
     <a href="{{.Base}}/plans" data-panel>📋 Rutinas</a>
     <a id="review-link" class="{{if .PendingCount}}attention{{end}}" href="{{.Base}}/review" data-panel>✅ Revisar{{if .PendingCount}} ({{.PendingCount}}){{end}}</a>
-    <a href="{{.Base}}/history#progreso" data-panel>📈 Progreso</a>
+    <a href="{{.Base}}/?modo=progreso" data-mode-go="progress">📈 Progreso</a>
     {{if .ConnectorsOn}}<a href="{{.Base}}/coach/connectors">🔌 Conectores</a>{{end}}
   </nav>
   {{if .CoachOn}}<!-- The person's conversations, filled from /coach/conversations; kept 90 days after the last message. -->
@@ -390,6 +420,18 @@
 </section>
 {{end}}
 
+<!-- The exercise picker: search, recent and by muscle group. Opened by the
+     workout's «+ Añadir ejercicio» (several at once) and «Sustituir» (one);
+     picker.js fills it from /exercises. -->
+<div id="picker-scrim" class="scrim picker-scrim" hidden></div>
+<section id="picker" class="sheet picker" role="dialog" aria-modal="true" aria-labelledby="picker-title" hidden>
+  <div class="sheet-head picker-head"><span class="grab" aria-hidden="true"></span><h2 id="picker-title">Añadir ejercicio</h2><button type="button" class="icon-btn" data-picker-close aria-label="Cerrar">✕</button></div>
+  <label class="picker-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg><input id="picker-q" type="search" placeholder="Buscar ejercicio…" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" aria-label="Buscar ejercicio"></label>
+  <div id="picker-chips" class="picker-chips" role="toolbar" aria-label="Filtrar"></div>
+  <ul id="picker-list" class="picker-list" aria-live="polite"></ul>
+  <div class="picker-foot"><button type="button" id="picker-done" class="btn primary big" disabled>Añadir</button></div>
+</section>
+
 <!-- One panel at a time over the chat; closing it returns to the same chat. -->
 <section id="panel-sheet" class="panel-sheet" role="dialog" aria-label="Panel" hidden>
   <header class="bar">
@@ -417,6 +459,8 @@
 <script src="{{.Base}}/static/app.js" defer></script>
 <script src="{{.Base}}/static/shell.js" defer></script>
 <script src="{{.Base}}/static/modes.js" defer></script>
+<script src="{{.Base}}/static/progress.js" defer></script>
+<script src="{{.Base}}/static/picker.js" defer></script>
 </body>
 </html>
 {{end}}
