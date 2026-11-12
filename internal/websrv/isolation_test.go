@@ -214,6 +214,9 @@ var webRoutes = map[string]func(*testing.T){
 	"POST /plans/move":        planRoute("/plans/move", url.Values{"exercise": {secretExercise}, "direction": {"down"}}),
 	"POST /plan":              testChoosingAnotherUsersPlanKeepsTheDaysEmptySession,
 	"GET /s/{id}":             testWebSessionPageTreatsAnotherUsersIDAsMissing,
+	"POST /s/{id}/plan": idRoute(func(w webWorld) string { return w.session }, func(id string) (string, url.Values) {
+		return "/s/" + id + "/plan", url.Values{"name": {"copia"}}
+	}),
 
 	"GET /{$}":               pageRoute("/", secretExercise),
 	"GET /history":           testHistoryRedirectIsTheSameForEveryone,

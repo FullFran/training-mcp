@@ -384,6 +384,7 @@ func (s *Server) routes() {
 	s.handle("POST "+b+"/finish", s.finishWorkout)
 	s.handle("GET "+b+"/exercise-info", s.exerciseInfo)
 	s.handle("GET "+b+"/s/{id}", s.session)
+	s.handle("POST "+b+"/s/{id}/plan", s.saveSessionAsPlan)
 	s.handle("GET "+b+"/review", s.reviewPage)
 	s.handle("POST "+b+"/review/{id}/accept", s.acceptProposal)
 	s.handle("POST "+b+"/review/{id}/reject", s.rejectProposal)
@@ -749,6 +750,51 @@ func (s *Server) session(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	s.sessionPage(w, r, id, http.StatusOK, "")
+}
+
+// saveSessionAsPlan turns a past session into a routine, the same call the
+// save_session_as_plan tool makes, and opens Rutinas to show it.
+func (s *Server) saveSessionAsPlan(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		s.fail(w, err)
+		return
+	}
+	name := strings.TrimSpace(r.PostFormValue("name"))
+	if _, err := s.service(r.Context()).SessionProgress(r.Context(), id); errors.Is(err, training.ErrNotFound) || errors.Is(err, training.ErrValidation) {
+		http.NotFound(w, r)
+		return
+	}
+	if name == "" {
+		s.sessionPage(w, r, id, http.StatusBadRequest, "Ponle un nombre a la rutina.")
+		return
+	}
+	switch _, err := s.service(r.Context()).SaveSessionAsPlan(r.Context(), id, name); {
+	case errors.Is(err, training.ErrNotFound):
+		http.NotFound(w, r)
+		return
+	case errors.Is(err, training.ErrValidation):
+		s.sessionPage(w, r, id, http.StatusBadRequest, "No se pudo guardar: la sesión no tiene ejercicios que copiar.")
+		return
+	case err != nil:
+		s.fail(w, err)
+		return
+	}
+	to := s.base + "/plans"
+	if r.Header.Get("HX-Request") != "" {
+		w.Header().Set("HX-Redirect", to)
+		return
+	}
+	http.Redirect(w, r, to, http.StatusSeeOther)
+}
+
+// sessionPage renders one session read-only, with message shown above it.
+func (s *Server) sessionPage(w http.ResponseWriter, r *http.Request, id int64, status int, message string) {
 	session, err := s.service(r.Context()).GetSession(r.Context(), id)
 	if errors.Is(err, training.ErrNotFound) || errors.Is(err, training.ErrValidation) {
 		http.NotFound(w, r)
@@ -758,7 +804,7 @@ func (s *Server) session(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	data := pageData{Base: s.base, Today: session.Date, Session: session, ReadOnly: true}
+	data := pageData{Base: s.base, Today: session.Date, Session: session, ReadOnly: true, Error: message}
 	if data.Progress, err = s.service(r.Context()).SessionProgress(r.Context(), session.ID); err != nil {
 		s.fail(w, err)
 		return
@@ -768,6 +814,11 @@ func (s *Server) session(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data.Today = s.todayDate()
+	if status != http.StatusOK {
+		// render sets the content type; the status must follow it.
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(status)
+	}
 	s.render(w, r, "session.html", data)
 }
 
