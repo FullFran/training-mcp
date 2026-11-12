@@ -75,6 +75,19 @@
     {{end}}
   </section>
   {{end}}
+
+  {{with .Weekly.Rows}}
+  <h2 class="section-label">Series por semana</h2>
+  <section class="weekly card" aria-label="Series de trabajo por grupo muscular y semana">
+    <table>
+      <thead><tr><th scope="col">Grupo</th>{{range $.Stats.Weekly.Weeks}}<th scope="col" data-week="{{.Start}}">{{.Label}}</th>{{end}}</tr></thead>
+      <tbody>{{range .}}{{$g := .MuscleGroup}}
+        <tr><th scope="row">{{if $g}}{{$g}}{{else}}sin grupo{{end}}</th>{{range .Cells}}<td data-cell="{{$g}} {{.Week}}"><strong class="num">{{if .Sets}}{{.Sets}}{{else}}–{{end}}</strong>{{if .SI}}<small class="muted num">SI {{num .SI}}</small>{{end}}</td>{{end}}</tr>{{end}}
+      </tbody>
+    </table>
+    <p class="muted">Series de trabajo de lunes a domingo, sin calentamientos.</p>
+  </section>
+  {{end}}
 </div>
 
 <div id="pg-body" class="pg-pane" role="tabpanel" aria-labelledby="pg-tab-body" hidden>

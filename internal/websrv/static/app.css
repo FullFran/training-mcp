@@ -1878,3 +1878,14 @@ body.coach-open .plan-today { display: none; }
 .lm-field > span { font-size: 12px; color: var(--muted); }
 .lm-field input[type="number"] { padding: 0 8px; text-align: center; }
 .lm-row .mini { min-height: var(--tap); }
+
+/* Series por semana in Progreso: muscle groups by the last four weeks. */
+.weekly { padding: 12px; }
+.weekly table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.weekly th, .weekly td { padding: 8px 4px; text-align: center; border-bottom: 1px solid var(--line); }
+.weekly thead th { font-weight: 500; color: var(--muted); font-size: 12px; }
+.weekly tbody th { text-align: left; font-weight: 600; text-transform: capitalize; }
+.weekly td strong { display: block; font-size: 16px; }
+.weekly td small { display: block; font-size: 11px; }
+.weekly tr:last-child > * { border-bottom: 0; }
+.weekly > p { margin: 8px 4px 0; font-size: 13px; }

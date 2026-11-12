@@ -36,6 +36,69 @@ type StatsData struct {
 	Exercises    []ExerciseStat
 	Volume       []training.GroupVolume
 	Recommend    []training.SetChange
+	Weekly       WeeklyGrid
+}
+
+// weeklyWeeks is how many training weeks Progreso shows per muscle group.
+const weeklyWeeks = 4
+
+// WeeklyGrid is weekly_volume laid out for a phone: the last weeks as columns,
+// oldest first, and one row per muscle group trained in them.
+type WeeklyGrid struct {
+	Weeks []WeeklyWeek
+	Rows  []WeeklyRow
+}
+
+// WeeklyWeek is one column: the Monday it starts on and its label.
+type WeeklyWeek struct {
+	Start, Label string
+}
+
+// WeeklyRow is one muscle group's working sets and SI per week; "" is the
+// sets whose exercise has no group yet.
+type WeeklyRow struct {
+	MuscleGroup string
+	Cells       []WeeklyCell
+}
+
+type WeeklyCell struct {
+	Week string
+	Sets int
+	SI   float64
+}
+
+// weeklyGrid reads the last weeks from the same call weekly_volume makes.
+func weeklyGrid(ctx context.Context, svc *training.Service, monday time.Time) (WeeklyGrid, error) {
+	var out WeeklyGrid
+	first := monday.AddDate(0, 0, -7*(weeklyWeeks-1))
+	rows, err := svc.WeeklyVolume(ctx, training.ListFilter{From: first.Format("2006-01-02"), To: monday.AddDate(0, 0, 6).Format("2006-01-02")})
+	if err != nil || len(rows) == 0 {
+		return out, err
+	}
+	for i := range weeklyWeeks {
+		d := first.AddDate(0, 0, 7*i)
+		out.Weeks = append(out.Weeks, WeeklyWeek{Start: d.Format("2006-01-02"), Label: strconv.Itoa(d.Day()) + " " + months[d.Month()-1]})
+	}
+	byGroup := map[string]map[string]training.WeeklyVolume{}
+	for _, r := range rows {
+		if byGroup[r.MuscleGroup] == nil {
+			byGroup[r.MuscleGroup] = map[string]training.WeeklyVolume{}
+		}
+		byGroup[r.MuscleGroup][r.WeekStart] = r
+	}
+	for _, g := range append(slices.Clone(training.MuscleGroups), "") {
+		weeks, ok := byGroup[g]
+		if !ok {
+			continue
+		}
+		row := WeeklyRow{MuscleGroup: g}
+		for _, w := range out.Weeks {
+			v := weeks[w.Start]
+			row.Cells = append(row.Cells, WeeklyCell{Week: w.Start, Sets: v.Sets, SI: v.TotalSI})
+		}
+		out.Rows = append(out.Rows, row)
+	}
+	return out, nil
 }
 
 // WeekDay is one dot of the week strip, Monday first.
@@ -171,6 +234,10 @@ func (s *Server) statsData(ctx context.Context) (StatsData, error) {
 		}
 		last := &out.Months[len(out.Months)-1]
 		last.Sessions = append(last.Sessions, row)
+	}
+
+	if out.Weekly, err = weeklyGrid(ctx, svc, monday); err != nil {
+		return out, err
 	}
 
 	groupOf := map[string]string{}
