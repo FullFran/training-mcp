@@ -10,7 +10,7 @@
   "scripts": {
     "build": "node build.mjs",
     "check": "tsc --noEmit",
-    "test": "node --test src/**/*.test.ts",
+    "test": "node --test 'src/**/*.test.ts'",
     "check:bundle": "node build.mjs --check"
   },
   "dependencies": {

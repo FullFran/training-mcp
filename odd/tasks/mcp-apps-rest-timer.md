@@ -1,0 +1,37 @@
+# MCP Apps: portable foundation and rest timer (#122, #123)
+
+Objective: serve an interactive rest-timer view from the MCP server through the official MCP Apps extension, portable across ChatGPT, Claude and other compatible hosts, with a text fallback everywhere else; and pin HCS v0.1.0-draft.9.
+Branch: `feat/mcp-apps-rest-timer` from `main` (9e857432). Delivery: `single-pr` proposed (vendored HCS and the generated bundle excluded from the line count), confirmed with Fran before the PR. Test runner: `go test ./...` for Go; `node --test` for the TypeScript view.
+
+## Specs
+
+- S1 (Fran, verbatim): "vamos a diseñar Mira, la parte de apps es lo que quiero meter". Scope: #122 (foundation) and #123 (rest timer as its first consumer); no throwaway hello-world.
+- S2 (Fran, verbatim): "Yo creo es mejor meter el sdk oficial pero podemos usar ts en vez de js? para no tner que mantener piezas custom de mas". The view is TypeScript on `@modelcontextprotocol/ext-apps` (`App`, no React); no hand-written host bridge.
+- S3 (Fran, verbatim): "Vale me gusta." accepting: commit the built single-file HTML bundle and have CI check it is fresh, so `go build` and `go test` never need Node.
+- S4 (Fran, verbatim): "mira, vamos a pasar a draft 9 y vamos a hacer lo de las mcp apps vale?". Pin HCS v0.1.0-draft.9 with the consumer kit, digest `d260ad58123cd434eae454d3945f57287b96ccc55dde1d482bd33dca30a1db5f`.
+- S5 (#123 design goals 1, 2, 5, 6, 9, 10 and MVP criteria, accepted design): resource `ui://vibetraining/rest-timer/v1` with MIME `text/html;profile=mcp-app`; render-only tool `render_rest_timer` (no writes, no user id argument) reading the caller's `live_workout`, returning structured rest data plus a readable text fallback; `log_sets` and the proposal rules unchanged. The view counts locally from the server's `now`, `since` and target, and re-queries through the bridge `tools/call` only on focus or refresh, never per second. States: `none` no countdown; `resting` countdown; `ready` completion; `superset` next movement without rest; `idle` no stale timer. A delayed render (for example 35 s later) shows the real remaining time, not the full target. No external script or CDN; keyboard, reduced motion, screen-reader status, dark mode from the host. The PWA timer is untouched.
+- S6 (#122 criteria taken in this branch): contract tests for resource discovery and read, `_meta.ui.resourceUri`, CSP and user identity; two-user isolation (Alice 90 s, Bob 180 s); hosts without MCP Apps still get useful text; no claim of universal rendering; document how to add a view.
+
+Assumptions: the server is stateless (`StreamableHTTPOptions{Stateless: true}`), so `tools/list` cannot see the client's `io.modelcontextprotocol/ui` capability; the tool always carries `_meta.ui` (the spec's "SHOULD check" is not met; the "MAY register variants" path is not available) and hosts without the extension ignore it and read the text. Both `_meta.ui.resourceUri` and the deprecated flat `_meta["ui/resourceUri"]` are sent, as the official `registerAppTool` does. A pending `log_sets` never starts the timer because the view reads only accepted sets; an explicit "awaiting approval" indicator, the per-account `show_rest_timer_after_set` preference, a persisted +30 s and live cross-device sync are out of this branch.
+
+## Tasks
+
+- [x] T0 (S4) inline: vendor HCS draft.9 under `tools/hcs` (root `vendor/` breaks Go module builds), CI `hcs_kit.py verify`, docs. Commit 907445b1.
+- [x] T1 (S2, S3, S5) inline: `ui/` TypeScript package on ext-apps 2.0.4: pure timer model with `node --test`, rest-timer view, esbuild single-file HTML into `internal/mcpsrv/apps/rest-timer.html` (committed). Commit e74b8fca.
+- [x] T2 (S5, S6) inline: Go resource `ui://vibetraining/rest-timer/v1` and `render_rest_timer` tool with `_meta.ui`; contract, isolation, delayed-render and state tests; `ToolNames`, docs. Commit b0b6f50a.
+- [x] T3 (S3, S6) inline: CI job for the view (typecheck, tests, bundle freshness); docs on adding a view and testing each host (docs/apps.md, in b0b6f50a). Commit fc4f7aba.
+- [ ] T4 (S6) needs Fran: render on real authenticated ChatGPT and Claude connections after deploy; record host versions and limits.
+
+Route evidence: one feature, sequential units (T2 embeds T1's bundle); no writer trigger (no parallel independent units, no context backstop).
+
+## Log
+
+- L1 (2026-11-12, Fran, verbatim): "vamos a diseñar Mira, la parte de apps es lo que quiero meter"
+- L2 (Fran, verbatim): "Yo creo es mejor meter el sdk oficial pero podemos usar ts en vez de js? para no tner que mantener piezas custom de mas"; then "Vale me gusta." (committed bundle); then "mira, vamos a pasar a draft 9 y vamos a hacer lo de las mcp apps vale?"
+- L3: Evidence. go-sdk v1.8.0 is the latest and has `Server.AddResource`, `Tool.Meta`, `ClientCapabilities.Extensions`. ext-apps 2.0.4: `RESOURCE_MIME_TYPE = "text/html;profile=mcp-app"`, `EXTENSION_ID = "io.modelcontextprotocol/ui"`, App API `connect`, `ontoolresult`, `callServerTool`, `getHostContext`, `applyHostStyleVariables`; peers zod ^4.2, @modelcontextprotocol/core ^2, client ^2. Spec 2026-01-26: tools MUST return meaningful content even with UI; `visibility` defaults to model and app.
+- L4: T0 done. A root `vendor/hcs` made `go build` fail with "inconsistent vendoring"; re-vendored with `--root tools/hcs`. Probe: appending to a vendored LICENSE made `verify` exit 1 ("changed: LICENSE"); restored, exit 0.
+- L5: T1. 8 node tests pass (delayed render 35 s shows 55 s left; local delta, never device vs server clock; ready at target; idle past 1200 s; none/superset/idle never count). `tsc --noEmit` clean. Bundle 654 KiB, 145 KiB gzip; zod 444 KiB, @modelcontextprotocol/client 159 KiB. Correction: the ready headline first included the over-by seconds, which would have made the aria-live region announce every second; it is now constant per state.
+- L6: T2. RED: apps_test.go did not build (no RestTimerOut, restTimerHTML, restTimerURI). GREEN: `go test ./internal/mcpsrv ./internal/websrv` ok. The existing isolation harness covers render_rest_timer (owner sees own data, other user does not, no rows change); the tool count went 50 to 51 and render_rest_timer joined the read-only set. Test fixes on the way: AddSet/LogSet need an RPE; user 2 needs its users row.
+- L7: T3. Simulated the ui job in a scratch copy with `npm ci --ignore-scripts`: check, 8 tests, bundle fresh. Probe: a comment-only change keeps the minified bundle identical (correctly fresh); changing "Rest done" made `check:bundle` exit 1 with the stale message. setup-node pinned to v7.1.0 (949feb24).
+- L8: Full `go test ./...` not run locally: remote-heavy-work defaults to a CI box, which needs a pushed branch (Fran's call). Risk: item 5 (new CI job and new npm dependencies).
+- L9: Independent verifier (Risk item 5): S1-S5 met, S6 met except T4; no blockers. tools/list baseline vs HEAD: the 50 existing tools are byte-identical, only render_rest_timer added. Bundle rebuilds byte-identical on Node 22. Advisory taken: the test script now quotes its glob so node expands `**`. Advisories left: bundle size; the server now advertises the resources capability (expected).
