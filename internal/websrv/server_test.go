@@ -217,7 +217,7 @@ func TestHistoryAndSessionPages(t *testing.T) {
 	post(t, h, base+"/sets", setForm("deadlift", "120", "5", "7"), true)
 	sessions, _ := service.ListSessions(t.Context(), training.ListFilter{Limit: 1})
 
-	history := get(t, h, base+"/history")
+	history := get(t, h, base+"/progress")
 	if history.Code != http.StatusOK || !strings.Contains(history.Body.String(), "SI 0.8") {
 		t.Fatalf("history status = %d, body = %q", history.Code, history.Body.String())
 	}
@@ -426,7 +426,7 @@ func TestHistoryShowsMuscleGroupVolume(t *testing.T) {
 	if err := service.SetExerciseGroup(t.Context(), "banca", "pecho"); err != nil {
 		t.Fatal(err)
 	}
-	body := get(t, h, base+"/history").Body.String()
+	body := get(t, h, base+"/progress").Body.String()
 	if !strings.Contains(body, `class="volume"`) || !strings.Contains(body, "pecho") {
 		t.Fatalf("history should chart volume per muscle group: %q", body)
 	}
@@ -701,7 +701,7 @@ func TestHistoryShowsNextWeekSetRecommendation(t *testing.T) {
 	post(t, h, base+"/feedback", url.Values{
 		"muscle_group": {"pecho"}, "fatigue": {"0"}, "pump": {"0"}, "recovery": {"0"},
 	}, true)
-	body := get(t, h, base+"/history").Body.String()
+	body := get(t, h, base+"/progress").Body.String()
 	if !strings.Contains(body, "Solo una sesión valorada") {
 		t.Fatalf("a single rating should decline to advise: %q", body)
 	}
@@ -721,7 +721,7 @@ func TestHistoryShowsNextWeekSetRecommendation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	body = get(t, h, base+"/history").Body.String()
+	body = get(t, h, base+"/progress").Body.String()
 	if !strings.Contains(body, `class="recommend"`) || !strings.Contains(body, "sube 3 series") {
 		t.Fatalf("history should recommend next week's volume: %q", body)
 	}
@@ -1207,7 +1207,7 @@ func TestProgressBarsDoNotInheritTheTopBar(t *testing.T) {
 	if err := service.SetExerciseGroup(t.Context(), "banca", "pecho"); err != nil {
 		t.Fatal(err)
 	}
-	body := get(t, h, base+"/history").Body.String()
+	body := get(t, h, base+"/progress").Body.String()
 	if strings.Contains(body, `<span class="bar">`) || !strings.Contains(body, `class="vbar" role="img" aria-label="pecho: `) {
 		t.Fatalf("volume bar markup:\n%s", body)
 	}

@@ -1,0 +1,140 @@
+{{/* Progreso's tab body: Historial, Ejercicios and Cuerpo. Rendered in place
+     when the page opens on the tab, otherwise loaded from /progress when the
+     tab is first shown. Each session and exercise opens as a pushed panel. */}}
+{{define "progress-body"}}{{with .Stats}}
+{{if not .Months}}
+<div class="empty-state">
+  <span class="empty-mark" aria-hidden="true"></span>
+  <h2>Tu primer entreno aparecerá aquí</h2>
+  <p class="muted">Cada sesión suma a tu historial, tus mejores series y tu e1RM.</p>
+  <a class="btn primary big" href="{{$.Base}}/" data-mode-go="home">Ir a Entrenar</a>
+</div>
+{{else}}
+<div class="segmented" role="tablist" aria-label="Progreso">
+  <button type="button" role="tab" id="pg-tab-history" aria-selected="true" aria-controls="pg-history" data-pg="history">Historial</button>
+  <button type="button" role="tab" id="pg-tab-exercises" aria-selected="false" aria-controls="pg-exercises" data-pg="exercises">Ejercicios</button>
+  <button type="button" role="tab" id="pg-tab-body" aria-selected="false" aria-controls="pg-body" data-pg="body">Cuerpo</button>
+</div>
+
+<div id="pg-history" class="pg-pane" role="tabpanel" aria-labelledby="pg-tab-history">
+  <div class="week-card">
+    <ol class="week-strip" aria-label="Esta semana">{{range .Week}}
+      <li class="day{{if .Done}} on{{end}}"{{if .Today}} aria-current="date"{{end}}><span>{{.Letter}}</span><i aria-hidden="true"></i></li>{{end}}
+    </ol>
+    <p class="week-sum">Esta semana: <span class="num">{{.WeekSessions}} sesi{{if eq .WeekSessions 1}}ón{{else}}ones{{end}}</span>{{if .WeekKG}} · <span class="num">{{kilos .WeekKG}} kg</span>{{end}}</p>
+  </div>
+  {{range .Months}}
+  <h2 class="section-label">{{.Name}}</h2>
+  <nav class="list" aria-label="{{.Name}}">{{range .Sessions}}
+    <a class="list-row" href="{{$.Base}}/s/{{.ID}}" data-panel data-title="{{.Day}}"><span class="row-main"><strong>{{if .PlanName}}{{.PlanName}}{{else}}Entreno libre{{end}}</strong><span class="muted num">{{.Day}} · {{.SetCount}} serie{{if ne .SetCount 1}}s{{end}}{{if .KG}} · {{kilos .KG}} kg{{end}}</span></span><span class="row-end num muted">SI {{num .TotalSI}}</span></a>{{end}}
+  </nav>
+  {{end}}
+</div>
+
+<div id="pg-exercises" class="pg-pane" role="tabpanel" aria-labelledby="pg-tab-exercises" hidden>
+  {{if .Exercises}}
+  <nav class="list" aria-label="Ejercicios">{{range .Exercises}}
+    <a class="list-row ex-row" href="{{$.Base}}/progress/exercise?name={{.Name}}" data-panel data-title="{{.Name}}">
+      <span class="row-main"><strong>{{.Name}}</strong><span class="muted num">{{if .Group}}{{.Group}} · {{end}}<span class="best">mejor {{num .BestWeight}} × {{.BestReps}}</span></span></span>
+      <svg class="spark" viewBox="0 0 300 80" preserveAspectRatio="none" aria-hidden="true"><polyline points="{{.Trend}}"/></svg>
+      <span class="ex-1rm"><strong class="num">{{num .Best1RM}}</strong><span class="muted">e1RM{{if .Delta}} <span class="delta{{if gt .Delta 0.0}} up{{end}}">{{if gt .Delta 0.0}}+{{end}}{{num .Delta}}</span>{{end}}</span></span>
+    </a>{{end}}
+  </nav>
+  {{else}}
+  <p class="muted pg-note">Aún no hay series de trabajo con peso en el último año.</p>
+  {{end}}
+
+  {{if .Recommend}}
+  <h2 class="section-label">Semana que viene</h2>
+  <section class="recommend" aria-label="Recomendación de volumen">
+    <ul>
+      {{range .Recommend}}
+      <li class="{{if gt .SetsDelta 0}}up{{else if lt .SetsDelta 0}}down{{end}}">
+        <span class="name">{{.MuscleGroup}}</span>
+        <span class="delta">{{if gt .SetsDelta 0}}+{{end}}{{.SetsDelta}}</span>
+        <span class="why">
+          {{.Advice}}{{if .LastWeekSets}} · hiciste {{.LastWeekSets}}{{end}}
+          <span class="conf conf-{{.Confidence}}">{{.Samples}} valoración{{if ne .Samples 1}}es{{end}} · confianza {{.Confidence}}</span>
+        </span>
+      </li>
+      {{end}}
+    </ul>
+  </section>
+  {{end}}
+
+  {{if .Volume}}
+  <h2 class="section-label">Volumen por músculo</h2>
+  <section class="volume" aria-label="Volumen por grupo muscular">
+    {{$max := 0.0}}{{range .Volume}}{{if gt .TotalSI $max}}{{$max = .TotalSI}}{{end}}{{end}}
+    {{range .Volume}}
+    <div class="row-v">
+      <span class="name">{{if .MuscleGroup}}{{.MuscleGroup}}{{else}}sin grupo{{end}}</span>
+      <span class="vbar" role="img" aria-label="{{if .MuscleGroup}}{{.MuscleGroup}}{{else}}sin grupo{{end}}: {{num .TotalSI}}"><span style="width:{{pct .TotalSI $max}}%"></span></span>
+      <span class="val num">{{num .TotalSI}}</span>
+    </div>
+    {{end}}
+  </section>
+  {{end}}
+</div>
+
+<div id="pg-body" class="pg-pane" role="tabpanel" aria-labelledby="pg-tab-body" hidden>
+  <div class="empty-state">
+    <span class="empty-mark" aria-hidden="true"></span>
+    <h2>Aún no registras tu peso ni medidas</h2>
+    <p class="muted">La app todavía no guarda peso corporal ni medidas. Si se lo cuentas al coach, lo recordará y lo tendrá en cuenta.</p>
+  </div>
+</div>
+{{end}}
+{{end}}{{end}}
+
+{{/* One exercise, pushed from Progreso: e1RM per session, the best sets, the
+     fatigue between sets last time, and every session's sets. */}}
+{{define "exercise.html"}}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{.Exercise.Exercise}}</title>
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="{{.Base}}/manifest.webmanifest">
+<link rel="icon" href="{{.Base}}/static/icon-192.png">
+<link rel="stylesheet" href="{{.Base}}/static/app.css">
+</head>
+<body data-base="{{.Base}}" class="pushed">
+
+<header class="bar back-only">
+  <a class="ghost" href="{{.Base}}/?modo=progreso">‹ Progreso</a>
+</header>
+
+{{with .Exercise}}
+<main class="screen ex-detail">
+  <header class="screen-head"><h1>{{.Exercise}}</h1>{{if .MuscleGroup}}<span class="date-chip">{{.MuscleGroup}}</span>{{end}}</header>
+
+  <section class="chart-card" aria-label="e1RM por sesión">
+    <div class="chart-head">
+      <span class="muted">Mejor e1RM</span>
+      {{if .Delta}}<span class="delta{{if gt .Delta 0.0}} up{{end}} num">{{if gt .Delta 0.0}}+{{end}}{{num .Delta}} kg</span>{{end}}
+    </div>
+    {{with .Best}}<strong class="big-num num">{{num .Est1RM}} <small>kg</small></strong>{{end}}
+    <svg class="spark big" viewBox="0 0 300 80" preserveAspectRatio="none" aria-hidden="true"><polyline points="{{.Trend}}"/></svg>
+  </section>
+
+  <h2 class="section-label">Mejores series</h2>
+  <ol class="list best-sets">{{range .Top}}
+    <li class="list-row"><span class="row-main"><strong class="num">{{num .WeightKG}} × {{.Reps}}</strong><span class="muted">{{shortDate .Date}}{{if and .RPE (not .RPEImputed)}} · RPE {{num .RPE}}{{end}}</span></span><span class="num muted">e1RM {{num .Est1RM}}</span></li>{{end}}
+  </ol>
+
+  {{with .DropOff}}
+  <h2 class="section-label">Fatiga entre series · última sesión</h2>
+  <p class="card pg-note">{{.Explanation}}</p>
+  {{end}}
+
+  <h2 class="section-label">Historial</h2>
+  <ol class="list">{{range .Days}}
+    <li class="list-row"><span class="row-main"><strong>{{.Day}}</strong><span class="muted num">{{range $i, $s := .Sets}}{{if $i}} · {{end}}{{num $s.WeightKG}} × {{$s.Reps}}{{end}}</span></span><span class="num muted">{{num .Best}}</span></li>{{end}}
+  </ol>
+</main>
+{{end}}
+</body>
+</html>
+{{end}}

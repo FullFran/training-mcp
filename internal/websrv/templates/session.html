@@ -12,12 +12,12 @@
 {{end}}</head>
 <body data-base="{{.Base}}"{{if .CSRF}} hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'{{end}}>
 
-<header class="bar">
+<header class="bar back-only">
   <div>
     <strong>{{.Session.Date}}</strong>
     {{if eq .Session.Date .Today}}<span class="muted">hoy</span>{{end}}
   </div>
-  <a class="ghost" href="{{.Base}}/history">Historial</a>
+  <a class="ghost" href="{{.Base}}/?modo=progreso">Progreso</a>
 </header>
 
 <main>

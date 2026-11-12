@@ -34,10 +34,10 @@ func TestHomeIsTheChatWithPanelButtons(t *testing.T) {
 	body := get(t, h, base+"/").Body.String()
 	nav := section(t, body, `class="panel-links"`, "</nav>")
 	for _, want := range []string{
-		`href="` + base + `/history" data-panel`,
+		`href="` + base + `/?modo=progreso" data-mode-go="progress">📅 Historial`,
 		`href="` + base + `/plans" data-panel`,
 		`href="` + base + `/review" data-panel`,
-		`href="` + base + `/history#progreso" data-panel`,
+		`href="` + base + `/?modo=progreso" data-mode-go="progress">📈 Progreso`,
 	} {
 		if !strings.Contains(nav, want) {
 			t.Fatalf("panel buttons lack %s: %s", want, nav)
@@ -48,8 +48,8 @@ func TestHomeIsTheChatWithPanelButtons(t *testing.T) {
 			t.Fatalf("home lacks %s", want)
 		}
 	}
-	if !strings.Contains(get(t, h, base+"/history").Body.String(), `id="progreso"`) {
-		t.Fatal("history has no progress anchor for the progress panel")
+	if w := get(t, h, base+"/history"); w.Header().Get("Location") != base+"/?modo=progreso" {
+		t.Fatal("the old history link does not land on Progreso")
 	}
 	if w := get(t, h, base+"/static/shell.js"); w.Code != http.StatusOK {
 		t.Fatalf("shell.js: %d", w.Code)
@@ -187,7 +187,7 @@ func TestComposerHasVoiceAndTheExtrasSlot(t *testing.T) {
 func TestServiceWorkerCachesTheChatShell(t *testing.T) {
 	h, _ := newServer(t)
 	body := get(t, h, base+"/sw.js").Body.String()
-	for _, want := range []string{"const VERSION = 'v14';", "BASE + '/static/shell.js'", "BASE + '/static/modes.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'", "BASE + '/static/coach-attach.js'"} {
+	for _, want := range []string{"const VERSION = 'v15';", "BASE + '/static/shell.js'", "BASE + '/static/modes.js'", "BASE + '/static/progress.js'", "BASE + '/static/picker.js'", "BASE + '/static/coach.js'", "BASE + '/static/markdown.js'", "BASE + '/static/coach-attach.js'"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("service worker lacks %s", want)
 		}

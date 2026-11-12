@@ -119,7 +119,7 @@
   let changed = false;
 
   function openPanel(link) {
-    title.textContent = link.textContent.replace(/\s*\(\d+\)$/, '');
+    title.textContent = link.dataset.title || link.textContent.replace(/\s*\(\d+\)$/, '');
     changed = false;
     frame.src = link.href;
     sheet.hidden = false;

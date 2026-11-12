@@ -132,6 +132,12 @@ type pageData struct {
 	Mode string
 	// Home is Entrenar's tab: the next routine, the others and the last session.
 	Home HomeData
+	// Stats is Progreso's tab, filled when the page opens on it or when the
+	// tab loads it from /progress; StatsReady says which.
+	Stats      StatsData
+	StatsReady bool
+	// Exercise is one exercise's pushed screen from Progreso.
+	Exercise ExerciseDetail
 	// Cards are today's exercises on the training screen, each with its set
 	// table pre-filled.
 	Cards []TrainCard
@@ -223,6 +229,8 @@ func New(service training.ServiceFor, snapshot func(context.Context, string) err
 func NewWithOptions(service training.ServiceFor, snapshot func(context.Context, string) error, clock training.Clock, basePath string, opts Options) (*Server, error) {
 	funcs := map[string]any{
 		"num":         formatNumber,
+		"kilos":       kilos,
+		"restClock":   restClock,
 		"shortDate":   shortDate,
 		"rpeScale":    rpeScale,
 		"techniques":  func() []string { return training.Techniques },
@@ -346,7 +354,10 @@ func (s *Server) routes() {
 	s.handle("POST "+b+"/sets", s.addSet)
 	s.handle("POST "+b+"/sets/{id}/delete", s.deleteSet)
 	s.handle("POST "+b+"/sets/{id}/update", s.updateSet)
-	s.handle("GET "+b+"/history", s.history)
+	s.handle("GET "+b+"/history", s.historyMoved)
+	s.handle("GET "+b+"/progress", s.progress)
+	s.handle("GET "+b+"/progress/exercise", s.exerciseDetail)
+	s.handle("GET "+b+"/exercises", s.exercises)
 	if s.opts.Export {
 		s.handle("GET "+b+"/export.db", s.export)
 	}
@@ -414,6 +425,19 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data.Mode = modeFromQuery(r.URL.Query().Get("modo"))
+	if data.Mode == "progress" {
+		if data.Stats, err = s.statsData(r.Context()); err != nil {
+			s.fail(w, err)
+			return
+		}
+		data.StatsReady = true
+	}
+	if data.RestTarget == 0 {
+		if data.RestTarget, err = s.service(r.Context()).RestTarget(r.Context()); err != nil {
+			s.fail(w, err)
+			return
+		}
+	}
 	if !data.Active() {
 		if data.Home, err = s.homeData(r.Context(), data.Plans); err != nil {
 			s.fail(w, err)
@@ -706,28 +730,6 @@ func (s *Server) export(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition",
 		`attachment; filename="training-`+s.todayDate()+`.db"`)
 	http.ServeContent(w, r, "training.db", info.ModTime(), f)
-}
-
-func (s *Server) history(w http.ResponseWriter, r *http.Request) {
-	sessions, err := s.service(r.Context()).ListSessions(r.Context(), training.ListFilter{Limit: 60})
-	if err != nil {
-		s.fail(w, err)
-		return
-	}
-	volume, err := s.service(r.Context()).VolumeByGroup(r.Context(), training.ListFilter{})
-	if err != nil {
-		s.fail(w, err)
-		return
-	}
-	recommend, err := s.service(r.Context()).VolumeRecommendation(r.Context())
-	if err != nil {
-		s.fail(w, err)
-		return
-	}
-	s.render(w, r, "history.html", pageData{
-		Base: s.base, Today: s.todayDate(), History: sessions,
-		Volume: volume, Recommend: recommend,
-	})
 }
 
 func (s *Server) session(w http.ResponseWriter, r *http.Request) {

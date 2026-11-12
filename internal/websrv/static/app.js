@@ -256,6 +256,11 @@
     const btn = event.target.closest('.swap');
     if (!btn) return;
     event.stopPropagation();
+    // The picker (picker.js) chooses the replacement; a prompt is the fallback.
+    if (window.openExercisePicker) {
+      window.openExercisePicker({ mode: 'swap', exercise: btn.dataset.exercise });
+      return;
+    }
     const replacement = window.prompt('¿Por qué ejercicio lo sustituyes?', '');
     if (!replacement || !replacement.trim()) return;
     if (!window.htmx) return;
@@ -366,6 +371,11 @@
   const served = parseInt(document.body.dataset.restTarget || '', 10);
   let restDefault = served > 0 ? served : parseInt(localStorage.getItem(REST_KEY) || '120', 10);
   localStorage.setItem(REST_KEY, String(restDefault));
+  // Tú's stepper changes the target too; the next rest starts from it.
+  document.addEventListener('rest:target', (event) => {
+    restDefault = event.detail;
+    localStorage.setItem(REST_KEY, String(restDefault));
+  });
   let remaining = 0;
   let ticker = null;
   // Signed-in pages carry a CSRF token every write must echo.
@@ -424,6 +434,7 @@
         // Adjusting mid-rest also becomes the new default for next time.
         restDefault = Math.min(900, Math.max(30, restDefault + delta));
         localStorage.setItem(REST_KEY, String(restDefault));
+        document.dispatchEvent(new CustomEvent('rest:target', { detail: restDefault }));
         // Best effort: offline, the phone keeps its own copy until next time.
         fetch(base + '/rest', {
           method: 'POST',

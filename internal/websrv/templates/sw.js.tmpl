@@ -10,7 +10,7 @@
 // only that partition is ever read offline: a new session drops the others, an
 // expired one is dropped before reading, and the logged-out page (X-Cache-Clear)
 // drops them all. The secret mount sends no partition and keeps the old cache.
-const VERSION = 'v14';
+const VERSION = 'v15';
 const SHELL = 'shell-' + VERSION;
 const PAGES = 'pages-' + VERSION;
 const BASE = '{{.Base}}';
@@ -25,6 +25,8 @@ const SHELL_ASSETS = [
   BASE + '/static/coach-attach.js',
   BASE + '/static/shell.js',
   BASE + '/static/modes.js',
+  BASE + '/static/progress.js',
+  BASE + '/static/picker.js',
   BASE + '/static/htmx.min.js',
   BASE + '/static/icon-192.png',
   BASE + '/static/icon-512.png'

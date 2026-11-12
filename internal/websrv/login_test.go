@@ -40,7 +40,7 @@ func newRootServer(t *testing.T) http.Handler {
 
 func TestRootPagesCarryTheCSRFTokenForEveryWrite(t *testing.T) {
 	h := newRootServer(t)
-	for _, path := range []string{"/", "/plans", "/history"} {
+	for _, path := range []string{"/", "/plans"} {
 		body := get(t, h, path).Body.String()
 		if !strings.Contains(body, `<meta name="csrf-token" content="`+testCSRF+`">`) {
 			t.Errorf("%s has no csrf meta tag", path)
@@ -54,12 +54,13 @@ func TestRootPagesCarryTheCSRFTokenForEveryWrite(t *testing.T) {
 	if _, err := newRootPlan(t, h); err != nil {
 		t.Fatal(err)
 	}
-	history := get(t, h, "/history").Body.String()
-	if !strings.Contains(history, `action="/logout"`) || !strings.Contains(history, `name="csrf_token" value="`+testCSRF+`"`) {
-		t.Error("history has no logout form carrying the token")
+	// Signing out moved from the history page to Tú.
+	you := section(t, get(t, h, "/?modo=tu").Body.String(), `id="you"`, "</section>\n\n")
+	if !strings.Contains(you, `action="/logout"`) || !strings.Contains(you, `name="csrf_token" value="`+testCSRF+`"`) {
+		t.Error("Tú has no logout form carrying the token")
 	}
-	if strings.Contains(history, "export.db") {
-		t.Error("history links to an export the root does not serve")
+	if strings.Contains(you, "export.db") {
+		t.Error("Tú links to an export the root does not serve")
 	}
 	if w := get(t, h, "/export.db"); w.Code != http.StatusNotFound {
 		t.Errorf("export at the root: status %d", w.Code)
@@ -84,13 +85,13 @@ func newRootPlan(t *testing.T, h http.Handler) (string, error) {
 
 func TestSecretMountPagesAreUnchanged(t *testing.T) {
 	h, _ := newServer(t)
-	for _, path := range []string{base + "/", base + "/plans", base + "/history"} {
+	for _, path := range []string{base + "/", base + "/plans", base + "/progress"} {
 		body := get(t, h, path).Body.String()
 		if strings.Contains(body, "csrf") || strings.Contains(body, "logout") || strings.Contains(body, "hx-headers") {
 			t.Errorf("%s gained login markup", path)
 		}
 	}
-	if !strings.Contains(get(t, h, base+"/history").Body.String(), base+"/export.db") {
+	if !strings.Contains(get(t, h, base+"/?modo=tu").Body.String(), base+"/export.db") {
 		t.Error("the secret mount lost its backup link")
 	}
 }

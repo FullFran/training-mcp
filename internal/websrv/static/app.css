@@ -1544,3 +1544,128 @@ body[data-mode="plan"]:has(.workout-pill:not([hidden])) .coach-sheet > .coach { 
   :root { --raise: #eef0f4; --accent-soft: rgba(22, 163, 74, .1); --amber: #b7791f; }
   .workout-pill, .workout:has(> .rest:not([hidden])) { background: #e9f7ee; }
 }
+
+/* === U9: Progreso, Tú and the exercise picker ================================
+   Everything below belongs to these three screens. Same vocabulary as the
+   shell above: cards with hairlines, one green accent, tabular numerals. */
+
+/* Progreso: Historial · Ejercicios · Cuerpo */
+.progress-body { display: flex; flex-direction: column; gap: 12px; flex: 1; }
+.progress-body .segmented {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px;
+  border: 1px solid var(--line); border-radius: 16px; background: var(--card);
+}
+.progress-body .segmented button {
+  min-height: 44px; border: 0; border-radius: 12px;
+  background: none; color: var(--muted); font: inherit; font-size: 16px; font-weight: 600;
+  transition: background .15s ease, color .15s ease;
+}
+.progress-body .segmented button[aria-selected="true"] { background: var(--raise); color: var(--text); font-weight: 800; }
+.pg-pane { display: flex; flex-direction: column; gap: 12px; }
+.pg-loading, .pg-note { margin: 0; padding: 16px; }
+
+.week-card { padding: 16px 18px 14px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); }
+.week-strip { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, 1fr); }
+.week-strip .day { display: grid; justify-items: center; gap: 10px; color: var(--muted); font-size: 14px; font-weight: 600; }
+.week-strip .day i { width: 12px; height: 12px; border-radius: 50%; background: var(--line); transition: transform .2s ease; }
+.week-strip .day.on i { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.week-strip .day[aria-current="date"] { color: var(--text); }
+.week-strip .day[aria-current="date"]:not(.on) i { background: none; border: 2px solid var(--muted); }
+.week-sum { margin: 14px 0 0; color: var(--muted); font-size: 15px; }
+.week-sum .num { color: var(--text); font-weight: 700; }
+
+.row-end { flex: none; font-size: 14px; white-space: nowrap; }
+/* Cards in a scrolling screen keep their height instead of shrinking to fit. */
+#you > *, .progress-body > *, .pg-pane > *, .ex-detail > * { flex-shrink: 0; }
+.ex-row { display: grid; grid-template-columns: minmax(0, 1fr) 64px auto; }
+.ex-row .row-main strong::first-letter, .ex-detail h1::first-letter { text-transform: uppercase; }
+.ex-row .best { white-space: nowrap; }
+.spark { width: 64px; height: 28px; overflow: visible; }
+.spark polyline { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.spark.big { width: 100%; height: 110px; margin-top: 8px; }
+.ex-1rm { display: grid; justify-items: end; min-width: 56px; }
+.ex-1rm strong { font-size: 19px; }
+.ex-1rm .muted { font-size: 12px; white-space: nowrap; }
+.delta { color: var(--muted); font-weight: 700; }
+.delta.up { color: var(--accent); }
+#pg-exercises .recommend, #pg-exercises .volume { margin: 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); }
+
+/* Exercise detail, pushed from Progreso */
+.pushed .screen { padding-top: 8px; }
+.ex-detail h1 { font-size: 28px; }
+.chart-card { padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); }
+.chart-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 15px; }
+.big-num { display: block; margin-top: 4px; font-size: 38px; font-weight: 800; letter-spacing: -.02em; }
+.big-num small { color: var(--muted); font-size: 16px; font-weight: 600; }
+.best-sets .list-row, .ex-detail .list .list-row { min-height: 60px; }
+
+/* Tú */
+.profile-card {
+  display: flex; align-items: center; gap: 16px;
+  min-height: 84px; padding: 14px 18px;
+  border: 1px solid var(--line); border-radius: 20px; background: var(--card);
+  color: var(--text); text-decoration: none;
+}
+.profile-card:active { background: var(--raise); }
+.profile-card .row-main { flex: 1; }
+.avatar { flex: none; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--raise); border: 1px solid var(--line); }
+.avatar svg { width: 26px; height: 26px; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; }
+#you .list button.list-row { cursor: pointer; }
+.list-row.static { cursor: default; }
+.stepper { flex: none; display: flex; align-items: center; gap: 4px; }
+.stepper output { min-width: 52px; text-align: center; font-size: 18px; font-weight: 700; }
+.step {
+  width: var(--tap); height: var(--tap); border-radius: 14px;
+  border: 1px solid var(--line); background: var(--raise); color: var(--text);
+  font: inherit; font-size: 22px; font-weight: 700; touch-action: manipulation;
+  transition: transform .12s ease;
+}
+.step:active { transform: scale(.94); border-color: var(--accent); }
+.signout { margin-top: 4px; }
+#you .list > * + * { border-top: 1px solid var(--line); }
+/* Inside a panel, «‹ Volver» already goes back: links to a tab are noise. */
+.in-panel body > .bar.back-only { display: none; }
+.in-panel body > .bar .bar-actions a[href*="?modo="] { display: none; }
+
+/* Exercise picker sheet */
+.picker-scrim { z-index: 39; }
+.picker {
+  z-index: 40; display: flex; flex-direction: column; gap: 12px;
+  height: 88vh; height: 88dvh; overflow: hidden;
+  background: var(--card); padding-bottom: 0;
+  animation: picker-up .22s ease-out;
+}
+@keyframes picker-up { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .picker { animation: none; } }
+.picker-head { justify-content: space-between; padding-top: 14px; }
+.picker-head h2 { margin: 0; font-size: 22px; font-weight: 800; text-transform: none; }
+.picker-head h2::first-letter { text-transform: uppercase; }
+.picker-search {
+  display: flex; align-items: center; gap: 10px;
+  min-height: var(--tap); padding: 0 16px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--bg);
+}
+.picker-search:focus-within { border-color: var(--accent); }
+.picker-search svg { width: 20px; height: 20px; flex: none; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+.picker-search input { flex: 1; min-width: 0; height: 48px; border: 0; background: none; color: var(--text); font: inherit; font-size: 17px; outline: none; }
+.picker-chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; flex: none; padding-bottom: 2px; }
+.picker-chips::-webkit-scrollbar { display: none; }
+.picker-chips .chip { min-height: 44px; background: var(--bg); color: var(--muted); font-size: 15px; }
+.picker-chips .chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.picker-list { list-style: none; margin: 0 -16px; padding: 0 16px; flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+.picker-list > li + li { border-top: 1px solid var(--line); }
+.pick {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 64px; padding: 8px 0;
+  border: 0; background: none; color: var(--text); font: inherit; text-align: left;
+}
+.pick .row-main strong { font-size: 17px; }
+.pick .row-main strong::first-letter { text-transform: uppercase; }
+.pick.create strong { color: var(--accent); }
+.tick { flex: none; width: 32px; height: 32px; border-radius: 10px; border: 2px solid var(--line); transition: background .12s ease, border-color .12s ease; }
+.pick[aria-pressed="true"] .tick { border-color: var(--accent); background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%2307240f' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 20px no-repeat; }
+.picker:has(#picker-done[hidden]) .tick { display: none; }
+.picker-empty { padding: 20px 0; }
+.picker-foot { flex: none; padding: 10px 0 calc(14px + env(safe-area-inset-bottom)); }
+.picker-foot .btn:disabled { opacity: .45; }
+/* === end U9 ================================================================ */
