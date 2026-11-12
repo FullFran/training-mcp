@@ -78,6 +78,41 @@ dropped answer has a `revoked` decision record (decider `policy`
 `HCS-0005-R008`, channel `migration:018`), and the person is asked again.
 Accept-all values were not touched.
 
+### Undo
+
+The person can undo an accepted proposal from its entry in the history on
+`/review` ("Deshacer"). The chat reads the ones it can offer from
+`GET /review/undoable`: JSON `{"proposals":[{"id","label","summary","when","undo_url"}]}`,
+the undoable proposals accepted in the last 12 hours, newest first, at most
+five; `undo_url` is `POST /review/{id}/undo`. Undo is the person's own action:
+no tool lets an agent undo, it applies at once, and it is recorded as its own
+history entry (action type `proposal.undo`, payload `{"proposal_id":<id>}`)
+with a decision record (`subject` `account`, channel `web`). A proposal is
+undone once; the undo itself cannot be undone.
+
+Accepting a proposal stores its **undo image**: every row it changed, as it was
+before and right after, for every action type (sets, sessions, plans and their
+exercises, session exercises, notes, groups, landmarks, feedback, the rest
+target, memory facts with their revisions and relations, and the link from an
+imported set to a deleted one). Undo writes the before rows back exactly, ids
+and timestamps included, deletions too, in one transaction. A log_sets
+idempotency key it added is removed, so the same key logs again.
+
+**When later changes depend on it, undo is refused** with the reason, and
+nothing changes:
+
+- a row the proposal changed was changed again afterwards (a set edited or
+  deleted, a memory rewritten, the rest target set again);
+- something added later points at a row the undo would remove (a set logged
+  in a session the proposal started, a session started from a plan it
+  created);
+- a row the undo would bring back lost its place to a later one (a set logged
+  where a deleted set stood) or belongs to one removed since.
+
+Later changes elsewhere do not stand in the way: undoing an added set leaves
+the sets logged after it in place. Proposals answered before migration 024,
+rejected or failed ones, and undos cannot be undone.
+
 ### Decision records (HCS-0005 section 3.3)
 
 Every decision on a proposal writes a decision record before it takes effect:

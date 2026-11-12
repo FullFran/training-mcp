@@ -370,6 +370,8 @@ func (s *Server) routes() {
 	s.handle("POST "+b+"/review/{id}/reject", s.rejectProposal)
 	s.handle("POST "+b+"/review/accept-all", s.setAcceptAll)
 	s.handle("POST "+b+"/review/forget", s.forgetRule)
+	s.handle("POST "+b+"/review/{id}/undo", s.undoProposal)
+	s.handle("GET "+b+"/review/undoable", s.undoableProposals)
 	s.handle("GET "+b+"/memory", s.memoryPage)
 	s.handle("POST "+b+"/memory/{id}/update", s.updateMemory)
 	s.handle("POST "+b+"/memory/{id}/delete", s.deleteMemory)
