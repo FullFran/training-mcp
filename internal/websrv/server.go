@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -207,6 +208,8 @@ type Options struct {
 	// Connectors are the person's own remote MCP servers. Used only with a
 	// Coach; nil serves no connector routes.
 	Connectors Connectors
+	// Logger records failed memory hooks. Nil: the standard logger.
+	Logger *log.Logger
 }
 
 // New serves the app under basePath with the database export on.
@@ -355,6 +358,7 @@ func (s *Server) routes() {
 	s.handle("POST "+b+"/feedback", s.recordFeedback)
 	s.handle("POST "+b+"/note", s.saveNote)
 	s.handle("POST "+b+"/rest", s.setRest)
+	s.handle("POST "+b+"/finish", s.finishWorkout)
 	s.handle("GET "+b+"/exercise-info", s.exerciseInfo)
 	s.handle("GET "+b+"/s/{id}", s.session)
 	s.handle("GET "+b+"/review", s.reviewPage)
@@ -397,6 +401,7 @@ func (s *Server) handle(pattern string, handler http.HandlerFunc) {
 }
 
 func (s *Server) today(w http.ResponseWriter, r *http.Request) {
+	s.proposeIdleSummaries(r.Context())
 	data, err := s.todayData(r.Context(), "")
 	if err != nil {
 		s.fail(w, err)
