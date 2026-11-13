@@ -29,13 +29,14 @@ before registering UI-enabled tools" is the one rule this does not meet.
 
 | View | Tool | What it shows |
 |---|---|---|
-| `ui://vibetraining/rest-timer/v2` | `render_rest_timer` | The rest since the last logged set: a countdown while `resting`, time over the target when `ready`, the seconds rested once `stopped`, the next exercise in a `superset`, and nothing running when `none` or `idle`. Below it, the next set (weight and reps prefilled from the last one of that exercise today, editable, with a warm-up box) and the last set (editable). |
+| `ui://vibetraining/rest-timer/v2` | `render_rest_timer` | The rest since the last logged set: a countdown while `resting`, time over the target when `ready`, the seconds rested once `stopped`, the next exercise in a `superset`, and nothing running when `none` or `idle`. Below it, the next set (weight and reps prefilled from the last one of that exercise today, editable, with an optional RPE of 7 to 10 and a warm-up box) and the last set (editable). |
 
 The view's buttons call the same tools the agent uses, so the person's
 approval mode decides each one, and the view says when a write waits on the
 review page: **Stop rest** calls `stop_rest` with the set and the seconds on
 screen, **Done** calls `log_sets` (one idempotency key per set, reused on a
-retry), and editing the last set calls `update_set` with only the changed
+retry; the RPE is sent only when the person picks one, so "No RPE" stays an
+unrated, `rpe_imputed` set), and editing the last set calls `update_set` with only the changed
 fields. **+30 s** only extends the countdown on screen; it never changes the
 person's target. After each write the view tells the model what happened
 (`ui/update-model-context`) and re-reads the timer. There is no app-only
