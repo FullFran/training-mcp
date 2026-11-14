@@ -193,7 +193,7 @@ check here once it has been done against production.
 
 ## Logging sets
 
-The everyday path. `log_sets` is the one to reach for: it needs no session id, its sets may differ, and repeating a call with the same `idempotency_key` stores nothing new, so a client that lost the response can safely retry.
+The everyday path. `log_sets` is the one to reach for: it needs no session id, its sets may differ, and repeating a call with the same `idempotency_key` stores nothing new, so a client that lost the response can safely retry. While the call waits for the person's approval, repeating it with the same key and sets returns the proposal already waiting, never a second one.
 
 
 | Tool | What it does |

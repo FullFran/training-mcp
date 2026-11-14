@@ -43,6 +43,15 @@ person's target. After each write the view tells the model what happened
 write tool: a tool hidden from the model is hidden by the host, not the
 server, so it would not be a boundary (#125).
 
+Done is safe to press twice. Before it logs, the view re-reads the session: if a
+set was logged elsewhere (the phone app, the chat) since the card was filled,
+nothing is logged and the card updates so the person looks again. While a set
+waits for approval the view does not send it again, and the server also points
+a repeated `log_sets` (same `idempotency_key` and sets) at the proposal already
+waiting instead of queueing a second one. A retry after a lost answer replays
+the same key. Errors say what happened: "Not saved" with the server's reason and
+how to retry, or "may or may not have been saved" when no answer came back.
+
 The rest timer counts locally from the server's `rest.elapsed_seconds` plus
 the time measured on the device since the result arrived. It never compares
 the device clock with the server's, so a skewed phone clock does not move it.

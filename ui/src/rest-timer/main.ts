@@ -16,8 +16,13 @@ import {
   type McpUiHostContext,
 } from "@modelcontextprotocol/ext-apps";
 import {
+  afterWrite,
+  attemptFor,
+  canSend,
   clock,
   headline,
+  isStale,
+  newKey,
   parseTimerData,
   project,
   RPE_CHOICES,
@@ -25,7 +30,9 @@ import {
   toKg,
   toUnit,
   weightStep,
+  writeNotice,
   writeOutcome,
+  type LogAttempt,
   type RestTimerData,
   type TimerView,
   type WriteOutcome,
@@ -71,10 +78,14 @@ let extra = 0;
 // The next set the inputs were filled from, so a refresh never overwrites
 // what the person is typing for the same set.
 let filledFor = "";
-// One key per set to log: a retry after a lost answer replays, never doubles.
-// It is only reused for the same body: a retry with other values is a new set.
-let logKey = crypto.randomUUID();
-let logBody = "";
+// The set being logged: one key per set, so a retry after a lost answer replays
+// and never doubles. It is only reused for the same body: other values are a new
+// set. While it waits for approval, Done does not send it again.
+let attempt: LogAttempt | undefined;
+// The last set id the card was filled for. A different one on the server means
+// a set was logged elsewhere (the PWA, the chat) since.
+let baselineLastId: number | undefined;
+let logging = false;
 
 function unit(): string {
   return data?.weight_unit === "lb" ? "lb" : "kg";
@@ -155,11 +166,12 @@ function drawSets(): void {
     const key = `${next.exercise}|${next.done_sets ?? 0}|${data.last_set?.id ?? 0}`;
     if (key !== filledFor) {
       filledFor = key;
+      baselineLastId = data.last_set?.id;
       el.weight.value = next.weight_kg ? String(toUnit(next.weight_kg, unit())) : "";
       el.reps.value = next.reps ? String(next.reps) : "";
       el.warmup.checked = false;
       setRPE(undefined);
-      logKey = crypto.randomUUID();
+      attempt = undefined;
     }
   }
   const last = data.last_set;
@@ -196,28 +208,44 @@ const app = new App({ name: "vibeTraining rest timer", version: "2.0.0" }, {});
 app.ontoolresult = (params) => accept(params.structuredContent);
 app.onhostcontextchanged = (params) => applyContext(params as McpUiHostContext);
 
-async function refresh(): Promise<void> {
+// refresh re-reads the server's truth and returns it; undefined when the host
+// refused the call or the result was not a timer, and the view keeps what it
+// shows.
+async function refresh(): Promise<RestTimerData | undefined> {
   el.refresh.disabled = true;
   try {
     const result = await app.callServerTool({ name: RENDER, arguments: {} });
-    if (!result.isError) accept(result.structuredContent);
+    if (result.isError) return undefined;
+    accept(result.structuredContent);
+    return parseTimerData(result.structuredContent);
   } catch {
     // The host may refuse tool calls from views; keep what is shown.
+    return undefined;
   } finally {
     el.refresh.disabled = false;
   }
 }
 
-// write calls one write tool and says what happened. The model is told too,
-// so the chat knows what the person did in the view.
-async function write(button: HTMLButtonElement, name: string, args: Record<string, unknown>, done: string): Promise<WriteOutcome> {
+// How a write is retried, for its error notice.
+interface WriteOptions {
+  retry: string;
+  // The retry replays one idempotency key, so it cannot record twice.
+  idempotent: boolean;
+}
+
+// write calls one write tool and says what happened, including whether it was
+// saved and how to retry. The model is told too, so the chat knows what the
+// person did in the view.
+async function write(button: HTMLButtonElement, name: string, args: Record<string, unknown>, done: string, options: WriteOptions): Promise<WriteOutcome> {
   button.disabled = true;
   let outcome: WriteOutcome = "error";
+  let failure: "server" | "unknown" = "unknown";
   let detail = "";
   try {
     const result = await app.callServerTool({ name, arguments: args });
     outcome = writeOutcome(result);
-    if (outcome === "error") {
+    if (outcome === "error" && result.isError) {
+      failure = "server";
       const first = result.content?.[0];
       detail = first && first.type === "text" ? first.text : "";
     }
@@ -226,19 +254,8 @@ async function write(button: HTMLButtonElement, name: string, args: Record<strin
   } finally {
     button.disabled = false;
   }
-  switch (outcome) {
-    case "accepted":
-      notify("ok", done);
-      break;
-    case "pending":
-      notify("pending", `${done.replace(/\.$/, "")}: waiting for your approval in vibeTraining.`);
-      break;
-    case "rejected":
-      notify("error", "Not saved: this action is set to be refused.");
-      break;
-    default:
-      notify("error", detail ? `Not saved: ${detail}` : "Not saved. Try again.");
-  }
+  const notice = writeNotice(outcome, { done, detail, failure, ...options });
+  notify(notice.kind, notice.text);
   if (outcome !== "error") {
     void app
       .updateModelContext({ content: [{ type: "text", text: `From the rest timer (${outcome}): ${done}` }] })
@@ -287,7 +304,10 @@ el.stop.addEventListener("click", () => {
   const last = data?.last_set;
   if (!v || !last) return;
   const rested = v.elapsedSeconds;
-  void write(el.stop, "stop_rest", { set_id: last.id, rest_seconds: rested }, `Stopped the rest after ${last.exercise} at ${clock(rested)}.`);
+  void write(el.stop, "stop_rest", { set_id: last.id, rest_seconds: rested }, `Stopped the rest after ${last.exercise} at ${clock(rested)}.`, {
+    retry: "Press Stop rest again.",
+    idempotent: false,
+  });
 });
 
 for (const button of document.querySelectorAll<HTMLButtonElement>(".stepper button")) {
@@ -301,9 +321,11 @@ for (const button of document.querySelectorAll<HTMLButtonElement>(".stepper butt
   });
 }
 
-el.done.addEventListener("click", () => {
+el.done.addEventListener("click", () => void logNext());
+
+async function logNext(): Promise<void> {
   const next = data?.next_set;
-  if (!next) return;
+  if (!next || logging) return;
   const weight = readNumber(el.weight);
   const reps = readNumber(el.reps);
   if (!(weight > 0) || !Number.isInteger(reps) || reps < 1) {
@@ -315,18 +337,38 @@ el.done.addEventListener("click", () => {
   // would log 80.0137 kg for 80.
   const kg = next.weight_kg && weight === toUnit(next.weight_kg, unit()) ? next.weight_kg : toKg(weight, unit());
   const set = setPayload({ weightKg: kg, reps, warmup: el.warmup.checked, rpe });
-  const body = JSON.stringify([next.exercise, set]);
-  if (body !== logBody) {
-    logBody = body;
-    logKey = crypto.randomUUID();
+  attempt = attemptFor(attempt, JSON.stringify([next.exercise, set]), () => newKey());
+  if (!canSend(attempt)) {
+    notify("pending", "This set is already waiting for your approval in vibeTraining. Approve it there, or change the values to log another.");
+    return;
   }
+  const sent = attempt;
   const label = `${el.warmup.checked ? "warm-up " : ""}${next.exercise} ${weight} ${unit()} × ${reps}${rpe === undefined ? "" : ` @ RPE ${rpe}`}`;
-  void write(el.done, "log_sets", { idempotency_key: logKey, exercise: next.exercise, sets: [set] }, `Logged ${label}.`).then(
-    (outcome) => {
-      if (outcome !== "error") logKey = crypto.randomUUID();
-    },
-  );
-});
+  logging = true;
+  el.done.disabled = true;
+  try {
+    // A set logged elsewhere (the PWA) since this card was filled changes what
+    // comes next: read the server first, and let the person look again.
+    const baseline = baselineLastId;
+    const fresh = await refresh();
+    if (!fresh) {
+      notify("error", "Could not check the session before saving, so nothing was saved. Press Done again.");
+      return;
+    }
+    if (isStale(baseline, fresh)) {
+      notify("pending", "A set was logged elsewhere since this card was filled, so it was updated. Check it and press Done again.");
+      return;
+    }
+    const outcome = await write(el.done, "log_sets", { idempotency_key: sent.key, exercise: next.exercise, sets: [set] }, `Logged ${label}.`, {
+      retry: "Press Done again.",
+      idempotent: true,
+    });
+    attempt = afterWrite(sent, outcome);
+  } finally {
+    logging = false;
+    el.done.disabled = false;
+  }
+}
 
 el.edit.addEventListener("click", () => {
   const last = data?.last_set;
@@ -364,7 +406,10 @@ el.editForm.addEventListener("submit", (event) => {
     return;
   }
   const save = el.editForm.querySelector<HTMLButtonElement>("button[type=submit]")!;
-  void write(save, "update_set", args, `Corrected ${last.exercise} to ${weight} ${unit()} × ${reps}.`).then(
+  void write(save, "update_set", args, `Corrected ${last.exercise} to ${weight} ${unit()} × ${reps}.`, {
+    retry: "Press Save again.",
+    idempotent: false,
+  }).then(
     (outcome) => {
       if (outcome !== "error") closeEdit();
     },

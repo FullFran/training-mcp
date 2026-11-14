@@ -1,6 +1,7 @@
 package mcpsrv
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -95,6 +96,21 @@ func addWriteBy[In, Out any, PO interface {
 		payload, err := json.Marshal(in)
 		if err != nil {
 			return nil, out, toolError(err)
+		}
+		// A call that carries an idempotency key and is repeated while its
+		// proposal still waits (a second tap, a retry after a lost answer) points
+		// at that proposal instead of queueing a second one.
+		if keyed, ok := any(in).(interface{ idempotencyKeyed() bool }); ok && keyed.idempotencyKeyed() {
+			waiting, err := svc.ListProposals(ctx, training.ProposalFilter{Pending: true, Limit: 200})
+			if err != nil {
+				return nil, out, toolError(err)
+			}
+			for _, w := range waiting {
+				if w.Tool == t.Name && w.ActionType == actionType(in) && w.Session == training.AgentSessionFrom(ctx) && bytes.Equal(w.Payload, payload) {
+					PO(&out).setProposal(ProposalRef{Status: "pending", ProposalID: w.ID})
+					return nil, out, nil
+				}
+			}
 		}
 		p, err := svc.Propose(ctx, training.ProposalInput{Tool: t.Name, ActionType: actionType(in), Payload: payload},
 			func(ctx context.Context) (json.RawMessage, error) {

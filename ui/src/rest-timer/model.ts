@@ -173,3 +173,96 @@ export function setPayload(input: SetInput): Record<string, unknown> {
   if (input.rpe !== undefined) set.rpe = input.rpe;
   return set;
 }
+
+// LogAttempt is one set the person asked to log: its idempotency key, the body
+// the key belongs to, and whether the server holds it waiting for approval.
+export interface LogAttempt {
+  key: string;
+  body: string;
+  pending: boolean;
+}
+
+// newKey mints an idempotency key. crypto.randomUUID only exists in secure
+// contexts, and a view is not always served from one, so without it the key is
+// 128 random bits as hex.
+export function newKey(c: Crypto = globalThis.crypto): string {
+  if (typeof c.randomUUID === "function") return c.randomUUID();
+  const bytes = c.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// attemptFor is the attempt for this body. The same body keeps its key (and its
+// pending flag), so a retry replays and never doubles; other values are a new
+// set with a new key.
+export function attemptFor(prev: LogAttempt | undefined, body: string, mintKey: () => string): LogAttempt {
+  if (prev && prev.body === body) return prev;
+  return { key: mintKey(), body, pending: false };
+}
+
+// canSend is false while the attempt waits for approval: pressing Done again
+// would queue a second proposal for the same set.
+export function canSend(attempt: LogAttempt): boolean {
+  return !attempt.pending;
+}
+
+// afterWrite is the attempt once the server answered. Accepted and rejected end
+// it; pending keeps it, marked as waiting; an error keeps it as it was, so the
+// retry replays the same key.
+export function afterWrite(attempt: LogAttempt, outcome: WriteOutcome): LogAttempt | undefined {
+  switch (outcome) {
+    case "accepted":
+    case "rejected":
+      return undefined;
+    case "pending":
+      return { ...attempt, pending: true };
+    default:
+      return attempt;
+  }
+}
+
+// isStale says the card was filled for another last set than the server holds
+// now: a set was logged (or removed) somewhere else, for example in the PWA.
+export function isStale(baselineLastSetId: number | undefined, fresh: RestTimerData): boolean {
+  return (fresh.last_set?.id) !== baselineLastSetId;
+}
+
+export interface NoticeInput {
+  // done is the success text, for example "Logged banca 80 kg × 9."
+  done: string;
+  // retry says how to try again, for example "Press Done again."
+  retry: string;
+  // idempotent: a retry replays the same key, so it can never record twice.
+  idempotent: boolean;
+  // server: the server answered with an error (nothing was applied).
+  // unknown: no answer came back (the bridge failed), so it may have been applied.
+  failure: "server" | "unknown";
+  detail?: string;
+}
+
+export interface Notice {
+  kind: "ok" | "pending" | "error";
+  text: string;
+}
+
+// writeNotice is what the view says about a write: whether it was saved, and how
+// to retry.
+export function writeNotice(outcome: WriteOutcome, input: NoticeInput): Notice {
+  switch (outcome) {
+    case "accepted":
+      return { kind: "ok", text: input.done };
+    case "pending":
+      return { kind: "pending", text: `${input.done.replace(/\.$/, "")}: waiting for your approval in vibeTraining.` };
+    case "rejected":
+      return { kind: "error", text: "Not saved: this action is set to be refused." };
+    default:
+      if (input.failure === "unknown") {
+        return {
+          kind: "error",
+          text: input.idempotent
+            ? `No answer came back: it may or may not have been saved. ${input.retry} It is the same request, so nothing is recorded twice.`
+            : `No answer came back: it may or may not have been applied. Refresh to check before ${input.retry.charAt(0).toLowerCase()}${input.retry.slice(1)}`,
+        };
+      }
+      return { kind: "error", text: `Not saved: ${(input.detail || "the server refused it").replace(/\.$/, "")}. ${input.retry}` };
+  }
+}
