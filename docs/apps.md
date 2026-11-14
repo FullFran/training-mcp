@@ -10,7 +10,7 @@ without MCP Apps gets that tool's text instead.
 ## How a view reaches the chat
 
 1. The tool lists `_meta.ui.resourceUri`, for example
-   `ui://vibetraining/rest-timer/v2`. It also sends the deprecated flat
+   `ui://vibetraining/rest-timer/v4`. It also sends the deprecated flat
    `_meta["ui/resourceUri"]`, as the official `registerAppTool` does.
 2. A host that supports MCP Apps reads that resource (`resources/read`,
    MIME `text/html;profile=mcp-app`) and renders it in a sandboxed iframe.
@@ -29,7 +29,7 @@ before registering UI-enabled tools" is the one rule this does not meet.
 
 | View | Tool | What it shows |
 |---|---|---|
-| `ui://vibetraining/rest-timer/v2` | `render_rest_timer` | The rest since the last logged set: a countdown while `resting`, time over the target when `ready`, the seconds rested once `stopped`, the next exercise in a `superset`, and nothing running when `none` or `idle`. Below it, the next set (weight and reps prefilled from the last one of that exercise today, editable, with an optional RPE of 7 to 10 and a warm-up box) and the last set (editable). |
+| `ui://vibetraining/rest-timer/v4` | `render_rest_timer` | The rest since the last logged set: a countdown while `resting`, time over the target when `ready`, the seconds rested once `stopped`, the next exercise in a `superset`, and nothing running when `none` or `idle`. Below it, the next set, with a picker to switch to any exercise of today's plan (shown with its progress, such as "Chest press · 2/3"; without a plan, the exercises done today) and a "2/3 sets done" line (weight and reps prefilled from the last set of the chosen exercise today, editable, with an optional RPE of 7 to 10 and a warm-up box) and the last set (editable). |
 
 The view's buttons call the same tools the agent uses, so the person's
 approval mode decides each one, and the view says when a write waits on the
@@ -42,6 +42,30 @@ person's target. After each write the view tells the model what happened
 (`ui/update-model-context`) and re-reads the timer. There is no app-only
 write tool: a tool hidden from the model is hidden by the host, not the
 server, so it would not be a boundary (#125).
+
+A refresh updates the progress counts but never overwrites the exercise or values the person is editing; a logged set resets the card to what the server offers next. Logging still goes through `log_sets` with the chosen exercise: there is no new write tool.
+
+`render_rest_timer` takes one optional argument, `mode`: `compact` shows only the
+countdown (a clock, a completion mark and an accessible label; no set details,
+picker, progress or controls), `full` shows the whole workout view. Without it
+the view is the full one, as before. Asking "ponme solo el crono" should be
+answered with `mode: "compact"`; the tool description says so, but a host may
+still choose its own call. **Show workout** and **Timer only** expand and
+collapse the same view: they change presentation only, never restart the rest,
+write an interval or call the server, and the mode the person picks is kept
+through refreshes and logged sets (logging a set does not switch it). Both modes
+count from the same `rest` state (`since`, `elapsed_seconds`, `target_seconds`)
+plus the time measured on the device, so a refresh in either shows the real
+remaining seconds.
+
+Done is safe to press twice. Before it logs, the view re-reads the session: if a
+set was logged elsewhere (the phone app, the chat) since the card was filled,
+nothing is logged and the card updates so the person looks again. While a set
+waits for approval the view does not send it again, and the server also points
+a repeated `log_sets` (same `idempotency_key` and sets) at the proposal already
+waiting instead of queueing a second one. A retry after a lost answer replays
+the same key. Errors say what happened: "Not saved" with the server's reason and
+how to retry, or "may or may not have been saved" when no answer came back.
 
 The rest timer counts locally from the server's `rest.elapsed_seconds` plus
 the time measured on the device since the result arrived. It never compares

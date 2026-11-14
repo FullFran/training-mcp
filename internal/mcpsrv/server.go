@@ -62,6 +62,10 @@ type LogSetsInput struct {
 	Exercise       string           `json:"exercise" jsonschema:"Non-empty exercise name; it is trimmed and lowercased before storage."`
 	Sets           []LoggedSetInput `json:"sets" jsonschema:"The sets in the order performed; 1 through 20. Each one may have its own weight, reps and RPE."`
 }
+
+// idempotencyKeyed marks a call whose repeat is the same request.
+func (in LogSetsInput) idempotencyKeyed() bool { return in.IdempotencyKey != "" }
+
 type LogSetsOut struct {
 	Session  training.Session `json:"session"`
 	Sets     []training.Set   `json:"sets"`

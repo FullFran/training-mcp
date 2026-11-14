@@ -23,7 +23,7 @@ import (
 
 const (
 	appMIMEType  = "text/html;profile=mcp-app"
-	restTimerURI = "ui://vibetraining/rest-timer/v2"
+	restTimerURI = "ui://vibetraining/rest-timer/v4"
 )
 
 //go:embed apps/rest-timer.html
@@ -45,6 +45,18 @@ type RestTimerSet struct {
 	Reps     int     `json:"reps"`
 }
 
+// The two presentations of the rest-timer view. Both read the same rest state;
+// the person can expand or collapse the view without asking again.
+const (
+	RestTimerCompact = "compact"
+	RestTimerFull    = "full"
+)
+
+// RestTimerIn is render_rest_timer's one optional argument.
+type RestTimerIn struct {
+	Mode string `json:"mode,omitempty" jsonschema:"How the view starts: 'compact' shows only the countdown, for when the person asks just for the timer (e.g. 'ponme solo el crono'); 'full' shows the last set, the next set and the progress. Omit it for 'full'. The person can expand or collapse the view either way."`
+}
+
 // RestTimerOut is what the rest-timer view starts from. The view counts down
 // locally from Rest.ElapsedSeconds; the server's clock stays the truth.
 type RestTimerOut struct {
@@ -56,6 +68,81 @@ type RestTimerOut struct {
 	NextSuperset     bool           `json:"next_superset,omitempty"`
 	NextSet          *RestTimerNext `json:"next_set,omitempty"`
 	WeightUnit       string         `json:"weight_unit"`
+	// Mode is how the view starts: compact or full (the default).
+	Mode string `json:"mode"`
+	// Exercises is what the next-set picker offers: today's plan with its
+	// progress, then the other exercises done today.
+	Exercises []RestTimerExercise `json:"exercises,omitempty"`
+}
+
+// RestTimerExercise is one exercise of today the person can switch the next set
+// to: its progress and the last weight and reps today, which the card refills
+// from. A planned exercise with nothing done yet starts from the top of its rep
+// range and no weight.
+type RestTimerExercise struct {
+	Exercise   string  `json:"exercise"`
+	WeightKG   float64 `json:"weight_kg,omitempty"`
+	Reps       int     `json:"reps,omitempty"`
+	DoneSets   int     `json:"done_sets"`
+	TargetSets int     `json:"target_sets,omitempty"`
+	Planned    bool    `json:"planned,omitempty"`
+}
+
+// restTimerExercises lists today's plan items (skipped ones left out) in plan
+// order, then the other exercises done today: the one just done first, the rest
+// in the order they were first done. Without a plan only the second part exists.
+func restTimerExercises(live training.LiveWorkout) []RestTimerExercise {
+	var sets []training.Set
+	if live.Session != nil {
+		sets = live.Session.Sets
+	}
+	lastToday := func(name string) (training.Set, bool) {
+		var found training.Set
+		var ok bool
+		for _, set := range sets {
+			if set.Exercise == name {
+				found, ok = set, true
+			}
+		}
+		return found, ok
+	}
+	var out []RestTimerExercise
+	listed := map[string]bool{}
+	for _, p := range live.Progress {
+		if p.Skipped {
+			continue
+		}
+		item := RestTimerExercise{Exercise: p.Exercise, Reps: p.RepMax, DoneSets: p.DoneSets, TargetSets: p.TargetSets, Planned: true}
+		if set, ok := lastToday(p.Exercise); ok {
+			item.WeightKG, item.Reps = set.WeightKG, set.Reps
+		}
+		listed[p.Exercise] = true
+		out = append(out, item)
+	}
+	var names []string
+	if live.LastSet != nil {
+		names = append(names, live.LastSet.Set.Exercise)
+	}
+	for _, set := range sets {
+		names = append(names, set.Exercise)
+	}
+	for _, name := range names {
+		if listed[name] {
+			continue
+		}
+		item := RestTimerExercise{Exercise: name}
+		for _, set := range sets {
+			if set.Exercise == name && set.Category != training.SetWarmup {
+				item.DoneSets++
+			}
+		}
+		if set, ok := lastToday(name); ok {
+			item.WeightKG, item.Reps = set.WeightKG, set.Reps
+		}
+		listed[name] = true
+		out = append(out, item)
+	}
+	return out
 }
 
 // RestTimerNext is the set the view offers to log next, which the person can
@@ -106,6 +193,7 @@ func restTimerOut(live training.LiveWorkout) RestTimerOut {
 		out.NextSuperset = live.Rest.State == training.RestSuperset
 	}
 	out.NextSet = restTimerNext(live)
+	out.Exercises = restTimerExercises(live)
 	return out
 }
 
@@ -163,16 +251,23 @@ func addApps(s *mcp.Server, service training.ServiceFor) {
 		return &mcp.ReadResourceResult{Contents: []*mcp.ResourceContents{{URI: restTimerURI, MIMEType: appMIMEType, Text: restTimerHTML}}}, nil
 	})
 
+	restTimerSchema := mustInputSchema[RestTimerIn]()
+	restTimerSchema.Properties["mode"].Enum = []any{RestTimerCompact, RestTimerFull}
 	addTool(s, &mcp.Tool{
 		Name:        "render_rest_timer",
-		Description: "Show the person's rest countdown since their last logged set, as an interactive timer in chats that support MCP Apps and as text elsewhere. Call it right after logging sets during a workout. It reads only; it records nothing and needs no arguments.",
+		Description: "Show the person's rest countdown since their last logged set, as an interactive timer in chats that support MCP Apps and as text elsewhere. Call it right after logging sets during a workout. The structured result also lists today's exercises with their progress, so the view can switch the next set to another one. Pass mode \"compact\" when the person asks only for the countdown (for example \"just the timer\", \"ponme solo el crono\"): the view then shows nothing but the clock, and the person can expand it. Leave mode out for the full workout view with the last set, the next set and the progress. It reads only; it records nothing.",
 		Meta:        appToolMeta(restTimerURI),
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, RestTimerOut, error) {
+		InputSchema: restTimerSchema,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in RestTimerIn) (*mcp.CallToolResult, RestTimerOut, error) {
 		live, err := service(ctx).LiveWorkout(ctx)
 		if err != nil {
 			return nil, RestTimerOut{}, toolError(err)
 		}
 		out := restTimerOut(live)
+		out.Mode = in.Mode
+		if out.Mode == "" {
+			out.Mode = RestTimerFull
+		}
 		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: restTimerText(out)}}}, out, nil
 	})
 }

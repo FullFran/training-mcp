@@ -31,11 +31,11 @@ func TestRenderRestTimerDeclaresItsView(t *testing.T) {
 		t.Fatal("render_rest_timer is not listed")
 	}
 	meta, _ := json.Marshal(tool.Meta)
-	if string(meta) != `{"ui":{"resourceUri":"ui://vibetraining/rest-timer/v2"},"ui/resourceUri":"ui://vibetraining/rest-timer/v2"}` {
+	if string(meta) != `{"ui":{"resourceUri":"ui://vibetraining/rest-timer/v4"},"ui/resourceUri":"ui://vibetraining/rest-timer/v4"}` {
 		t.Fatalf("_meta = %s", meta)
 	}
-	if props := tool.InputSchema.(map[string]any)["properties"]; props != nil && len(props.(map[string]any)) != 0 {
-		t.Fatalf("render_rest_timer takes arguments (a user id would be a hole): %v", props)
+	if props, _ := tool.InputSchema.(map[string]any)["properties"].(map[string]any); len(props) != 1 || props["mode"] == nil {
+		t.Fatalf("render_rest_timer takes more than the optional mode (a user id would be a hole): %v", props)
 	}
 }
 

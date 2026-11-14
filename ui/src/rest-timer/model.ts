@@ -44,7 +44,22 @@ export interface RestTimerData {
   next_superset?: boolean;
   last_set?: LastSet;
   next_set?: NextSet;
+  exercises?: ExerciseToday[];
   weight_unit?: string;
+  // How the tool asked the view to start (compact or full). Absent in results
+  // from before modes: the full view.
+  mode?: string;
+}
+
+// One exercise of today the next set can switch to (internal/mcpsrv,
+// RestTimerExercise): its progress and its last weight and reps today.
+export interface ExerciseToday {
+  exercise: string;
+  weight_kg?: number;
+  reps?: number;
+  done_sets?: number;
+  target_sets?: number;
+  planned?: boolean;
 }
 
 export interface TimerView {
@@ -172,4 +187,202 @@ export function setPayload(input: SetInput): Record<string, unknown> {
   if (input.warmup) set.category = "warmup";
   if (input.rpe !== undefined) set.rpe = input.rpe;
   return set;
+}
+
+// LogAttempt is one set the person asked to log: its idempotency key, the body
+// the key belongs to, and whether the server holds it waiting for approval.
+export interface LogAttempt {
+  key: string;
+  body: string;
+  pending: boolean;
+}
+
+// newKey mints an idempotency key. crypto.randomUUID only exists in secure
+// contexts, and a view is not always served from one, so without it the key is
+// 128 random bits as hex.
+export function newKey(c: Crypto = globalThis.crypto): string {
+  if (typeof c.randomUUID === "function") return c.randomUUID();
+  const bytes = c.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// attemptFor is the attempt for this body. The same body keeps its key (and its
+// pending flag), so a retry replays and never doubles; other values are a new
+// set with a new key.
+export function attemptFor(prev: LogAttempt | undefined, body: string, mintKey: () => string): LogAttempt {
+  if (prev && prev.body === body) return prev;
+  return { key: mintKey(), body, pending: false };
+}
+
+// canSend is false while the attempt waits for approval: pressing Done again
+// would queue a second proposal for the same set.
+export function canSend(attempt: LogAttempt): boolean {
+  return !attempt.pending;
+}
+
+// afterWrite is the attempt once the server answered. Accepted and rejected end
+// it; pending keeps it, marked as waiting; an error keeps it as it was, so the
+// retry replays the same key.
+export function afterWrite(attempt: LogAttempt, outcome: WriteOutcome): LogAttempt | undefined {
+  switch (outcome) {
+    case "accepted":
+    case "rejected":
+      return undefined;
+    case "pending":
+      return { ...attempt, pending: true };
+    default:
+      return attempt;
+  }
+}
+
+// isStale says the card was filled for another last set than the server holds
+// now: a set was logged (or removed) somewhere else, for example in the PWA.
+export function isStale(baselineLastSetId: number | undefined, fresh: RestTimerData): boolean {
+  return (fresh.last_set?.id) !== baselineLastSetId;
+}
+
+export interface NoticeInput {
+  // done is the success text, for example "Logged banca 80 kg × 9."
+  done: string;
+  // retry says how to try again, for example "Press Done again."
+  retry: string;
+  // idempotent: a retry replays the same key, so it can never record twice.
+  idempotent: boolean;
+  // server: the server answered with an error (nothing was applied).
+  // unknown: no answer came back (the bridge failed), so it may have been applied.
+  failure: "server" | "unknown";
+  detail?: string;
+}
+
+export interface Notice {
+  kind: "ok" | "pending" | "error";
+  text: string;
+}
+
+// writeNotice is what the view says about a write: whether it was saved, and how
+// to retry.
+export function writeNotice(outcome: WriteOutcome, input: NoticeInput): Notice {
+  switch (outcome) {
+    case "accepted":
+      return { kind: "ok", text: input.done };
+    case "pending":
+      return { kind: "pending", text: `${input.done.replace(/\.$/, "")}: waiting for your approval in vibeTraining.` };
+    case "rejected":
+      return { kind: "error", text: "Not saved: this action is set to be refused." };
+    default:
+      if (input.failure === "unknown") {
+        return {
+          kind: "error",
+          text: input.idempotent
+            ? `No answer came back: it may or may not have been saved. ${input.retry} It is the same request, so nothing is recorded twice.`
+            : `No answer came back: it may or may not have been applied. Refresh to check before ${input.retry.charAt(0).toLowerCase()}${input.retry.slice(1)}`,
+        };
+      }
+      return { kind: "error", text: `Not saved: ${(input.detail || "the server refused it").replace(/\.$/, "")}. ${input.retry}` };
+  }
+}
+
+// title capitalizes an exercise name for display; the server stores it lowercased.
+export function title(name: string): string {
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+// progressText is the compact progress line of a card: "2/3 sets done".
+export function progressText(card: { exercise?: string; done_sets?: number; target_sets?: number }): string {
+  const done = card.done_sets ?? 0;
+  if (card.target_sets) return `${done}/${card.target_sets} sets done`;
+  if (done === 0) return "No sets done yet";
+  return `${done} ${done === 1 ? "set" : "sets"} done`;
+}
+
+export interface PickerOption {
+  exercise: string;
+  label: string;
+}
+
+function optionLabel(item: { exercise: string; done_sets?: number; target_sets?: number }): string {
+  const done = item.done_sets ?? 0;
+  const progress = item.target_sets ? `${done}/${item.target_sets}` : `${done} ${done === 1 ? "set" : "sets"} done`;
+  return `${title(item.exercise)} · ${progress}`;
+}
+
+// pickerOptions are the exercises the next set can switch to: today's plan
+// items first (with progress), then what was done today. The exercise the card
+// offers is always among them, even when the server listed none.
+export function pickerOptions(data: RestTimerData): PickerOption[] {
+  const items: { exercise: string; done_sets?: number; target_sets?: number }[] = [...(data.exercises ?? [])];
+  const next = data.next_set;
+  if (next && !items.some((i) => i.exercise === next.exercise)) items.unshift(next);
+  return items.map((i) => ({ exercise: i.exercise, label: optionLabel(i) }));
+}
+
+// cardFor is the set the card offers: the picked exercise with its own last
+// weight and reps today and its own progress, or the server's next set when
+// nothing (or something that is no longer listed) is picked.
+export function cardFor(data: RestTimerData, picked?: string): NextSet | undefined {
+  if (picked === undefined || picked === data.next_set?.exercise) return data.next_set;
+  const item = data.exercises?.find((e) => e.exercise === picked);
+  if (!item) return data.next_set;
+  return { exercise: item.exercise, weight_kg: item.weight_kg, reps: item.reps, done_sets: item.done_sets, target_sets: item.target_sets };
+}
+
+// Card is what the next-set card remembers about how it was filled.
+export interface Card {
+  fillKey: string;
+  // The person picked an exercise or typed a value since it was filled.
+  dirty: boolean;
+}
+
+// fillKeyOf identifies what the server offered: another one means the set to
+// offer changed (a set was logged here or elsewhere).
+export function fillKeyOf(data: RestTimerData): string {
+  const next = data.next_set;
+  return `${next?.exercise ?? ""}|${next?.done_sets ?? 0}|${data.last_set?.id ?? 0}`;
+}
+
+// shouldRefill says whether a new snapshot refills the card's inputs. It never
+// does while the person has edited the card: a refresh only updates progress.
+export function shouldRefill(card: Card | undefined, data: RestTimerData): boolean {
+  if (!card) return true;
+  if (card.dirty) return false;
+  return card.fillKey !== fillKeyOf(data);
+}
+
+// ViewMode is how much of the workout the view shows: compact is the countdown
+// alone, full adds the next set, the picker and the last set. Both read the same
+// snapshot, so switching never restarts or writes anything.
+export type ViewMode = "compact" | "full";
+
+// resolveMode is the mode to show: the one the person selected on this screen if
+// any, else the one the tool asked for, else full (a result without a mode, from
+// before modes, is the full view).
+export function resolveMode(requested: string | undefined, chosen: ViewMode | undefined): ViewMode {
+  if (chosen) return chosen;
+  return requested === "compact" ? "compact" : "full";
+}
+
+export function nextMode(mode: ViewMode): ViewMode {
+  return mode === "compact" ? "full" : "compact";
+}
+
+// modeToggleLabel names what the toggle does from the current mode.
+export function modeToggleLabel(mode: ViewMode): string {
+  return mode === "compact" ? "Show workout" : "Timer only";
+}
+
+// timerLabel is the spoken label of the timer. It is the accessible name of the
+// clock, which is not a live region, so the changing seconds are never announced.
+export function timerLabel(view: TimerView, data: RestTimerData): string {
+  switch (view.state) {
+    case "resting":
+      return `Rest timer: ${clock(view.remainingSeconds)} left of ${clock(view.targetSeconds)}`;
+    case "ready":
+      return `Rest done: ${clock(view.overBySeconds)} over the ${clock(view.targetSeconds)} target`;
+    case "stopped":
+      return `Rest stopped after ${clock(view.elapsedSeconds)}`;
+    case "none":
+      return `${headline(view, data)}. Rest target ${clock(view.targetSeconds)}`;
+    default:
+      return headline(view, data);
+  }
 }
