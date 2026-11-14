@@ -285,7 +285,8 @@ shared with the MCP tools and cannot drift apart.
   stored it (so a reload resumes it) and shows the exercise planned next. Its
   ±30 s buttons change the rest target the agent also reads (`live_workout`).
   In ChatGPT, Claude and other chats that support MCP Apps, `render_rest_timer`
-  shows the same rest as an interactive countdown in the conversation
+  shows the same rest as an interactive countdown in the conversation, or as the
+  countdown alone with `mode: "compact"`
   ([MCP Apps](docs/apps.md)).
 - Every in-session change the MCP offers is on the workout screen: add an
   exercise to today's plan, change its sets, rep range or RPE, skip, swap or

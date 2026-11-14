@@ -1,5 +1,5 @@
 // The rest-timer view, rendered by an MCP Apps host for render_rest_timer
-// (ui://vibetraining/rest-timer/v3). It talks to the host only through the
+// (ui://vibetraining/rest-timer/v4). It talks to the host only through the
 // official ext-apps App bridge: the tool result arrives as a notification, and
 // every action calls a server tool through the host, which runs it as the
 // signed-in person. The view holds no credentials and calls no URL.
@@ -24,14 +24,18 @@ import {
   fillKeyOf,
   headline,
   isStale,
+  modeToggleLabel,
   newKey,
+  nextMode,
   parseTimerData,
   pickerOptions,
   progressText,
   project,
+  resolveMode,
   RPE_CHOICES,
   setPayload,
   shouldRefill,
+  timerLabel,
   title,
   toKg,
   toUnit,
@@ -43,6 +47,7 @@ import {
   type NextSet,
   type RestTimerData,
   type TimerView,
+  type ViewMode,
   type WriteOutcome,
 } from "./model.ts";
 
@@ -77,6 +82,7 @@ const el = {
   editCancel: $<HTMLButtonElement>("edit-cancel"),
   notice: $("notice"),
   refresh: $<HTMLButtonElement>("refresh"),
+  mode: $<HTMLButtonElement>("mode"),
 };
 
 let data: RestTimerData | undefined;
@@ -97,6 +103,9 @@ let attempt: LogAttempt | undefined;
 // a set was logged elsewhere (the PWA, the chat) since.
 let baselineLastId: number | undefined;
 let logging = false;
+// The mode the person selected with the toggle on this screen. It outlives
+// refreshes and later results, which only carry the mode the tool asked for.
+let chosenMode: ViewMode | undefined;
 
 function unit(): string {
   return data?.weight_unit === "lb" ? "lb" : "kg";
@@ -115,6 +124,7 @@ function draw(): void {
   document.body.dataset.state = v.state;
   const running = v.state === "resting" || v.state === "ready";
   el.clock.textContent = clockText(v);
+  el.clock.setAttribute("aria-label", timerLabel(v, data));
   el.sub.textContent = subText(v);
   const progress = running ? Math.min(1, v.elapsedSeconds / v.targetSeconds) : v.state === "stopped" ? 1 : 0;
   el.arc.style.strokeDashoffset = String(RING * (1 - progress));
@@ -124,6 +134,15 @@ function draw(): void {
     clearInterval(tick);
     tick = undefined;
   }
+}
+
+// drawMode shows the compact (countdown only) or the full view. It changes
+// presentation only: the countdown keeps running and nothing is sent.
+function drawMode(): void {
+  const mode = resolveMode(data?.mode, chosenMode);
+  document.body.dataset.mode = mode;
+  el.mode.textContent = modeToggleLabel(mode);
+  el.mode.setAttribute("aria-expanded", String(mode === "full"));
 }
 
 function clockText(v: TimerView): string {
@@ -224,6 +243,7 @@ function accept(structured: unknown): void {
   if (parsed.rest.since !== data?.rest.since || parsed.rest.state === "stopped") extra = 0;
   data = parsed;
   receivedAt = performance.now();
+  drawMode();
   draw();
   drawSets();
 }
@@ -482,6 +502,11 @@ el.editForm.addEventListener("submit", (event) => {
       if (outcome !== "error") closeEdit();
     },
   );
+});
+
+el.mode.addEventListener("click", () => {
+  chosenMode = nextMode(resolveMode(data?.mode, chosenMode));
+  drawMode();
 });
 
 el.refresh.addEventListener("click", () => void refresh());

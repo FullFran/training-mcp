@@ -103,9 +103,18 @@ button.link:hover:not(:disabled) { background: none; text-decoration: underline;
 #notice[data-kind="ok"] { --tone-n: var(--done); }
 #notice[data-kind="pending"] { --tone-n: var(--warn); }
 #notice[data-kind="error"] { --tone-n: var(--bad); }
-footer { display: flex; justify-content: center; }
+footer { display: flex; justify-content: center; gap: 8px; }
 
-@media (max-width: 340px) { .ring { width: 160px; height: 160px; } #clock { font-size: 40px; } }
+/* Compact: the countdown alone. The workout details come back on expand. */
+body[data-mode="compact"] #next, body[data-mode="compact"] #last, body[data-mode="compact"] #controls,
+body[data-mode="compact"] #notice { display: none; }
+body[data-mode="compact"] .ring { width: 220px; height: 220px; }
+body[data-mode="compact"] #clock { font-size: 54px; }
+body[data-mode="compact"][data-state="none"] #clock, body[data-mode="compact"][data-state="idle"] #clock,
+body[data-mode="compact"][data-state="superset"] #clock { font-size: 40px; }
+body[data-state="ready"] #status::before { content: "\2713\00a0"; }
+
+@media (max-width: 340px) { .ring, body[data-mode="compact"] .ring { width: 160px; height: 160px; } #clock, body[data-mode="compact"] #clock { font-size: 40px; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 </head>
@@ -164,7 +173,10 @@ footer { display: flex; justify-content: center; }
   </section>
 
   <p id="notice" role="status" aria-live="polite" hidden></p>
-  <footer><button id="refresh" class="link" type="button">Refresh</button></footer>
+  <footer>
+    <button id="mode" class="link" type="button" aria-expanded="true" aria-controls="next last">Timer only</button>
+    <button id="refresh" class="link" type="button">Refresh</button>
+  </footer>
 </main>
 <!--SCRIPT-->
 </body>

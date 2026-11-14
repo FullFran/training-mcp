@@ -46,6 +46,9 @@ export interface RestTimerData {
   next_set?: NextSet;
   exercises?: ExerciseToday[];
   weight_unit?: string;
+  // How the tool asked the view to start (compact or full). Absent in results
+  // from before modes: the full view.
+  mode?: string;
 }
 
 // One exercise of today the next set can switch to (internal/mcpsrv,
@@ -343,4 +346,43 @@ export function shouldRefill(card: Card | undefined, data: RestTimerData): boole
   if (!card) return true;
   if (card.dirty) return false;
   return card.fillKey !== fillKeyOf(data);
+}
+
+// ViewMode is how much of the workout the view shows: compact is the countdown
+// alone, full adds the next set, the picker and the last set. Both read the same
+// snapshot, so switching never restarts or writes anything.
+export type ViewMode = "compact" | "full";
+
+// resolveMode is the mode to show: the one the person selected on this screen if
+// any, else the one the tool asked for, else full (a result without a mode, from
+// before modes, is the full view).
+export function resolveMode(requested: string | undefined, chosen: ViewMode | undefined): ViewMode {
+  if (chosen) return chosen;
+  return requested === "compact" ? "compact" : "full";
+}
+
+export function nextMode(mode: ViewMode): ViewMode {
+  return mode === "compact" ? "full" : "compact";
+}
+
+// modeToggleLabel names what the toggle does from the current mode.
+export function modeToggleLabel(mode: ViewMode): string {
+  return mode === "compact" ? "Show workout" : "Timer only";
+}
+
+// timerLabel is the spoken label of the timer. It is the accessible name of the
+// clock, which is not a live region, so the changing seconds are never announced.
+export function timerLabel(view: TimerView, data: RestTimerData): string {
+  switch (view.state) {
+    case "resting":
+      return `Rest timer: ${clock(view.remainingSeconds)} left of ${clock(view.targetSeconds)}`;
+    case "ready":
+      return `Rest done: ${clock(view.overBySeconds)} over the ${clock(view.targetSeconds)} target`;
+    case "stopped":
+      return `Rest stopped after ${clock(view.elapsedSeconds)}`;
+    case "none":
+      return `${headline(view, data)}. Rest target ${clock(view.targetSeconds)}`;
+    default:
+      return headline(view, data);
+  }
 }

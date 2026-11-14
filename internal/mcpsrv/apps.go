@@ -23,7 +23,7 @@ import (
 
 const (
 	appMIMEType  = "text/html;profile=mcp-app"
-	restTimerURI = "ui://vibetraining/rest-timer/v3"
+	restTimerURI = "ui://vibetraining/rest-timer/v4"
 )
 
 //go:embed apps/rest-timer.html
@@ -45,6 +45,18 @@ type RestTimerSet struct {
 	Reps     int     `json:"reps"`
 }
 
+// The two presentations of the rest-timer view. Both read the same rest state;
+// the person can expand or collapse the view without asking again.
+const (
+	RestTimerCompact = "compact"
+	RestTimerFull    = "full"
+)
+
+// RestTimerIn is render_rest_timer's one optional argument.
+type RestTimerIn struct {
+	Mode string `json:"mode,omitempty" jsonschema:"How the view starts: 'compact' shows only the countdown, for when the person asks just for the timer (e.g. 'ponme solo el crono'); 'full' shows the last set, the next set and the progress. Omit it for 'full'. The person can expand or collapse the view either way."`
+}
+
 // RestTimerOut is what the rest-timer view starts from. The view counts down
 // locally from Rest.ElapsedSeconds; the server's clock stays the truth.
 type RestTimerOut struct {
@@ -56,6 +68,8 @@ type RestTimerOut struct {
 	NextSuperset     bool           `json:"next_superset,omitempty"`
 	NextSet          *RestTimerNext `json:"next_set,omitempty"`
 	WeightUnit       string         `json:"weight_unit"`
+	// Mode is how the view starts: compact or full (the default).
+	Mode string `json:"mode"`
 	// Exercises is what the next-set picker offers: today's plan with its
 	// progress, then the other exercises done today.
 	Exercises []RestTimerExercise `json:"exercises,omitempty"`
@@ -237,16 +251,23 @@ func addApps(s *mcp.Server, service training.ServiceFor) {
 		return &mcp.ReadResourceResult{Contents: []*mcp.ResourceContents{{URI: restTimerURI, MIMEType: appMIMEType, Text: restTimerHTML}}}, nil
 	})
 
+	restTimerSchema := mustInputSchema[RestTimerIn]()
+	restTimerSchema.Properties["mode"].Enum = []any{RestTimerCompact, RestTimerFull}
 	addTool(s, &mcp.Tool{
 		Name:        "render_rest_timer",
-		Description: "Show the person's rest countdown since their last logged set, as an interactive timer in chats that support MCP Apps and as text elsewhere. Call it right after logging sets during a workout. The structured result also lists today's exercises with their progress, so the view can switch the next set to another one. It reads only; it records nothing and needs no arguments.",
+		Description: "Show the person's rest countdown since their last logged set, as an interactive timer in chats that support MCP Apps and as text elsewhere. Call it right after logging sets during a workout. The structured result also lists today's exercises with their progress, so the view can switch the next set to another one. Pass mode \"compact\" when the person asks only for the countdown (for example \"just the timer\", \"ponme solo el crono\"): the view then shows nothing but the clock, and the person can expand it. Leave mode out for the full workout view with the last set, the next set and the progress. It reads only; it records nothing.",
 		Meta:        appToolMeta(restTimerURI),
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, RestTimerOut, error) {
+		InputSchema: restTimerSchema,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in RestTimerIn) (*mcp.CallToolResult, RestTimerOut, error) {
 		live, err := service(ctx).LiveWorkout(ctx)
 		if err != nil {
 			return nil, RestTimerOut{}, toolError(err)
 		}
 		out := restTimerOut(live)
+		out.Mode = in.Mode
+		if out.Mode == "" {
+			out.Mode = RestTimerFull
+		}
 		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: restTimerText(out)}}}, out, nil
 	})
 }
