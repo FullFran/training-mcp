@@ -60,7 +60,10 @@ button.link:hover:not(:disabled) { background: none; text-decoration: underline;
 .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .pill { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; padding: 2px 9px; border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
-#next-name { margin: -6px 0 0; font-size: 20px; font-weight: 700; text-transform: capitalize; }
+#next-name { margin: -6px 0 0; font-size: 20px; font-weight: 700; }
+.pick { width: 100%; min-height: 44px; margin: -6px 0 0; padding: 0 36px 0 12px; font: 700 17px var(--font); color: inherit; cursor: pointer;
+  background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23888' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); -webkit-appearance: none; appearance: none; text-overflow: ellipsis; }
 .steppers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .stepper { display: grid; grid-template-columns: 36px 1fr 36px; align-items: center; background: var(--bg);
   border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 4px; }
@@ -127,8 +130,9 @@ footer { display: flex; justify-content: center; }
   </section>
 
   <section class="card" id="next" hidden aria-labelledby="next-name">
-    <header><span class="eyebrow">Next set</span><span class="pill" id="next-count" hidden></span></header>
+    <header><span class="eyebrow">Next set</span><span class="pill" id="next-count"></span></header>
     <h2 id="next-name"></h2>
+    <select id="exercise" class="pick" aria-label="Exercise for the next set" hidden></select>
     <div class="steppers">
       <div class="stepper">
         <button type="button" data-field="weight" data-dir="-1" aria-label="Less weight">−</button>

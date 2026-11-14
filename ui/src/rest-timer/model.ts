@@ -44,7 +44,19 @@ export interface RestTimerData {
   next_superset?: boolean;
   last_set?: LastSet;
   next_set?: NextSet;
+  exercises?: ExerciseToday[];
   weight_unit?: string;
+}
+
+// One exercise of today the next set can switch to (internal/mcpsrv,
+// RestTimerExercise): its progress and its last weight and reps today.
+export interface ExerciseToday {
+  exercise: string;
+  weight_kg?: number;
+  reps?: number;
+  done_sets?: number;
+  target_sets?: number;
+  planned?: boolean;
 }
 
 export interface TimerView {
@@ -265,4 +277,70 @@ export function writeNotice(outcome: WriteOutcome, input: NoticeInput): Notice {
       }
       return { kind: "error", text: `Not saved: ${(input.detail || "the server refused it").replace(/\.$/, "")}. ${input.retry}` };
   }
+}
+
+// title capitalizes an exercise name for display; the server stores it lowercased.
+export function title(name: string): string {
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+// progressText is the compact progress line of a card: "2/3 sets done".
+export function progressText(card: { exercise?: string; done_sets?: number; target_sets?: number }): string {
+  const done = card.done_sets ?? 0;
+  if (card.target_sets) return `${done}/${card.target_sets} sets done`;
+  if (done === 0) return "No sets done yet";
+  return `${done} ${done === 1 ? "set" : "sets"} done`;
+}
+
+export interface PickerOption {
+  exercise: string;
+  label: string;
+}
+
+function optionLabel(item: { exercise: string; done_sets?: number; target_sets?: number }): string {
+  const done = item.done_sets ?? 0;
+  const progress = item.target_sets ? `${done}/${item.target_sets}` : `${done} ${done === 1 ? "set" : "sets"} done`;
+  return `${title(item.exercise)} · ${progress}`;
+}
+
+// pickerOptions are the exercises the next set can switch to: today's plan
+// items first (with progress), then what was done today. The exercise the card
+// offers is always among them, even when the server listed none.
+export function pickerOptions(data: RestTimerData): PickerOption[] {
+  const items: { exercise: string; done_sets?: number; target_sets?: number }[] = [...(data.exercises ?? [])];
+  const next = data.next_set;
+  if (next && !items.some((i) => i.exercise === next.exercise)) items.unshift(next);
+  return items.map((i) => ({ exercise: i.exercise, label: optionLabel(i) }));
+}
+
+// cardFor is the set the card offers: the picked exercise with its own last
+// weight and reps today and its own progress, or the server's next set when
+// nothing (or something that is no longer listed) is picked.
+export function cardFor(data: RestTimerData, picked?: string): NextSet | undefined {
+  if (picked === undefined || picked === data.next_set?.exercise) return data.next_set;
+  const item = data.exercises?.find((e) => e.exercise === picked);
+  if (!item) return data.next_set;
+  return { exercise: item.exercise, weight_kg: item.weight_kg, reps: item.reps, done_sets: item.done_sets, target_sets: item.target_sets };
+}
+
+// Card is what the next-set card remembers about how it was filled.
+export interface Card {
+  fillKey: string;
+  // The person picked an exercise or typed a value since it was filled.
+  dirty: boolean;
+}
+
+// fillKeyOf identifies what the server offered: another one means the set to
+// offer changed (a set was logged here or elsewhere).
+export function fillKeyOf(data: RestTimerData): string {
+  const next = data.next_set;
+  return `${next?.exercise ?? ""}|${next?.done_sets ?? 0}|${data.last_set?.id ?? 0}`;
+}
+
+// shouldRefill says whether a new snapshot refills the card's inputs. It never
+// does while the person has edited the card: a refresh only updates progress.
+export function shouldRefill(card: Card | undefined, data: RestTimerData): boolean {
+  if (!card) return true;
+  if (card.dirty) return false;
+  return card.fillKey !== fillKeyOf(data);
 }

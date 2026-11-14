@@ -1,5 +1,5 @@
 // The rest-timer view, rendered by an MCP Apps host for render_rest_timer
-// (ui://vibetraining/rest-timer/v2). It talks to the host only through the
+// (ui://vibetraining/rest-timer/v3). It talks to the host only through the
 // official ext-apps App bridge: the tool result arrives as a notification, and
 // every action calls a server tool through the host, which runs it as the
 // signed-in person. The view holds no credentials and calls no URL.
@@ -19,20 +19,28 @@ import {
   afterWrite,
   attemptFor,
   canSend,
+  cardFor,
   clock,
+  fillKeyOf,
   headline,
   isStale,
   newKey,
   parseTimerData,
+  pickerOptions,
+  progressText,
   project,
   RPE_CHOICES,
   setPayload,
+  shouldRefill,
+  title,
   toKg,
   toUnit,
   weightStep,
   writeNotice,
   writeOutcome,
+  type Card,
   type LogAttempt,
+  type NextSet,
   type RestTimerData,
   type TimerView,
   type WriteOutcome,
@@ -53,6 +61,7 @@ const el = {
   next: $("next"),
   nextName: $("next-name"),
   nextCount: $("next-count"),
+  exercise: $<HTMLSelectElement>("exercise"),
   weight: $<HTMLInputElement>("weight"),
   reps: $<HTMLInputElement>("reps"),
   unit: $("unit"),
@@ -75,9 +84,11 @@ let receivedAt = 0;
 let tick: ReturnType<typeof setInterval> | undefined;
 // Seconds +30 s added to this rest, on this screen only.
 let extra = 0;
-// The next set the inputs were filled from, so a refresh never overwrites
-// what the person is typing for the same set.
-let filledFor = "";
+// How the next-set card was filled, and the exercise the person picked there
+// (undefined: it follows the server's next set). Once the person edits the card,
+// a refresh updates the progress only and never overwrites it.
+let card: Card | undefined;
+let picked: string | undefined;
 // The set being logged: one key per set, so a retry after a lost answer replays
 // and never doubles. It is only reused for the same body: other values are a new
 // set. While it waits for approval, Done does not send it again.
@@ -145,34 +156,61 @@ function subText(v: TimerView): string {
   }
 }
 
-function title(name: string): string {
-  return name.charAt(0).toUpperCase() + name.slice(1);
-}
-
 function weightText(kg: number): string {
   return `${toUnit(kg, unit())} ${unit()}`;
+}
+
+// offered is the set the card shows: the picked exercise, or the server's next.
+function offered(): NextSet | undefined {
+  return data && cardFor(data, picked);
+}
+
+function fillInputs(set: NextSet): void {
+  el.weight.value = set.weight_kg ? String(toUnit(set.weight_kg, unit())) : "";
+  el.reps.value = set.reps ? String(set.reps) : "";
+  el.warmup.checked = false;
+  setRPE(undefined);
+}
+
+// markDirty records that the person changed the card, so a refresh leaves it be.
+function markDirty(): void {
+  if (card) card.dirty = true;
 }
 
 function drawSets(): void {
   if (!data) return;
   el.unit.textContent = unit();
-  const next = data.next_set;
-  el.next.hidden = !next;
-  if (next) {
-    el.nextName.textContent = next.exercise;
-    const count = next.target_sets ? `${Math.min((next.done_sets ?? 0) + 1, next.target_sets)} / ${next.target_sets}` : "";
-    el.nextCount.hidden = !count;
-    el.nextCount.textContent = count ? `Set ${count}` : "";
-    const key = `${next.exercise}|${next.done_sets ?? 0}|${data.last_set?.id ?? 0}`;
-    if (key !== filledFor) {
-      filledFor = key;
-      baselineLastId = data.last_set?.id;
-      el.weight.value = next.weight_kg ? String(toUnit(next.weight_kg, unit())) : "";
-      el.reps.value = next.reps ? String(next.reps) : "";
-      el.warmup.checked = false;
-      setRPE(undefined);
-      attempt = undefined;
+  const options = pickerOptions(data);
+  if (shouldRefill(card, data) || (picked !== undefined && !options.some((o) => o.exercise === picked))) {
+    picked = undefined;
+    card = { fillKey: fillKeyOf(data), dirty: false };
+    baselineLastId = data.last_set?.id;
+    attempt = undefined;
+    const first = cardFor(data);
+    if (first) fillInputs(first);
+  }
+  const set = cardFor(data, picked);
+  el.next.hidden = !set;
+  if (set) {
+    // One exercise: its name. Several: a picker with each one's progress.
+    const several = options.length > 1;
+    el.nextName.hidden = several;
+    el.exercise.hidden = !several;
+    el.nextName.textContent = title(set.exercise);
+    const signature = options.map((o) => `${o.exercise}\u0000${o.label}`).join("\u0001");
+    if (el.exercise.dataset.signature !== signature) {
+      el.exercise.dataset.signature = signature;
+      el.exercise.replaceChildren(
+        ...options.map((o) => {
+          const option = document.createElement("option");
+          option.value = o.exercise;
+          option.textContent = o.label;
+          return option;
+        }),
+      );
     }
+    el.exercise.value = set.exercise;
+    el.nextCount.textContent = progressText(set);
   }
   const last = data.last_set;
   el.last.hidden = !last;
@@ -231,6 +269,8 @@ interface WriteOptions {
   retry: string;
   // The retry replays one idempotency key, so it cannot record twice.
   idempotent: boolean;
+  // Runs when the write was applied, before the view reads the server again.
+  onApplied?: () => void;
 }
 
 // write calls one write tool and says what happened, including whether it was
@@ -254,7 +294,8 @@ async function write(button: HTMLButtonElement, name: string, args: Record<strin
   } finally {
     button.disabled = false;
   }
-  const notice = writeNotice(outcome, { done, detail, failure, ...options });
+  const notice = writeNotice(outcome, { done, detail, failure, retry: options.retry, idempotent: options.idempotent });
+  if (outcome === "accepted") options.onApplied?.();
   notify(notice.kind, notice.text);
   if (outcome !== "error") {
     void app
@@ -282,7 +323,10 @@ for (const value of [...RPE_CHOICES, undefined]) {
   input.name = "rpe";
   input.value = value === undefined ? "" : String(value);
   input.checked = value === undefined;
-  input.addEventListener("change", () => setRPE(value));
+  input.addEventListener("change", () => {
+    setRPE(value);
+    markDirty();
+  });
   const text = document.createElement("span");
   text.textContent = value === undefined ? "No RPE" : String(value);
   label.append(input, text);
@@ -318,13 +362,26 @@ for (const button of document.querySelectorAll<HTMLButtonElement>(".stepper butt
     const current = readNumber(input) || 0;
     const next = Math.max(weight ? 0 : 1, Math.round((current + step * Number(button.dataset.dir)) * 10) / 10);
     input.value = String(next);
+    markDirty();
   });
 }
+
+el.weight.addEventListener("input", markDirty);
+el.reps.addEventListener("input", markDirty);
+el.warmup.addEventListener("change", markDirty);
+el.exercise.addEventListener("change", () => {
+  if (!data) return;
+  picked = el.exercise.value;
+  const set = cardFor(data, picked);
+  if (set) fillInputs(set);
+  markDirty();
+  drawSets();
+});
 
 el.done.addEventListener("click", () => void logNext());
 
 async function logNext(): Promise<void> {
-  const next = data?.next_set;
+  const next = offered();
   if (!next || logging) return;
   const weight = readNumber(el.weight);
   const reps = readNumber(el.reps);
@@ -356,12 +413,23 @@ async function logNext(): Promise<void> {
       return;
     }
     if (isStale(baseline, fresh)) {
-      notify("pending", "A set was logged elsewhere since this card was filled, so it was updated. Check it and press Done again.");
+      baselineLastId = fresh.last_set?.id;
+      notify(
+        "pending",
+        card?.dirty
+          ? "A set was logged elsewhere since this card was filled. The progress is updated and your choice is kept. Check it and press Done again."
+          : "A set was logged elsewhere since this card was filled, so it was updated. Check it and press Done again.",
+      );
       return;
     }
     const outcome = await write(el.done, "log_sets", { idempotency_key: sent.key, exercise: next.exercise, sets: [set] }, `Logged ${label}.`, {
       retry: "Press Done again.",
       idempotent: true,
+      // The next set starts from what the server offers, not from this one.
+      onApplied: () => {
+        card = undefined;
+        picked = undefined;
+      },
     });
     attempt = afterWrite(sent, outcome);
   } finally {
