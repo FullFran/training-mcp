@@ -30,7 +30,7 @@ func TestRenderRestTimerModeOnlyChangesPresentation(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	service := training.NewService(store.ForUser(1), liveClock)
 	session := mustConnect(t, New(only(service)).Handler())
-	_, sets, err := service.LogSet(context.Background(), "elevaciones laterales", 8, 12, 8, 1, "", "")
+	_, sets, err := service.LogSet(context.Background(), "elevaciones laterales", 8, 12, 8, 1, "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

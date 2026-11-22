@@ -272,7 +272,7 @@ func insertSet(ctx context.Context, tx *sql.Tx, userID int64, in training.AddSet
 		category = training.SetWorking
 	}
 	si := training.SetSI(in.RPE, category)
-	res, err := tx.ExecContext(ctx, `INSERT INTO sets(session_id,position,exercise,weight_kg,reps,rpe,rpe_imputed,si,technique,superset,category,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`, in.SessionID, pos, in.Exercise, in.WeightKG, in.Reps, in.RPE, in.RPEImputed, si, in.Technique, in.Superset, category)
+	res, err := tx.ExecContext(ctx, `INSERT INTO sets(session_id,position,exercise,weight_kg,reps,rpe,rpe_imputed,si,technique,superset,category,equipment,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,NULLIF(?,''),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`, in.SessionID, pos, in.Exercise, in.WeightKG, in.Reps, in.RPE, in.RPEImputed, si, in.Technique, in.Superset, category, in.Equipment)
 	if err != nil {
 		return training.Set{}, 0, err
 	}
@@ -285,7 +285,7 @@ func insertSet(ctx context.Context, tx *sql.Tx, userID int64, in training.AddSet
 		return training.Set{}, 0, err
 	}
 	total = training.NormalizeSI(total)
-	return training.Set{ID: id, SessionID: in.SessionID, Position: pos, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, RPEImputed: in.RPEImputed, SI: si, Technique: in.Technique, Superset: in.Superset, Category: category}, total, nil
+	return training.Set{ID: id, SessionID: in.SessionID, Position: pos, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, RPEImputed: in.RPEImputed, SI: si, Technique: in.Technique, Superset: in.Superset, Category: category, Equipment: in.Equipment}, total, nil
 }
 
 // LogSets records a batch of sets into the given date's session, creating it if
@@ -349,7 +349,7 @@ func (s *userStore) LogSets(ctx context.Context, in training.LogSetsRecord) (tra
 	for _, set := range in.Sets {
 		stored, total, err := insertSet(ctx, tx, s.userID, training.AddSetInput{
 			SessionID: out.Session.ID, Exercise: in.Exercise, WeightKG: set.WeightKG,
-			Reps: set.Reps, RPE: set.RPE, RPEImputed: set.RPEImputed, Technique: set.Technique, Superset: superset, Category: set.Category,
+			Reps: set.Reps, RPE: set.RPE, RPEImputed: set.RPEImputed, Technique: set.Technique, Superset: superset, Category: set.Category, Equipment: set.Equipment,
 		})
 		if err != nil {
 			return training.LogSetsResult{}, err
@@ -385,7 +385,7 @@ func (s *userStore) UpdateSet(ctx context.Context, id int64, p training.SetPatch
 	}
 	defer tx.Rollback()
 	var set training.Set
-	err = tx.QueryRowContext(ctx, `SELECT st.id,st.session_id,st.position,st.exercise,st.weight_kg,st.reps,st.rpe,st.rpe_imputed,st.si,st.technique,st.superset,st.category FROM sets st JOIN sessions se ON se.id=st.session_id WHERE st.id=? AND se.user_id=?`, id, s.userID).Scan(&set.ID, &set.SessionID, &set.Position, &set.Exercise, &set.WeightKG, &set.Reps, &set.RPE, &set.RPEImputed, &set.SI, &set.Technique, &set.Superset, &set.Category)
+	err = tx.QueryRowContext(ctx, `SELECT st.id,st.session_id,st.position,st.exercise,st.weight_kg,st.reps,st.rpe,st.rpe_imputed,st.si,st.technique,st.superset,st.category,COALESCE(st.equipment,'') FROM sets st JOIN sessions se ON se.id=st.session_id WHERE st.id=? AND se.user_id=?`, id, s.userID).Scan(&set.ID, &set.SessionID, &set.Position, &set.Exercise, &set.WeightKG, &set.Reps, &set.RPE, &set.RPEImputed, &set.SI, &set.Technique, &set.Superset, &set.Category, &set.Equipment)
 	if errors.Is(err, sql.ErrNoRows) {
 		return training.Set{}, 0, training.ErrNotFound
 	}
@@ -411,8 +411,11 @@ func (s *userStore) UpdateSet(ctx context.Context, id int64, p training.SetPatch
 	if p.Category != nil {
 		set.Category = *p.Category
 	}
+	if p.Equipment != nil {
+		set.Equipment = *p.Equipment
+	}
 	set.SI = training.SetSI(set.RPE, set.Category)
-	_, err = tx.ExecContext(ctx, `UPDATE sets SET exercise=?,weight_kg=?,reps=?,rpe=?,rpe_imputed=?,si=?,technique=?,category=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND session_id=?`, set.Exercise, set.WeightKG, set.Reps, set.RPE, set.RPEImputed, set.SI, set.Technique, set.Category, id, set.SessionID)
+	_, err = tx.ExecContext(ctx, `UPDATE sets SET exercise=?,weight_kg=?,reps=?,rpe=?,rpe_imputed=?,si=?,technique=?,category=?,equipment=NULLIF(?,''),updated_at=CURRENT_TIMESTAMP WHERE id=? AND session_id=?`, set.Exercise, set.WeightKG, set.Reps, set.RPE, set.RPEImputed, set.SI, set.Technique, set.Category, set.Equipment, id, set.SessionID)
 	if err != nil {
 		return training.Set{}, 0, err
 	}
@@ -508,14 +511,14 @@ FROM sessions WHERE id=? AND user_id=?`, s.userID, id, s.userID).
 	if !imported {
 		out.StartedAt = sessionStart(startedAt)
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,session_id,position,exercise,weight_kg,reps,rpe,rpe_imputed,si,technique,superset,category,rest_after_seconds FROM sets WHERE session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?) ORDER BY position`, id, s.userID)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,session_id,position,exercise,weight_kg,reps,rpe,rpe_imputed,si,technique,superset,category,rest_after_seconds,COALESCE(equipment,'') FROM sets WHERE session_id IN (SELECT id FROM sessions WHERE id=? AND user_id=?) ORDER BY position`, id, s.userID)
 	if err != nil {
 		return out, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var v training.Set
-		if err = rows.Scan(&v.ID, &v.SessionID, &v.Position, &v.Exercise, &v.WeightKG, &v.Reps, &v.RPE, &v.RPEImputed, &v.SI, &v.Technique, &v.Superset, &v.Category, &v.RestAfterSeconds); err != nil {
+		if err = rows.Scan(&v.ID, &v.SessionID, &v.Position, &v.Exercise, &v.WeightKG, &v.Reps, &v.RPE, &v.RPEImputed, &v.SI, &v.Technique, &v.Superset, &v.Category, &v.RestAfterSeconds, &v.Equipment); err != nil {
 			return out, err
 		}
 		v.SI = training.NormalizeSI(v.SI)
@@ -1178,7 +1181,7 @@ func (s *userStore) ExerciseHistory(ctx context.Context, exercise string, limit 
 		return out, err
 	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT st.id,st.session_id,se.date,st.weight_kg,st.reps,st.rpe,st.rpe_imputed,st.si,st.technique,st.superset,st.category
+SELECT st.id,st.session_id,se.date,st.weight_kg,st.reps,st.rpe,st.rpe_imputed,st.si,st.technique,st.superset,st.category,COALESCE(st.equipment,'')
 FROM sets st JOIN sessions se ON se.id=st.session_id
 WHERE se.user_id=? AND st.exercise=?
 ORDER BY se.date DESC, st.position DESC LIMIT ?`, s.userID, exercise, limit)
@@ -1188,7 +1191,7 @@ ORDER BY se.date DESC, st.position DESC LIMIT ?`, s.userID, exercise, limit)
 	defer rows.Close()
 	for rows.Next() {
 		var v training.ExerciseSet
-		if err = rows.Scan(&v.SetID, &v.SessionID, &v.Date, &v.WeightKG, &v.Reps, &v.RPE, &v.RPEImputed, &v.SI, &v.Technique, &v.Superset, &v.Category); err != nil {
+		if err = rows.Scan(&v.SetID, &v.SessionID, &v.Date, &v.WeightKG, &v.Reps, &v.RPE, &v.RPEImputed, &v.SI, &v.Technique, &v.Superset, &v.Category, &v.Equipment); err != nil {
 			return out, err
 		}
 		v.SI = training.NormalizeSI(v.SI)
@@ -1205,11 +1208,11 @@ ORDER BY se.date DESC, st.position DESC LIMIT ?`, s.userID, exercise, limit)
 	// ranked as training.Epley1RM ranks it: a single counts as its lifted weight.
 	var best training.ExerciseSet
 	err = s.db.QueryRowContext(ctx, `
-SELECT st.id,st.session_id,se.date,st.weight_kg,st.reps,st.rpe,st.rpe_imputed,st.si,st.technique,st.superset,st.category
+SELECT st.id,st.session_id,se.date,st.weight_kg,st.reps,st.rpe,st.rpe_imputed,st.si,st.technique,st.superset,st.category,COALESCE(st.equipment,'')
 FROM sets st JOIN sessions se ON se.id=st.session_id
 WHERE se.user_id=? AND st.exercise=? AND st.technique='' AND st.category='working'
 ORDER BY CASE WHEN st.reps=1 THEN st.weight_kg ELSE st.weight_kg*(1+CAST(st.reps AS REAL)/30) END DESC, se.date DESC LIMIT 1`, s.userID, exercise).
-		Scan(&best.SetID, &best.SessionID, &best.Date, &best.WeightKG, &best.Reps, &best.RPE, &best.RPEImputed, &best.SI, &best.Technique, &best.Superset, &best.Category)
+		Scan(&best.SetID, &best.SessionID, &best.Date, &best.WeightKG, &best.Reps, &best.RPE, &best.RPEImputed, &best.SI, &best.Technique, &best.Superset, &best.Category, &best.Equipment)
 	if errors.Is(err, sql.ErrNoRows) {
 		return out, nil
 	}

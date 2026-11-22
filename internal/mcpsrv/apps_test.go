@@ -183,7 +183,7 @@ func TestRenderRestTimerUsesEachPersonsOwnTarget(t *testing.T) {
 		service *training.Service
 		target  int
 	}{{alice, 90}, {bob, 180}} {
-		if _, _, err := person.service.LogSet(ctx, "banca", 80, 8, 8, 1, "", ""); err != nil {
+		if _, _, err := person.service.LogSet(ctx, "banca", 80, 8, 8, 1, "", "", ""); err != nil {
 			t.Fatal(err)
 		}
 		var out RestTimerOut

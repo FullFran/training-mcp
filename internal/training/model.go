@@ -28,6 +28,9 @@ type LoggedSet struct {
 	Technique  string  `json:"technique,omitempty"`
 	// Category is SetWarmup or SetWorking; empty means working.
 	Category string `json:"category,omitempty"`
+	// Equipment is the machine or equipment the set was done on, as free text.
+	// Empty means not stated.
+	Equipment string `json:"equipment,omitempty"`
 }
 
 // LogSetsInput asks to record a batch of sets of one exercise into today's
@@ -97,6 +100,10 @@ type Set struct {
 	// only when they stopped the rest timer. Nil when never stopped: a rest is
 	// never inferred from the gap between two sets.
 	RestAfterSeconds *int `json:"rest_after_seconds,omitempty"`
+	// Equipment is the machine or equipment the set was done on, as free text
+	// normalized like exercise names. Empty means not stated (NULL in the
+	// database). Sets of one exercise on different equipment are not compared.
+	Equipment string `json:"equipment,omitempty"`
 }
 
 // Set categories. Working is the default; a warm-up only prepares for the
@@ -115,6 +122,9 @@ var Techniques = []string{
 }
 
 const maxTechniqueLen = 40
+
+// maxEquipmentLen bounds the equipment text of a set.
+const maxEquipmentLen = 80
 
 const (
 	maxIdempotencyKeyLen = 128
@@ -140,6 +150,8 @@ type AddSetInput struct {
 	Superset   string
 	// Category is SetWarmup or SetWorking; empty means working.
 	Category string
+	// Equipment is free text; empty means not stated.
+	Equipment string
 }
 type SetPatch struct {
 	Exercise  *string
@@ -148,6 +160,8 @@ type SetPatch struct {
 	RPE       *float64
 	Technique *string
 	Category  *string
+	// Equipment set to an empty string clears it.
+	Equipment *string
 }
 type ListFilter struct {
 	Limit    int
@@ -466,6 +480,7 @@ func Epley1RM(weightKG float64, reps int) float64 {
 // exercise's progression can be read without walking every session.
 type ExerciseSet struct {
 	Technique string `json:"technique,omitempty"`
+	Equipment string `json:"equipment,omitempty"`
 	// Category is SetWorking or SetWarmup; a warm-up carries no est_1rm.
 	Category  string  `json:"category"`
 	Superset  string  `json:"superset,omitempty"`
@@ -526,5 +541,5 @@ type ExerciseMemory struct {
 type Clock func() time.Time
 
 func (p SetPatch) Empty() bool {
-	return p.Exercise == nil && p.WeightKG == nil && p.Reps == nil && p.RPE == nil && p.Technique == nil && p.Category == nil
+	return p.Exercise == nil && p.WeightKG == nil && p.Reps == nil && p.RPE == nil && p.Technique == nil && p.Category == nil && p.Equipment == nil
 }

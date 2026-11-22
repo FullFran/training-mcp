@@ -495,7 +495,7 @@ func (s *Service) SessionProgress(ctx context.Context, sessionID int64) ([]PlanP
 // LogSet is the one-call entry path: it finds today's session, creates it if
 // needed, and records count identical sets. Callers never handle a session id,
 // which is what makes conversational logging a single step.
-func (s *Service) LogSet(ctx context.Context, exercise string, weightKG float64, reps int, rpe float64, count int, technique, category string) (Session, []Set, error) {
+func (s *Service) LogSet(ctx context.Context, exercise string, weightKG float64, reps int, rpe float64, count int, technique, category, equipment string) (Session, []Set, error) {
 	if count <= 0 {
 		count = 1
 	}
@@ -513,7 +513,7 @@ func (s *Service) LogSet(ctx context.Context, exercise string, weightKG float64,
 	} else {
 		// Validate before creating, so a bad call never leaves an empty session
 		// behind as a side effect of a typo.
-		if _, _, ok := setCategory(category, technique); !ok || !validSetFields(exercise, weightKG, reps, rpe) {
+		if _, _, ok := setCategory(category, technique); !ok || !validSetFields(exercise, weightKG, reps, rpe) || len(normalizeEquipment(equipment)) > maxEquipmentLen {
 			return Session{}, nil, ErrValidation
 		}
 		if session, err = s.StartSession(ctx, today); err != nil {
@@ -524,7 +524,7 @@ func (s *Service) LogSet(ctx context.Context, exercise string, weightKG float64,
 	for range count {
 		set, total, err := s.AddSet(ctx, AddSetInput{
 			SessionID: session.ID, Exercise: exercise, WeightKG: weightKG,
-			Reps: reps, RPE: rpe, Technique: technique, Category: category,
+			Reps: reps, RPE: rpe, Technique: technique, Category: category, Equipment: equipment,
 		})
 		if err != nil {
 			return session, out, err
@@ -555,11 +555,12 @@ func (s *Service) LogSets(ctx context.Context, in LogSetsInput) (LogSetsResult, 
 		if category == SetWarmup {
 			set.Category = SetWarmup
 		}
+		set.Equipment = normalizeEquipment(set.Equipment)
 		set.WeightKG = RoundWeight(set.WeightKG)
 		if set.RPE == 0 {
 			set.RPE, set.RPEImputed = ImputedRPE, true
 		}
-		if !ok || !validSetFields(exercise, set.WeightKG, set.Reps, set.RPE) || len(set.Technique) > maxTechniqueLen {
+		if !ok || !validSetFields(exercise, set.WeightKG, set.Reps, set.RPE) || len(set.Technique) > maxTechniqueLen || len(set.Equipment) > maxEquipmentLen {
 			return LogSetsResult{}, ErrValidation
 		}
 		sets[i] = set
@@ -591,11 +592,12 @@ func (s *Service) AddSet(ctx context.Context, in AddSetInput) (Set, float64, err
 	category, technique, ok := setCategory(in.Category, in.Technique)
 	in.Category, in.Technique = category, technique
 	in.Superset = normalizeSuperset(in.Superset)
+	in.Equipment = normalizeEquipment(in.Equipment)
 	in.WeightKG = RoundWeight(in.WeightKG)
 	if !ok || in.SessionID <= 0 || !validSetFields(in.Exercise, in.WeightKG, in.Reps, in.RPE) {
 		return Set{}, 0, ErrValidation
 	}
-	if len(in.Technique) > maxTechniqueLen || len(in.Superset) > maxTechniqueLen {
+	if len(in.Technique) > maxTechniqueLen || len(in.Superset) > maxTechniqueLen || len(in.Equipment) > maxEquipmentLen {
 		return Set{}, 0, ErrValidation
 	}
 	if in.Superset == "" {
@@ -634,6 +636,10 @@ func (s *Service) ExerciseNotes(ctx context.Context) ([]ExerciseNote, error) {
 func normalizeTechnique(v string) string {
 	return strings.Join(strings.Fields(strings.ToLower(strings.TrimSpace(v))), " ")
 }
+
+// normalizeEquipment folds case and spacing, so "Technogym  Pec Fly" and
+// "technogym pec fly" name the same equipment, the rule exercise names follow.
+func normalizeEquipment(v string) string { return normalizeTechnique(v) }
 
 // warmupWords are what a warm-up was called before it was a category. As a
 // category they name a warm-up; as a technique they become one.
@@ -725,6 +731,13 @@ func (s *Service) UpdateSet(ctx context.Context, id int64, p SetPatch) (Set, flo
 			v = ""
 		}
 		p.Technique = &v
+	}
+	if p.Equipment != nil {
+		v := normalizeEquipment(*p.Equipment)
+		if len(v) > maxEquipmentLen {
+			return Set{}, 0, ErrValidation
+		}
+		p.Equipment = &v
 	}
 	return s.store.UpdateSet(ctx, id, p)
 }

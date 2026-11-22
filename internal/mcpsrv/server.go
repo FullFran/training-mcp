@@ -372,7 +372,7 @@ func New(service training.ServiceFor) *Server {
 	logSchema.Properties["count"].Maximum = jsonschema.Ptr(20.0)
 	setCategoryEnum(logSchema.Properties["category"])
 	addWrite(w, &mcp.Tool{Name: "log_set", Description: "Record one or more identical sets into today's session, creating that session if it does not exist yet. It needs no session id but is not safe to retry, since repeating it records the sets again. Prefer log_sets, which is.", InputSchema: logSchema}, "set.log", func(ctx context.Context, svc *training.Service, in LogInput) (LogOut, error) {
-		session, sets, err := svc.LogSet(ctx, in.Exercise, in.WeightKG, in.Reps, in.RPE, in.Count, in.Technique, in.Category)
+		session, sets, err := svc.LogSet(ctx, in.Exercise, in.WeightKG, in.Reps, in.RPE, in.Count, in.Technique, in.Category, "")
 		return LogOut{Session: session, Sets: sets, TotalSI: session.TotalSI}, err
 	})
 	logSetsSchema := mustInputSchema[LogSetsInput]()
