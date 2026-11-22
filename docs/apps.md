@@ -25,6 +25,12 @@ also carries a readable text. Hosts without MCP Apps ignore the metadata and
 show the text. The specification's "servers SHOULD check client capabilities
 before registering UI-enabled tools" is the one rule this does not meet.
 
+Revision 2026-07-28 requires an `Mcp-Name` header equal to the URI on
+`resources/read`, and the SDK answers 400 without it. ChatGPT omits that header
+on `resources/read` (it sends it on `tools/call`), so the server fills a missing
+`Mcp-Name` from the body's URI (`internal/mcpsrv/header_compat.go`). A header
+that is present and differs is still rejected.
+
 ## Views
 
 | View | Tool | What it shows |

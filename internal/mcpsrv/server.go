@@ -16,7 +16,7 @@ import (
 
 type Server struct {
 	mcp     *mcp.Server
-	handler *mcp.StreamableHTTPHandler
+	handler http.Handler
 	writes  *writes
 }
 type StartInput struct {
@@ -748,7 +748,7 @@ func New(service training.ServiceFor) *Server {
 		func(*http.Request) *mcp.Server { return s },
 		&mcp.StreamableHTTPOptions{Stateless: true},
 	)
-	return &Server{mcp: s, handler: h, writes: w}
+	return &Server{mcp: s, handler: fillMissingMcpName(h), writes: w}
 }
 func (s *Server) Handler() http.Handler { return s.handler }
 func (s *Server) ToolNames() []string {
