@@ -78,7 +78,7 @@ func TestUnknownCategoryIsRejectedByEveryWritePath(t *testing.T) {
 	if _, _, err := svc.AddSet(ctx, AddSetInput{SessionID: 1, Exercise: "squat", WeightKG: 60, Reps: 5, RPE: 6, Category: "top set"}); !errors.Is(err, ErrValidation) {
 		t.Fatalf("AddSet err = %v", err)
 	}
-	if _, _, err := svc.LogSet(ctx, "squat", 60, 5, 6, 1, "", "top set"); !errors.Is(err, ErrValidation) {
+	if _, _, err := svc.LogSet(ctx, "squat", 60, 5, 6, 1, "", "top set", ""); !errors.Is(err, ErrValidation) {
 		t.Fatalf("LogSet err = %v", err)
 	}
 	if _, err := svc.LogSets(ctx, LogSetsInput{Key: "k", Exercise: "squat", Sets: []LoggedSet{{WeightKG: 60, Reps: 5, Category: "top set"}}}); !errors.Is(err, ErrValidation) {
@@ -139,7 +139,7 @@ func TestEveryWritePathRoundsWeightsToTwoDecimals(t *testing.T) {
 	if _, _, err := svc.AddSet(ctx, AddSetInput{SessionID: 1, Exercise: "squat", WeightKG: raw, Reps: 5, RPE: 8}); err != nil || store.added[0].WeightKG != want {
 		t.Fatalf("AddSet stored %v, %v", store.added, err)
 	}
-	if _, _, err := svc.LogSet(ctx, "squat", raw, 5, 8, 1, "", ""); err != nil || store.added[1].WeightKG != want {
+	if _, _, err := svc.LogSet(ctx, "squat", raw, 5, 8, 1, "", "", ""); err != nil || store.added[1].WeightKG != want {
 		t.Fatalf("LogSet stored %v, %v", store.added, err)
 	}
 	if _, err := svc.LogSets(ctx, LogSetsInput{Key: "k", Exercise: "squat", Sets: []LoggedSet{{WeightKG: raw, Reps: 5}}}); err != nil || store.logged[0].Sets[0].WeightKG != want {

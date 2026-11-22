@@ -61,16 +61,20 @@ is **comparable** when all of these hold; otherwise it is listed with an
 | Working set: not recorded as a warm-up (`category` `warmup`) | `warmup` |
 | Straight set: no intensity technique (drop set, rest-pause, myo-reps, parciales, asistida, ...) | `technique` |
 | Load and reps are both positive | `no_load_or_reps` |
-| Not a probable warm-up: logged before the session's top straight working load and lighter than 60% of it | `probable_warmup` |
+| Not a probable warm-up: logged before the top straight working load of its own equipment in the session and lighter than 60% of it | `probable_warmup` |
+| Same equipment as the reference set (no equipment stated counts as its own value) | `different_equipment` |
 
 What the contract derives instead of storing:
 
-- **Equipment and configuration**: the exercise name is the identity. Two
-  machines with the same display name are not comparable, so they must be logged
-  under different names (`aperturas máquina`, `aperturas polea`). Setup details
-  (seat, pin, grip, straps) go in `set_exercise_note`, which needs no tap while
-  logging. Stored equipment and setup fields are milestone M2 (#24), not this
-  engine.
+- **Equipment and configuration**: a set's optional `equipment` (free text,
+  normalized like exercise names) plus the exercise name are the identity.
+  Sets on other equipment than the reference are excluded as
+  `different_equipment`; sets with no equipment stated compare only with each
+  other, so history logged before the field existed behaves as before. Two
+  machines can still be told apart by name (`aperturas máquina`, `aperturas
+  polea`). Setup details (seat, pin, grip, straps) go in `set_exercise_note`.
+  Typos split one machine into two; the phone and `exercise_history` show the
+  value so it can be corrected with `update_set`.
 - **Technique compatibility**: the existing per-set `technique` field.
 - **Units**: weights are kilograms as stored. The historical lb/kg audit is not
   finished, so the engine compares within a session only and makes no historical

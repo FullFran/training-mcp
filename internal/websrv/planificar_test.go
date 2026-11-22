@@ -104,7 +104,7 @@ func TestPlanificarShowsWhatTheCoachSees(t *testing.T) {
 	if _, err := w.service.CreatePlan(ctx, training.Plan{Name: "Fuerza 3 días", Items: []training.PlanItem{{Position: 1, Exercise: "sentadilla", TargetSets: 3}}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := w.service.LogSet(ctx, "sentadilla", 100, 5, 8, 1, "", ""); err != nil {
+	if _, _, err := w.service.LogSet(ctx, "sentadilla", 100, 5, 8, 1, "", "", ""); err != nil {
 		t.Fatal(err)
 	}
 	card := section(t, get(t, w.handler, "/?modo=planificar").Body.String(), `id="coach-sees"`, "</a>")

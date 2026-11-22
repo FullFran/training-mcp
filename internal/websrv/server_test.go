@@ -1251,3 +1251,22 @@ func TestProgressBarsDoNotInheritTheTopBar(t *testing.T) {
 		t.Fatal("volume bars still styled through the top bar's class")
 	}
 }
+
+// Equipment is written by the chat tools, not the phone form, but the phone
+// shows it on the set so a typo that split one machine in two can be seen.
+func TestSetShowsItsEquipment(t *testing.T) {
+	h, service := newServer(t)
+	if _, _, err := service.LogSet(context.Background(), "aperturas", 90, 10, 8, 1, "", "", " Technogym  Pec Fly "); err != nil {
+		t.Fatal(err)
+	}
+	body := get(t, h, base+"/").Body.String()
+	if !strings.Contains(body, `class="equip-tag" title="Máquina">technogym pec fly<`) {
+		t.Fatalf("equipment should be shown on the set: %q", body)
+	}
+	if _, _, err := service.LogSet(context.Background(), "remo", 60, 10, 8, 1, "", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(get(t, h, base+"/").Body.String(), `class="equip-tag"`); n != 1 {
+		t.Fatalf("a set without equipment must show no tag; tags = %d", n)
+	}
+}
