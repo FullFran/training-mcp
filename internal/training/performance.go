@@ -43,6 +43,9 @@ const (
 	ExcludedWarmup         = "warmup"
 	ExcludedNoLoadOrReps   = "no_load_or_reps"
 	ExcludedProbableWarmup = "probable_warmup"
+	// ExcludedDifferentEquipment marks a set done on other equipment than the
+	// reference set. No equipment stated counts as its own value.
+	ExcludedDifferentEquipment = "different_equipment"
 )
 
 const (
@@ -172,6 +175,7 @@ type DropOffSet struct {
 	RPE            float64       `json:"rpe,omitempty"`
 	RPEObserved    bool          `json:"rpe_observed"`
 	Technique      string        `json:"technique,omitempty"`
+	Equipment      string        `json:"equipment,omitempty"`
 	Comparable     bool          `json:"comparable"`
 	ExcludedReason string        `json:"excluded_reason,omitempty"`
 	Reference      bool          `json:"reference,omitempty"`
@@ -208,7 +212,7 @@ type DropOffAnalysis struct {
 // dropOffAssumptions are stated with every analysis, because each one is a way
 // the number can be wrong.
 var dropOffAssumptions = []string{
-	"Mismo nombre de ejercicio = mismo equipo y configuración: si dos máquinas comparten nombre, regístralas con nombres distintos.",
+	"Mismo nombre de ejercicio y misma máquina indicada (equipment) = mismo equipo y configuración; las series en otra máquina que la de referencia se excluyen, y sin máquina indicada solo se comparan entre sí.",
 	"Pesos en kg tal como se guardaron; la auditoría lb/kg del histórico no está cerrada, así que no se calibra con datos antiguos.",
 	"La referencia es la primera serie comparable de la sesión; caída positiva = rendimiento aparente menor.",
 	"Un RPE no indicado (rpe_imputed) nunca se usa como RIR.",
@@ -217,9 +221,9 @@ var dropOffAssumptions = []string{
 
 // AnalyzeDropOff compares the sets of one exercise logged in one session. Sets
 // are ordered by position. A set is comparable when it is a working straight
-// set (not a warm-up, no technique) with load and reps and is not a probable
-// warm-up. The first
-// comparable set is the reference; each estimator reports every later set's
+// set (not a warm-up, no technique) with load and reps, is not a probable
+// warm-up and was done on the same equipment as the reference. The first
+// such set is the reference; each estimator reports every later set's
 // apparent drop against it, or abstains. It is pure: no store, no clock.
 func AnalyzeDropOff(exercise string, sets []Set) DropOffAnalysis {
 	ordered := append([]Set(nil), sets...)
@@ -238,7 +242,7 @@ func AnalyzeDropOff(exercise string, sets []Set) DropOffAnalysis {
 	for i, s := range ordered {
 		d := DropOffSet{
 			SetID: s.ID, Position: s.Position, WeightKG: s.WeightKG, Reps: s.Reps,
-			RPEObserved: !s.RPEImputed && s.RPE > 0, Technique: s.Technique,
+			RPEObserved: !s.RPEImputed && s.RPE > 0, Technique: s.Technique, Equipment: s.Equipment,
 		}
 		if d.RPEObserved {
 			d.RPE = s.RPE
@@ -252,6 +256,8 @@ func AnalyzeDropOff(exercise string, sets []Set) DropOffAnalysis {
 			d.ExcludedReason = ExcludedNoLoadOrReps
 		case warmups[i]:
 			d.ExcludedReason = ExcludedProbableWarmup
+		case ref >= 0 && s.Equipment != out.Sets[ref].Equipment:
+			d.ExcludedReason = ExcludedDifferentEquipment
 		default:
 			d.Comparable = true
 			d.Estimates = EstimatePerformance(s.WeightKG, s.Reps, s.RPE, d.RPEObserved)
@@ -272,18 +278,23 @@ func AnalyzeDropOff(exercise string, sets []Set) DropOffAnalysis {
 	return out
 }
 
-// probableWarmups marks straight sets logged before the first set at the
-// session's top load and lighter than warmupFraction of it.
+// probableWarmups marks straight sets logged before the first set at the top
+// load of their own equipment and lighter than warmupFraction of it, so a
+// lighter machine is never read as a warm-up for a heavier one.
 func probableWarmups(sets []Set) map[int]bool {
-	top, topAt := 0.0, -1
+	type peak struct {
+		load float64
+		at   int
+	}
+	tops := map[string]peak{}
 	for i, s := range sets {
-		if s.Technique == "" && s.Category != SetWarmup && s.Reps > 0 && s.WeightKG > top {
-			top, topAt = s.WeightKG, i
+		if s.Technique == "" && s.Category != SetWarmup && s.Reps > 0 && s.WeightKG > tops[s.Equipment].load {
+			tops[s.Equipment] = peak{s.WeightKG, i}
 		}
 	}
 	out := map[int]bool{}
-	for i := 0; i < topAt; i++ {
-		if sets[i].WeightKG < top*warmupFraction {
+	for i, s := range sets {
+		if top, ok := tops[s.Equipment]; ok && i < top.at && s.WeightKG < top.load*warmupFraction {
 			out[i] = true
 		}
 	}

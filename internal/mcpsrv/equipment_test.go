@@ -81,3 +81,24 @@ func TestEquipmentIsInTheSetToolSchemas(t *testing.T) {
 		t.Fatalf("tools not listed: %v", want)
 	}
 }
+
+// Through the real tools and store: sets logged on two machines under one
+// exercise name are not compared by performance_dropoff.
+func TestPerformanceDropoffSeparatesEquipment(t *testing.T) {
+	session := logSetsSession(t)
+	var batch LogSetsOut
+	decode(t, call(t, session, "log_sets", map[string]any{"idempotency_key": "eq-2", "exercise": "aperturas", "sets": []map[string]any{
+		{"weight_kg": 100, "reps": 6, "rpe": 8, "equipment": "machine a"},
+		{"weight_kg": 95, "reps": 6, "rpe": 8, "equipment": "machine a"},
+		{"weight_kg": 86, "reps": 6, "rpe": 8, "equipment": "machine b"},
+	}}), &batch)
+	var out PerformanceOut
+	decode(t, call(t, session, "performance_dropoff", map[string]any{"session_id": batch.Session.ID}), &out)
+	if len(out.Analyses) != 1 || len(out.Analyses[0].Sets) != 3 {
+		t.Fatalf("analyses = %#v", out.Analyses)
+	}
+	sets := out.Analyses[0].Sets
+	if sets[0].ExcludedReason != "" || sets[1].ExcludedReason != "" || sets[2].ExcludedReason != "different_equipment" || sets[2].Equipment != "machine b" {
+		t.Fatalf("sets = %#v", sets)
+	}
+}
