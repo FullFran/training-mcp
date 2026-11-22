@@ -34,6 +34,7 @@ type AddInput struct {
 	RPE       float64 `json:"rpe" jsonschema:"Numeric rate of perceived exertion from 1 through 10; determines the set's SI."`
 	Technique string  `json:"technique,omitempty" jsonschema:"Optional intensity technique applied to the set, e.g. 'drop set', 'rest-pause'. Omit for a normal straight set."`
 	Category  string  `json:"category,omitempty" jsonschema:"Set category: 'warmup' for a lighter preparatory set done before the working weight, 'working' (the default) for everything else. Use warmup whenever the user calls a set a warm-up (calentamiento, aproximación); a warm-up is recorded and shown but never counts toward SI, volume, set counts, plan progress, best set, e1RM, suggest_load or performance estimates. Do not put warm-up in technique."`
+	Equipment string  `json:"equipment,omitempty" jsonschema:"Optional machine or equipment the set was done on, as free text, e.g. 'technogym pec fly', 'hammer row'. Only when the user names it; never guess. Sets of one exercise on different equipment are not compared by the performance engine. Normalized like exercise names; at most 80 characters."`
 }
 type LogInput struct {
 	Exercise  string  `json:"exercise" jsonschema:"Non-empty exercise name; it is trimmed and lowercased before storage."`
@@ -43,6 +44,7 @@ type LogInput struct {
 	Count     int     `json:"count,omitempty" jsonschema:"How many identical sets to record; defaults to 1, accepts up to 20. Use it for '3x10 at 80kg'."`
 	Technique string  `json:"technique,omitempty" jsonschema:"Optional intensity technique applied to the set, e.g. 'drop set', 'rest-pause', 'myo-reps', 'sin parar'. Omit for a normal straight set."`
 	Category  string  `json:"category,omitempty" jsonschema:"Set category: 'warmup' for a lighter preparatory set done before the working weight, 'working' (the default) for everything else. Use warmup whenever the user calls a set a warm-up (calentamiento, aproximación); a warm-up is recorded and shown but never counts toward SI, volume, set counts, plan progress, best set, e1RM, suggest_load or performance estimates. Do not put warm-up in technique."`
+	Equipment string  `json:"equipment,omitempty" jsonschema:"Optional machine or equipment the set was done on, as free text, e.g. 'technogym pec fly', 'hammer row'. Only when the user names it; never guess. Sets of one exercise on different equipment are not compared by the performance engine. Normalized like exercise names; at most 80 characters."`
 }
 type LogOut struct {
 	Session training.Session `json:"session"`
@@ -56,6 +58,7 @@ type LoggedSetInput struct {
 	RPE       *float64 `json:"rpe,omitempty" jsonschema:"Rate of perceived exertion from 1 through 10, only if the user stated it. Never guess: omit it otherwise, and the set counts one SI unit and is marked rpe_imputed."`
 	Technique string   `json:"technique,omitempty" jsonschema:"Optional intensity technique applied to the set, e.g. 'drop set', 'rest-pause'. Omit for a normal straight set."`
 	Category  string   `json:"category,omitempty" jsonschema:"Set category: 'warmup' for a lighter preparatory set done before the working weight, 'working' (the default) for everything else. Use warmup whenever the user calls a set a warm-up (calentamiento, aproximación); a warm-up is recorded and shown but never counts toward SI, volume, set counts, plan progress, best set, e1RM, suggest_load or performance estimates. Do not put warm-up in technique."`
+	Equipment string   `json:"equipment,omitempty" jsonschema:"Optional machine or equipment the set was done on, as free text, e.g. 'technogym pec fly', 'hammer row'. Only when the user names it; never guess. Sets of one exercise on different equipment are not compared by the performance engine. Normalized like exercise names; at most 80 characters."`
 }
 type LogSetsInput struct {
 	IdempotencyKey string           `json:"idempotency_key" jsonschema:"A unique value you generate once for this request, such as a UUID. Send the exact same value if you retry after an error or timeout, so nothing is recorded twice. Never reuse it for different sets."`
@@ -104,6 +107,7 @@ type UpdateInput struct {
 	RPE       *float64 `json:"rpe,omitempty" jsonschema:"Replacement numeric RPE from 1 through 10; recalculates the set's SI."`
 	Technique *string  `json:"technique,omitempty" jsonschema:"Replacement intensity technique. Pass an empty string to clear it back to a normal set."`
 	Category  *string  `json:"category,omitempty" jsonschema:"Replacement set category: 'warmup' marks the set as a warm-up, which stops counting toward SI, volume, set counts, plan progress, records and estimates; 'working' makes it count again. Use it when the user says a logged set was a warm-up, instead of writing warm-up in technique."`
+	Equipment *string  `json:"equipment,omitempty" jsonschema:"Replacement machine or equipment, as free text. Pass an empty string to clear it to not stated."`
 }
 type DeleteInput struct {
 	SetID int64 `json:"set_id" jsonschema:"Positive ID of the existing set to delete."`
@@ -359,7 +363,7 @@ func New(service training.ServiceFor) *Server {
 	setRPERange(addSchema.Properties["rpe"])
 	setCategoryEnum(addSchema.Properties["category"])
 	addWrite(w, &mcp.Tool{Name: "add_set", Description: "Add a set to an existing training session and return the set plus the session's recalculated total SI.", InputSchema: addSchema}, "set.log", func(ctx context.Context, svc *training.Service, in AddInput) (SetOut, error) {
-		v, total, err := svc.AddSet(ctx, training.AddSetInput{SessionID: in.SessionID, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, Technique: in.Technique, Category: in.Category})
+		v, total, err := svc.AddSet(ctx, training.AddSetInput{SessionID: in.SessionID, Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, Technique: in.Technique, Category: in.Category, Equipment: in.Equipment})
 		return SetOut{Set: v, TotalSI: total}, err
 	})
 	logSchema := mustInputSchema[LogInput]()
@@ -372,7 +376,7 @@ func New(service training.ServiceFor) *Server {
 	logSchema.Properties["count"].Maximum = jsonschema.Ptr(20.0)
 	setCategoryEnum(logSchema.Properties["category"])
 	addWrite(w, &mcp.Tool{Name: "log_set", Description: "Record one or more identical sets into today's session, creating that session if it does not exist yet. It needs no session id but is not safe to retry, since repeating it records the sets again. Prefer log_sets, which is.", InputSchema: logSchema}, "set.log", func(ctx context.Context, svc *training.Service, in LogInput) (LogOut, error) {
-		session, sets, err := svc.LogSet(ctx, in.Exercise, in.WeightKG, in.Reps, in.RPE, in.Count, in.Technique, in.Category, "")
+		session, sets, err := svc.LogSet(ctx, in.Exercise, in.WeightKG, in.Reps, in.RPE, in.Count, in.Technique, in.Category, in.Equipment)
 		return LogOut{Session: session, Sets: sets, TotalSI: session.TotalSI}, err
 	})
 	logSetsSchema := mustInputSchema[LogSetsInput]()
@@ -390,7 +394,7 @@ func New(service training.ServiceFor) *Server {
 	addWrite(w, &mcp.Tool{Name: "log_sets", Description: "Record the sets of one exercise into today's session in a single call, creating the session if needed. The sets may differ, as in '12, 12, 10 and 8 reps'. All are stored or none. Omit rpe unless the user stated it. Repeating a call with the same idempotency_key returns the original result with replayed true and stores nothing new, so retrying is always safe. Prefer this over log_set.", InputSchema: logSetsSchema}, "set.log", func(ctx context.Context, svc *training.Service, in LogSetsInput) (LogSetsOut, error) {
 		batch := training.LogSetsInput{Key: in.IdempotencyKey, Exercise: in.Exercise}
 		for _, set := range in.Sets {
-			logged := training.LoggedSet{WeightKG: set.WeightKG, Reps: set.Reps, Technique: set.Technique, Category: set.Category}
+			logged := training.LoggedSet{WeightKG: set.WeightKG, Reps: set.Reps, Technique: set.Technique, Category: set.Category, Equipment: set.Equipment}
 			if set.RPE != nil {
 				logged.RPE = *set.RPE
 			}
@@ -413,9 +417,10 @@ func New(service training.ServiceFor) *Server {
 	setRPERange(updateSchema.Properties["rpe"])
 	setNonNullableType(updateSchema.Properties["technique"], "string")
 	setNonNullableType(updateSchema.Properties["category"], "string")
+	setNonNullableType(updateSchema.Properties["equipment"], "string")
 	setCategoryEnum(updateSchema.Properties["category"])
 	addWrite(w, &mcp.Tool{Name: "update_set", Description: "Update one or more fields of an existing set. Omitted fields remain unchanged; RPE changes recalculate SI. Set category to 'warmup' when the user says a logged set was a warm-up, or to 'working' to undo that.", InputSchema: updateSchema}, "set.update", func(ctx context.Context, svc *training.Service, in UpdateInput) (SetOut, error) {
-		v, total, err := svc.UpdateSet(ctx, in.SetID, training.SetPatch{Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, Technique: in.Technique, Category: in.Category})
+		v, total, err := svc.UpdateSet(ctx, in.SetID, training.SetPatch{Exercise: in.Exercise, WeightKG: in.WeightKG, Reps: in.Reps, RPE: in.RPE, Technique: in.Technique, Category: in.Category, Equipment: in.Equipment})
 		return SetOut{Set: v, TotalSI: total}, err
 	})
 	deleteSchema := mustInputSchema[DeleteInput]()

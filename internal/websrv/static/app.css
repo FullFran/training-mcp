@@ -583,7 +583,7 @@ main { padding-bottom: 140px; }
   cursor: pointer;
 }
 .tech input { margin-top: 8px; }
-.tech-tag {
+.tech-tag, .equip-tag {
   display: inline-block;
   margin-left: 6px;
   padding: 1px 7px;
