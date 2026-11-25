@@ -1,0 +1,54 @@
+{
+  "id": "robinson-2024-proximity-to-failure-dose-response",
+  "title": "Exploring the Dose–Response Relationship Between Estimated Resistance Training Proximity to Failure, Strength Gain, and Muscle Hypertrophy: A Series of Meta-Regressions",
+  "authors": [
+    "Zac P. Robinson",
+    "Joshua C. Pelland",
+    "Jacob F. Remmert",
+    "Martin C. Refalo",
+    "Ivan Jukic",
+    "James Steele",
+    "Michael C. Zourdos"
+  ],
+  "year": 2024,
+  "publication": "Sports Medicine",
+  "volume": "54",
+  "issue": "9",
+  "pages": "2209-2231",
+  "study_type": "meta_analysis",
+  "doi": "10.1007/s40279-024-02069-2",
+  "pmid": "38970765",
+  "url": "https://doi.org/10.1007/s40279-024-02069-2",
+  "population": "Training studies of failure versus non-failure, velocity loss and set structures, pooled in exploratory meta-regressions; participant details are not summarized in the abstract.",
+  "topics": [
+    "proximity_to_failure",
+    "rir_rpe",
+    "hypertrophy",
+    "strength"
+  ],
+  "debates": [
+    "proximity_to_failure"
+  ],
+  "keywords": [
+    "repetitions in reserve",
+    "dose-response",
+    "meta-regression",
+    "velocity loss"
+  ],
+  "key_findings": [
+    "Repetitions in reserve were estimated for each training condition from the study descriptions and modelled as a continuous dose.",
+    "Strength gains showed a negligible relationship with estimated repetitions in reserve: similar across a wide range.",
+    "Hypertrophy increased as sets ended closer to failure in every best-fit model; the authors stress that the exact relationship remains unclear and the analysis is exploratory."
+  ],
+  "methods": "Series of multilevel meta-regressions of estimated repetitions in reserve against strength and hypertrophy, adjusted for load, method of volume equating, duration and training status, with sensitivity analyses.",
+  "limitations": "Repetitions in reserve were estimated by the authors, not measured; overall model fit was modest; exploratory by the authors' own description.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

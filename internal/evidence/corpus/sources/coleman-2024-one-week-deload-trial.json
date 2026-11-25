@@ -1,0 +1,57 @@
+{
+  "id": "coleman-2024-one-week-deload-trial",
+  "title": "Gaining more from doing less? The effects of a one-week deload period during supervised resistance training on muscular adaptations",
+  "authors": [
+    "Max Coleman",
+    "Ryan Burke",
+    "Francesca Augustin",
+    "Alec Piñero",
+    "Jaime Maldonado",
+    "James P. Fisher",
+    "Michael Israetel",
+    "Patroklos Androulakis Korakakis",
+    "Paul Swinton",
+    "Douglas Oberlin",
+    "Brad J. Schoenfeld"
+  ],
+  "year": 2024,
+  "publication": "PeerJ",
+  "volume": "12",
+  "pages": "e16777",
+  "study_type": "randomized_trial",
+  "doi": "10.7717/peerj.16777",
+  "pmid": "38274324",
+  "url": "https://doi.org/10.7717/peerj.16777",
+  "population": "39 resistance-trained young adults (29 men, 10 women).",
+  "topics": [
+    "deload",
+    "hypertrophy",
+    "strength",
+    "fatigue"
+  ],
+  "debates": [
+    "deload_value"
+  ],
+  "keywords": [
+    "training cessation",
+    "one-week break",
+    "high-volume program",
+    "readiness to train"
+  ],
+  "key_findings": [
+    "Stopping training for one week in the middle of a 9-week high-volume programme gave the same lower-body muscle growth, local endurance and power as training straight through.",
+    "Training straight through gave larger gains in isometric and dynamic lower-body strength.",
+    "The continuous group also reported slightly better readiness to train."
+  ],
+  "methods": "Randomized parallel-group trial: one week of complete training cessation at the midpoint versus continuous training; lower-body sessions supervised, upper-body sessions not; ultrasound muscle thickness, strength, endurance and power.",
+  "limitations": "The deload was full cessation rather than reduced training; 9 weeks; outcomes mainly lower body; upper-body training was unsupervised.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

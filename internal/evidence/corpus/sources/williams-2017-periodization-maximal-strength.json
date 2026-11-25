@@ -1,0 +1,51 @@
+{
+  "id": "williams-2017-periodization-maximal-strength",
+  "title": "Comparison of Periodized and Non-Periodized Resistance Training on Maximal Strength: A Meta-Analysis",
+  "authors": [
+    "Tyler D. Williams",
+    "Danilo V. Tolusso",
+    "Michael V. Fedewa",
+    "Michael R. Esco"
+  ],
+  "year": 2017,
+  "publication": "Sports Medicine",
+  "volume": "47",
+  "issue": "10",
+  "pages": "2083-2100",
+  "study_type": "meta_analysis",
+  "doi": "10.1007/s40279-017-0734-y",
+  "pmid": "28497285",
+  "url": "https://doi.org/10.1007/s40279-017-0734-y",
+  "population": "18 studies published from 1988 to 2015 (81 effects), comparing periodized and non-periodized groups.",
+  "topics": [
+    "periodization",
+    "strength",
+    "frequency"
+  ],
+  "debates": [
+    "periodization_value"
+  ],
+  "keywords": [
+    "periodized",
+    "non-periodized",
+    "undulating",
+    "1RM squat",
+    "1RM bench press"
+  ],
+  "key_findings": [
+    "Periodized training improved 1RM more than non-periodized training, a moderate effect (effect size 0.43).",
+    "Undulating programmes were more favourable, untrained participants improved more, and higher frequency and longer studies were associated with larger 1RM gains.",
+    "The authors conclude that variation in the training stimulus appears important for maximal strength."
+  ],
+  "methods": "Meta-analysis with random-effects models and moderator analysis of 1RM squat, bench press or leg press outcomes; English-language peer-reviewed studies only.",
+  "limitations": "Strength outcomes only; English-language studies only; the abstract does not state whether volume was equated between groups.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

@@ -1,0 +1,55 @@
+{
+  "id": "zourdos-2016-rir-rpe-scale",
+  "title": "Novel Resistance Training–Specific Rating of Perceived Exertion Scale Measuring Repetitions in Reserve",
+  "authors": [
+    "Michael C. Zourdos",
+    "Alex Klemp",
+    "Chad Dolan",
+    "Justin M. Quiles",
+    "Kyle A. Schau",
+    "Edward Jo",
+    "Eric Helms",
+    "Ben Esgro",
+    "Scott Duncan",
+    "Sonia Garcia Merino",
+    "Rocky Blanco"
+  ],
+  "year": 2016,
+  "publication": "Journal of Strength and Conditioning Research",
+  "volume": "30",
+  "issue": "1",
+  "pages": "267-275",
+  "study_type": "acute_study",
+  "doi": "10.1519/jsc.0000000000001049",
+  "pmid": "26049792",
+  "url": "https://doi.org/10.1519/jsc.0000000000001049",
+  "population": "29 adults (mean age 24): 15 experienced squatters and 14 novices.",
+  "topics": [
+    "rir_rpe",
+    "autoregulation",
+    "load"
+  ],
+  "keywords": [
+    "RPE",
+    "repetitions in reserve",
+    "squat",
+    "bar velocity",
+    "1RM"
+  ],
+  "key_findings": [
+    "Lifters rated each squat on an RPE scale mapped to repetitions in reserve (RPE 10 = 0 in reserve, RPE 9 = 1, and so on).",
+    "Average bar velocity fell as RPE rose, strongly in experienced squatters (r = -0.88) and in novices (r = -0.77).",
+    "Experienced squatters were slower and rated a higher RPE at their 1RM than novices; the authors present the scale as practical for adjusting daily load."
+  ],
+  "methods": "Single-session comparison: a 1RM squat, single repetitions at 60, 75 and 90% of 1RM and an 8-repetition set at 70%, with average velocity and RIR-based RPE recorded.",
+  "limitations": "One exercise, one session and a small sample; it shows how ratings track velocity, not training outcomes.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

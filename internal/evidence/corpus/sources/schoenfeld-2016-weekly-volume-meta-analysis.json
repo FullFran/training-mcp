@@ -1,0 +1,48 @@
+{
+  "id": "schoenfeld-2016-weekly-volume-meta-analysis",
+  "title": "Dose-response relationship between weekly resistance training volume and increases in muscle mass: A systematic review and meta-analysis",
+  "authors": [
+    "Brad J. Schoenfeld",
+    "Dan Ogborn",
+    "James W. Krieger"
+  ],
+  "year": 2016,
+  "publication": "Journal of Sports Sciences",
+  "volume": "35",
+  "issue": "11",
+  "pages": "1073-1082",
+  "study_type": "meta_analysis",
+  "doi": "10.1080/02640414.2016.1210197",
+  "pmid": "27433992",
+  "url": "https://doi.org/10.1080/02640414.2016.1210197",
+  "population": "15 studies with 34 treatment groups; participant characteristics are not detailed in the abstract.",
+  "topics": [
+    "volume",
+    "hypertrophy"
+  ],
+  "debates": [
+    "volume_dose_response"
+  ],
+  "keywords": [
+    "dose-response",
+    "weekly sets",
+    "meta-regression"
+  ],
+  "key_findings": [
+    "Treated as a continuous variable, more weekly sets were associated with larger gains in muscle size: each extra set added about 0.023 to the effect size, roughly 0.37 percentage points of growth.",
+    "Comparing the higher-volume and lower-volume arms within each study, higher volume gave an effect size about 0.24 larger, roughly 3.9 percentage points more growth.",
+    "Grouped as fewer than 5, 5 to 9, and 10 or more weekly sets per muscle, the difference was only a trend (p = 0.074).",
+    "The authors read the pattern as a graded dose-response: more volume, more hypertrophy, within the range the studies covered."
+  ],
+  "methods": "Systematic review with meta-regression of weekly sets per muscle against measures of muscle mass.",
+  "limitations": "Only 15 studies; the three-category analysis did not reach significance; the abstract does not report the training status, sex or age of participants, and the relationship can only be read within the volumes the studies tested.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

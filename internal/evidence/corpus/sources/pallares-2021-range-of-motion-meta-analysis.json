@@ -1,0 +1,53 @@
+{
+  "id": "pallares-2021-range-of-motion-meta-analysis",
+  "title": "Effects of range of motion on resistance training adaptations: A systematic review and meta-analysis",
+  "authors": [
+    "Jesús G. Pallarés",
+    "Alejandro Hernández-Belmonte",
+    "Alejandro Martínez-Cava",
+    "Tomas Vetrovsky",
+    "Michal Steffl",
+    "Javier Courel-Ibáñez"
+  ],
+  "year": 2021,
+  "publication": "Scandinavian Journal of Medicine & Science in Sports",
+  "volume": "31",
+  "issue": "10",
+  "pages": "1866-1881",
+  "study_type": "meta_analysis",
+  "doi": "10.1111/sms.14006",
+  "pmid": "34170576",
+  "url": "https://doi.org/10.1111/sms.14006",
+  "population": "16 studies of full versus partial range-of-motion training.",
+  "topics": [
+    "range_of_motion",
+    "exercise_selection",
+    "strength",
+    "hypertrophy"
+  ],
+  "debates": [
+    "partial_range_of_motion"
+  ],
+  "keywords": [
+    "full ROM",
+    "partial ROM",
+    "muscle architecture",
+    "functional performance"
+  ],
+  "key_findings": [
+    "Full range of motion gave larger strength gains (effect size 0.56) and larger lower-limb hypertrophy (effect size 0.88) than partial range.",
+    "Functional performance leaned towards full range without reaching significance.",
+    "Muscle architecture (thickness, pennation angle, fascicle length) did not differ significantly."
+  ],
+  "methods": "Prospectively registered systematic review (PROSPERO) and meta-analysis with robust variance estimation; risk of bias with RoB 2 and certainty with GRADE.",
+  "limitations": "Sixteen studies; the abstract compares full against partial range without separating where in the range partial repetitions were done.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

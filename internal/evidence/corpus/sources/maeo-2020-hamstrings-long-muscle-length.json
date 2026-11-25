@@ -1,0 +1,53 @@
+{
+  "id": "maeo-2020-hamstrings-long-muscle-length",
+  "title": "Greater Hamstrings Muscle Hypertrophy but Similar Damage Protection after Training at Long versus Short Muscle Lengths",
+  "authors": [
+    "Sumiaki Maeo",
+    "Meng Huang",
+    "Yuhang Wu",
+    "Hikaru Sakurai",
+    "Yuki Kusagawa",
+    "Takashi Sugiyama",
+    "Hiroaki Kanehisa",
+    "Tadao Isaka"
+  ],
+  "year": 2020,
+  "publication": "Medicine & Science in Sports & Exercise",
+  "volume": "53",
+  "issue": "4",
+  "pages": "825-837",
+  "study_type": "controlled_trial",
+  "doi": "10.1249/mss.0000000000002523",
+  "pmid": "33009197",
+  "url": "https://doi.org/10.1249/mss.0000000000002523",
+  "population": "20 healthy adults trained one leg seated and the other prone; 12 untrained controls joined the muscle-damage part.",
+  "topics": [
+    "exercise_selection",
+    "range_of_motion",
+    "hypertrophy"
+  ],
+  "keywords": [
+    "seated leg curl",
+    "prone leg curl",
+    "long muscle length",
+    "hamstrings",
+    "MRI",
+    "stretch"
+  ],
+  "key_findings": [
+    "Seated leg curls, which train the hamstrings at longer muscle lengths, grew the whole hamstrings more than prone leg curls over 12 weeks (+14% versus +9% muscle volume).",
+    "The difference showed in the biarticular hamstring muscles, not in the monoarticular one.",
+    "Both conditions protected similarly against damage from later eccentric exercise."
+  ],
+  "methods": "Within-participant comparison (one leg each condition): 5 sets of 10 at 70% of 1RM, twice a week for 12 weeks, with MRI muscle volume; then an eccentric bout with MRI T2 and 1RM over 72 hours.",
+  "limitations": "One pair of exercises and one muscle group; the abstract does not report randomization of legs or the training status of participants.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

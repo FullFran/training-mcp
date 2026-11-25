@@ -1,0 +1,50 @@
+{
+  "id": "wolf-2023-partial-vs-full-range-of-motion",
+  "title": "Partial Vs Full Range of Motion Resistance Training: A Systematic Review and Meta-Analysis",
+  "authors": [
+    "Milo Wolf",
+    "Patroklos Androulakis-Korakakis",
+    "James Fisher",
+    "Brad Schoenfeld",
+    "James Steele"
+  ],
+  "year": 2023,
+  "publication": "International Journal of Strength and Conditioning",
+  "volume": "3",
+  "issue": "1",
+  "study_type": "meta_analysis",
+  "doi": "10.47206/ijsc.v3i1.182",
+  "url": "https://doi.org/10.47206/ijsc.v3i1.182",
+  "population": "Studies comparing partial and full range-of-motion training on hypertrophy, strength, sport, power and body-fat outcomes; participant details are not summarized in the abstract.",
+  "topics": [
+    "range_of_motion",
+    "exercise_selection",
+    "hypertrophy",
+    "strength"
+  ],
+  "debates": [
+    "partial_range_of_motion"
+  ],
+  "keywords": [
+    "partial ROM",
+    "full ROM",
+    "long muscle lengths",
+    "lengthened partials",
+    "specificity"
+  ],
+  "key_findings": [
+    "Overall the difference was trivial, slightly favouring full range of motion (standardized mean difference 0.12, interval -0.02 to 0.26); every outcome group favoured full range by a trivial to small amount.",
+    "A subgroup suggested a possible hypertrophy benefit of partial range performed at long muscle lengths over full range, with an interval that includes no difference.",
+    "Strength gains were specific to the range trained, and partial range may be a reasonable choice for variation, preference or when injury prevents full range."
+  ],
+  "methods": "Pre-registered systematic review following PRISMA with a Bayesian multilevel meta-analysis and exploratory subgroup and moderator analyses.",
+  "limitations": "The long-muscle-length subgroup estimate is uncertain and exploratory; differences overall are trivial to small. Not indexed in PubMed; verified against Crossref only.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

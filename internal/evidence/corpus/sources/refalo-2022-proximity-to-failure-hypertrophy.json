@@ -1,0 +1,50 @@
+{
+  "id": "refalo-2022-proximity-to-failure-hypertrophy",
+  "title": "Influence of Resistance Training Proximity-to-Failure on Skeletal Muscle Hypertrophy: A Systematic Review with Meta-analysis",
+  "authors": [
+    "Martin C. Refalo",
+    "Eric R. Helms",
+    "Eric. T. Trexler",
+    "D. Lee Hamilton",
+    "Jackson J. Fyfe"
+  ],
+  "year": 2022,
+  "publication": "Sports Medicine",
+  "volume": "53",
+  "issue": "3",
+  "pages": "649-665",
+  "study_type": "meta_analysis",
+  "doi": "10.1007/s40279-022-01784-y",
+  "pmid": "36334240",
+  "url": "https://doi.org/10.1007/s40279-022-01784-y",
+  "population": "15 studies in healthy adults of any age and training experience.",
+  "topics": [
+    "proximity_to_failure",
+    "hypertrophy"
+  ],
+  "debates": [
+    "proximity_to_failure"
+  ],
+  "keywords": [
+    "momentary muscular failure",
+    "non-failure",
+    "velocity loss",
+    "set failure"
+  ],
+  "key_findings": [
+    "Pooling every definition of set failure, training to failure gave a trivial hypertrophy advantage over stopping short (effect size 0.19, confidence interval 0.00 to 0.37).",
+    "Training to momentary muscular failure was not better than non-failure training (effect size 0.12, interval -0.13 to 0.37), and high velocity-loss thresholds were not better than moderate ones.",
+    "The authors propose that the relationship between proximity to failure and growth may be non-linear."
+  ],
+  "methods": "Systematic review and meta-analysis comparing failure with non-failure training, with subgroups by the definition of failure and by velocity-loss threshold; volume load and relative load tested as moderators.",
+  "limitations": "Studies defined failure inconsistently, which forced subgroup analyses; few studies per subgroup.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

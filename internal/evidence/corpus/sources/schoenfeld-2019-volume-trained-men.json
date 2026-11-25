@@ -1,0 +1,53 @@
+{
+  "id": "schoenfeld-2019-volume-trained-men",
+  "title": "Resistance Training Volume Enhances Muscle Hypertrophy but Not Strength in Trained Men",
+  "authors": [
+    "BRAD J. SCHOENFELD",
+    "BRET CONTRERAS",
+    "JAMES KRIEGER",
+    "JOZO GRGIC",
+    "KENNETH DELCASTILLO",
+    "RAMON BELLIARD",
+    "ANDREW ALTO"
+  ],
+  "year": 2019,
+  "publication": "Medicine & Science in Sports & Exercise",
+  "volume": "51",
+  "issue": "1",
+  "pages": "94-103",
+  "study_type": "randomized_trial",
+  "doi": "10.1249/mss.0000000000001764",
+  "pmid": "30153194",
+  "url": "https://doi.org/10.1249/mss.0000000000001764",
+  "population": "34 healthy resistance-trained men.",
+  "topics": [
+    "volume",
+    "hypertrophy",
+    "strength"
+  ],
+  "debates": [
+    "volume_dose_response"
+  ],
+  "keywords": [
+    "sets per exercise",
+    "low volume",
+    "high volume",
+    "time-efficient"
+  ],
+  "key_findings": [
+    "1, 3 or 5 sets per exercise per session, three sessions a week for 8 weeks, gave similar gains in squat and bench press 1RM and in upper-body muscular endurance.",
+    "Muscle growth favoured the higher-volume groups at the elbow flexors, mid-thigh and lateral thigh.",
+    "The authors conclude that strength can be gained with short sessions, while hypertrophy rose with volume in this sample."
+  ],
+  "methods": "Randomized trial of three volume conditions (1, 3 or 5 sets per exercise per session), 3 sessions per week on non-consecutive days for 8 weeks; 1RM squat and bench press, bench press repetitions at 50% of 1RM, and ultrasound muscle thickness at four sites.",
+  "limitations": "Small groups (11 to 12 men each), men only, 8 weeks, and muscle size measured by ultrasound at selected sites.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

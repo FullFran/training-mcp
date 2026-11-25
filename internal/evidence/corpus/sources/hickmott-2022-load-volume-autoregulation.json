@@ -1,0 +1,50 @@
+{
+  "id": "hickmott-2022-load-volume-autoregulation",
+  "title": "The Effect of Load and Volume Autoregulation on Muscular Strength and Hypertrophy: A Systematic Review and Meta-Analysis",
+  "authors": [
+    "Landyn M. Hickmott",
+    "Philip D. Chilibeck",
+    "Keely A. Shaw",
+    "Scotty J. Butcher"
+  ],
+  "year": 2022,
+  "publication": "Sports Medicine - Open",
+  "volume": "8",
+  "issue": "1",
+  "study_type": "meta_analysis",
+  "doi": "10.1186/s40798-021-00404-9",
+  "pmid": "35038063",
+  "url": "https://doi.org/10.1186/s40798-021-00404-9",
+  "population": "15 studies in resistance-trained individuals: 6 on load autoregulation and 9 on volume autoregulation by velocity loss.",
+  "topics": [
+    "autoregulation",
+    "rir_rpe",
+    "load",
+    "proximity_to_failure",
+    "strength",
+    "hypertrophy"
+  ],
+  "keywords": [
+    "velocity-based training",
+    "velocity loss",
+    "percentage-based",
+    "RIR-based RPE",
+    "1RM"
+  ],
+  "key_findings": [
+    "Autoregulated load prescription (RIR-based RPE or velocity-based) and fixed percentage-based prescription gave similar 1RM gains.",
+    "With sets and relative intensity equated, velocity-loss thresholds of 25% or less gave more 1RM strength but less hypertrophy than thresholds above 25%.",
+    "Thresholds above 25% gave more hypertrophy than 20% or less, but no difference was found against 20 to 25%."
+  ],
+  "methods": "Systematic review and meta-analysis following PRISMA, prospectively registered (PROSPERO CRD42021240506); mean differences and standardized mean differences.",
+  "limitations": "Few studies per comparison; velocity-loss thresholds change how many repetitions are done, so they mix effort with volume.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

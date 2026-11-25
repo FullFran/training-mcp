@@ -1,0 +1,46 @@
+{
+  "id": "schoenfeld-2020-range-of-motion-review",
+  "title": "Effects of range of motion on muscle development during resistance training interventions: A systematic review",
+  "authors": [
+    "Brad J Schoenfeld",
+    "Jozo Grgic"
+  ],
+  "year": 2020,
+  "publication": "SAGE Open Medicine",
+  "volume": "8",
+  "study_type": "systematic_review",
+  "doi": "10.1177/2050312120901559",
+  "pmid": "32030125",
+  "url": "https://doi.org/10.1177/2050312120901559",
+  "population": "6 studies with 135 participants (127 men, 8 women).",
+  "topics": [
+    "range_of_motion",
+    "exercise_selection",
+    "hypertrophy"
+  ],
+  "debates": [
+    "partial_range_of_motion"
+  ],
+  "keywords": [
+    "full ROM",
+    "partial ROM",
+    "lower body",
+    "upper body"
+  ],
+  "key_findings": [
+    "Full range of motion appears better than partial range for lower-body hypertrophy.",
+    "Evidence for the upper limbs is limited and conflicting, and no study had looked at trunk muscles.",
+    "Some evidence suggests the response to range of motion may differ by muscle."
+  ],
+  "methods": "Systematic review of longitudinal dynamic training studies, quality rated with a modified PEDro scale; no pooled meta-analysis.",
+  "limitations": "Six studies, mostly men; upper-body conclusions not possible.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

@@ -1,0 +1,49 @@
+{
+  "id": "kassiano-2022-exercise-variation-review",
+  "title": "Does Varying Resistance Exercises Promote Superior Muscle Hypertrophy and Strength Gains? A Systematic Review",
+  "authors": [
+    "Witalo Kassiano",
+    "João Pedro Nunes",
+    "Bruna Costa",
+    "Alex S. Ribeiro",
+    "Brad J. Schoenfeld",
+    "Edilson S. Cyrino"
+  ],
+  "year": 2022,
+  "publication": "Journal of Strength & Conditioning Research",
+  "volume": "36",
+  "issue": "6",
+  "pages": "1753-1762",
+  "study_type": "systematic_review",
+  "doi": "10.1519/jsc.0000000000004258",
+  "pmid": "35438660",
+  "url": "https://doi.org/10.1519/jsc.0000000000004258",
+  "population": "8 studies with 241 young men.",
+  "topics": [
+    "exercise_selection",
+    "hypertrophy",
+    "strength"
+  ],
+  "keywords": [
+    "exercise variation",
+    "exercise rotation",
+    "regional hypertrophy",
+    "fixed exercises"
+  ],
+  "key_findings": [
+    "Varying exercises can change hypertrophy and strength outcomes.",
+    "Some systematic variation appears to help regional hypertrophy and maximal dynamic strength, while excessive or random variation may compromise gains.",
+    "The authors advise choosing variations for distinct anatomical and biomechanical reasons, and warn that redundant exercises or very frequent rotation may hinder progress."
+  ],
+  "methods": "Systematic review of three databases; study quality rated good to excellent on the PEDro scale; no pooled meta-analysis.",
+  "limitations": "Eight studies, young men only, qualitative synthesis.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}
