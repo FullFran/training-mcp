@@ -107,6 +107,10 @@
     memory_confirm: ['Confirmando un recuerdo', 'Recuerdo confirmado'],
     memory_consolidate_preview: ['Viendo cómo unir recuerdos', 'Visto cómo unir recuerdos'],
     memory_consolidate: ['Uniendo recuerdos', 'Recuerdos unidos'],
+    lookup_exercise: ['Buscando un ejercicio en la biblioteca', 'Ejercicio buscado en la biblioteca'],
+    list_exercises_needing_mapping: ['Viendo ejercicios sin músculos', 'Vistos ejercicios sin músculos'],
+    save_exercise_entry: ['Guardando un ejercicio en tu biblioteca', 'Ejercicio guardado en tu biblioteca'],
+    set_exercise_alias: ['Poniendo otro nombre a un ejercicio', 'Otro nombre puesto a un ejercicio'],
   };
   function words(name) {
     const w = WORDS[name];

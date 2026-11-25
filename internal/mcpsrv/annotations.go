@@ -92,6 +92,11 @@ var toolBehaviors = map[string]toolBehavior{
 	"memory_judge":            overwriting("Judge memory relation"),
 	"memory_confirm":          overwriting("Confirm memory"),
 	"memory_consolidate":      overwriting("Merge memories"),
+
+	"lookup_exercise":                read("Look up exercise"),
+	"list_exercises_needing_mapping": read("List exercises needing mapping"),
+	"save_exercise_entry":            overwriting("Save exercise library entry"),
+	"set_exercise_alias":             overwriting("Set exercise alias"),
 }
 
 // addTool registers a tool with its declared behavior. A tool missing from

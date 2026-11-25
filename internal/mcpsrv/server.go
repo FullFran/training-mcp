@@ -325,6 +325,8 @@ type PerformanceOut struct {
 }
 type WeeklyOut struct {
 	Weeks []training.WeeklyVolume `json:"weeks"`
+	// Fractional is the exercise library's view beside weeks (#137); weeks is unchanged.
+	Fractional *training.FractionalWeekly `json:"fractional,omitempty"`
 }
 type GroupInput struct {
 	Exercise    string `json:"exercise" jsonschema:"Non-empty exercise name; it is trimmed and lowercased to match stored sets."`
@@ -344,6 +346,8 @@ type VolumeInput struct {
 }
 type VolumeOut struct {
 	Volume []training.GroupVolume `json:"volume"`
+	// Fractional is the exercise library's view beside volume (#137); volume is unchanged.
+	Fractional *training.FractionalTotal `json:"fractional,omitempty"`
 }
 
 func New(service training.ServiceFor) *Server {
@@ -719,9 +723,13 @@ func New(service training.ServiceFor) *Server {
 	weeklySchema := mustInputSchema[VolumeInput]()
 	weeklySchema.Properties["from"].Pattern = `^\d{4}-\d{2}-\d{2}$`
 	weeklySchema.Properties["to"].Pattern = `^\d{4}-\d{2}-\d{2}$`
-	addTool(s, &mcp.Tool{Name: "weekly_volume", Description: "SI and set count per muscle group per training week, newest week first. Warm-up sets are not counted. Week start is the Monday of that week. Use this to see whether a muscle group's stimulus is rising or falling over time.", InputSchema: weeklySchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in VolumeInput) (*mcp.CallToolResult, WeeklyOut, error) {
+	addTool(s, &mcp.Tool{Name: "weekly_volume", Description: "SI and set count per muscle group per training week, newest week first. Warm-up sets are not counted. Week start is the Monday of that week. Use this to see whether a muscle group's stimulus is rising or falling over time." + fractionalNote, InputSchema: weeklySchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in VolumeInput) (*mcp.CallToolResult, WeeklyOut, error) {
 		v, err := service(ctx).WeeklyVolume(ctx, training.ListFilter{From: in.From, To: in.To})
-		return nil, WeeklyOut{Weeks: v}, toolError(err)
+		if err != nil {
+			return nil, WeeklyOut{Weeks: v}, toolError(err)
+		}
+		f, err := service(ctx).FractionalWeeklyVolume(ctx, training.ListFilter{From: in.From, To: in.To})
+		return nil, WeeklyOut{Weeks: v, Fractional: f}, toolError(err)
 	})
 
 	groupSchema := mustInputSchema[GroupInput]()
@@ -738,13 +746,18 @@ func New(service training.ServiceFor) *Server {
 	volumeSchema := mustInputSchema[VolumeInput]()
 	volumeSchema.Properties["from"].Pattern = `^\d{4}-\d{2}-\d{2}$`
 	volumeSchema.Properties["to"].Pattern = `^\d{4}-\d{2}-\d{2}$`
-	addTool(s, &mcp.Tool{Name: "volume_by_muscle", Description: "Total SI and set count per muscle group, optionally within an inclusive date range. Warm-up sets are not counted. Sets whose exercise has no group yet are reported under an empty muscle_group.", InputSchema: volumeSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in VolumeInput) (*mcp.CallToolResult, VolumeOut, error) {
+	addTool(s, &mcp.Tool{Name: "volume_by_muscle", Description: "Total SI and set count per muscle group, optionally within an inclusive date range. Warm-up sets are not counted. Sets whose exercise has no group yet are reported under an empty muscle_group." + fractionalNote, InputSchema: volumeSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in VolumeInput) (*mcp.CallToolResult, VolumeOut, error) {
 		v, err := service(ctx).VolumeByGroup(ctx, training.ListFilter{From: in.From, To: in.To})
-		return nil, VolumeOut{Volume: v}, toolError(err)
+		if err != nil {
+			return nil, VolumeOut{Volume: v}, toolError(err)
+		}
+		f, err := service(ctx).FractionalVolume(ctx, training.ListFilter{From: in.From, To: in.To})
+		return nil, VolumeOut{Volume: v, Fractional: f}, toolError(err)
 	})
 	addMemoryTools(s, w, service)
 	addLbTools(s, w, service)
 	addApps(s, service)
+	addExerciseLibraryTools(s, w, service)
 
 	// Stateless: the server keeps no per-client session state, so restarting the
 	// container no longer invalidates a live conversation. These tools are plain
