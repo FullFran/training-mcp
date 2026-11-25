@@ -73,7 +73,8 @@ func (s *Service) StartPlannedSession(ctx context.Context, date string, planID i
 	if err != nil {
 		return Session{}, err
 	}
-	return session, s.placeSession(ctx, session.ID)
+	s.placeAfterWrite(ctx, session.ID)
+	return session, nil
 }
 
 // CreatePlan stores a reusable workout template. Exercise names are normalized
@@ -586,7 +587,8 @@ func (s *Service) LogSets(ctx context.Context, in LogSetsInput) (LogSetsResult, 
 	if err != nil || result.Replayed {
 		return result, err
 	}
-	return result, s.placeSession(ctx, result.Session.ID)
+	s.placeAfterWrite(ctx, result.Session.ID)
+	return result, nil
 }
 
 // validSetFields holds the rules a recorded set must satisfy, shared by every
@@ -621,7 +623,8 @@ func (s *Service) AddSet(ctx context.Context, in AddSetInput) (Set, float64, err
 	if err != nil {
 		return Set{}, 0, err
 	}
-	return set, si, s.placeSession(ctx, in.SessionID)
+	s.placeAfterWrite(ctx, in.SessionID)
+	return set, si, nil
 }
 
 // SetExerciseNote stores a persistent setup reminder for an exercise. An empty

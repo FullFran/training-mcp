@@ -149,3 +149,37 @@ func TestPeriodizationToolsRejectInvalidCallsWithoutWriting(t *testing.T) {
 		t.Fatal("a rejected call changed rows")
 	}
 }
+
+// A placement failure never fails a write proposal: log_set through the
+// proposal flow is accepted with an undo image, and every set is stored.
+func TestAPlacementFailureLeavesTheProposalAcceptedAndUndoable(t *testing.T) {
+	ctx := context.Background()
+	w := newIsolationWorld(t)
+	if out := structured(t, call(t, w.owner, "advance_block", map[string]any{"block_id": w.ids.block, "action": "activate"})); out["status"] != "accepted" {
+		t.Fatalf("activate = %v", out)
+	}
+	if _, err := w.db.Exec(`CREATE TRIGGER fail_placement BEFORE UPDATE OF block_id, block_microcycle_id, block_off_plan ON sessions
+		BEGIN SELECT RAISE(ABORT, 'placement unavailable'); END`); err != nil {
+		t.Fatal(err)
+	}
+	sets := func() int64 {
+		return w.scalar(t, `SELECT COUNT(*) FROM sets WHERE session_id=?`, w.ids.session).(int64)
+	}
+	before := sets()
+	result := call(t, w.owner, "log_set", map[string]any{"exercise": isolationExercise, "weight_kg": 80, "reps": 5, "rpe": 8, "count": 3})
+	if result.IsError {
+		t.Errorf("log_set failed: %s", stringContent(result))
+	}
+	if got := sets(); got-before != 3 {
+		t.Errorf("stored %d sets, want 3", got-before)
+	}
+	if !result.IsError {
+		out := structured(t, result)
+		if p, err := w.ownerService.GetProposal(ctx, proposalOf(t, out)); err != nil || p.Status != training.ProposalAccepted || !p.Undoable {
+			t.Errorf("proposal = %+v, %v", p, err)
+		}
+	}
+	if got := w.scalar(t, `SELECT block_off_plan FROM sessions WHERE id=?`, w.ids.session); got != nil {
+		t.Errorf("session placed despite the failure: %v", got)
+	}
+}

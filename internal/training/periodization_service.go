@@ -3,6 +3,7 @@ package training
 import (
 	"context"
 	"errors"
+	"log"
 	"math"
 	"strings"
 	"time"
@@ -767,6 +768,16 @@ func (s *Service) AssignSessionBlock(ctx context.Context, in AssignInput) (Sessi
 		return SessionLink{}, err
 	}
 	return ps.SessionLink(ctx, in.SessionID)
+}
+
+// placeAfterWrite places a session after a write that already committed. It is
+// best effort: logging a set never fails or loses data because of
+// periodization, so a failure is logged server-side (no personal data) and the
+// session stays unplaced, for the next write or assign_session_block to place.
+func (s *Service) placeAfterWrite(ctx context.Context, sessionID int64) {
+	if err := s.placeSession(ctx, sessionID); err != nil {
+		log.Printf("periodization: session left unplaced after a write: %v", err)
+	}
 }
 
 // placeSession places a session nobody placed yet in the active block, if

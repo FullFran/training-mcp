@@ -227,6 +227,79 @@ func (w *periodWorld) get(id int64) training.BlockView {
 	return b
 }
 
+// failPlacement makes every write of a session's block link fail, as a broken
+// periodization store would.
+func failPlacement(t *testing.T, db *sql.DB) {
+	t.Helper()
+	if _, err := db.Exec(`CREATE TRIGGER fail_placement BEFORE UPDATE OF block_id, block_microcycle_id, block_off_plan ON sessions
+		BEGIN SELECT RAISE(ABORT, 'placement unavailable'); END`); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (w *periodWorld) sets(session int64) int {
+	w.t.Helper()
+	var n int
+	if err := w.store.db.QueryRow(`SELECT COUNT(*) FROM sets WHERE session_id=?`, session).Scan(&n); err != nil {
+		w.t.Fatal(err)
+	}
+	return n
+}
+
+// Placement is best effort: when it fails, every requested set is stored, the
+// write reports success and the session stays unplaced. Periodization never
+// fails or loses a logged set.
+func TestAPlacementFailureNeverFailsOrLosesAWrite(t *testing.T) {
+	ctx := context.Background()
+	w := newPeriodWorld(t)
+	b := w.block(training.BlockInput{Intent: strPtr("volumen"), MicrocycleCount: intPtr(2), Rotation: w.rotation("torso", "pierna")})
+	w.day("2026-11-16")
+	today, err := w.svc.StartPlannedSession(ctx, "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.advance(b.ID, training.BlockActivate)
+	failPlacement(t, w.store.db)
+	before := states(w.get(b.ID))
+
+	// log_set into today's unplaced session.
+	n := w.sets(today.ID)
+	if _, out, err := w.svc.LogSet(ctx, "press banca", 80, 5, 8, 3, "", "", ""); err != nil || len(out) != 3 || w.sets(today.ID)-n != 3 {
+		t.Errorf("log_set into an unplaced session: %d sets returned, %d stored, err %v", len(out), w.sets(today.ID)-n, err)
+	}
+	// add_set.
+	n = w.sets(today.ID)
+	if _, _, err := w.svc.AddSet(ctx, training.AddSetInput{SessionID: today.ID, Exercise: "press banca", WeightKG: 80, Reps: 5, RPE: 8}); err != nil || w.sets(today.ID)-n != 1 {
+		t.Errorf("add_set: %d stored, err %v", w.sets(today.ID)-n, err)
+	}
+	// log_sets.
+	n = w.sets(today.ID)
+	logged, err := w.svc.LogSets(ctx, training.LogSetsInput{Key: "k1", Exercise: "remo", Sets: []training.LoggedSet{{WeightKG: 60, Reps: 8, RPE: 8}, {WeightKG: 60, Reps: 8, RPE: 8}}})
+	if err != nil || len(logged.Sets) != 2 || w.sets(today.ID)-n != 2 {
+		t.Errorf("log_sets: %d stored, err %v", w.sets(today.ID)-n, err)
+	}
+	if l := w.link(today.ID); l.Placed {
+		t.Errorf("today's session placed despite the failure: %+v", l)
+	}
+	// log_set on a new day creates the session and stores every set.
+	w.day("2026-11-17")
+	session, out, err := w.svc.LogSet(ctx, "sentadilla", 100, 5, 8, 3, "", "", "")
+	if err != nil || len(out) != 3 || session.ID == 0 || w.sets(session.ID) != 3 {
+		t.Errorf("log_set on a new day: %d sets returned, session %d, err %v", len(out), session.ID, err)
+	}
+	if session.ID != 0 && w.link(session.ID).Placed {
+		t.Errorf("new session placed despite the failure: %+v", w.link(session.ID))
+	}
+	// start_session.
+	started, err := w.svc.StartPlannedSession(ctx, "2026-11-18", w.plans["torso"])
+	if err != nil || started.ID == 0 || w.link(started.ID).Placed {
+		t.Errorf("start_session: %+v, %v", started, err)
+	}
+	if after := states(w.get(b.ID)); after != before {
+		t.Errorf("block moved: %s, want %s", after, before)
+	}
+}
+
 // states reads each microcycle as position:state:sessions.
 func states(b training.BlockView) string {
 	out := make([]string, len(b.Microcycles))
