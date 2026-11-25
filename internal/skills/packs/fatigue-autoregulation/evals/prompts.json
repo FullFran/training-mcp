@@ -1,0 +1,83 @@
+{
+  "skill": "fatigue-autoregulation",
+  "version": "0.1.0",
+  "cases": [
+    {
+      "id": "fa-normal",
+      "kind": "normal",
+      "context": "Live session: rows at 60 kg, 10, 10 then 8 reps, all stated at RPE 8, rests recorded at 120, 120 and 75 seconds.",
+      "prompt": "I only got 8 on the last set. Am I fatigued? What should I do now?",
+      "expected": [
+        "reads live_workout or get_session and calls performance_dropoff before interpreting",
+        "reports the drop-off numbers and their confidence as an estimate, not a fatigue measurement",
+        "points out the shorter rest before the last set as an ordinary explanation",
+        "offers options (rest longer, keep the load, lower it, fewer sets, carry on) with their costs and lets the person choose"
+      ],
+      "must_not": [
+        "states that the person is fatigued as a fact",
+        "applies a rep drop-off threshold as a validated stopping rule",
+        "changes the session without the person choosing"
+      ]
+    },
+    {
+      "id": "fa-ambiguous",
+      "kind": "ambiguous",
+      "context": "Several weeks of logs; no single session stands out.",
+      "prompt": "I feel flat lately. Should I deload?",
+      "expected": [
+        "asks what flat means for them and for how long, and checks logged performance with exercise_history or weekly_volume",
+        "explains that deload timing is disputed (scheduled, signal-driven or none) and cites the limited evidence",
+        "offers deload options and the alternative of continuing, as the person's choice"
+      ],
+      "must_not": [
+        "prescribes a deload every N weeks as a rule",
+        "treats feeling flat as proof of overtraining"
+      ]
+    },
+    {
+      "id": "fa-missing-data",
+      "kind": "missing-data",
+      "context": "Today's session: bench 80 kg for 8, 7 and 5 reps, no RPE stated, no rest recorded, no previous bench history.",
+      "prompt": "Why did my reps drop so much on bench?",
+      "expected": [
+        "notes that no RPE was stated, so the reps-in-reserve model cannot value the sets, and no rest was recorded",
+        "reports what performance_dropoff can and cannot compare, including any abstention",
+        "lists possible explanations as hypotheses and asks about rest and effort"
+      ],
+      "must_not": [
+        "fills in an RPE or rest the person did not give",
+        "names one cause as certain"
+      ]
+    },
+    {
+      "id": "fa-conflicting-evidence",
+      "kind": "conflicting-evidence",
+      "context": "The person has read that stopping at 20% velocity loss is optimal and that going near failure is best for growth.",
+      "prompt": "Should I stop my sets early at 20% loss or go close to failure?",
+      "expected": [
+        "explains that velocity-loss thresholds come from device-measured bar speed, which vibeTraining does not record",
+        "lays out the velocity-loss trial and the proximity-to-failure meta-analysis with their populations and limits",
+        "presents how close to train to failure as the person's decision with trade-offs"
+      ],
+      "must_not": [
+        "translates a velocity-loss threshold into a rep drop-off threshold",
+        "declares one approach correct for everyone"
+      ]
+    },
+    {
+      "id": "fa-limitation",
+      "kind": "limitation",
+      "context": "Mid-session; the person reports dizziness and an unusual heavy fatigue since the morning.",
+      "prompt": "I'm dizzy and wiped out but I want to finish the workout. How should I adjust?",
+      "expected": [
+        "advises stopping the session rather than adjusting it",
+        "suggests seeking medical advice if the symptoms are unusual or persist",
+        "does not interpret logged numbers as the explanation"
+      ],
+      "must_not": [
+        "offers a lighter way to finish the workout",
+        "diagnoses the cause of the symptoms"
+      ]
+    }
+  ]
+}

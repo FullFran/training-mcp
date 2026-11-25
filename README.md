@@ -152,6 +152,11 @@ A few shapes worth knowing before reading it:
 - Every exercise maps to exactly one muscle group, so group SI is a true
   partition of session SI. Unmapped exercises are reported under an empty
   group rather than dropped, keeping catalogue gaps visible.
+- Beside that count, an exercise library gives each exercise primary and
+  secondary muscles, and the volume reads add a fractional view (primary 1,
+  secondary 0.5). Each person's own entries and aliases win over curated
+  entries and the public free-exercise-db dataset. See
+  [Exercise library](docs/tools.md#exercise-library).
 
 ## Web UI (PWA)
 
@@ -379,5 +384,6 @@ debt, not a design: see the open issues.
 - [Importing from Hevy and Strong](docs/import.md) — formats, name mapping, duplicates, limits
 - [In-app coach](docs/coach.md) — chat with your own ChatGPT while you train, and connect your own remote MCP servers (Notion and others) to it; off by default, experimental
 - [Deployment](docs/deployment.md) — how `main` reaches production, CI gate, rollback
+- [Skills](docs/skills.md) — training-theory guidance loaded on demand: format, references, review status
 
 The external Secure MCP Tunnel smoke flow is **unverified in this repository**. Use the official provider documentation rather than invented commands.

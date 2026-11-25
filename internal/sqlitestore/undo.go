@@ -73,6 +73,8 @@ var undoTables = []undoTable{
 		refs: []undoRef{{"coach_memory_revisions", "memory_id"}, {"coach_memory_relations", "memory_id"}, {"coach_memory_relations", "candidate_id"}, {"coach_memory", "superseded_by"}, {"coach_memory", "consolidated_into"}}},
 	{name: "coach_memory_revisions", key: []string{"id"}, owned: `memory_id IN (SELECT id FROM coach_memory WHERE user_id=?)`},
 	{name: "coach_memory_relations", key: []string{"id"}, owned: `user_id=?`},
+	{name: "exercise_library_entries", key: []string{"user_id", "match_key"}, owned: `user_id=?`},
+	{name: "exercise_aliases", key: []string{"user_id", "match_key"}, owned: `user_id=?`},
 	{name: "goals", key: []string{"id"}, owned: `user_id=?`, refs: []undoRef{{"blocks", "goal_id"}}},
 	{name: "blocks", key: []string{"id"}, owned: `user_id=?`, refs: []undoRef{{"block_microcycles", "block_id"}, {"block_rotations", "block_id"}, {"sessions", "block_id"}}},
 	{name: "block_microcycles", key: []string{"id"}, owned: `user_id=?`, temp: map[string]string{"position": positionTemp}, refs: []undoRef{{"block_rotations", "microcycle_id"}, {"sessions", "block_microcycle_id"}}},

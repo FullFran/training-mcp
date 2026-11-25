@@ -44,6 +44,8 @@ var actionLabels = map[string]string{
 	"memory.confirm":          "Confirmar recuerdo",
 	"memory.consolidate":      "Fusionar recuerdos",
 	training.UndoAction:       "Deshacer",
+	"exercise.library.save":   "Guardar ejercicio en tu biblioteca",
+	"exercise.alias.set":      "Poner otro nombre a un ejercicio",
 
 	// Periodization (#41).
 	"goal.create":               "Crear objetivo",

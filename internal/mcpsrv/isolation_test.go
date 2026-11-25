@@ -40,6 +40,10 @@ type isolationCase struct {
 	args  func(toolIDs) map[string]any
 	byID  bool
 	count string
+
+	// global tools serve the same read-only content to everyone (skills):
+	// every user, the owner included, gets the answer of an empty database.
+	global bool
 }
 
 func noArgs(toolIDs) map[string]any { return map[string]any{} }
@@ -161,6 +165,18 @@ var isolationCases = map[string]isolationCase{
 	"set_volume_landmarks": {count: `volume_landmarks WHERE user_id=2 AND muscle_group='pecho' AND mev=1`, args: func(toolIDs) map[string]any {
 		return map[string]any{"muscle_group": "pecho", "mev": 1, "mrv": 2}
 	}},
+	"list_skills": {global: true, args: noArgs},
+	"load_skill": {global: true, args: func(toolIDs) map[string]any {
+		return map[string]any{"id": "hypertrophy-programming"}
+	}},
+	"lookup_exercise":                {args: func(toolIDs) map[string]any { return map[string]any{"name": "press plano"} }},
+	"list_exercises_needing_mapping": {args: noArgs},
+	"save_exercise_entry": {count: `exercise_library_entries WHERE user_id=2 AND match_key='press militar'`, args: func(toolIDs) map[string]any {
+		return map[string]any{"name": "Press Militar", "primary": []string{"hombro anterior"}, "secondary": []string{"hombro lateral"}}
+	}},
+	"set_exercise_alias": {count: `exercise_aliases WHERE user_id=2 AND match_key='banca'`, args: func(toolIDs) map[string]any {
+		return map[string]any{"alias": "banca", "target": "Bench Press - Powerlifting"}
+	}},
 	"training_status": {args: noArgs},
 	"list_blocks":     {args: noArgs},
 	"get_block":       {byID: true, args: func(id toolIDs) map[string]any { return map[string]any{"block_id": id.block} }},
@@ -252,6 +268,12 @@ func newIsolationWorld(t *testing.T) isolationWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err = owner.SaveExerciseEntry(ctx, training.LibraryEntryInput{Name: "press militar", Primary: []string{"hombro anterior"}, Secondary: []string{"triceps"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = owner.SetExerciseAlias(ctx, "press plano", "press militar"); err != nil {
+		t.Fatal(err)
+	}
 	// User 2 accepts every proposal, so each write tool reaches its data path. The
 	// pending path is isolated by TestPendingProposalsAreIsolatedBetweenUsers.
 	if err = services.ForUser(2).SetAcceptAll(ctx, true); err != nil {
@@ -276,6 +298,7 @@ func dumpTables(t *testing.T, db *sql.DB, where map[string]string) string {
 	t.Helper()
 	tables := []string{"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
 		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys", "coach_memory", "coach_memory_revisions", "coach_memory_relations",
+		"exercise_library_entries", "exercise_aliases",
 		"goals", "blocks", "block_microcycles", "block_rotations"}
 	var out strings.Builder
 	for _, table := range tables {
@@ -318,10 +341,13 @@ var ownersRows = map[string]string{
 	"coach_memory":           `WHERE user_id=1`,
 	"coach_memory_revisions": `WHERE memory_id IN (SELECT id FROM coach_memory WHERE user_id=1)`,
 	"coach_memory_relations": `WHERE user_id=1`,
-	"goals":                  `WHERE user_id=1`,
-	"blocks":                 `WHERE user_id=1`,
-	"block_microcycles":      `WHERE user_id=1`,
-	"block_rotations":        `WHERE user_id=1`,
+
+	"exercise_library_entries": `WHERE user_id=1`,
+	"exercise_aliases":         `WHERE user_id=1`,
+	"goals":                    `WHERE user_id=1`,
+	"blocks":                   `WHERE user_id=1`,
+	"block_microcycles":        `WHERE user_id=1`,
+	"block_rotations":          `WHERE user_id=1`,
 }
 
 func answer(t *testing.T, result *mcp.CallToolResult) string {
@@ -370,6 +396,25 @@ func TestEveryToolIsIsolatedBetweenUsers(t *testing.T) {
 				}
 				if after := dumpTables(t, world.db, ownersRows); after != before {
 					t.Fatalf("owner's rows changed:\nbefore\n%s\nafter\n%s", before, after)
+				}
+
+			case tc.global:
+				before := dumpTables(t, world.db, nil)
+				got := answer(t, call(t, world.second, name, args))
+				store, err := sqlitestore.Open(sqlitestoretest.Path(t))
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer store.Close()
+				empty := mustConnect(t, New(only(training.NewServices(store, isolationClock).ForUser(1))).Handler())
+				if want := answer(t, call(t, empty, name, args)); got != want {
+					t.Fatalf("beside the owner:\n%s\non an empty database:\n%s", got, want)
+				}
+				if owner := answer(t, call(t, world.owner, name, args)); owner != got {
+					t.Fatalf("a global tool answers the owner differently:\n%s\nsecond user:\n%s", owner, got)
+				}
+				if after := dumpTables(t, world.db, nil); after != before {
+					t.Fatalf("a read changed rows:\nbefore\n%s\nafter\n%s", before, after)
 				}
 
 			default:
