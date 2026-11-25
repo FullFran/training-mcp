@@ -18,8 +18,8 @@ effort-weighted sets, the engine compares sets.
 rounded to 0.1 kg, with one rule: **a single (1 rep) is the lifted weight**. The
 raw formula would report a 100 kg single as 103.3 kg, a heavier lift than the one
 recorded. The best set in `exercise_history` (and the web app's record badge,
-which compares against it) is ranked by the same rule in SQL; the two must change
-together.
+which compares against it) and the per-equipment bests in `best_by_equipment` are
+ranked by the same rule in SQL; they must change together.
 
 Visible effect of adopting the rule: only sets of exactly 1 rep change; their
 estimate drops by 3.3%, and an exercise whose record was a single may now show a
@@ -83,6 +83,25 @@ What the contract derives instead of storing:
   RPE feeds `rir_epley_v1`.
 
 No migration: every input above already exists on a stored set.
+
+## Best set and load suggestion per equipment
+
+The same equipment rule applies outside a session:
+
+- `exercise_history` keeps its overall `best` (every equipment together, as
+  before) and adds `best_by_equipment`: for each equipment value, ordered by
+  name, the best working straight set over the whole history, ranked like
+  `best`. Sets with no equipment stated are one group, written `equipment: ""`.
+- `suggest_load` takes an optional `equipment`, normalized as on write. Given,
+  the advice comes from the latest comparable set on that equipment only, and
+  the output echoes `equipment`. If that equipment has no comparable set, the
+  tool suggests nothing, sets `no_sets_on_equipment` and lists `equipment_seen`;
+  it never falls back to another machine or to sets with no equipment stated.
+  Omitted, every field is computed as before, and `equipment_seen` lists the
+  values when the exercise has sets on more than one.
+
+The web app's entry form shows the overall record and the suggestion without
+equipment, so what it shows is unchanged.
 
 ## Drop-off
 

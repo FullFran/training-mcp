@@ -254,7 +254,8 @@ type RecommendOut struct {
 	Recommendations []training.SetChange `json:"recommendations"`
 }
 type LoadInput struct {
-	Exercise string `json:"exercise" jsonschema:"Non-empty exercise name; trimmed and lowercased to match stored sets."`
+	Exercise  string `json:"exercise" jsonschema:"Non-empty exercise name; trimmed and lowercased to match stored sets."`
+	Equipment string `json:"equipment,omitempty" jsonschema:"Optional machine or equipment to advise for, normalized like exercise names; at most 80 characters. Only sets on that equipment are used, and if it has none the output says so (no_sets_on_equipment) instead of using other equipment. Omit to use every set, as before; equipment_seen then lists the values when there are several, so you can ask which one or pick."`
 }
 type LoadSuggestionOut struct {
 	Suggestion training.LoadSuggestion `json:"suggestion"`
@@ -622,8 +623,8 @@ func New(service training.ServiceFor) *Server {
 
 	loadSchema := mustInputSchema[LoadInput]()
 	loadSchema.Properties["exercise"].Pattern = `.*\S.*`
-	addTool(s, &mcp.Tool{Name: "suggest_load", Description: "Suggest the next working weight for an exercise, judged against the rep range and RPE it is prescribed at. Advisory only: it explains its reasoning and never changes a plan. Sets carrying an intensity technique are ignored, since they are not comparable to straight sets, and so are warm-up sets.", InputSchema: loadSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in LoadInput) (*mcp.CallToolResult, LoadSuggestionOut, error) {
-		v, err := service(ctx).SuggestLoad(ctx, in.Exercise)
+	addTool(s, &mcp.Tool{Name: "suggest_load", Description: "Suggest the next working weight for an exercise, judged against the rep range and RPE it is prescribed at. Advisory only: it explains its reasoning and never changes a plan. Sets carrying an intensity technique are ignored, since they are not comparable to straight sets, and so are warm-up sets. With equipment, only sets on that equipment are used, and an equipment with no sets is reported as such (no_sets_on_equipment); without it, every set is used and equipment_seen lists the equipment values when there are several.", InputSchema: loadSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in LoadInput) (*mcp.CallToolResult, LoadSuggestionOut, error) {
+		v, err := service(ctx).SuggestLoadOn(ctx, in.Exercise, in.Equipment)
 		return nil, LoadSuggestionOut{Suggestion: v}, toolError(err)
 	})
 
@@ -707,7 +708,7 @@ func New(service training.ServiceFor) *Server {
 	historySchema.Properties["limit"].Default = json.RawMessage("50")
 	historySchema.Properties["limit"].Minimum = jsonschema.Ptr(1.0)
 	historySchema.Properties["limit"].Maximum = jsonschema.Ptr(500.0)
-	addTool(s, &mcp.Tool{Name: "exercise_history", Description: "All recorded sets of one exercise, newest first, with each set's estimated 1RM, plus the best set ever recorded for it. Use this to judge progression instead of reading whole sessions.", InputSchema: historySchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in HistoryInput) (*mcp.CallToolResult, HistoryOut, error) {
+	addTool(s, &mcp.Tool{Name: "exercise_history", Description: "All recorded sets of one exercise, newest first, with each set's estimated 1RM, plus the best set ever recorded for it and, in best_by_equipment, the best set on each equipment value (an empty equipment groups the sets with no equipment stated), so two machines sharing a name keep separate records. Use this to judge progression instead of reading whole sessions.", InputSchema: historySchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in HistoryInput) (*mcp.CallToolResult, HistoryOut, error) {
 		v, err := service(ctx).ExerciseHistory(ctx, in.Exercise, in.Limit)
 		return nil, HistoryOut{History: v}, toolError(err)
 	})

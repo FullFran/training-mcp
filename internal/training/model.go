@@ -402,6 +402,16 @@ type LoadSuggestion struct {
 	TargetRPE float64 `json:"target_rpe,omitempty"`
 	LastReps  int     `json:"last_reps,omitempty"`
 	LastRPE   float64 `json:"last_rpe,omitempty"`
+	// Equipment is the normalized equipment the advice was restricted to;
+	// empty when none was asked for and every set was considered.
+	Equipment string `json:"equipment,omitempty"`
+	// NoSetsOnEquipment is true when the asked equipment has no comparable
+	// set: nothing is suggested rather than borrowing another machine's sets.
+	NoSetsOnEquipment bool `json:"no_sets_on_equipment,omitempty"`
+	// EquipmentSeen lists the equipment values with comparable sets, "" for
+	// sets with no equipment stated. Set when no equipment was asked for and
+	// there are several, or when the asked one has no sets.
+	EquipmentSeen []string `json:"equipment_seen,omitempty"`
 }
 
 // LoadStep is the smallest sensible jump for an exercise. Upper-body isolation
@@ -465,8 +475,8 @@ func SuggestLoad(last *ExerciseSet, repMin, repMax int, targetRPE float64) LoadS
 // unchanged: the formula would add 3.3%, which is an artefact, not a heavier
 // lift. It is descriptive only and is never stored: SI remains the single
 // recorded intensity metric. Non-positive weight or reps return 0. It is the
-// estimator EstimatorEpley; the best-set query in the store ranks sets the
-// same way, so the two must change together.
+// estimator EstimatorEpley; the best-set queries in the store (overall and per
+// equipment) rank sets the same way, so they must change together.
 func Epley1RM(weightKG float64, reps int) float64 {
 	if weightKG <= 0 || reps <= 0 {
 		return 0
@@ -505,6 +515,21 @@ type ExerciseHistory struct {
 	MuscleGroup string        `json:"muscle_group,omitempty"`
 	Sets        []ExerciseSet `json:"sets"`
 	Best        *ExerciseSet  `json:"best,omitempty"`
+	// BestByEquipment is the best set on each equipment value, ranked as Best
+	// is, ordered by equipment, so two machines sharing an exercise name keep
+	// separate records. Sets with no equipment stated are a group of their own.
+	BestByEquipment []EquipmentBest `json:"best_by_equipment,omitempty"`
+}
+
+// EquipmentBest is the record of one exercise on one equipment value.
+type EquipmentBest struct {
+	// Equipment is the normalized value; "" is the group of sets with no
+	// equipment stated, always written out so it is never mistaken for absent.
+	Equipment string      `json:"equipment"`
+	Best      ExerciseSet `json:"best"`
+	// Latest is the most recent comparable set on this equipment over the
+	// whole history, which suggest_load advises from. Not part of the output.
+	Latest ExerciseSet `json:"-"`
 }
 
 // WeeklyVolume is SI for one muscle group in one training week. WeekStart is

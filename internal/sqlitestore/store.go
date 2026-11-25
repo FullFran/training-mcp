@@ -1226,7 +1226,49 @@ ORDER BY CASE WHEN st.reps=1 THEN st.weight_kg ELSE st.weight_kg*(1+CAST(st.reps
 	best.SI = training.NormalizeSI(best.SI)
 	best.Est1RM = training.Epley1RM(best.WeightKG, best.Reps)
 	out.Best = &best
-	return out, nil
+	out.BestByEquipment, err = s.bestByEquipment(ctx, exercise)
+	return out, err
+}
+
+// bestByEquipment ranks the comparable sets of each equipment value apart, the
+// sets with no equipment stated being one more value: rank_best is the record
+// (the same order as the overall best, with the set id breaking a full tie)
+// and rank_latest the most recent set, in history order.
+func (s *userStore) bestByEquipment(ctx context.Context, exercise string) ([]training.EquipmentBest, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id,session_id,date,weight_kg,reps,rpe,rpe_imputed,si,technique,superset,category,eq,rank_best,rank_latest FROM (
+SELECT st.id,st.session_id,se.date,st.weight_kg,st.reps,st.rpe,st.rpe_imputed,st.si,st.technique,st.superset,st.category,COALESCE(st.equipment,'') AS eq,
+ROW_NUMBER() OVER (PARTITION BY COALESCE(st.equipment,'') ORDER BY CASE WHEN st.reps=1 THEN st.weight_kg ELSE st.weight_kg*(1+CAST(st.reps AS REAL)/30) END DESC, se.date DESC, st.id DESC) AS rank_best,
+ROW_NUMBER() OVER (PARTITION BY COALESCE(st.equipment,'') ORDER BY se.date DESC, st.position DESC, st.id DESC) AS rank_latest
+FROM sets st JOIN sessions se ON se.id=st.session_id
+WHERE se.user_id=? AND st.exercise=? AND st.technique='' AND st.category='working')
+WHERE rank_best=1 OR rank_latest=1
+ORDER BY eq`, s.userID, exercise)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []training.EquipmentBest
+	for rows.Next() {
+		var v training.ExerciseSet
+		var rankBest, rankLatest int
+		if err = rows.Scan(&v.SetID, &v.SessionID, &v.Date, &v.WeightKG, &v.Reps, &v.RPE, &v.RPEImputed, &v.SI, &v.Technique, &v.Superset, &v.Category, &v.Equipment, &rankBest, &rankLatest); err != nil {
+			return nil, err
+		}
+		v.SI = training.NormalizeSI(v.SI)
+		v.Est1RM = training.Epley1RM(v.WeightKG, v.Reps)
+		if n := len(out); n == 0 || out[n-1].Equipment != v.Equipment {
+			out = append(out, training.EquipmentBest{Equipment: v.Equipment})
+		}
+		g := &out[len(out)-1]
+		if rankBest == 1 {
+			g.Best = v
+		}
+		if rankLatest == 1 {
+			g.Latest = v
+		}
+	}
+	return out, rows.Err()
 }
 
 // WeeklyVolume buckets SI per muscle group by training week. The week start is
