@@ -109,6 +109,10 @@
     memory_consolidate: ['Uniendo recuerdos', 'Recuerdos unidos'],
     list_skills: ['Consultando las guías de entrenamiento', 'Consultadas las guías de entrenamiento'],
     load_skill: ['Leyendo una guía de entrenamiento', 'Leída una guía de entrenamiento'],
+    log_bodyweight: ['Apuntando tu peso corporal', 'Peso corporal apuntado'],
+    bodyweight_history: ['Consultando tu peso corporal', 'Consultado tu peso corporal'],
+    delete_bodyweight: ['Borrando un registro de peso', 'Registro de peso borrado'],
+    set_session_notes: ['Guardando las notas de la sesión', 'Notas de la sesión guardadas'],
   };
   function words(name) {
     const w = WORDS[name];

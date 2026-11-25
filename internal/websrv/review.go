@@ -43,6 +43,10 @@ var actionLabels = map[string]string{
 	"memory.judge":            "Relacionar recuerdos",
 	"memory.confirm":          "Confirmar recuerdo",
 	"memory.consolidate":      "Fusionar recuerdos",
+	"bodyweight.log":          "Registrar peso corporal",
+	"bodyweight.delete":       "Borrar peso corporal",
+	"session.notes.set":       "Guardar notas de la sesión",
+	"session.notes.remove":    "Borrar notas de la sesión",
 	training.UndoAction:       "Deshacer",
 }
 
@@ -351,6 +355,7 @@ var undoRows = map[string]string{
 	"coach_memory":           "un recuerdo",
 	"coach_memory_revisions": "un recuerdo",
 	"coach_memory_relations": "una relación entre recuerdos",
+	"bodyweight":             "un registro de peso corporal",
 }
 
 // undoRefusal explains why an undo was refused.
