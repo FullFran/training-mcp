@@ -2004,3 +2004,52 @@ body.coach-open .plan-today { display: none; }
 .body-weeks th, .body-weeks td { padding: 6px 4px; text-align: right; border-top: 1px solid var(--line); }
 .body-weeks th:first-child { text-align: left; font-weight: 600; }
 .body-weeks thead th { color: var(--muted); font-size: 12px; font-weight: 600; border-top: 0; }
+
+/* --- Bloques: goals, blocks and microcycles (#41). States are named, never
+   coloured as good or bad; only the current microcycle is marked. */
+main.periodization { display: grid; gap: 14px; }
+.pz-intro h2 { margin: 4px 0 6px; font-size: 22px; }
+.pz-intro p { margin: 0; font-size: 16px; line-height: 1.45; }
+.pz-section { display: grid; gap: 10px; }
+.pz-section > .section-label { margin: 6px 2px 0; }
+.pz-goal { gap: 6px; }
+.pz-goal-text { margin: 0; font-size: 17px; }
+.pz-intent { margin: 0; font-size: 22px; line-height: 1.25; }
+.pz-block p { margin: 0; }
+.pz-next, .pz-current { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.pz-next .section-label, .pz-current .section-label { margin: 0; }
+.pz-next-name { font-size: 20px; }
+.pz-actions { display: grid; gap: 8px; }
+.pz-actions form { display: grid; }
+.pz-form { display: grid; gap: 12px; padding: 12px 0 4px; }
+.pz-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.periodization input[type="date"], .periodization select {
+  width: 100%; min-height: var(--tap); padding: 0 14px; border-radius: 12px;
+  border: 1px solid var(--line); background: #10131a; color: var(--text); font-size: 17px;
+  color-scheme: dark;
+}
+.periodization .pz-move select { min-height: 40px; font-size: 15px; padding: 0 10px; }
+.pz-fieldset { margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 8px; }
+.pz-fieldset legend { padding: 0 4px; color: var(--muted); font-size: 13px; }
+.pz-radio { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+.pz-radio input { width: 20px; height: 20px; }
+.pz-edit > summary { min-height: 44px; display: flex; align-items: center; color: var(--accent); font-weight: 600; cursor: pointer; }
+.pz-timeline { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 18px; background: var(--card); overflow: hidden; }
+.pz-micro + .pz-micro { border-top: 1px solid var(--line); }
+.pz-micro > details > summary {
+  display: grid; grid-template-columns: 32px 1fr auto; gap: 10px; align-items: center;
+  min-height: var(--tap); padding: 10px 14px; cursor: pointer; list-style: none;
+}
+.pz-micro > details > summary::-webkit-details-marker { display: none; }
+.pz-pos { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 999px; border: 1px solid var(--line); font-size: 13px; }
+.pz-micro.is-current .pz-pos { border-color: var(--accent); color: var(--accent); }
+.pz-micro-body { display: grid; gap: 10px; padding: 0 14px 12px 56px; }
+.pz-routines { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pz-routines li { display: flex; justify-content: space-between; gap: 10px; }
+.pz-tag { color: var(--muted); font-size: 14px; }
+.pz-session { display: grid; gap: 6px; }
+.pz-session > a { color: var(--text); }
+.pz-move { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+@media (prefers-color-scheme: light) {
+  .periodization input[type="date"], .periodization select { background: #f0f2f6; color-scheme: light; }
+}

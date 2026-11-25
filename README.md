@@ -213,7 +213,8 @@ shared with the MCP tools and cannot drift apart.
   to the same point; when an answer gives a load («45 kg × 8») an **Aplicar**
   chip writes it into the set row, which the person still logs with its check.
   **Planificar** is the coach's chat on the whole screen, with its
-  conversations behind ☰ and the chips Coach, Rutinas, Revisión and Memoria;
+  conversations behind ☰ and the chips Coach, Rutinas, Revisión, Memoria and
+  Bloques (optional goals, blocks and microcycles, edited by hand, forward only);
   the plan of the day, pending proposals (a routine the coach proposes is a
   draft to **Revisar y guardar**), what was applied in the last 12 hours
   (**Deshacer**) and logged sets appear there as cards rendered by the

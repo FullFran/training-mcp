@@ -1,0 +1,252 @@
+{{/* Bloques, opened from Planificar's chips: goals, the active block with its
+     microcycles, what is due next and the sessions outside the plan. Every
+     form writes through the same domain calls as the MCP tools; nothing here
+     suggests a length, a deload or a score. */}}
+{{define "blocks.html"}}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bloques</title>
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="{{.Base}}/manifest.webmanifest">
+<link rel="icon" href="{{.Base}}/static/icon-192.png">
+<link rel="stylesheet" href="{{.Base}}/static/app.css">
+{{if .CSRF}}<meta name="csrf-token" content="{{.CSRF}}">
+{{end}}</head>
+<body data-base="{{.Base}}">
+
+<header class="bar back-only">
+  <div><strong>Bloques</strong></div>
+  {{if .Periodization.Single}}<a class="ghost" href="{{.Base}}/blocks">Todos los bloques</a>{{else}}<a class="ghost" href="{{.Base}}/?modo=planificar">Planificar</a>{{end}}
+</header>
+
+<main class="periodization">
+  {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
+  {{$pz := .Periodization}}
+
+  {{if $pz.Empty}}
+  <section class="pz-intro">
+    <h2>Planifica por bloques, si quieres</h2>
+    <p class="muted">Los bloques son opcionales: si no creas ninguno, una sola rutina sigue funcionando como hasta ahora. Un bloque agrupa microciclos con la intención, la duración y la rotación de rutinas que tú decidas, y lo puedes cambiar sobre la marcha.</p>
+  </section>
+  {{end}}
+
+  {{if not $pz.Single}}
+  <section class="pz-section" aria-labelledby="pz-goals-title">
+    <h2 id="pz-goals-title" class="section-label">Objetivo</h2>
+    {{range $pz.Goals}}
+    <div class="card pz-goal">
+      <p class="pz-goal-text"><strong>{{.Text}}</strong>{{if .TargetDate}} <span class="muted num">· {{.TargetDate}}</span>{{end}}</p>
+      <details class="pz-edit">
+        <summary>Editar objetivo</summary>
+        <form method="post" action="{{$.Base}}/blocks/goal" class="pz-form">{{if $.CSRF}}
+          <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+          <input type="hidden" name="goal_id" value="{{.ID}}">
+          <label class="field"><span>Objetivo</span><input type="text" name="text" value="{{.Text}}" maxlength="500" required></label>
+          <label class="field"><span>Fecha (opcional)</span><input type="date" name="target_date" value="{{.TargetDate}}"></label>
+          <button type="submit" class="btn">Guardar objetivo</button>
+        </form>
+      </details>
+    </div>
+    {{end}}
+    <details class="pz-edit"{{if $pz.Empty}} open{{end}}>
+      <summary>Nuevo objetivo</summary>
+      <form method="post" action="{{$.Base}}/blocks/goal" class="pz-form">{{if $.CSRF}}
+        <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+        <label class="field"><span>Objetivo, con tus palabras</span><input type="text" name="text" maxlength="500" required></label>
+        <label class="field"><span>Fecha (opcional)</span><input type="date" name="target_date"></label>
+        <button type="submit" class="btn">Crear objetivo</button>
+      </form>
+    </details>
+  </section>
+  {{end}}
+
+  {{with $pz.Shown}}
+  <section class="card pz-block" aria-labelledby="pz-block-title">
+    <span class="eyebrow">{{.StatusLabel}}</span>
+    <h2 id="pz-block-title" class="pz-intent">{{.Intent}}</h2>
+    <p class="muted pz-meta">{{.AdvanceLabel}} · {{.Days}} · {{.Count}}</p>
+    {{if .GoalText}}<p class="muted">Objetivo: {{.GoalText}}</p>{{end}}
+    {{if .StartDate}}<p class="muted num">{{.StartDate}}{{if .EndDate}} → {{.EndDate}}{{end}}{{if .EndedOn}} · terminado el {{.EndedOn}}{{end}}</p>{{end}}
+
+    {{if .Next}}
+    <section id="pz-next" class="pz-next" aria-label="Lo siguiente">
+      <span class="section-label">Siguiente</span>
+      <strong class="pz-next-name">{{.Next.PlanName}}</strong>
+      <form method="post" action="{{$.Base}}/plan">{{if $.CSRF}}
+        <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+        <input type="hidden" name="plan_id" value="{{.Next.PlanID}}">
+        <button type="submit" class="btn primary wide">Empezar {{.Next.PlanName}}</button>
+      </form>
+    </section>
+    {{end}}
+
+    {{with .Current}}
+    <section id="pz-current" class="pz-current" aria-label="Microciclo actual">
+      <span class="section-label">Microciclo {{.Position}}{{if .Label}} · {{.Label}}{{end}}</span>
+      {{if .Modifiers}}<p class="muted">{{.Modifiers}}</p>{{end}}
+      {{if .Routines}}<ul class="pz-routines">{{range .Routines}}
+        <li><span>{{if .PlanName}}{{.PlanName}}{{else}}Rutina borrada{{end}}</span> <span class="pz-tag">{{.Status}}</span></li>{{end}}
+      </ul>{{else}}<p class="muted">Sin rotación: cualquier sesión cuenta.</p>{{end}}
+    </section>
+    {{end}}
+
+    <div class="pz-actions">
+      {{if .Startable}}
+      <form method="post" action="{{$.Base}}/blocks/advance" class="pz-form">{{if $.CSRF}}
+        <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+        <input type="hidden" name="block_id" value="{{.ID}}">
+        <input type="hidden" name="action" value="activate">
+        <label class="field"><span>Empieza el (vacío: hoy)</span><input type="date" name="start_date"></label>
+        <button type="submit" class="btn primary">Activar bloque</button>
+      </form>
+      {{end}}
+      {{if and .Active .Sequence .Current}}
+      <form method="post" action="{{$.Base}}/blocks/advance">{{if $.CSRF}}
+        <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+        <input type="hidden" name="block_id" value="{{.ID}}">
+        <input type="hidden" name="action" value="complete_microcycle">
+        <button type="submit" class="btn">Cerrar microciclo {{.Current.Position}}</button>
+      </form>
+      <form method="post" action="{{$.Base}}/blocks/advance">{{if $.CSRF}}
+        <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+        <input type="hidden" name="block_id" value="{{.ID}}">
+        <input type="hidden" name="action" value="skip_microcycle">
+        <button type="submit" class="btn">Saltar microciclo {{.Current.Position}}</button>
+      </form>
+      {{end}}
+      {{if not .Done}}
+      <form method="post" action="{{$.Base}}/blocks/advance">{{if $.CSRF}}
+        <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+        <input type="hidden" name="block_id" value="{{.ID}}">
+        <input type="hidden" name="action" value="close">
+        <button type="submit" class="btn outline">Terminar bloque</button>
+      </form>
+      {{end}}
+    </div>
+  </section>
+
+  <section class="pz-section" aria-labelledby="pz-timeline-title">
+    <h2 id="pz-timeline-title" class="section-label">Microciclos</h2>
+    <ol class="pz-timeline">{{$block := .}}{{range .Microcycles}}
+      <li class="pz-micro{{if .IsCurrent}} is-current{{end}}">
+        <details{{if .IsCurrent}} open{{end}}>
+          <summary>
+            <span class="pz-pos num">{{.Position}}</span>
+            <span class="row-main"><strong>{{if .Label}}{{.Label}}{{else}}Microciclo {{.Position}}{{end}}</strong>
+              <span class="muted">{{.StateLabel}}{{if .StartDate}} · <span class="num">{{.StartDate}}</span>{{end}}{{if .Modifiers}} · {{.Modifiers}}{{end}}</span></span>
+            <span class="pz-tally num muted">{{.Tally}}</span>
+          </summary>
+          <div class="pz-micro-body">
+            {{if .Routines}}<ul class="pz-routines">{{range .Routines}}
+              <li><span>{{if .PlanName}}{{.PlanName}}{{else}}Rutina borrada{{end}}</span> <span class="pz-tag">{{.Status}}</span></li>{{end}}
+            </ul>{{end}}
+            {{range .SessionRows}}{{template "blocks-session" .}}{{end}}
+            {{if .Editable}}
+            <details class="pz-edit">
+              <summary>Editar microciclo {{.Position}}</summary>
+              <form method="post" action="{{$.Base}}/blocks/microcycle" class="pz-form">{{if $.CSRF}}
+                <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+                <input type="hidden" name="block_id" value="{{$block.ID}}">
+                <input type="hidden" name="position" value="{{.Position}}">
+                <label class="field"><span>Etiqueta (opcional)</span><input type="text" name="label" value="{{.Label}}" maxlength="80"></label>
+                <div class="pz-pair">
+                  <label class="field"><span>Series por ejercicio (±)</span><input type="number" name="sets_delta" value="{{.SetsValue}}" step="1" inputmode="numeric"></label>
+                  <label class="field"><span>RPE (±)</span><input type="number" name="effort_delta" value="{{.EffortValue}}" step="0.5" inputmode="decimal"></label>
+                </div>
+                <fieldset class="pz-fieldset">
+                  <legend>Rotación</legend>
+                  <label class="pz-radio"><input type="radio" name="rotation_mode" value="block"{{if not .OwnRotation}} checked{{end}}> La del bloque</label>
+                  <label class="pz-radio"><input type="radio" name="rotation_mode" value="own"{{if .OwnRotation}} checked{{end}}> Propia:</label>
+                  {{range .Slots}}{{template "blocks-slot" .}}{{end}}
+                </fieldset>
+                <button type="submit" class="btn">Guardar microciclo</button>
+              </form>
+            </details>
+            {{end}}
+          </div>
+        </details>
+      </li>{{end}}
+    </ol>
+  </section>
+
+  {{if .OffPlan}}
+  <section id="pz-off-plan" class="pz-section" aria-labelledby="pz-off-title">
+    <h2 id="pz-off-title" class="section-label">Fuera del plan</h2>
+    {{range .OffPlanRows}}{{template "blocks-session" .}}{{end}}
+  </section>
+  {{end}}
+
+  {{if not .Done}}
+  <details class="pz-edit pz-section">
+    <summary>Editar bloque</summary>
+    {{template "blocks-form" .Form}}
+  </details>
+  {{end}}
+  {{end}}
+
+  {{if $pz.Others}}
+  <section class="pz-section" aria-labelledby="pz-others-title">
+    <h2 id="pz-others-title" class="section-label">{{if $pz.Single}}Los demás bloques{{else}}Otros bloques{{end}}</h2>
+    <div class="list">{{range $pz.Others}}
+      <a class="list-row" href="{{$.Base}}/blocks?bloque={{.ID}}"><span class="row-main"><strong>{{.Intent}}</strong><span class="muted">{{.StatusLabel}} · {{.AdvanceLabel}} · {{.MicrocycleCount}} microciclo{{if ne .MicrocycleCount 1}}s{{end}}{{if .GoalText}} · {{.GoalText}}{{end}}</span></span><span class="chev" aria-hidden="true">›</span></a>{{end}}
+    </div>
+  </section>
+  {{end}}
+
+  {{if not $pz.Single}}
+  <details class="pz-edit pz-section"{{if $pz.Empty}} open{{end}}>
+    <summary>{{if $pz.Empty}}Crear un primer bloque en borrador{{else}}Nuevo bloque{{end}}</summary>
+    {{template "blocks-form" $pz.NewForm}}
+  </details>
+  {{end}}
+</main>
+</body>
+</html>
+{{end}}
+
+{{define "blocks-session"}}<div class="pz-session">
+  <a href="{{.Base}}/s/{{.Session.SessionID}}"><span class="num">{{.Session.Date}}</span> · {{if .Session.PlanName}}{{.Session.PlanName}}{{else}}Entreno libre{{end}}</a>
+  <form method="post" action="{{.Base}}/blocks/assign" class="pz-move">{{if .CSRF}}
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
+    <input type="hidden" name="session_id" value="{{.Session.SessionID}}">
+    <select name="microcycle_id" aria-label="Mover la sesión del {{.Session.Date}}">{{range .Targets}}
+      <option value="{{.ID}}"{{if eq .ID $.Session.MicrocycleID}} selected{{end}}>{{.Label}}</option>{{end}}
+      <option value="off_plan"{{if $.Session.OffPlan}} selected{{end}}>Fuera del plan</option>
+    </select>
+    <button type="submit" class="mini">Mover</button>
+  </form>
+</div>{{end}}
+
+{{define "blocks-slot"}}<label class="field pz-slot"><span>Rutina {{.N}}</span><select name="rotation">
+    <option value="">—</option>{{range .Plans}}
+    <option value="{{.ID}}"{{if eq .ID $.Selected}} selected{{end}}>{{.Name}}</option>{{end}}
+  </select></label>{{end}}
+
+{{define "blocks-form"}}<form method="post" action="{{.Base}}/blocks/save" class="pz-form">{{if .CSRF}}
+  <input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
+  {{with .Block}}<input type="hidden" name="block_id" value="{{.ID}}">{{end}}
+  <label class="field"><span>Intención</span><input type="text" name="intent" value="{{with .Block}}{{.Intent}}{{end}}" maxlength="500" required></label>
+  <div class="pz-pair">
+    <label class="field"><span>Microciclos</span><input type="number" name="microcycle_count"{{with .Block}} value="{{.MicrocycleCount}}"{{end}} min="1" max="{{.MaxCount}}" inputmode="numeric" required></label>
+    <label class="field"><span>Días por microciclo</span><input type="number" name="microcycle_days"{{with .Block}} value="{{.MicrocycleDays}}"{{end}} min="1" max="{{.MaxDays}}" inputmode="numeric"></label>
+  </div>
+  <label class="field"><span>Avance</span><select name="advance">
+    <option value="sequence"{{if .Calendar}}{{else}} selected{{end}}>Por secuencia: pasa al siguiente al completar la rotación</option>
+    <option value="calendar"{{if .Calendar}} selected{{end}}>Por calendario: pasa al siguiente cuando acaban los días</option>
+  </select></label>
+  {{if .Goals}}<label class="field"><span>Objetivo</span><select name="goal_id">
+    <option value="">Sin objetivo</option>{{range .Goals}}
+    <option value="{{.ID}}"{{if eq .ID $.GoalID}} selected{{end}}>{{.Text}}</option>{{end}}
+  </select></label>{{end}}
+  {{if .Status}}<label class="field"><span>Estado</span><select name="status">
+    <option value="sketch"{{if eq .Status "sketch"}} selected{{end}}>Borrador</option>
+    <option value="planned"{{if eq .Status "planned"}} selected{{end}}>Planificado</option>
+  </select></label>{{end}}
+  {{if .Plans}}<fieldset class="pz-fieldset">
+    <legend>Rotación de rutinas (opcional)</legend>
+    {{range .Slots}}{{template "blocks-slot" .}}{{end}}
+  </fieldset>{{end}}
+  <button type="submit" class="btn primary">{{if .Block}}Guardar bloque{{else}}Crear bloque en borrador{{end}}</button>
+</form>{{end}}
