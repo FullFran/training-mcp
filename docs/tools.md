@@ -1,8 +1,10 @@
 # MCP tool reference
 
-35 tools over Streamable HTTP at `/mcp`. Descriptions below are the ones the
-model actually receives — they are extracted from `internal/mcpsrv/server.go`,
-so this page cannot drift from the surface it documents.
+Every tool served over Streamable HTTP at `/mcp`. Descriptions below follow the
+ones the model receives, which are written in `internal/mcpsrv`. A test
+(`internal/mcpsrv/docs_drift_test.go`) fails when a registered tool is missing
+from the tool tables here, when a table lists a tool that is not registered, or
+when a document states a tool count other than the registered one.
 
 
 ## Every write is a proposal
@@ -176,8 +178,7 @@ and OQ-0005-7).
 | `exercise.group.set` | `set_exercise_group` |
 | `feedback.record` | `record_feedback` |
 | `landmarks.set` | `set_volume_landmarks` |
-| `rest.set` | `stop_rest` | Stop the rest between sets and store how long the person rested, on the set the rest followed. With no arguments it stops the rest running now at the seconds elapsed; `set_id` with `rest_seconds` (0 to 1200) records a rest the person reports. Stored once per set. |
-| `set_rest_target` |
+| `rest.set` | `set_rest_target` |
 | `rest.stop` | `stop_rest` |
 | `set.correct_lb` | `correct_lb_sets` |
 | `memory.save` / `memory.forget` | `memory_save` / `memory_forget` |
@@ -242,6 +243,7 @@ Starting a session from a plan **copies** it. From then on the session owns its 
 | `live_workout` | What is happening in today's workout right now: the session with its sets, planned versus done per exercise, the exercise planned next, the last set and when it was logged, and the rest since it against the person's target. Needs no session id. |
 | `render_rest_timer` | The person's rest since their last logged set, as an interactive countdown in chats that support MCP Apps (`ui://vibetraining/rest-timer/v4`) and as one line of text elsewhere. The structured result lists today's exercises with their progress for the view's exercise picker. Optional `mode`: `compact` for the countdown alone (when the person asks just for the timer), `full` (the default) for the whole workout view. Reads only. See [MCP Apps](apps.md). |
 | `set_rest_target` | Set the person's target rest between sets, 30 to 900 seconds (120 until set). The phone's rest timer uses the same value. |
+| `stop_rest` | Stop the rest between sets and store how long the person rested, on the set the rest followed. With no arguments it stops the rest running now (state `resting` or `ready` in `live_workout`) at the seconds elapsed; `set_id` with `rest_seconds` (0 to 1200) records a rest the person reports. Stored once per set; `live_workout` then shows state `stopped` with `rested_seconds`. |
 | `session_progress` | For a session following a plan: planned versus completed sets per exercise, with the prescribed rep range and RPE. Exercises done off-plan are listed with target_sets 0. |
 | `add_session_exercise` | Add an exercise to today's session plan. If it is already there, target_sets is replaced and every optional field you omit (rep range, RPE, superset, notes) keeps its current value; sending either rep bound replaces the whole range. To clear a field, remove the exercise and add it again. Adjusting a session never edits the plan it was started from. |
 | `adjust_session_exercise` | Change one exercise of today's session: its set count, rep range, RPE, or whether it is skipped. Omitted fields stay as they are. Use when the session does not go as planned. |

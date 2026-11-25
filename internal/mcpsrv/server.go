@@ -774,19 +774,6 @@ func New(service training.ServiceFor) *Server {
 	return &Server{mcp: s, handler: fillMissingMcpName(h), writes: w}
 }
 func (s *Server) Handler() http.Handler { return s.handler }
-func (s *Server) ToolNames() []string {
-	return []string{"log_sets", "log_set", "start_session", "add_set", "update_set", "delete_set", "delete_session",
-		"get_session", "list_sessions", "exercise_history", "weekly_volume",
-		"set_exercise_group", "list_exercise_groups", "volume_by_muscle",
-		"create_plan", "list_plans", "get_plan", "update_plan", "delete_plan", "session_progress",
-		"set_plan_exercise", "remove_plan_exercise", "move_plan_exercise",
-		"add_session_exercise", "adjust_session_exercise", "swap_session_exercise",
-		"remove_session_exercise", "save_session_as_plan",
-		"record_feedback", "volume_recommendation", "simulate_plan",
-		"set_volume_landmarks", "list_volume_landmarks",
-		"set_exercise_note", "list_exercise_notes", "suggest_load", "performance_dropoff",
-		"preview_lb_correction", "correct_lb_sets", "render_rest_timer"}
-}
 
 // noteAction tells setting a note from removing one: an empty note deletes it.
 func noteAction(in NoteInput) string {
