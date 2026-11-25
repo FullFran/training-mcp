@@ -82,6 +82,7 @@ secret web mount was retired; backups snapshot the data volume instead.
 | `internal/httpsrv` | Composition: routing, auth, health | the adapters above |
 | `internal/config` | Environment and flags | nothing |
 | `cmd/training-mcp` | Wiring | everything, briefly |
+| `internal/skills` | Embedded training-theory skills, parsed and validated; served by `mcpsrv` | nothing but stdlib |
 | `internal/evidence` | Evidence library: embedded corpus, its validation and search rules, the `Index` port | nothing but stdlib |
 
 The dependency arrow only ever points **inwards**. `training` imports no

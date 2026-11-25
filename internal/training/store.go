@@ -91,6 +91,7 @@ type UserStore interface {
 	// corrected and still weighs OldKG; otherwise it changes nothing and
 	// returns ErrNotFound or ErrLbCorrected.
 	CorrectLbSets(context.Context, []LbSet, time.Time) error
+	BodyweightStore
 }
 
 // ProposalStore keeps one user's agent proposals and standing answers.

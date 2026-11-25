@@ -8,7 +8,7 @@ import (
 
 // serverInstructions is cross-tool guidance sent to clients on connect. ChatGPT
 // only guarantees the first 512 characters count, so it must stay under that.
-const serverInstructions = `Personal strength-training log. To record training call log_sets: it needs no session id, its sets may differ, and it creates today's session. Omit rpe unless the user stated it. Generate one idempotency_key per request and resend it when retrying. Call start_session first only to follow a plan. To judge progress use exercise_history and weekly_volume. Call suggest_load before proposing a weight and volume_recommendation before changing weekly sets. Weights are kilograms.`
+const serverInstructions = `Personal strength-training log. To record training call log_sets: it needs no session id, its sets may differ, and it creates today's session. Omit rpe unless the user stated it. Generate one idempotency_key per request and resend it when retrying. Call start_session first only to follow a plan. To judge progress use exercise_history and weekly_volume. Call suggest_load before proposing a weight and volume_recommendation before changing weekly sets. Weights are kilograms. For theory call list_skills.`
 
 // toolBehavior is what a tool declares to the client. Hosts use it to decide
 // when to ask the user for confirmation; it never replaces server validation.
@@ -59,6 +59,9 @@ var toolBehaviors = map[string]toolBehavior{
 	"memory_get":                 read("Get memory"),
 	"memory_context":             read("Get memory context"),
 	"memory_consolidate_preview": read("Preview memory merge"),
+	"list_skills":                read("List skills"),
+	"load_skill":                 read("Load skill"),
+	"bodyweight_history":         read("Get bodyweight history"),
 	"search_evidence":            read("Search evidence"),
 	"get_evidence":               read("Get evidence"),
 
@@ -94,6 +97,15 @@ var toolBehaviors = map[string]toolBehavior{
 	"memory_judge":            overwriting("Judge memory relation"),
 	"memory_confirm":          overwriting("Confirm memory"),
 	"memory_consolidate":      overwriting("Merge memories"),
+
+	"lookup_exercise":                read("Look up exercise"),
+	"list_exercises_needing_mapping": read("List exercises needing mapping"),
+	"save_exercise_entry":            overwriting("Save exercise library entry"),
+	"set_exercise_alias":             overwriting("Set exercise alias"),
+	// One entry per day: logging a day again replaces it.
+	"log_bodyweight":    overwriting("Log bodyweight"),
+	"delete_bodyweight": overwriting("Delete bodyweight"),
+	"set_session_notes": overwriting("Set session notes"),
 }
 
 // addTool registers a tool with its declared behavior. A tool missing from

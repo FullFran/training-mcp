@@ -452,6 +452,9 @@ func (s *Server) routes() {
 	s.handle("POST "+b+"/import/apply", s.applyImport)
 	s.handle("GET "+b+"/manifest.webmanifest", s.manifest)
 	s.handle("GET "+b+"/sw.js", s.serviceWorker)
+	s.handle("POST "+b+"/bodyweight", s.logBodyweight)
+	s.handle("POST "+b+"/bodyweight/delete", s.deleteBodyweight)
+	s.handle("POST "+b+"/s/{id}/notes", s.saveSessionNotes)
 
 	s.coachRoutes()
 

@@ -111,8 +111,8 @@ func TestProgressExercisesShowBestE1RMAndBestSet(t *testing.T) {
 			t.Errorf("Ejercicios lacks %q", want)
 		}
 	}
-	if !strings.Contains(body, "Aún no registras tu peso ni medidas") {
-		t.Error("Cuerpo has no empty state")
+	if !strings.Contains(body, "¿Cuánto pesas hoy?") {
+		t.Error("Cuerpo has no bodyweight form")
 	}
 }
 

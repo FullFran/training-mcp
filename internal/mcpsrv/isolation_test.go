@@ -38,8 +38,10 @@ type isolationCase struct {
 	args  func(toolIDs) map[string]any
 	byID  bool
 	count string
-	// global tools read data that belongs to no user: every user, and an
-	// empty database, must get the same answer, and nothing is written.
+
+	// global tools serve the same read-only content to everyone (skills,
+	// evidence): every user, the owner included, gets the answer of an
+	// empty database.
 	global bool
 }
 
@@ -162,6 +164,26 @@ var isolationCases = map[string]isolationCase{
 	"set_volume_landmarks": {count: `volume_landmarks WHERE user_id=2 AND muscle_group='pecho' AND mev=1`, args: func(toolIDs) map[string]any {
 		return map[string]any{"muscle_group": "pecho", "mev": 1, "mrv": 2}
 	}},
+	"list_skills": {global: true, args: noArgs},
+	"load_skill": {global: true, args: func(toolIDs) map[string]any {
+		return map[string]any{"id": "hypertrophy-programming"}
+	}},
+	"lookup_exercise":                {args: func(toolIDs) map[string]any { return map[string]any{"name": "press plano"} }},
+	"list_exercises_needing_mapping": {args: noArgs},
+	"save_exercise_entry": {count: `exercise_library_entries WHERE user_id=2 AND match_key='press militar'`, args: func(toolIDs) map[string]any {
+		return map[string]any{"name": "Press Militar", "primary": []string{"hombro anterior"}, "secondary": []string{"hombro lateral"}}
+	}},
+	"set_exercise_alias": {count: `exercise_aliases WHERE user_id=2 AND match_key='banca'`, args: func(toolIDs) map[string]any {
+		return map[string]any{"alias": "banca", "target": "Bench Press - Powerlifting"}
+	}},
+	"log_bodyweight": {count: `bodyweight WHERE user_id=2 AND date='` + isolationDay + `' AND weight_kg=70`, args: func(toolIDs) map[string]any {
+		return map[string]any{"weight": 70, "unit": "kg"}
+	}},
+	"bodyweight_history": {args: noArgs},
+	"delete_bodyweight":  {byID: true, args: func(toolIDs) map[string]any { return map[string]any{"date": isolationDay} }},
+	"set_session_notes": {byID: true, args: func(id toolIDs) map[string]any {
+		return map[string]any{"session_id": id.session, "notes": "suyas"}
+	}},
 	"search_evidence": {global: true, args: func(toolIDs) map[string]any { return map[string]any{"query": "deload"} }},
 	"get_evidence": {global: true, args: func(toolIDs) map[string]any {
 		return map[string]any{"source_id": "coleman-2024-one-week-deload-trial"}
@@ -238,8 +260,17 @@ func newIsolationWorld(t *testing.T) isolationWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err = owner.LogBodyweight(ctx, training.BodyweightInput{Date: isolationDay, Weight: 81.5, Unit: "kg"}); err != nil {
+		t.Fatal(err)
+	}
 	merge, err := owner.PreviewConsolidation(ctx, training.ConsolidationInput{MemoryIDs: []int64{memory.Memory.ID, sibling.Memory.ID}, Title: "fusion", Body: "fusion"})
 	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = owner.SaveExerciseEntry(ctx, training.LibraryEntryInput{Name: "press militar", Primary: []string{"hombro anterior"}, Secondary: []string{"triceps"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = owner.SetExerciseAlias(ctx, "press plano", "press militar"); err != nil {
 		t.Fatal(err)
 	}
 	// User 2 accepts every proposal, so each write tool reaches its data path. The
@@ -263,7 +294,8 @@ func newIsolationWorld(t *testing.T) isolationWorld {
 func dumpTables(t *testing.T, db *sql.DB, where map[string]string) string {
 	t.Helper()
 	tables := []string{"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
-		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys", "coach_memory", "coach_memory_revisions", "coach_memory_relations"}
+		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys", "coach_memory", "coach_memory_revisions", "coach_memory_relations",
+		"exercise_library_entries", "exercise_aliases", "bodyweight"}
 	var out strings.Builder
 	for _, table := range tables {
 		rows, err := db.Query(`SELECT * FROM ` + table + ` ` + where[table] + ` ORDER BY rowid`)
@@ -305,6 +337,10 @@ var ownersRows = map[string]string{
 	"coach_memory":           `WHERE user_id=1`,
 	"coach_memory_revisions": `WHERE memory_id IN (SELECT id FROM coach_memory WHERE user_id=1)`,
 	"coach_memory_relations": `WHERE user_id=1`,
+
+	"exercise_library_entries": `WHERE user_id=1`,
+	"exercise_aliases":         `WHERE user_id=1`,
+	"bodyweight":               `WHERE user_id=1`,
 }
 
 func answer(t *testing.T, result *mcp.CallToolResult) string {
@@ -357,19 +393,18 @@ func TestEveryToolIsIsolatedBetweenUsers(t *testing.T) {
 
 			case tc.global:
 				before := dumpTables(t, world.db, nil)
-				owner := call(t, world.owner, name, args)
-				second := call(t, world.second, name, args)
+				got := answer(t, call(t, world.second, name, args))
 				store, err := sqlitestore.Open(sqlitestoretest.Path(t))
 				if err != nil {
 					t.Fatal(err)
 				}
 				defer store.Close()
-				empty := call(t, mustConnect(t, New(only(training.NewServices(store, isolationClock).ForUser(1))).Handler()), name, args)
-				if owner.IsError || !strings.Contains(stringContent(owner), "coleman-2024-one-week-deload-trial") {
-					t.Fatalf("owner: %s", answer(t, owner))
+				empty := mustConnect(t, New(only(training.NewServices(store, isolationClock).ForUser(1))).Handler())
+				if want := answer(t, call(t, empty, name, args)); got != want {
+					t.Fatalf("beside the owner:\n%s\non an empty database:\n%s", got, want)
 				}
-				if answer(t, second) != answer(t, owner) || answer(t, empty) != answer(t, owner) {
-					t.Fatalf("a global read differs by user:\nowner\n%s\nsecond\n%s\nempty\n%s", answer(t, owner), answer(t, second), answer(t, empty))
+				if owner := answer(t, call(t, world.owner, name, args)); owner != got {
+					t.Fatalf("a global tool answers the owner differently:\n%s\nsecond user:\n%s", owner, got)
 				}
 				if after := dumpTables(t, world.db, nil); after != before {
 					t.Fatalf("a read changed rows:\nbefore\n%s\nafter\n%s", before, after)

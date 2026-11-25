@@ -27,7 +27,7 @@ const (
 
 // StatsData is Progreso's tab: Historial (this week, then every session by
 // month), Ejercicios (e1RM and best set per exercise, volume per muscle) and
-// Cuerpo, which has nothing recorded yet.
+// Cuerpo (bodyweight, which Historial also sets beside each week's volume).
 type StatsData struct {
 	Week         []WeekDay
 	WeekSessions int
@@ -37,6 +37,7 @@ type StatsData struct {
 	Volume       []training.GroupVolume
 	Recommend    []training.SetChange
 	Weekly       WeeklyGrid
+	Body         BodyStats
 }
 
 // weeklyWeeks is how many training weeks Progreso shows per muscle group.
@@ -245,6 +246,9 @@ func (s *Server) statsData(ctx context.Context) (StatsData, error) {
 		groupOf[g.Exercise] = g.MuscleGroup
 	}
 	out.Exercises = exerciseStats(sets, groupOf)
+	if out.Body, err = s.bodyStats(ctx, svc, today, kgByDate); err != nil {
+		return out, err
+	}
 	return out, nil
 }
 
