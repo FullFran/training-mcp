@@ -22,7 +22,7 @@ var userTables = []string{
 	"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
 	"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys",
 	"proposals", "answer_rules", "decision_records", "agent_permissions", "coach_memory", "coach_memory_revisions", "coach_memory_relations",
-	"imports", "imported_sets", "import_exercise_map",
+	"imports", "imported_sets", "import_exercise_map", "bodyweight",
 }
 
 // ownedRows selects one user's rows from each table, children through their parent.
@@ -47,6 +47,7 @@ var ownedRows = map[string]string{
 	"imports":                `SELECT * FROM imports WHERE user_id=? ORDER BY rowid`,
 	"imported_sets":          `SELECT * FROM imported_sets WHERE user_id=? ORDER BY rowid`,
 	"import_exercise_map":    `SELECT * FROM import_exercise_map WHERE user_id=? ORDER BY rowid`,
+	"bodyweight":             `SELECT * FROM bodyweight WHERE user_id=? ORDER BY rowid`,
 }
 
 func openTwoUsers(t *testing.T) *Store {
@@ -205,6 +206,9 @@ func seedUser(t *testing.T, user training.UserStore, group string) seeded {
 	if _, err = user.JudgeMemory(ctx, third.Candidates[0].RelationID, training.RelationConflictsWith, "opuestos", time.Unix(1, 0)); err != nil {
 		t.Fatal(err)
 	}
+	if err = user.PutBodyweight(ctx, training.Bodyweight{Date: sharedDay, WeightKG: 81.5, Note: "de " + group}); err != nil {
+		t.Fatal(err)
+	}
 	return seeded{session: session.ID, set: set.ID, plan: plan.ID, proposal: pending.ID, claimed: claimed.ID, rule: rule,
 		memory: memory.Memory.ID, sibling: sibling.Memory.ID, relation: sibling.Candidates[0].RelationID, conflict: third.Candidates[0].RelationID}
 }
@@ -356,6 +360,17 @@ var idCases = map[string]func(context.Context, training.UserStore, seeded) (any,
 	},
 	// Deleting everything as someone else must leave every row of the owner.
 	"DeleteAllMemory": func(c context.Context, u training.UserStore, _ seeded) (any, error) { return u.DeleteAllMemory(c) },
+	"SetSessionNotes": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		return nil, u.SetSessionNotes(c, id.session, "robadas")
+	},
+	// Bodyweight is addressed by its date: the owner's day, or a day nobody logged.
+	"DeleteBodyweight": func(c context.Context, u training.UserStore, id seeded) (any, error) {
+		day := sharedDay
+		if id.session == missingID {
+			day = "2099-01-01"
+		}
+		return nil, u.DeleteBodyweight(c, day)
+	},
 }
 
 func TestAnotherUsersIDBehavesExactlyLikeAMissingOne(t *testing.T) {
@@ -440,6 +455,9 @@ var readCases = map[string]func(context.Context, training.UserStore) (any, error
 		}
 		answered, err := u.ListProposals(c, training.ProposalFilter{Limit: 50})
 		return []any{pending, answered}, err
+	},
+	"Bodyweights": func(c context.Context, u training.UserStore) (any, error) {
+		return u.Bodyweights(c, "2026-01-01", "2026-12-31")
 	},
 }
 
@@ -564,6 +582,13 @@ var writeCases = map[string]struct {
 			return err
 		},
 		`SELECT COUNT(*) FROM coach_memory WHERE user_id=2 AND topic_key='lesion/hombro' AND title='suya'`,
+	},
+	// The owner already has an entry on this day: user 2 gets their own.
+	"PutBodyweight": {
+		func(c context.Context, u training.UserStore) error {
+			return u.PutBodyweight(c, training.Bodyweight{Date: sharedDay, WeightKG: 70})
+		},
+		`SELECT COUNT(*) FROM bodyweight WHERE user_id=2 AND date='2026-08-07' AND weight_kg=70`,
 	},
 }
 
