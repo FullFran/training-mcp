@@ -48,6 +48,8 @@ var actionLabels = map[string]string{
 	"session.notes.set":       "Guardar notas de la sesión",
 	"session.notes.remove":    "Borrar notas de la sesión",
 	training.UndoAction:       "Deshacer",
+	"exercise.library.save":   "Guardar ejercicio en tu biblioteca",
+	"exercise.alias.set":      "Poner otro nombre a un ejercicio",
 }
 
 func actionLabel(actionType string) string {

@@ -73,6 +73,8 @@ var undoTables = []undoTable{
 		refs: []undoRef{{"coach_memory_revisions", "memory_id"}, {"coach_memory_relations", "memory_id"}, {"coach_memory_relations", "candidate_id"}, {"coach_memory", "superseded_by"}, {"coach_memory", "consolidated_into"}}},
 	{name: "coach_memory_revisions", key: []string{"id"}, owned: `memory_id IN (SELECT id FROM coach_memory WHERE user_id=?)`},
 	{name: "coach_memory_relations", key: []string{"id"}, owned: `user_id=?`},
+	{name: "exercise_library_entries", key: []string{"user_id", "match_key"}, owned: `user_id=?`},
+	{name: "exercise_aliases", key: []string{"user_id", "match_key"}, owned: `user_id=?`},
 	{name: "bodyweight", key: []string{"user_id", "date"}, owned: `user_id=?`},
 }
 
