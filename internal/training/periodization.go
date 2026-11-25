@@ -39,6 +39,14 @@ const (
 	MicrocycleSkipped = "skipped"
 )
 
+// How a microcycle was closed: its last routine was done, by hand, or its
+// dates passed when the block went back to sequence.
+const (
+	ClosedByPlacement  = "placement"
+	ClosedByHand       = "hand"
+	ClosedByModeChange = "mode_change"
+)
+
 // Microcycle states as read on a given day. done and skipped are closed;
 // current and upcoming are the remaining microcycles, the only ones an edit
 // may change; elapsed is a microcycle whose dates passed in a calendar block
@@ -72,8 +80,8 @@ const (
 	MaxMicrocycleDays = 28
 	// MaxRotation bounds the routines one rotation holds.
 	MaxRotation = 14
-	// MaxSetsDelta and MaxEffortDelta bound a microcycle's modifiers. They are
-	// stored for the prescription to apply later; nothing applies them yet.
+	// MaxSetsDelta and MaxEffortDelta bound a microcycle's modifiers, which a
+	// session started in the microcycle applies to its copy of the routine.
 	MaxSetsDelta   = 20
 	MaxEffortDelta = 5.0
 )
@@ -113,6 +121,7 @@ type Microcycle struct {
 	Rotation    []RotationEntry `json:"rotation,omitempty"`
 	Status      string          `json:"status"`
 	ClosedOn    string          `json:"closed_on,omitempty"`
+	ClosedBy    string          `json:"closed_by,omitempty"`
 }
 
 // Block is the stored aggregate: the block, its rotation and its microcycles in

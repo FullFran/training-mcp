@@ -39,7 +39,7 @@ func TestServerProtocolRegistrationTypedSchemasAndCRUDFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_session_exercise", "add_set", "adjust_session_exercise", "advance_block", "assign_session_block", "bodyweight_history", "correct_lb_sets", "create_plan", "delete_bodyweight", "delete_plan", "delete_session", "delete_set", "exercise_history", "get_block", "get_evidence", "get_plan", "get_session", "list_blocks", "list_exercise_groups", "list_exercise_notes", "list_exercises_needing_mapping", "list_plans", "list_sessions", "list_skills", "list_volume_landmarks", "live_workout", "load_skill", "log_bodyweight", "log_set", "log_sets", "lookup_exercise", "memory_confirm", "memory_consolidate", "memory_consolidate_preview", "memory_context", "memory_forget", "memory_get", "memory_judge", "memory_save", "memory_search", "move_plan_exercise", "performance_dropoff", "preview_lb_correction", "record_feedback", "remove_plan_exercise", "remove_session_exercise", "render_rest_timer", "save_block", "save_exercise_entry", "save_session_as_plan", "search_evidence", "session_progress", "set_exercise_alias", "set_exercise_group", "set_exercise_note", "set_goal", "set_plan_exercise", "set_rest_target", "set_session_notes", "set_volume_landmarks", "simulate_plan", "start_session", "stop_rest", "suggest_load", "swap_session_exercise", "training_status", "update_plan", "update_set", "volume_by_muscle", "volume_recommendation", "weekly_volume"}) {
+	if !reflect.DeepEqual(sortedToolNames(tools), []string{"add_session_exercise", "add_set", "adjust_session_exercise", "advance_block", "assign_session_block", "bodyweight_history", "correct_lb_sets", "create_plan", "delete_bodyweight", "delete_plan", "delete_session", "delete_set", "exercise_history", "get_block", "get_evidence", "get_plan", "get_session", "list_blocks", "list_exercise_groups", "list_exercise_notes", "list_exercises_needing_mapping", "list_plans", "list_sessions", "list_skills", "list_volume_landmarks", "live_workout", "load_skill", "log_bodyweight", "log_set", "log_sets", "lookup_exercise", "memory_confirm", "memory_consolidate", "memory_consolidate_preview", "memory_context", "memory_forget", "memory_get", "memory_judge", "memory_save", "memory_search", "move_plan_exercise", "performance_dropoff", "preview_lb_correction", "record_feedback", "remove_plan_exercise", "remove_session_exercise", "render_rest_timer", "review_microcycle", "save_block", "save_exercise_entry", "save_session_as_plan", "search_evidence", "session_progress", "set_exercise_alias", "set_exercise_group", "set_exercise_note", "set_goal", "set_plan_exercise", "set_rest_target", "set_session_notes", "set_volume_landmarks", "simulate_plan", "start_session", "stop_rest", "suggest_load", "swap_session_exercise", "training_status", "update_plan", "update_set", "volume_by_muscle", "volume_recommendation", "weekly_volume"}) {
 		t.Fatalf("tools=%v", toolNames(tools))
 	}
 	for _, tool := range tools.Tools {
@@ -117,6 +117,7 @@ func TestServerToolsDeclareHowTheyBehave(t *testing.T) {
 		"bodyweight_history": true,
 		"search_evidence":    true, "get_evidence": true,
 		"training_status": true, "list_blocks": true, "get_block": true,
+		"review_microcycle": true,
 	}
 	additive := map[string]bool{
 		"start_session": true, "add_set": true, "log_set": true, "create_plan": true,
@@ -124,8 +125,8 @@ func TestServerToolsDeclareHowTheyBehave(t *testing.T) {
 		"advance_block": true,
 	}
 	nonDestructive := func(name string) bool { return additive[name] || name == "log_sets" || name == "stop_rest" }
-	if len(result.Tools) != 71 {
-		t.Fatalf("got %d tools, want 71", len(result.Tools))
+	if len(result.Tools) != 72 {
+		t.Fatalf("got %d tools, want 72", len(result.Tools))
 	}
 	for _, tool := range result.Tools {
 		a := tool.Annotations
@@ -224,7 +225,7 @@ func TestServerToolsDescribeTheirInputsAndValidationContract(t *testing.T) {
 	}{
 		{
 			name:        "start_session",
-			description: "Start a training session on an optional date, optionally following a plan. Omit date to use the server's current local date." + pendingNote,
+			description: "Start a training session on an optional date, optionally following a plan. Omit date to use the server's current local date. Inside an active block, a session from a routine that lands in a microcycle with modifiers gets them applied to its own copy of the routine (never the routine): sets + sets_delta kept within 1-20, target RPE + effort_delta kept within 1-10 only where one is set; block_modifiers shows the base, the delta and the result with the block and microcycle." + pendingNote,
 			properties: map[string]map[string]any{
 				"date": {"description": "Training date in exact YYYY-MM-DD format.", "pattern": `^\d{4}-\d{2}-\d{2}$`},
 			},

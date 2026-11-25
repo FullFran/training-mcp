@@ -143,6 +143,13 @@ corpus is global and read-only, embedded in the binary, and `Open` rebuilds
 them in one transaction whenever the embedded corpus version or digest differs
 from the latest load. See [evidence.md](evidence.md).
 
+Migration 034 adds two periodization facts that cannot be derived later:
+`sessions.block_modifiers`, the microcycle modifiers a session's copy of its
+routine got when it started (JSON, reached through the optional
+`training.PrescriptionStore` port), and `block_microcycles.closed_by`, how a
+microcycle closed (`placement`, `hand` or `mode_change`). See the Periodization
+section of [tools.md](tools.md).
+
 `sqlitestore` carries the highest coverage floor in CI (70% statements) because
 it is the layer that touches the data: a bug in a driving adapter shows up as a
 wrong answer, a bug here shows up as a lost training log.

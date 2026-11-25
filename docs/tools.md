@@ -209,7 +209,7 @@ The everyday path. `log_sets` is the one to reach for: it needs no session id, i
 |---|---|
 | `log_sets` | Record the sets of one exercise into today's session in a single call, creating the session if needed. The sets may differ, as in '12, 12, 10 and 8 reps'. All are stored or none. Omit rpe unless the user stated it. Repeating a call with the same idempotency_key returns the original result with replayed true and stores nothing new, so retrying is always safe. Prefer this over log_set. |
 | `log_set` | Record one or more identical sets into today's session, creating that session if it does not exist yet. It needs no session id but is not safe to retry, since repeating it records the sets again. Prefer log_sets, which is. |
-| `start_session` | Start a training session on an optional date, optionally following a plan. Omit date to use the server's current local date. |
+| `start_session` | Start a training session on an optional date, optionally following a plan. Omit date to use the server's current local date. Inside an active block, the current microcycle's modifiers are applied to the session's copy of the routine and shown in `block_modifiers` (see [Periodization](#periodization)). |
 | `add_set` | Add a set to an existing training session and return the set plus the session's recalculated total SI. |
 | `update_set` | Update one or more fields of an existing set. Omitted fields remain unchanged; RPE changes recalculate SI. Set category to 'warmup' when the user says a logged set was a warm-up, or to 'working' to undo that. |
 | `delete_set` | Permanently delete an existing set and compact the remaining set positions to a dense sequence. |
@@ -244,7 +244,7 @@ Starting a session from a plan **copies** it. From then on the session owns its 
 | `render_rest_timer` | The person's rest since their last logged set, as an interactive countdown in chats that support MCP Apps (`ui://vibetraining/rest-timer/v4`) and as one line of text elsewhere. The structured result lists today's exercises with their progress for the view's exercise picker. Optional `mode`: `compact` for the countdown alone (when the person asks just for the timer), `full` (the default) for the whole workout view. Reads only. See [MCP Apps](apps.md). |
 | `set_rest_target` | Set the person's target rest between sets, 30 to 900 seconds (120 until set). The phone's rest timer uses the same value. |
 | `stop_rest` | Stop the rest between sets and store how long the person rested, on the set the rest followed. With no arguments it stops the rest running now (state `resting` or `ready` in `live_workout`) at the seconds elapsed; `set_id` with `rest_seconds` (0 to 1200) records a rest the person reports. Stored once per set; `live_workout` then shows state `stopped` with `rested_seconds`. |
-| `session_progress` | For a session following a plan: planned versus completed sets per exercise, with the prescribed rep range and RPE. Exercises done off-plan are listed with target_sets 0. |
+| `session_progress` | For a session following a plan: planned versus completed sets per exercise, with the prescribed rep range and RPE. Exercises done off-plan are listed with target_sets 0. `block_modifiers` shows the microcycle modifiers the session got when it started, if any. |
 | `add_session_exercise` | Add an exercise to today's session plan. If it is already there, target_sets is replaced and every optional field you omit (rep range, RPE, superset, notes) keeps its current value; sending either rep bound replaces the whole range. To clear a field, remove the exercise and add it again. Adjusting a session never edits the plan it was started from. |
 | `adjust_session_exercise` | Change one exercise of today's session: its set count, rep range, RPE, or whether it is skipped. Omitted fields stay as they are. Use when the session does not go as planned. |
 | `swap_session_exercise` | Substitute one exercise for another in today's session, keeping the same prescription. Use when the planned machine is taken or the movement does not feel right. |
@@ -503,7 +503,7 @@ and the coach should say so when it cites one.
 
 ## Periodization
 
-Optional planning above the routine (#41, slice 1). It imposes no methodology:
+Optional planning above the routine (#41, slices 1 to 3). It imposes no methodology:
 a **goal** is free text with an optional target date; a **block** is a run of
 microcycles with a free-text intent, an optional goal and a rotation of
 routines (plans); a **microcycle** has an optional free label and optional
@@ -518,23 +518,62 @@ Without an active block, training works exactly as before, routine by routine.
   closes by itself; `advance_block` with `close` ends it.
 - **Placement.** While a block is active, every session started or logged is
   placed in it on its own; a session that fits nowhere is kept off-plan, never
-  rejected. `assign_session_block` moves it.
+  rejected. `assign_session_block` moves it. Deleting the session that closed
+  a microcycle of the active sequence block reopens it, when it no longer holds
+  every routine of its rotation and no later microcycle has moved on; one closed
+  by hand or by a mode change stays closed.
+- **Undoing an activation.** Refused once a session is linked to the block or
+  one of its microcycles closed, so a sketch or planned block never holds what
+  only an active block produces; undo those first.
 - **Forward only.** Edits change the remaining microcycles; done, skipped and
   elapsed ones keep what they ran. Shrinking a block drops only remaining
   microcycles with no session, and is a deleting action (`block.shorten`).
-- **Not yet.** `sets_delta` and `effort_delta` are stored and shown, not
-  applied to any prescription. There is no microcycle review or progression
-  rule yet.
+- **Today's prescription.** A session started from a routine that lands in a
+  microcycle with modifiers gets them on its own copy of the routine
+  (`session_items`): sets + `sets_delta`, never below 1 or above 20; target
+  RPE + `effort_delta`, only where the routine sets one, kept within 1-10. The
+  routine is never changed and past sessions are never rewritten, even when the
+  microcycle's deltas are edited later. `start_session` returns
+  `block_modifiers` (block, microcycle, deltas, the rule, and per exercise the
+  base value, the result and whether a bound held it), and the session keeps it
+  (migration 034 `sessions.block_modifiers`). A free-form or off-plan session,
+  one outside an active block, or a microcycle without modifiers starts exactly
+  as before. Applying them is best effort: if it fails, the session still starts
+  with the routine's values and no `block_modifiers`.
+- **How a microcycle closed.** `closed_by` is `placement` (its last routine was
+  done), `hand` (`complete_microcycle` or `skip_microcycle`) or `mode_change`
+  (its dates passed when the block went back to sequence); absent for
+  microcycles closed before migration 034.
+- **Reviewing a microcycle.** `review_microcycle` reads one microcycle planned
+  against done and gives no verdict, score or recommendation. Without
+  `block_id` it reads the active block, else the most recently closed one;
+  without `microcycle_id`, the block's last closed microcycle, else the
+  current one, else the first (`selected_by` says which). Planned sets of a
+  session that was done are its own copy; a rotation routine with no session
+  counts at the routine's values with the microcycle's modifiers, as `skipped`
+  once the microcycle closed and `pending` while it is current or upcoming.
+  Done sets are working sets; sets of exercises a session did not plan are
+  `extra_work`. Muscles come in the single-group count and, with the exercise
+  library, in the fractional one with its method and uncertain muscles apart.
+  Effort compares target and logged RPE only where both exist; imputed RPE is
+  counted, never compared. It also carries the drop-off read with its
+  not-comparable reasons, off-plan sessions in the microcycle's days (listed,
+  in no total), session feedback, the bodyweight change over those days
+  (sequence: from the day after the previous microcycle closed, or the block's
+  start, to its close or today) and the previous microcycle in short. Lists
+  stop at a fixed length beside their full count.
+- **Not yet.** There is no progression rule.
 
 | Tool | What it does |
 |---|---|
-| `training_status` | Today's planning: active goals, the active block and its current microcycle, with routines done and due and its stored modifiers. Applies nothing. |
+| `training_status` | Today's planning: active goals, the active block and its current microcycle, with routines done and due and its modifiers, and `next_prescription`: the first routine due with those modifiers applied to the routine as it is today, base and result per exercise. Reads only. |
 | `list_blocks` | Every goal and block with its progress: microcycles done, skipped and remaining, the current one, and sessions off-plan. |
 | `get_block` | One block in full: rotation, every microcycle with its state (`done`, `skipped`, `current`, `upcoming`, `elapsed`), dates in calendar mode, sessions placed and off-plan. |
 | `set_goal` | Create or edit a goal (text, `target_date`, status `active`, `achieved` or `dropped`). A proposal. |
 | `save_block` | Create or edit a block: intent, goal, advance mode, `microcycle_days`, `microcycle_count`, status `sketch` or `planned`, rotation, and per-microcycle label, deltas and rotation. A proposal; shrinking waits for the person under `accept_except_delete`. |
 | `advance_block` | `activate` a block (one active at a time, from `start_date` or today), `complete_microcycle` or `skip_microcycle` on a sequence block, or `close` it. A proposal. |
 | `assign_session_block` | Put a session in a microcycle of any block, or off-plan. Never closes or reopens a microcycle. A proposal. |
+| `review_microcycle` | One microcycle planned against done, as counts: rotation, sets per exercise and per muscle (single-group and fractional), effort, drop-off, off-plan sessions and extra work, feedback, bodyweight, and the previous microcycle. `block_id` and `microcycle_id` are optional. Reads only; no verdict. |
 
 ---
 

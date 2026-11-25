@@ -105,7 +105,7 @@ FROM blocks WHERE id=? AND user_id=?`, id, s.userID).Scan(&b.ID, &b.GoalID, &b.I
 	if err != nil {
 		return training.Block{}, err
 	}
-	rows, err := q.QueryContext(ctx, `SELECT id,position,label,COALESCE(sets_delta,0),COALESCE(effort_delta,0),own_rotation,status,COALESCE(closed_on,'')
+	rows, err := q.QueryContext(ctx, `SELECT id,position,label,COALESCE(sets_delta,0),COALESCE(effort_delta,0),own_rotation,status,COALESCE(closed_on,''),COALESCE(closed_by,'')
 FROM block_microcycles WHERE block_id=? AND user_id=? ORDER BY position`, b.ID, s.userID)
 	if err != nil {
 		return training.Block{}, err
@@ -113,7 +113,7 @@ FROM block_microcycles WHERE block_id=? AND user_id=? ORDER BY position`, b.ID, 
 	index := map[int64]int{}
 	for rows.Next() {
 		var m training.Microcycle
-		if err = rows.Scan(&m.ID, &m.Position, &m.Label, &m.SetsDelta, &m.EffortDelta, &m.OwnRotation, &m.Status, &m.ClosedOn); err != nil {
+		if err = rows.Scan(&m.ID, &m.Position, &m.Label, &m.SetsDelta, &m.EffortDelta, &m.OwnRotation, &m.Status, &m.ClosedOn, &m.ClosedBy); err != nil {
 			rows.Close()
 			return training.Block{}, err
 		}
@@ -373,8 +373,8 @@ func (s *userStore) saveBlock(ctx context.Context, tx *sql.Tx, b training.Block)
 		}
 		var closed any = nullText(m.ClosedOn)
 		if m.ID == 0 {
-			res, err := tx.ExecContext(ctx, `INSERT INTO block_microcycles(user_id,block_id,position,label,sets_delta,effort_delta,own_rotation,status,closed_on) VALUES (?,?,?,?,?,?,?,?,?)`,
-				s.userID, b.ID, m.Position, m.Label, sets, effort, m.OwnRotation, m.Status, closed)
+			res, err := tx.ExecContext(ctx, `INSERT INTO block_microcycles(user_id,block_id,position,label,sets_delta,effort_delta,own_rotation,status,closed_on,closed_by) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+				s.userID, b.ID, m.Position, m.Label, sets, effort, m.OwnRotation, m.Status, closed, nullText(m.ClosedBy))
 			if err != nil {
 				return 0, err
 			}
@@ -382,8 +382,8 @@ func (s *userStore) saveBlock(ctx context.Context, tx *sql.Tx, b training.Block)
 				return 0, err
 			}
 		} else {
-			res, err := tx.ExecContext(ctx, `UPDATE block_microcycles SET position=?,label=?,sets_delta=?,effort_delta=?,own_rotation=?,status=?,closed_on=? WHERE id=? AND block_id=? AND user_id=?`,
-				m.Position, m.Label, sets, effort, m.OwnRotation, m.Status, closed, m.ID, b.ID, s.userID)
+			res, err := tx.ExecContext(ctx, `UPDATE block_microcycles SET position=?,label=?,sets_delta=?,effort_delta=?,own_rotation=?,status=?,closed_on=?,closed_by=? WHERE id=? AND block_id=? AND user_id=?`,
+				m.Position, m.Label, sets, effort, m.OwnRotation, m.Status, closed, nullText(m.ClosedBy), m.ID, b.ID, s.userID)
 			if err != nil {
 				return 0, err
 			}

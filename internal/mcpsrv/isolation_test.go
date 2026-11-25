@@ -205,6 +205,9 @@ var isolationCases = map[string]isolationCase{
 	"assign_session_block": {byID: true, args: func(id toolIDs) map[string]any {
 		return map[string]any{"session_id": id.session, "microcycle_id": id.microcycle}
 	}},
+	"review_microcycle": {byID: true, args: func(id toolIDs) map[string]any {
+		return map[string]any{"block_id": id.block, "microcycle_id": id.microcycle}
+	}},
 }
 
 type isolationWorld struct {

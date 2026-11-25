@@ -126,6 +126,7 @@
     save_block: ['Planificando un bloque', 'Bloque planificado'],
     advance_block: ['Avanzando el bloque', 'Bloque avanzado'],
     assign_session_block: ['Colocando la sesión en el bloque', 'Sesión colocada en el bloque'],
+    review_microcycle: ['Revisando el microciclo', 'Microciclo revisado'],
   };
   function words(name) {
     const w = WORDS[name];
