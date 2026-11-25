@@ -178,6 +178,8 @@ type pageData struct {
 	Cards []TrainCard
 	// Records are today's sets that match their exercise's best estimated 1RM.
 	Records map[int64]bool
+	// Periodization is the blocks screen: goals, blocks and microcycles.
+	Periodization PeriodizationData
 
 	// AssetVersion names the service worker's caches; see assets.
 	AssetVersion string
@@ -455,6 +457,12 @@ func (s *Server) routes() {
 	s.handle("POST "+b+"/bodyweight", s.logBodyweight)
 	s.handle("POST "+b+"/bodyweight/delete", s.deleteBodyweight)
 	s.handle("POST "+b+"/s/{id}/notes", s.saveSessionNotes)
+	s.handle("GET "+b+"/blocks", s.blocksPage)
+	s.handle("POST "+b+"/blocks/goal", s.saveGoal)
+	s.handle("POST "+b+"/blocks/save", s.saveBlock)
+	s.handle("POST "+b+"/blocks/microcycle", s.saveMicrocycle)
+	s.handle("POST "+b+"/blocks/advance", s.advanceBlock)
+	s.handle("POST "+b+"/blocks/assign", s.assignSession)
 
 	s.coachRoutes()
 
