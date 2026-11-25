@@ -67,7 +67,8 @@ type Session struct {
 	// snapshot so renaming or deleting a plan never rewrites past sessions.
 	PlanID   int64  `json:"plan_id,omitempty"`
 	PlanName string `json:"plan_name,omitempty"`
-	// Notes are an imported workout's own notes; sessions logged here have none.
+	// Notes are free notes on the session: an imported workout's own notes, or
+	// what the person or the coach set with set_session_notes.
 	Notes string `json:"notes,omitempty"`
 	// StartedAt is when the session was started here, RFC 3339 in UTC, so
 	// every device times the workout from the same instant. Imported workouts

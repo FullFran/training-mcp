@@ -32,6 +32,7 @@ var wantActionType = map[string]string{
 	"memory_save":     "memory.save", "memory_forget": "memory.forget",
 	"memory_judge": "memory.judge", "memory_confirm": "memory.confirm", "memory_consolidate": "memory.consolidate",
 	"save_exercise_entry": "exercise.library.save", "set_exercise_alias": "exercise.alias.set",
+	"log_bodyweight": "bodyweight.log", "delete_bodyweight": "bodyweight.delete", "set_session_notes": "session.notes.set",
 }
 
 // Every tool that is not read-only proposes, and no read-only tool does.

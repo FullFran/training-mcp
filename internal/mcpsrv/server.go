@@ -756,6 +756,7 @@ func New(service training.ServiceFor) *Server {
 	})
 	addMemoryTools(s, w, service)
 	addLbTools(s, w, service)
+	addBodyweightTools(s, w, service)
 	addApps(s, service)
 	addSkillTools(s)
 	addExerciseLibraryTools(s, w, service)

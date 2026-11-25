@@ -75,6 +75,7 @@ var undoTables = []undoTable{
 	{name: "coach_memory_relations", key: []string{"id"}, owned: `user_id=?`},
 	{name: "exercise_library_entries", key: []string{"user_id", "match_key"}, owned: `user_id=?`},
 	{name: "exercise_aliases", key: []string{"user_id", "match_key"}, owned: `user_id=?`},
+	{name: "bodyweight", key: []string{"user_id", "date"}, owned: `user_id=?`},
 }
 
 func undoTableNamed(name string) (undoTable, int, bool) {

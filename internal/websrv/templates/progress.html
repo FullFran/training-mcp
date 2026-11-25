@@ -9,6 +9,7 @@
   <p class="muted">Cada sesión suma a tu historial, tus mejores series y tu e1RM.</p>
   <a class="btn primary big" href="{{$.Base}}/" data-mode-go="home">Ir a Entrenar</a>
 </div>
+<section id="pg-body" aria-label="Cuerpo">{{template "body-pane" $}}</section>
 {{else}}
 <div class="segmented" role="tablist" aria-label="Progreso">
   <button type="button" role="tab" id="pg-tab-history" aria-selected="true" aria-controls="pg-history" data-pg="history">Historial</button>
@@ -23,6 +24,7 @@
     </ol>
     <p class="week-sum">Esta semana: <span class="num">{{.WeekSessions}} sesi{{if eq .WeekSessions 1}}ón{{else}}ones{{end}}</span>{{if .WeekKG}} · <span class="num">{{wkilos .WeekKG}} {{unit}}</span>{{end}}</p>
   </div>
+  {{if .Body.Weeks}}{{template "body-weeks" .Body}}{{end}}
   <a class="list-row" href="{{$.Base}}/sessions/past" data-panel data-title="Añadir sesión pasada"><span class="row-main"><strong>Añadir sesión pasada</strong><span class="muted">Un entreno que no registraste ese día</span></span><span class="chev" aria-hidden="true">›</span></a>
   {{range .Months}}
   <h2 class="section-label">{{.Name}}</h2>
@@ -92,13 +94,66 @@
 </div>
 
 <div id="pg-body" class="pg-pane" role="tabpanel" aria-labelledby="pg-tab-body" hidden>
-  <div class="empty-state">
-    <span class="empty-mark" aria-hidden="true"></span>
-    <h2>Aún no registras tu peso ni medidas</h2>
-    <p class="muted">La app todavía no guarda peso corporal ni medidas. Si se lo cuentas al coach, lo recordará y lo tendrá en cuenta.</p>
-  </div>
+  {{template "body-pane" $}}
 </div>
 {{end}}
+{{end}}{{end}}
+
+{{/* Historial's bodyweight card: each recent week's working volume beside its
+     mean bodyweight, and the 90-day line. Shown only once there are entries;
+     it reports numbers and judges none. */}}
+{{define "body-weeks"}}<section class="chart-card body-weeks" aria-label="Peso corporal y volumen">
+  <div class="chart-head"><strong>Peso corporal y volumen</strong><span class="muted">por semana</span></div>
+  <svg class="spark big" viewBox="0 0 300 80" preserveAspectRatio="none" aria-hidden="true"><polyline points="{{.Trend}}"/></svg>
+  <table>
+    <thead><tr><th scope="col">Semana</th><th scope="col">Volumen</th><th scope="col">Peso medio</th></tr></thead>
+    <tbody>{{range .Weeks}}
+      <tr><th scope="row">{{.Label}}</th><td class="num">{{if .KG}}{{wkilos .KG}} {{unit}}{{else}}–{{end}}</td><td class="num">{{if .Entries}}{{wt .AvgKG}} {{unit}}{{else}}–{{end}}</td></tr>{{end}}
+    </tbody>
+  </table>
+</section>{{end}}
+
+{{/* Cuerpo: today's bodyweight in one optional form, then the recent entries.
+     The heading says whether today has a weight; nothing else asks for it. */}}
+{{define "body-pane"}}{{with .Stats.Body}}
+  <form class="card body-form" method="post" action="{{$.Base}}/bodyweight" hx-post="{{$.Base}}/bodyweight" hx-target="#progress-body" hx-swap="innerHTML" autocomplete="off">{{if $.CSRF}}
+    <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+    <h2>{{with .Logged}}Hoy: <span class="num">{{wt .WeightKG}} {{unit}}</span>{{else}}¿Cuánto pesas hoy?{{end}}</h2>
+    {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
+    <div class="body-fields">
+      <label class="field"><span>Peso</span><input type="number" name="weight" inputmode="decimal" step="any" min="0" required{{with .Logged}} value="{{wt .WeightKG}}"{{end}}></label>
+      {{template "unit-select" $}}
+      <label class="field"><span>Fecha</span><input type="date" name="date" value="{{.Today}}" required></label>
+    </div>
+    <label class="field"><span>Nota (opcional)</span><input type="text" name="note" maxlength="500" placeholder="En ayunas, tras un viaje…"></label>
+    <button type="submit" class="primary wide">Guardar peso</button>
+    <p class="muted">Un registro por día: guardar otro el mismo día lo sustituye.</p>
+  </form>
+  {{with .Summary}}
+  <section class="chart-card" aria-label="Últimos 90 días">
+    <div class="chart-head"><strong>Últimos 90 días</strong><span class="muted num">{{.Count}} registro{{if ne .Count 1}}s{{end}}</span></div>
+    <svg class="spark big" viewBox="0 0 300 80" preserveAspectRatio="none" aria-hidden="true"><polyline points="{{$.Stats.Body.Trend}}"/></svg>
+    <dl class="body-numbers">
+      <div><dt>Último</dt><dd class="num">{{wt .Last.WeightKG}} {{unit}}</dd></div>
+      <div><dt>Media 7 días</dt><dd class="num">{{wt .Avg7.WeightKG}} {{unit}}</dd></div>
+      <div><dt>Mínimo</dt><dd class="num">{{wt .Min.WeightKG}} {{unit}}</dd></div>
+      <div><dt>Máximo</dt><dd class="num">{{wt .Max.WeightKG}} {{unit}}</dd></div>
+      <div><dt>Cambio</dt><dd class="num">{{if gt .ChangeKG 0.0}}+{{end}}{{wt .ChangeKG}} {{unit}}</dd></div>
+    </dl>
+  </section>
+  {{end}}
+  {{if .Recent}}
+  <h2 class="section-label">Registros</h2>
+  <ul class="list body-list" aria-label="Registros de peso">{{range .Recent}}
+    <li class="list-row static"><span class="row-main"><strong class="num">{{wt .WeightKG}} {{unit}}</strong><span class="muted">{{shortDate .Date}}{{if .Note}} · {{.Note}}{{end}}</span></span>
+      <form method="post" action="{{$.Base}}/bodyweight/delete" hx-post="{{$.Base}}/bodyweight/delete" hx-target="#progress-body" hx-swap="innerHTML">{{if $.CSRF}}
+        <input type="hidden" name="csrf_token" value="{{$.CSRF}}">{{end}}
+        <input type="hidden" name="date" value="{{.Date}}">
+        <button type="submit" class="mini danger" aria-label="Borrar el peso del {{shortDate .Date}}">Borrar</button>
+      </form>
+    </li>{{end}}
+  </ul>
+  {{end}}
 {{end}}{{end}}
 
 {{/* One exercise, pushed from Progreso: e1RM per session, the best sets, the
