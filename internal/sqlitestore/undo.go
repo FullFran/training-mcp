@@ -58,7 +58,7 @@ const (
 // undoTables are in the order rows are added back: a parent before its rows.
 var undoTables = []undoTable{
 	{name: "users", key: []string{"id"}, cols: []string{"id", "rest_seconds"}, owned: `id=?`},
-	{name: "plans", key: []string{"id"}, owned: `user_id=?`, refs: []undoRef{{"plan_items", "plan_id"}, {"sessions", "plan_id"}}},
+	{name: "plans", key: []string{"id"}, owned: `user_id=?`, refs: []undoRef{{"plan_items", "plan_id"}, {"sessions", "plan_id"}, {"block_rotations", "plan_id"}}},
 	{name: "plan_items", key: []string{"id"}, owned: `plan_id IN (SELECT id FROM plans WHERE user_id=?)`, temp: map[string]string{"position": positionTemp}},
 	{name: "sessions", key: []string{"id"}, owned: `user_id=?`, refs: []undoRef{{"sets", "session_id"}, {"session_items", "session_id"}, {"session_feedback", "session_id"}}},
 	{name: "sets", key: []string{"id"}, owned: sessionOwned, bySession: true, temp: map[string]string{"position": positionTemp}, refs: []undoRef{{"imported_sets", "set_id"}}},
@@ -73,6 +73,10 @@ var undoTables = []undoTable{
 		refs: []undoRef{{"coach_memory_revisions", "memory_id"}, {"coach_memory_relations", "memory_id"}, {"coach_memory_relations", "candidate_id"}, {"coach_memory", "superseded_by"}, {"coach_memory", "consolidated_into"}}},
 	{name: "coach_memory_revisions", key: []string{"id"}, owned: `memory_id IN (SELECT id FROM coach_memory WHERE user_id=?)`},
 	{name: "coach_memory_relations", key: []string{"id"}, owned: `user_id=?`},
+	{name: "goals", key: []string{"id"}, owned: `user_id=?`, refs: []undoRef{{"blocks", "goal_id"}}},
+	{name: "blocks", key: []string{"id"}, owned: `user_id=?`, refs: []undoRef{{"block_microcycles", "block_id"}, {"block_rotations", "block_id"}, {"sessions", "block_id"}}},
+	{name: "block_microcycles", key: []string{"id"}, owned: `user_id=?`, temp: map[string]string{"position": positionTemp}, refs: []undoRef{{"block_rotations", "microcycle_id"}, {"sessions", "block_microcycle_id"}}},
+	{name: "block_rotations", key: []string{"id"}, owned: `user_id=?`},
 }
 
 func undoTableNamed(name string) (undoTable, int, bool) {
