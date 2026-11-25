@@ -768,6 +768,7 @@ func New(service training.ServiceFor) *Server {
 	addExerciseLibraryTools(s, w, service)
 	addEvidenceTools(s, service)
 	registerPeriodizationTools(s, w, service)
+	registerPeriodizationReviewTool(s, service)
 
 	// Stateless: the server keeps no per-client session state, so restarting the
 	// container no longer invalidates a live conversation. These tools are plain

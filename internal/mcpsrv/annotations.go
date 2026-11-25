@@ -115,6 +115,7 @@ var toolBehaviors = map[string]toolBehavior{
 	"save_block":           overwriting("Save block"),
 	"advance_block":        additive("Advance block"),
 	"assign_session_block": overwriting("Assign session to block"),
+	"review_microcycle":    read("Review microcycle"),
 }
 
 // addTool registers a tool with its declared behavior. A tool missing from

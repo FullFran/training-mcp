@@ -542,6 +542,24 @@ Without an active block, training works exactly as before, routine by routine.
   done), `hand` (`complete_microcycle` or `skip_microcycle`) or `mode_change`
   (its dates passed when the block went back to sequence); absent for
   microcycles closed before migration 034.
+- **Reviewing a microcycle.** `review_microcycle` reads one microcycle planned
+  against done and gives no verdict, score or recommendation. Without
+  `block_id` it reads the active block, else the most recently closed one;
+  without `microcycle_id`, the block's last closed microcycle, else the
+  current one, else the first (`selected_by` says which). Planned sets of a
+  session that was done are its own copy; a rotation routine with no session
+  counts at the routine's values with the microcycle's modifiers, as `skipped`
+  once the microcycle closed and `pending` while it is current or upcoming.
+  Done sets are working sets; sets of exercises a session did not plan are
+  `extra_work`. Muscles come in the single-group count and, with the exercise
+  library, in the fractional one with its method and uncertain muscles apart.
+  Effort compares target and logged RPE only where both exist; imputed RPE is
+  counted, never compared. It also carries the drop-off read with its
+  not-comparable reasons, off-plan sessions in the microcycle's days (listed,
+  in no total), session feedback, the bodyweight change over those days
+  (sequence: from the day after the previous microcycle closed, or the block's
+  start, to its close or today) and the previous microcycle in short. Lists
+  stop at a fixed length beside their full count.
 - **Not yet.** There is no progression rule.
 
 | Tool | What it does |
@@ -553,6 +571,7 @@ Without an active block, training works exactly as before, routine by routine.
 | `save_block` | Create or edit a block: intent, goal, advance mode, `microcycle_days`, `microcycle_count`, status `sketch` or `planned`, rotation, and per-microcycle label, deltas and rotation. A proposal; shrinking waits for the person under `accept_except_delete`. |
 | `advance_block` | `activate` a block (one active at a time, from `start_date` or today), `complete_microcycle` or `skip_microcycle` on a sequence block, or `close` it. A proposal. |
 | `assign_session_block` | Put a session in a microcycle of any block, or off-plan. Never closes or reopens a microcycle. A proposal. |
+| `review_microcycle` | One microcycle planned against done, as counts: rotation, sets per exercise and per muscle (single-group and fractional), effort, drop-off, off-plan sessions and extra work, feedback, bodyweight, and the previous microcycle. `block_id` and `microcycle_id` are optional. Reads only; no verdict. |
 
 ---
 
