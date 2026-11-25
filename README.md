@@ -379,5 +379,6 @@ debt, not a design: see the open issues.
 - [Importing from Hevy and Strong](docs/import.md) — formats, name mapping, duplicates, limits
 - [In-app coach](docs/coach.md) — chat with your own ChatGPT while you train, and connect your own remote MCP servers (Notion and others) to it; off by default, experimental
 - [Deployment](docs/deployment.md) — how `main` reaches production, CI gate, rollback
+- [Evidence library](docs/evidence.md) — the citable training-science sources behind `search_evidence` and `get_evidence`, how to add one, what `review_status` means
 
 The external Secure MCP Tunnel smoke flow is **unverified in this repository**. Use the official provider documentation rather than invented commands.
