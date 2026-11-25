@@ -38,6 +38,9 @@ type isolationCase struct {
 	args  func(toolIDs) map[string]any
 	byID  bool
 	count string
+	// global tools read data that belongs to no user: every user, and an
+	// empty database, must get the same answer, and nothing is written.
+	global bool
 }
 
 func noArgs(toolIDs) map[string]any { return map[string]any{} }
@@ -158,6 +161,10 @@ var isolationCases = map[string]isolationCase{
 	}},
 	"set_volume_landmarks": {count: `volume_landmarks WHERE user_id=2 AND muscle_group='pecho' AND mev=1`, args: func(toolIDs) map[string]any {
 		return map[string]any{"muscle_group": "pecho", "mev": 1, "mrv": 2}
+	}},
+	"search_evidence": {global: true, args: func(toolIDs) map[string]any { return map[string]any{"query": "deload"} }},
+	"get_evidence": {global: true, args: func(toolIDs) map[string]any {
+		return map[string]any{"source_id": "coleman-2024-one-week-deload-trial"}
 	}},
 }
 
@@ -346,6 +353,26 @@ func TestEveryToolIsIsolatedBetweenUsers(t *testing.T) {
 				}
 				if after := dumpTables(t, world.db, ownersRows); after != before {
 					t.Fatalf("owner's rows changed:\nbefore\n%s\nafter\n%s", before, after)
+				}
+
+			case tc.global:
+				before := dumpTables(t, world.db, nil)
+				owner := call(t, world.owner, name, args)
+				second := call(t, world.second, name, args)
+				store, err := sqlitestore.Open(sqlitestoretest.Path(t))
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer store.Close()
+				empty := call(t, mustConnect(t, New(only(training.NewServices(store, isolationClock).ForUser(1))).Handler()), name, args)
+				if owner.IsError || !strings.Contains(stringContent(owner), "coleman-2024-one-week-deload-trial") {
+					t.Fatalf("owner: %s", answer(t, owner))
+				}
+				if answer(t, second) != answer(t, owner) || answer(t, empty) != answer(t, owner) {
+					t.Fatalf("a global read differs by user:\nowner\n%s\nsecond\n%s\nempty\n%s", answer(t, owner), answer(t, second), answer(t, empty))
+				}
+				if after := dumpTables(t, world.db, nil); after != before {
+					t.Fatalf("a read changed rows:\nbefore\n%s\nafter\n%s", before, after)
 				}
 
 			default:

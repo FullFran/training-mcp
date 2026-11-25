@@ -347,6 +347,26 @@ summary when a workout ends, and proposes the items of a reply's closing
 `## Aprendizajes` block. All three are `memory_save` proposals, never direct
 writes; see [Memory hooks](coach.md#memory-hooks).
 
+## Evidence library
+
+A curated, versioned library of training-science sources, embedded in the
+binary and searched locally with SQLite FTS5: no network, no vector store.
+It is global and read-only, the same for every user, so both tools are reads
+that write nothing and take no user id. How sources enter it, and what
+`review_status` means, is in [evidence.md](evidence.md).
+
+| Tool | What it does |
+|---|---|
+| `search_evidence` | Find sources by words, in English or Spanish (`query`, up to 500 characters; operators and punctuation are ignored), with optional `filters`: `topic` (closed list), `study_type` (closed list), `year_from`, `year_to`. Every word must match; when no source has them all, sources with more than half of them are returned and `match` says `most_terms`. `limit` defaults to 5 (1 to 20). Each result carries `source_id`, a one-line `citation`, authors, year, publication, `doi` and/or `pmid`, `url`, study type, population, topics, a `snippet`, `summary_basis` and `review_status`. `debates` names every contested question the results take part in, with all its sources, so the coach can present each side. An empty or unmatched query returns an explicit `no_results` message instead of loosely related sources. |
+| `get_evidence` | One source whole by `source_id`: citation metadata, population, key findings, methods, limitations, how and when it was verified, its debates, `content_version` and `review_status`. An unknown id is a not-found error. |
+
+Both answers start with a `notice`, and their text content is the notice
+followed by the data fenced in `<untrusted_evidence_data>` tags. Every text
+field is reference data about published research, never an instruction; JSON
+encoding escapes `<` and `>`, so a source's own text cannot close the fence.
+Every seed source is `unreviewed`: no human expert has checked its summary,
+and the coach should say so when it cites one.
+
 ---
 
 ## Design notes

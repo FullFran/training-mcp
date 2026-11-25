@@ -59,6 +59,8 @@ var toolBehaviors = map[string]toolBehavior{
 	"memory_get":                 read("Get memory"),
 	"memory_context":             read("Get memory context"),
 	"memory_consolidate_preview": read("Preview memory merge"),
+	"search_evidence":            read("Search evidence"),
+	"get_evidence":               read("Get evidence"),
 
 	"start_session":        additive("Start session"),
 	"add_set":              additive("Add set"),
