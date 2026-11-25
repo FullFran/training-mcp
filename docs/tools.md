@@ -347,6 +347,19 @@ summary when a workout ends, and proposes the items of a reply's closing
 `## Aprendizajes` block. All three are `memory_save` proposals, never direct
 writes; see [Memory hooks](coach.md#memory-hooks).
 
+## Skills
+
+Training-theory guidance the agent loads on demand instead of carrying it in
+every prompt. Skills ship inside the binary, are the same for every person and
+are read-only. Loading one registers no tool, hides none and grants nothing:
+the tool list is the same before and after. Format, review status and how to
+add one: [skills.md](skills.md).
+
+| Tool | What it does |
+|---|---|
+| `list_skills` | List the training-theory skills you can load: id, version, one-line summary, the situations each is for and its review status. Metadata only; call load_skill for one skill's instructions. The same for every person. |
+| `load_skill` | Load one skill whole: its instructions (sections Evidence, Heuristics, Person-specific assumptions and Decisions), limitations, the read tools it relies on and its references. Guidance only: it changes no tool and no data. An unknown `id` is a not-found error that points back to `list_skills`. |
+
 ---
 
 ## Design notes
