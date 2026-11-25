@@ -38,6 +38,10 @@ type isolationCase struct {
 	args  func(toolIDs) map[string]any
 	byID  bool
 	count string
+
+	// global tools serve the same read-only content to everyone (skills):
+	// every user, the owner included, gets the answer of an empty database.
+	global bool
 }
 
 func noArgs(toolIDs) map[string]any { return map[string]any{} }
@@ -158,6 +162,10 @@ var isolationCases = map[string]isolationCase{
 	}},
 	"set_volume_landmarks": {count: `volume_landmarks WHERE user_id=2 AND muscle_group='pecho' AND mev=1`, args: func(toolIDs) map[string]any {
 		return map[string]any{"muscle_group": "pecho", "mev": 1, "mrv": 2}
+	}},
+	"list_skills": {global: true, args: noArgs},
+	"load_skill": {global: true, args: func(toolIDs) map[string]any {
+		return map[string]any{"id": "hypertrophy-programming"}
 	}},
 	"lookup_exercise":                {args: func(toolIDs) map[string]any { return map[string]any{"name": "press plano"} }},
 	"list_exercises_needing_mapping": {args: noArgs},
@@ -364,6 +372,25 @@ func TestEveryToolIsIsolatedBetweenUsers(t *testing.T) {
 				}
 				if after := dumpTables(t, world.db, ownersRows); after != before {
 					t.Fatalf("owner's rows changed:\nbefore\n%s\nafter\n%s", before, after)
+				}
+
+			case tc.global:
+				before := dumpTables(t, world.db, nil)
+				got := answer(t, call(t, world.second, name, args))
+				store, err := sqlitestore.Open(sqlitestoretest.Path(t))
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer store.Close()
+				empty := mustConnect(t, New(only(training.NewServices(store, isolationClock).ForUser(1))).Handler())
+				if want := answer(t, call(t, empty, name, args)); got != want {
+					t.Fatalf("beside the owner:\n%s\non an empty database:\n%s", got, want)
+				}
+				if owner := answer(t, call(t, world.owner, name, args)); owner != got {
+					t.Fatalf("a global tool answers the owner differently:\n%s\nsecond user:\n%s", owner, got)
+				}
+				if after := dumpTables(t, world.db, nil); after != before {
+					t.Fatalf("a read changed rows:\nbefore\n%s\nafter\n%s", before, after)
 				}
 
 			default:

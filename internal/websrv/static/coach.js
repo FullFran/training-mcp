@@ -107,6 +107,8 @@
     memory_confirm: ['Confirmando un recuerdo', 'Recuerdo confirmado'],
     memory_consolidate_preview: ['Viendo cómo unir recuerdos', 'Visto cómo unir recuerdos'],
     memory_consolidate: ['Uniendo recuerdos', 'Recuerdos unidos'],
+    list_skills: ['Consultando las guías de entrenamiento', 'Consultadas las guías de entrenamiento'],
+    load_skill: ['Leyendo una guía de entrenamiento', 'Leída una guía de entrenamiento'],
     lookup_exercise: ['Buscando un ejercicio en la biblioteca', 'Ejercicio buscado en la biblioteca'],
     list_exercises_needing_mapping: ['Viendo ejercicios sin músculos', 'Vistos ejercicios sin músculos'],
     save_exercise_entry: ['Guardando un ejercicio en tu biblioteca', 'Ejercicio guardado en tu biblioteca'],

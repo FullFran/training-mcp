@@ -757,6 +757,7 @@ func New(service training.ServiceFor) *Server {
 	addMemoryTools(s, w, service)
 	addLbTools(s, w, service)
 	addApps(s, service)
+	addSkillTools(s)
 	addExerciseLibraryTools(s, w, service)
 
 	// Stateless: the server keeps no per-client session state, so restarting the
