@@ -1,0 +1,10 @@
+{
+  "exercises": [
+    {
+      "name": "bench press - powerlifting",
+      "primary": ["pecho"],
+      "secondary": ["triceps", "hombro anterior"],
+      "reason": "free-exercise-db lists triceps as the primary muscle of Bench Press - Powerlifting (issue #137). It is the same horizontal press as its Barbell Bench Press - Medium Grip (chest primary; shoulders and triceps secondary), so chest is primary, triceps secondary, and its shoulders are the anterior head."
+    }
+  ]
+}
