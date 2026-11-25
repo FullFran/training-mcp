@@ -1,0 +1,52 @@
+{
+  "id": "moesgaard-2022-periodization-volume-equated",
+  "title": "Effects of Periodization on Strength and Muscle Hypertrophy in Volume-Equated Resistance Training Programs: A Systematic Review and Meta-analysis",
+  "authors": [
+    "Lukas Moesgaard",
+    "Mikkel Malling Beck",
+    "Lasse Christiansen",
+    "Per Aagaard",
+    "Jesper Lundbye-Jensen"
+  ],
+  "year": 2022,
+  "publication": "Sports Medicine",
+  "volume": "52",
+  "issue": "7",
+  "pages": "1647-1666",
+  "study_type": "meta_analysis",
+  "doi": "10.1007/s40279-021-01636-1",
+  "pmid": "35044672",
+  "url": "https://doi.org/10.1007/s40279-021-01636-1",
+  "population": "35 studies in trained and untrained participants, with volume equated between conditions.",
+  "topics": [
+    "periodization",
+    "strength",
+    "hypertrophy"
+  ],
+  "debates": [
+    "periodization_value"
+  ],
+  "keywords": [
+    "linear periodization",
+    "undulating periodization",
+    "non-periodized",
+    "volume-equated",
+    "1RM"
+  ],
+  "key_findings": [
+    "With volume equated, periodized training gave larger 1RM gains than non-periodized training (effect size 0.31), but not more hypertrophy (0.13, interval including zero).",
+    "Undulating periodization gave larger 1RM gains than linear (0.31), driven by trained participants (0.61); in untrained participants they were similar.",
+    "Linear and undulating periodization gave similar hypertrophy."
+  ],
+  "methods": "Systematic review and inverse-variance random-effects meta-analyses of non-periodized versus periodized and linear versus undulating training, with subgroups by training status.",
+  "limitations": "Other periodization models could not be meta-analysed for lack of studies; the neural explanation offered for the strength effect is the authors' proposal.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

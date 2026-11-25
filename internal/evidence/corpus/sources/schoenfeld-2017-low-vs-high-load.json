@@ -1,0 +1,49 @@
+{
+  "id": "schoenfeld-2017-low-vs-high-load",
+  "title": "Strength and Hypertrophy Adaptations Between Low- vs. High-Load Resistance Training: A Systematic Review and Meta-analysis",
+  "authors": [
+    "Brad J. Schoenfeld",
+    "Jozo Grgic",
+    "Dan Ogborn",
+    "James W. Krieger"
+  ],
+  "year": 2017,
+  "publication": "Journal of Strength and Conditioning Research",
+  "volume": "31",
+  "issue": "12",
+  "pages": "3508-3523",
+  "study_type": "meta_analysis",
+  "doi": "10.1519/jsc.0000000000002200",
+  "pmid": "28834797",
+  "url": "https://doi.org/10.1519/jsc.0000000000002200",
+  "population": "21 studies of at least 6 weeks in participants without medical conditions or injuries limiting training.",
+  "topics": [
+    "load",
+    "hypertrophy",
+    "strength"
+  ],
+  "keywords": [
+    "low load",
+    "high load",
+    "60% 1RM",
+    "repetition range",
+    "heavy",
+    "light"
+  ],
+  "key_findings": [
+    "With every set taken to momentary muscular failure, high loads (over 60% of 1RM) gave larger 1RM strength gains than low loads (60% or less).",
+    "Isometric strength gains did not differ significantly between loads.",
+    "Hypertrophy was similar across low and high loads."
+  ],
+  "methods": "Systematic review and meta-analysis of trials comparing low-load and high-load training with all sets to momentary failure.",
+  "limitations": "Every included protocol took sets to failure, so the findings may not carry over to sets stopped short of failure.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

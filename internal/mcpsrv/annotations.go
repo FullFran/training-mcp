@@ -62,6 +62,8 @@ var toolBehaviors = map[string]toolBehavior{
 	"list_skills":                read("List skills"),
 	"load_skill":                 read("Load skill"),
 	"bodyweight_history":         read("Get bodyweight history"),
+	"search_evidence":            read("Search evidence"),
+	"get_evidence":               read("Get evidence"),
 
 	"start_session":        additive("Start session"),
 	"add_set":              additive("Add set"),

@@ -1,0 +1,48 @@
+{
+  "id": "bell-2023-deloading-delphi-consensus",
+  "title": "Integrating Deloading into Strength and Physique Sports Training Programmes: An International Delphi Consensus Approach",
+  "authors": [
+    "Lee Bell",
+    "Ben William Strafford",
+    "Max Coleman",
+    "Patroklos Androulakis Korakakis",
+    "David Nolan"
+  ],
+  "year": 2023,
+  "publication": "Sports Medicine - Open",
+  "volume": "9",
+  "issue": "1",
+  "study_type": "delphi_consensus",
+  "doi": "10.1186/s40798-023-00633-0",
+  "pmid": "37730925",
+  "url": "https://doi.org/10.1186/s40798-023-00633-0",
+  "population": "Expert strength and physique coaches: 34 in round one, 29 in round two, 21 in round three.",
+  "topics": [
+    "deload",
+    "fatigue"
+  ],
+  "debates": [
+    "deload_value"
+  ],
+  "keywords": [
+    "deloading",
+    "coaches",
+    "consensus definition",
+    "design principles"
+  ],
+  "key_findings": [
+    "Coaches reached consensus on design principles for building deloads into strength and physique programmes.",
+    "Proposed consensus definition: a deload is a period of reduced training stress meant to reduce physiological and psychological fatigue, promote recovery and improve readiness for the training that follows."
+  ],
+  "methods": "Three-round online Delphi: open questions analysed thematically into 138 statements, then rated on a four-point scale for agreement.",
+  "limitations": "Expert opinion and practice, not measured outcomes; panel shrank from 34 to 21 coaches across rounds.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

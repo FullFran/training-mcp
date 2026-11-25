@@ -1,0 +1,50 @@
+{
+  "id": "grgic-2022-failure-vs-non-failure",
+  "title": "Effects of resistance training performed to repetition failure or non-failure on muscular strength and hypertrophy: A systematic review and meta-analysis",
+  "authors": [
+    "Jozo Grgic",
+    "Brad J. Schoenfeld",
+    "John Orazem",
+    "Filip Sabol"
+  ],
+  "year": 2022,
+  "publication": "Journal of Sport and Health Science",
+  "volume": "11",
+  "issue": "2",
+  "pages": "202-211",
+  "study_type": "meta_analysis",
+  "doi": "10.1016/j.jshs.2021.01.007",
+  "pmid": "33497853",
+  "url": "https://doi.org/10.1016/j.jshs.2021.01.007",
+  "population": "15 studies, all in young adults.",
+  "topics": [
+    "proximity_to_failure",
+    "hypertrophy",
+    "strength"
+  ],
+  "debates": [
+    "proximity_to_failure"
+  ],
+  "keywords": [
+    "repetition failure",
+    "non-failure",
+    "volume-equated"
+  ],
+  "key_findings": [
+    "Overall, training to failure and stopping short gave no significant difference in strength or in hypertrophy.",
+    "Where volume was not equated, non-failure training gave larger strength gains.",
+    "In resistance-trained participants, training to failure showed a small hypertrophy advantage (effect size 0.15).",
+    "The authors conclude failure is not required for gains in strength or size, nor does it appear harmful to them."
+  ],
+  "methods": "Systematic review and meta-analysis of effect sizes, with subgroups by training status, volume equating, body region, exercise type and study design.",
+  "limitations": "Only young adults; few highly trained or older participants, which the authors name as a limit to generalizing.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

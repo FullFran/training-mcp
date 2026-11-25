@@ -83,6 +83,7 @@ secret web mount was retired; backups snapshot the data volume instead.
 | `internal/config` | Environment and flags | nothing |
 | `cmd/training-mcp` | Wiring | everything, briefly |
 | `internal/skills` | Embedded training-theory skills, parsed and validated; served by `mcpsrv` | nothing but stdlib |
+| `internal/evidence` | Evidence library: embedded corpus, its validation and search rules, the `Index` port | nothing but stdlib |
 
 The dependency arrow only ever points **inwards**. `training` imports no
 adapter, which is what keeps it testable without a database and what makes the
@@ -128,6 +129,13 @@ key per imported set, unique per user, which is what makes importing a file
 twice add nothing), `import_exercise_map` and `sessions.notes`. The import
 methods form `training.ImportStore`, reached through `Store.ImportsFor`, so the
 `UserStore` test doubles did not have to grow. See [import.md](import.md).
+
+Migration 033 adds the evidence library's index: `evidence_corpus_loads` (one
+row per corpus load; the latest is the corpus held), `evidence_sources`,
+`evidence_source_topics` and `evidence_fts`. These tables have no user id: the
+corpus is global and read-only, embedded in the binary, and `Open` rebuilds
+them in one transaction whenever the embedded corpus version or digest differs
+from the latest load. See [evidence.md](evidence.md).
 
 `sqlitestore` carries the highest coverage floor in CI (70% statements) because
 it is the layer that touches the data: a bug in a driving adapter shows up as a

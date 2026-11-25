@@ -1,0 +1,56 @@
+{
+  "id": "pelland-2025-volume-frequency-dose-response",
+  "title": "The Resistance Training Dose Response: Meta-Regressions Exploring the Effects of Weekly Volume and Frequency on Muscle Hypertrophy and Strength Gains",
+  "authors": [
+    "Joshua C. Pelland",
+    "Jacob F. Remmert",
+    "Zac P. Robinson",
+    "Seth R. Hinson",
+    "Michael C. Zourdos"
+  ],
+  "year": 2025,
+  "publication": "Sports Medicine",
+  "volume": "56",
+  "issue": "2",
+  "pages": "481-505",
+  "study_type": "meta_analysis",
+  "doi": "10.1007/s40279-025-02344-w",
+  "pmid": "41343037",
+  "url": "https://doi.org/10.1007/s40279-025-02344-w",
+  "population": "67 studies with 2058 participants (79.1% male, 20.9% female; mean age about 25 years).",
+  "topics": [
+    "volume",
+    "frequency",
+    "fractional_volume",
+    "hypertrophy",
+    "strength"
+  ],
+  "debates": [
+    "volume_dose_response",
+    "frequency_independent_effect"
+  ],
+  "keywords": [
+    "dose-response",
+    "meta-regression",
+    "direct sets",
+    "indirect sets",
+    "diminishing returns",
+    "Bayesian"
+  ],
+  "key_findings": [
+    "Sets were classed as direct or indirect for the measured muscle; counting an indirect set as half a set (fractional counting) fitted the data better than counting it as a full set or as zero.",
+    "With fractional counting, both hypertrophy and strength increased with weekly volume, with diminishing returns that were considerably more pronounced for strength.",
+    "Weekly frequency showed effects on hypertrophy compatible with negligible, while strength increased with frequency, again with diminishing returns."
+  ],
+  "methods": "Multilevel meta-regressions of weekly set volume and weekly frequency against hypertrophy and strength, reported as posterior probabilities, adjusted for intervention duration and training status; three ways of counting indirect sets were compared.",
+  "limitations": "Comparisons are largely between studies, so they show associations across protocols rather than effects within one person; most participants were young men; the half-set weight for indirect sets is one of three modelled options, chosen by relative fit.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

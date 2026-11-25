@@ -41,8 +41,9 @@ type isolationCase struct {
 	byID  bool
 	count string
 
-	// global tools serve the same read-only content to everyone (skills):
-	// every user, the owner included, gets the answer of an empty database.
+	// global tools serve the same read-only content to everyone (skills,
+	// evidence): every user, the owner included, gets the answer of an
+	// empty database.
 	global bool
 }
 
@@ -184,6 +185,10 @@ var isolationCases = map[string]isolationCase{
 	"delete_bodyweight":  {byID: true, args: func(toolIDs) map[string]any { return map[string]any{"date": isolationDay} }},
 	"set_session_notes": {byID: true, args: func(id toolIDs) map[string]any {
 		return map[string]any{"session_id": id.session, "notes": "suyas"}
+	}},
+	"search_evidence": {global: true, args: func(toolIDs) map[string]any { return map[string]any{"query": "deload"} }},
+	"get_evidence": {global: true, args: func(toolIDs) map[string]any {
+		return map[string]any{"source_id": "coleman-2024-one-week-deload-trial"}
 	}},
 	"training_status": {args: noArgs},
 	"list_blocks":     {args: noArgs},

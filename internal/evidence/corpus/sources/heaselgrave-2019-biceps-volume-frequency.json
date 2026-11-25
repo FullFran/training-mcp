@@ -1,0 +1,53 @@
+{
+  "id": "heaselgrave-2019-biceps-volume-frequency",
+  "title": "Dose-Response Relationship of Weekly Resistance-Training Volume and Frequency on Muscular Adaptations in Trained Men",
+  "authors": [
+    "Samuel R. Heaselgrave",
+    "Joe Blacker",
+    "Benoit Smeuninx",
+    "James McKendry",
+    "Leigh Breen"
+  ],
+  "year": 2019,
+  "publication": "International Journal of Sports Physiology and Performance",
+  "volume": "14",
+  "issue": "3",
+  "pages": "360-368",
+  "study_type": "randomized_trial",
+  "doi": "10.1123/ijspp.2018-0427",
+  "pmid": "30160627",
+  "url": "https://doi.org/10.1123/ijspp.2018-0427",
+  "population": "49 resistance-trained young men.",
+  "topics": [
+    "volume",
+    "frequency",
+    "hypertrophy",
+    "strength"
+  ],
+  "debates": [
+    "volume_dose_response"
+  ],
+  "keywords": [
+    "biceps",
+    "weekly sets",
+    "9 sets",
+    "18 sets",
+    "27 sets"
+  ],
+  "key_findings": [
+    "9, 18 or 27 weekly sets of biceps work for 6 weeks all increased biceps thickness and 1RM strength; growth averaged 4.3%, 9.5% and 5.4% respectively.",
+    "There were no statistically significant differences between groups in muscle thickness or strength, although effect sizes for the moderate and high groups were moderate to large compared with the low group.",
+    "The highest volume did not show the largest mean growth; the authors conclude 9 weekly sets in one session are enough to grow, and 18 to 27 sets over two sessions may add strength."
+  ],
+  "methods": "Randomized to low (9 sets, one session a week), moderate (18 sets) or high (27 sets, both twice a week) biceps volume for 6 weeks, with post-exercise protein controlled; ultrasound muscle thickness, isometric and 1RM strength.",
+  "limitations": "Six weeks, a single muscle, men only; volume and frequency changed together, so their separate effects cannot be told apart.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

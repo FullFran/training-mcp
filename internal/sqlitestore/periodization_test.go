@@ -85,7 +85,7 @@ func migrateExcept(t *testing.T, path string, skip int) *sql.DB {
 	return db
 }
 
-// Migration 030 can land after 031 and 032 were applied: Open applies it to
+// Migration 030 can land after 031 to 033 were applied: Open applies it to
 // that database and every row stored before reads back unchanged.
 func TestMigration030AppliesAfterLaterMigrationsKeepingEveryRow(t *testing.T) {
 	path := t.TempDir() + "/training.db"
@@ -110,6 +110,10 @@ func TestMigration030AppliesAfterLaterMigrationsKeepingEveryRow(t *testing.T) {
 	before := snapshot(db)
 	if got := dumpQuery(t, db, `SELECT COUNT(*) FROM schema_migrations WHERE version=30`); got != "[]interface {}{0}\n" {
 		t.Fatalf("030 already applied: %s", got)
+	}
+	// The database already ran every later migration, 031 to 033 at least.
+	if got := dumpQuery(t, db, `SELECT COUNT(*) FROM schema_migrations WHERE version IN (31,32,33)`); got != "[]interface {}{3}\n" {
+		t.Fatalf("later migrations applied: %s", got)
 	}
 	db.Close()
 

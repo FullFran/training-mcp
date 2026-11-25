@@ -117,6 +117,8 @@
     bodyweight_history: ['Consultando tu peso corporal', 'Consultado tu peso corporal'],
     delete_bodyweight: ['Borrando un registro de peso', 'Registro de peso borrado'],
     set_session_notes: ['Guardando las notas de la sesión', 'Notas de la sesión guardadas'],
+    search_evidence: ['Buscando en la biblioteca de estudios', 'Buscado en la biblioteca de estudios'],
+    get_evidence: ['Leyendo un estudio', 'Leído un estudio'],
     training_status: ['Mirando cómo va tu planificación', 'Mirado cómo va tu planificación'],
     list_blocks: ['Consultando tus bloques', 'Consultados tus bloques'],
     get_block: ['Consultando el bloque', 'Consultado el bloque'],

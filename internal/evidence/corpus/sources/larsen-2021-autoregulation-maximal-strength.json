@@ -1,0 +1,47 @@
+{
+  "id": "larsen-2021-autoregulation-maximal-strength",
+  "title": "Effects of subjective and objective autoregulation methods for intensity and volume on enhancing maximal strength during resistance-training interventions: a systematic review",
+  "authors": [
+    "Stian Larsen",
+    "Eirik Kristiansen",
+    "Roland van den Tillaar"
+  ],
+  "year": 2021,
+  "publication": "PeerJ",
+  "volume": "9",
+  "pages": "e10663",
+  "study_type": "systematic_review",
+  "doi": "10.7717/peerj.10663",
+  "pmid": "33520457",
+  "url": "https://doi.org/10.7717/peerj.10663",
+  "population": "14 studies, 30 training groups and 356 healthy participants.",
+  "topics": [
+    "autoregulation",
+    "rir_rpe",
+    "strength",
+    "periodization"
+  ],
+  "keywords": [
+    "subjective autoregulation",
+    "objective autoregulation",
+    "velocity",
+    "flexible daily undulating periodization",
+    "1RM"
+  ],
+  "key_findings": [
+    "Every autoregulated protocol in the included studies increased 1RM, with small to large effect sizes.",
+    "Both subjective methods (RIR-based RPE, flexible daily undulating periodization) and objective methods (velocity targets, velocity loss) appear effective for maximal strength.",
+    "The authors speculate that autoregulation helps because it accounts for daily fluctuations in fitness, fatigue and readiness."
+  ],
+  "methods": "Systematic review with per-study effect sizes and percentage differences; no pooled meta-analysis.",
+  "limitations": "Strength outcomes only; no pooled estimate; the proposed mechanism is speculative by the authors' own wording.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

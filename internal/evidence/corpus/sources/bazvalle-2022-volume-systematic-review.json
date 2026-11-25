@@ -1,0 +1,50 @@
+{
+  "id": "bazvalle-2022-volume-systematic-review",
+  "title": "A Systematic Review of the Effects of Different Resistance Training Volumes on Muscle Hypertrophy",
+  "authors": [
+    "Eneko Baz-Valle",
+    "Carlos Balsalobre-Fernández",
+    "Carlos Alix-Fages",
+    "Jordan Santos-Concejero"
+  ],
+  "year": 2022,
+  "publication": "Journal of Human Kinetics",
+  "volume": "81",
+  "pages": "199-210",
+  "study_type": "systematic_review",
+  "doi": "10.2478/hukin-2022-0017",
+  "pmid": "35291645",
+  "url": "https://doi.org/10.2478/hukin-2022-0017",
+  "population": "Randomized trials in men aged 18 to 35 with at least one year of resistance training experience.",
+  "topics": [
+    "volume",
+    "hypertrophy"
+  ],
+  "debates": [
+    "volume_dose_response"
+  ],
+  "keywords": [
+    "12-20 sets",
+    "high volume",
+    "moderate volume",
+    "quadriceps",
+    "triceps",
+    "biceps"
+  ],
+  "key_findings": [
+    "Volumes were grouped as low (under 12 weekly sets), moderate (12 to 20) and high (over 20).",
+    "Moderate and high volumes gave similar growth for the quadriceps and the biceps; high volume gave more growth for the triceps.",
+    "The authors suggest 12 to 20 weekly sets per muscle group as a general starting recommendation for young trained men."
+  ],
+  "methods": "Systematic review with a quantitative synthesis of six of seven included randomized trials lasting at least six weeks, using direct measures of muscle thickness or cross-sectional area.",
+  "limitations": "Seven studies, of which six were pooled; young trained men only; three muscles analysed; the suggested range is the authors' reading of these few studies.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

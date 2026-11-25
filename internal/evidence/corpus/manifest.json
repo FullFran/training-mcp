@@ -1,0 +1,34 @@
+{
+  "version": "2026.11.25-1",
+  "description": "Seed corpus of the training-science library (#116). Every source was checked against its live Crossref record, and PubMed record when indexed, on the ingestion date. Summaries are in our own words and unreviewed.",
+  "debates": [
+    {
+      "id": "volume_dose_response",
+      "question": "Does muscle growth keep rising with more weekly sets, and where do the returns flatten?"
+    },
+    {
+      "id": "frequency_independent_effect",
+      "question": "Does training a muscle more often per week help beyond the extra volume it allows?"
+    },
+    {
+      "id": "proximity_to_failure",
+      "question": "How close to failure do sets need to end for strength and for hypertrophy?"
+    },
+    {
+      "id": "rest_interval_length",
+      "question": "Do longer rests between sets give more hypertrophy and strength than short rests?"
+    },
+    {
+      "id": "deload_value",
+      "question": "Do planned deloads improve results, or only how training feels?"
+    },
+    {
+      "id": "periodization_value",
+      "question": "Does periodizing training add strength or hypertrophy over non-periodized training of equal volume?"
+    },
+    {
+      "id": "partial_range_of_motion",
+      "question": "Is full range of motion better than partial range, including partials at long muscle lengths?"
+    }
+  ]
+}

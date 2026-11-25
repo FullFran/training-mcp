@@ -760,6 +760,7 @@ func New(service training.ServiceFor) *Server {
 	addApps(s, service)
 	addSkillTools(s)
 	addExerciseLibraryTools(s, w, service)
+	addEvidenceTools(s, service)
 	registerPeriodizationTools(s, w, service)
 
 	// Stateless: the server keeps no per-client session state, so restarting the
