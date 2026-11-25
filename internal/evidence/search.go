@@ -12,9 +12,8 @@ import (
 // Index is the port a storage adapter implements: one loaded corpus, indexed
 // for lexical search. It is global and read-only; it holds nothing personal.
 type Index interface {
-	// Search runs a query whose terms hold only letters and digits. MatchAll
-	// asks for sources matching every term, otherwise any term. Hits come
-	// best first, one per source.
+	// Search finds the sources matching every term, best first, one hit per
+	// source. Terms hold only letters and digits.
 	Search(ctx context.Context, q IndexQuery) ([]Hit, error)
 	// Source is one source of the loaded corpus; ErrUnknownSource if absent.
 	Source(ctx context.Context, id string) (Source, error)
@@ -32,8 +31,7 @@ type Filters struct {
 
 // IndexQuery is a search already checked and reduced to plain words.
 type IndexQuery struct {
-	Terms    []string
-	MatchAll bool
+	Terms []string
 	Filters
 	Limit int
 }
@@ -66,13 +64,19 @@ const (
 	MaxLimit     = 20
 	maxQueryLen  = 500
 	maxTerms     = 16
+	// perTermLimit bounds each single-word search of the fallback; it is
+	// above the size of the corpus so no matching source is cut off.
+	perTermLimit = 500
 )
 
 // Match kinds of a search result.
 const (
+	// MatchAllTerms: every result contains every query word.
 	MatchAllTerms = "all_terms"
-	MatchAnyTerm  = "any_term"
-	MatchNone     = "none"
+	// MatchMostTerms: no source had every word, so results contain more
+	// than half of them, most matched words first.
+	MatchMostTerms = "most_terms"
+	MatchNone      = "none"
 )
 
 // Notice travels with every answer. The library's text is data about
@@ -197,9 +201,10 @@ type Library struct{ index Index }
 func NewLibrary(index Index) *Library { return &Library{index: index} }
 
 // Search finds sources by words, filtered. Every word must match; when no
-// source matches them all, sources matching any of them are returned and the
-// answer says so. An empty query, or one nothing matches, is an explicit
-// no-results answer.
+// source matches them all, sources matching more than half of them are
+// returned and the answer says so. One stray shared word ("creatine loading
+// phase" sharing "loading") is not a match. An empty query, or one nothing
+// matches, is an explicit no-results answer.
 func (l *Library) Search(ctx context.Context, in SearchInput) (Result, error) {
 	if len(in.Query) > maxQueryLen {
 		return Result{}, fmt.Errorf("%w: the query is longer than %d bytes", ErrInvalid, maxQueryLen)
@@ -222,18 +227,16 @@ func (l *Library) Search(ctx context.Context, in SearchInput) (Result, error) {
 		out.NoResults = fmt.Sprintf("The query has no searchable words, so nothing in the evidence library (corpus %s) was matched. Ask with specific words, such as 'rest between sets hypertrophy'. Do not cite studies that this library did not return.", loaded.Version)
 		return out, nil
 	}
-	q := IndexQuery{Terms: out.Terms, MatchAll: true, Filters: in.Filters, Limit: in.Limit}
-	hits, err := l.index.Search(ctx, q)
+	hits, err := l.index.Search(ctx, IndexQuery{Terms: out.Terms, Filters: in.Filters, Limit: in.Limit})
 	if err != nil {
 		return Result{}, err
 	}
 	out.Match = MatchAllTerms
-	if len(hits) == 0 && len(out.Terms) > 1 {
-		q.MatchAll = false
-		if hits, err = l.index.Search(ctx, q); err != nil {
+	if len(hits) == 0 && len(out.Terms) > 2 {
+		if hits, err = l.mostTerms(ctx, out.Terms, in.Filters); err != nil {
 			return Result{}, err
 		}
-		out.Match = MatchAnyTerm
+		out.Match = MatchMostTerms
 	}
 	if len(hits) == 0 {
 		out.Match = MatchNone
@@ -249,8 +252,8 @@ func (l *Library) Search(ctx context.Context, in SearchInput) (Result, error) {
 		}
 		seen[s.ID] = true
 		why := "Matches every query word."
-		if out.Match == MatchAnyTerm {
-			why = "Matches some of the query words; no source matched all of them."
+		if out.Match == MatchMostTerms {
+			why = "Matches most of the query words; no source matched all of them."
 		}
 		if len(s.Debates) > 0 {
 			why += " Takes part in a debate where sources disagree: " + strings.Join(s.Debates, ", ") + "."
@@ -264,6 +267,58 @@ func (l *Library) Search(ctx context.Context, in SearchInput) (Result, error) {
 		}
 	}
 	out.Debates = debatesNamed(loaded.Debates, debates)
+	return out, nil
+}
+
+// mostTerms searches each word alone and keeps the sources more than half of
+// the words found, ordered by how many words matched and then by their rank in
+// each single-word search.
+func (l *Library) mostTerms(ctx context.Context, terms []string, f Filters) ([]Hit, error) {
+	type score struct {
+		hit         Hit
+		words, rank int
+		first       int
+	}
+	scores := map[string]*score{}
+	for _, term := range terms {
+		hits, err := l.index.Search(ctx, IndexQuery{Terms: []string{term}, Filters: f, Limit: perTermLimit})
+		if err != nil {
+			return nil, err
+		}
+		counted := map[string]bool{}
+		for rank, h := range hits {
+			if counted[h.Source.ID] {
+				continue
+			}
+			counted[h.Source.ID] = true
+			sc, ok := scores[h.Source.ID]
+			if !ok {
+				sc = &score{hit: h, first: len(scores)}
+				scores[h.Source.ID] = sc
+			}
+			sc.words++
+			sc.rank += rank
+		}
+	}
+	var kept []*score
+	for _, sc := range scores {
+		if sc.words*2 > len(terms) {
+			kept = append(kept, sc)
+		}
+	}
+	slices.SortFunc(kept, func(a, b *score) int {
+		if a.words != b.words {
+			return b.words - a.words
+		}
+		if a.rank != b.rank {
+			return a.rank - b.rank
+		}
+		return a.first - b.first
+	})
+	out := make([]Hit, len(kept))
+	for i, sc := range kept {
+		out[i] = sc.hit
+	}
 	return out, nil
 }
 

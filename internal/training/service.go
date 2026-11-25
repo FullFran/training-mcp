@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/fullfran/training-mcp/internal/evidence"
 )
 
 func NormalizeSI(si float64) float64 {
@@ -31,6 +33,8 @@ type Service struct {
 	clock Clock
 	// imports is nil for a Service built without one; its import methods then fail.
 	imports ImportStore
+	// evidence is nil for a Service built without one; its evidence methods then fail.
+	evidence *evidence.Library
 }
 
 func NewService(store UserStore, clock Clock) *Service { return &Service{store: store, clock: clock} }
@@ -50,6 +54,7 @@ func NewServices(store Store, clock Clock) *Services { return &Services{store: s
 func (s *Services) ForUser(userID int64) *Service {
 	svc := NewService(s.store.ForUser(userID), s.clock)
 	svc.imports = s.store.ImportsFor(userID)
+	svc.evidence = evidence.NewLibrary(s.store.Evidence())
 	return svc
 }
 

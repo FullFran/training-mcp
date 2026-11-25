@@ -3,6 +3,8 @@ package training
 import (
 	"context"
 	"time"
+
+	"github.com/fullfran/training-mcp/internal/evidence"
 )
 
 // Store is the persistence port. Everything that belongs to a person is reached
@@ -19,6 +21,8 @@ type Store interface {
 	ProvisionUser(ctx context.Context, subject string) (int64, error)
 	// Snapshot copies the whole database, every user's data included.
 	Snapshot(context.Context, string) error
+	// Evidence is the training-science library, the same for every user.
+	Evidence() evidence.Index
 }
 
 // UserStore is the data of one user. Another user's id behaves exactly as a missing

@@ -11,16 +11,16 @@ import (
 
 func TestTermsKeepOnlyLettersAndDigits(t *testing.T) {
 	cases := map[string][]string{
-		"":                                      nil,
-		"   ":                                   nil,
+		"":    nil,
+		"   ": nil,
 		`"rest" AND (NEAR(x y)) OR -volume* ^col:`: {"rest", "near", "volume", "col"},
-		"descanso entre series ¿cuánto?":         {"descanso", "entre", "series"},
-		"Hipertrofia, HIPERTROFIA hipertrofia":   {"hipertrofia"},
-		"the effect of training on the study":    nil,
-		"1RM; DROP TABLE evidence_sources; --":   {"1rm", "drop", "table", "sources"},
-		"rest_intervals 3' 90\"":                 {"rest", "intervals", "90"},
-		"a b c ñ é":                              nil,
-		"\x00\x01 volume ‮":                 {"volume"},
+		"descanso entre series ¿cuánto?":           {"descanso", "entre", "series"},
+		"Hipertrofia, HIPERTROFIA hipertrofia":     {"hipertrofia"},
+		"the effect of training on the study":      nil,
+		"1RM; DROP TABLE evidence_sources; --":     {"1rm", "drop", "table", "sources"},
+		"rest_intervals 3' 90\"":                   {"rest", "intervals", "90"},
+		"a b c ñ é":                                nil,
+		"\x00\x01 volume ‮":                        {"volume"},
 	}
 	for in, want := range cases {
 		if got := Terms(in); !reflect.DeepEqual(got, want) {
@@ -34,7 +34,7 @@ func TestTermsKeepOnlyLettersAndDigits(t *testing.T) {
 }
 
 // fakeIndex answers from a fixed list: a source matches when its title holds
-// every term (or any term when MatchAll is false).
+// every term. Each match is returned twice, to prove the library deduplicates.
 type fakeIndex struct {
 	sources []Source
 	queries []IndexQuery
@@ -51,7 +51,7 @@ func (f *fakeIndex) Search(_ context.Context, q IndexQuery) ([]Hit, error) {
 				n++
 			}
 		}
-		if (q.MatchAll && n == len(q.Terms)) || (!q.MatchAll && n > 0) {
+		if n == len(q.Terms) {
 			out = append(out, Hit{Source: s, Snippet: s.Title}, Hit{Source: s, Snippet: "duplicate"})
 		}
 	}
@@ -93,13 +93,14 @@ func TestSearchEmptyQueryIsAnExplicitNoResult(t *testing.T) {
 	}
 }
 
-func TestSearchFallsBackToAnyTermAndDeduplicates(t *testing.T) {
+func TestSearchFallsBackToMostTermsAndDeduplicates(t *testing.T) {
 	idx := newFake()
-	r, err := NewLibrary(idx).Search(context.Background(), SearchInput{Query: "rest volume"})
+	r, err := NewLibrary(idx).Search(context.Background(), SearchInput{Query: "rest volume hypertrophy"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.Match != MatchAnyTerm || len(r.Results) != 2 || len(idx.queries) != 2 || idx.queries[1].MatchAll {
+	// One search for all three words, then one per word.
+	if r.Match != MatchMostTerms || len(r.Results) != 2 || len(idx.queries) != 4 {
 		t.Fatalf("%+v %+v", r, idx.queries)
 	}
 	if r.Results[0].SourceID == r.Results[1].SourceID {
@@ -111,9 +112,12 @@ func TestSearchFallsBackToAnyTermAndDeduplicates(t *testing.T) {
 	if len(r.Debates) != 1 || !slices.Equal(r.Debates[0].SourceIDs, []string{"a-1", "b-2"}) {
 		t.Fatalf("debates: %+v", r.Debates)
 	}
-	r, _ = NewLibrary(idx).Search(context.Background(), SearchInput{Query: "nutrition creatine"})
-	if len(r.Results) != 0 || r.NoResults == "" || r.Match != MatchNone {
-		t.Fatalf("irrelevant query: %+v", r)
+	// Two words must both match: no fallback below three words.
+	for _, q := range []string{"nutrition creatine", "rest volume", "creatine loading hypertrophy"} {
+		r, _ = NewLibrary(idx).Search(context.Background(), SearchInput{Query: q})
+		if len(r.Results) != 0 || r.NoResults == "" || r.Match != MatchNone {
+			t.Fatalf("%q: %+v", q, r)
+		}
 	}
 }
 
