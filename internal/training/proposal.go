@@ -162,6 +162,8 @@ var deletingActions = map[string]bool{
 	"bodyweight.delete":    true,
 	// set_session_notes with empty notes clears them.
 	"session.notes.remove": true,
+	// save_block with a smaller microcycle_count drops microcycles.
+	"block.shorten": true,
 }
 
 // IsDeletingAction reports whether an action type removes data. The

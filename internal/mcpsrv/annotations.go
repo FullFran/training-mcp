@@ -106,6 +106,15 @@ var toolBehaviors = map[string]toolBehavior{
 	"log_bodyweight":    overwriting("Log bodyweight"),
 	"delete_bodyweight": overwriting("Delete bodyweight"),
 	"set_session_notes": overwriting("Set session notes"),
+
+	// Periodization (#41).
+	"training_status":      read("Get training status"),
+	"list_blocks":          read("List blocks"),
+	"get_block":            read("Get block"),
+	"set_goal":             overwriting("Set goal"),
+	"save_block":           overwriting("Save block"),
+	"advance_block":        additive("Advance block"),
+	"assign_session_block": overwriting("Assign session to block"),
 }
 
 // addTool registers a tool with its declared behavior. A tool missing from

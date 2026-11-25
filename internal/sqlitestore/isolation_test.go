@@ -24,6 +24,7 @@ var userTables = []string{
 	"proposals", "answer_rules", "decision_records", "agent_permissions", "coach_memory", "coach_memory_revisions", "coach_memory_relations",
 	"imports", "imported_sets", "import_exercise_map",
 	"exercise_library_entries", "exercise_aliases", "bodyweight",
+	"goals", "blocks", "block_microcycles", "block_rotations",
 }
 
 // ownedRows selects one user's rows from each table, children through their parent.
@@ -52,6 +53,10 @@ var ownedRows = map[string]string{
 	"exercise_library_entries": `SELECT * FROM exercise_library_entries WHERE user_id=? ORDER BY rowid`,
 	"exercise_aliases":         `SELECT * FROM exercise_aliases WHERE user_id=? ORDER BY rowid`,
 	"bodyweight":               `SELECT * FROM bodyweight WHERE user_id=? ORDER BY rowid`,
+	"goals":                    `SELECT * FROM goals WHERE user_id=? ORDER BY rowid`,
+	"blocks":                   `SELECT * FROM blocks WHERE user_id=? ORDER BY rowid`,
+	"block_microcycles":        `SELECT * FROM block_microcycles WHERE user_id=? ORDER BY rowid`,
+	"block_rotations":          `SELECT * FROM block_rotations WHERE user_id=? ORDER BY rowid`,
 }
 
 func openTwoUsers(t *testing.T) *Store {

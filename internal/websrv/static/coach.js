@@ -119,6 +119,13 @@
     set_session_notes: ['Guardando las notas de la sesión', 'Notas de la sesión guardadas'],
     search_evidence: ['Buscando en la biblioteca de estudios', 'Buscado en la biblioteca de estudios'],
     get_evidence: ['Leyendo un estudio', 'Leído un estudio'],
+    training_status: ['Mirando cómo va tu planificación', 'Mirado cómo va tu planificación'],
+    list_blocks: ['Consultando tus bloques', 'Consultados tus bloques'],
+    get_block: ['Consultando el bloque', 'Consultado el bloque'],
+    set_goal: ['Guardando un objetivo', 'Objetivo guardado'],
+    save_block: ['Planificando un bloque', 'Bloque planificado'],
+    advance_block: ['Avanzando el bloque', 'Bloque avanzado'],
+    assign_session_block: ['Colocando la sesión en el bloque', 'Sesión colocada en el bloque'],
   };
   function words(name) {
     const w = WORDS[name];

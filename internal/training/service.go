@@ -74,7 +74,12 @@ func (s *Service) StartPlannedSession(ctx context.Context, date string, planID i
 	if planID < 0 {
 		return Session{}, ErrValidation
 	}
-	return s.store.Start(ctx, Session{Date: date, PlanID: planID})
+	session, err := s.store.Start(ctx, Session{Date: date, PlanID: planID})
+	if err != nil {
+		return Session{}, err
+	}
+	s.placeAfterWrite(ctx, session.ID)
+	return session, nil
 }
 
 // CreatePlan stores a reusable workout template. Exercise names are normalized
@@ -580,10 +585,15 @@ func (s *Service) LogSets(ctx context.Context, in LogSetsInput) (LogSetsResult, 
 		return LogSetsResult{}, err
 	}
 	sum := sha256.Sum256(canonical)
-	return s.store.LogSets(ctx, LogSetsRecord{
+	result, err := s.store.LogSets(ctx, LogSetsRecord{
 		Key: key, Fingerprint: hex.EncodeToString(sum[:]),
 		Date: s.clock().Format("2006-01-02"), Exercise: exercise, Sets: sets,
 	})
+	if err != nil || result.Replayed {
+		return result, err
+	}
+	s.placeAfterWrite(ctx, result.Session.ID)
+	return result, nil
 }
 
 // validSetFields holds the rules a recorded set must satisfy, shared by every
@@ -614,7 +624,12 @@ func (s *Service) AddSet(ctx context.Context, in AddSetInput) (Set, float64, err
 		}
 		in.Superset = label
 	}
-	return s.store.AddSet(ctx, in)
+	set, si, err := s.store.AddSet(ctx, in)
+	if err != nil {
+		return Set{}, 0, err
+	}
+	s.placeAfterWrite(ctx, in.SessionID)
+	return set, si, nil
 }
 
 // SetExerciseNote stores a persistent setup reminder for an exercise. An empty
