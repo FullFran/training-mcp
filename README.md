@@ -152,6 +152,11 @@ A few shapes worth knowing before reading it:
 - Every exercise maps to exactly one muscle group, so group SI is a true
   partition of session SI. Unmapped exercises are reported under an empty
   group rather than dropped, keeping catalogue gaps visible.
+- Beside that count, an exercise library gives each exercise primary and
+  secondary muscles, and the volume reads add a fractional view (primary 1,
+  secondary 0.5). Each person's own entries and aliases win over curated
+  entries and the public free-exercise-db dataset. See
+  [Exercise library](docs/tools.md#exercise-library).
 
 ## Web UI (PWA)
 

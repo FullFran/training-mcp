@@ -181,6 +181,7 @@ and OQ-0005-7).
 | `set.correct_lb` | `correct_lb_sets` |
 | `memory.save` / `memory.forget` | `memory_save` / `memory_forget` |
 | `memory.judge` / `memory.confirm` / `memory.consolidate` | `memory_judge` / `memory_confirm` / `memory_consolidate` |
+| `exercise.library.save` / `exercise.alias.set` | `save_exercise_entry` / `set_exercise_alias` |
 
 A proposal is claimed before it is applied, so two answers cannot apply it
 twice. If the process stops between applying and recording the outcome, the
@@ -266,8 +267,26 @@ Judging progress in one call instead of reading back every session.
 | `suggest_load` | Suggest the next working weight for an exercise, judged against the rep range and RPE it is prescribed at. Advisory only: it explains its reasoning and never changes a plan. Sets carrying an intensity technique are ignored, since they are not comparable to straight sets, and so are warm-up sets. |
 | `exercise_history` | All recorded sets of one exercise, newest first, with each set's estimated 1RM, plus the best set ever recorded for it. Use this to judge progression instead of reading whole sessions. |
 | `performance_dropoff` | Apparent per-set performance drop within one session, per exercise, computed deterministically from load, reps and stated RPE with named estimators (epley_v1, rir_epley_v1, brzycki_v1). Lists which sets were comparable and why others were excluded (recorded warm-up, technique, no load, probable warm-up), the reference set, each model's drop and confidence, and abstains with fewer than two comparable sets. An unstated RPE never feeds the RIR model. A device-free proxy: not velocity, force or fatigue, and it changes nothing. |
-| `weekly_volume` | SI and set count per muscle group per training week, newest week first. Warm-up sets are not counted. Week start is the Monday of that week. Use this to see whether a muscle group's stimulus is rising or falling over time. |
-| `volume_by_muscle` | Total SI and set count per muscle group, optionally within an inclusive date range. Warm-up sets are not counted. Sets whose exercise has no group yet are reported under an empty muscle_group. |
+| `weekly_volume` | SI and set count per muscle group per training week, newest week first. Warm-up sets are not counted. Week start is the Monday of that week. Use this to see whether a muscle group's stimulus is rising or falling over time. Beside it, fractional gives the same working sets counted by the exercise library: each primary muscle of an exercise's entry gets 1 set and each secondary muscle 0.5 (Pelland et al., Sports Medicine 2025), with SI weighted the same way; an exercise without an entry gives 1 set to its exercise group. Muscles the library marks uncertain are listed under uncertain and not counted. The existing fields are unchanged. |
+| `volume_by_muscle` | Total SI and set count per muscle group, optionally within an inclusive date range. Warm-up sets are not counted. Sets whose exercise has no group yet are reported under an empty muscle_group. Beside it, fractional gives the same working sets counted by the exercise library: each primary muscle of an exercise's entry gets 1 set and each secondary muscle 0.5 (Pelland et al., Sports Medicine 2025), with SI weighted the same way; an exercise without an entry gives 1 set to its exercise group. Muscles the library marks uncertain are listed under uncertain and not counted. The existing fields are unchanged. |
+
+`weekly_volume` returns `weeks` and `volume_by_muscle` returns `volume` exactly
+as before. Both now also return an optional `fractional` object (#137), left
+out only when the store keeps no exercise library:
+
+- `method` and `source`: how the credit is counted and the study it follows.
+- `weeks[]` (`weekly_volume`) with `week_start`, `groups[]` and `uncertain[]`,
+  or `groups[]` and `uncertain[]` directly (`volume_by_muscle`).
+- `groups[]`: `muscle_group`, fractional `sets` and `total_si`, rounded to 0.1,
+  largest first. `muscle_group` is empty for sets with neither a library entry
+  nor an exercise group, as in the existing totals.
+- `uncertain[]`: credit not counted because a muscle has no clear group:
+  `exercise`, `entry`, `layer`, `source_muscle`, `role`, `candidates`, `sets`
+  and `total_si`.
+
+The fractional sets of a group can differ from its existing count in both
+directions: a bench press now also credits triceps 0.5, and an exercise whose
+entry names another primary muscle than its exercise group moves there.
 
 ## Feedback loop
 
@@ -293,6 +312,66 @@ Per-exercise metadata that persists across sessions.
 | `list_exercise_groups` | List every exercise that has a muscle group assigned, ordered by group. |
 | `set_exercise_note` | Store a persistent setup reminder for an exercise, such as seat height or grip width. It is shown every time that exercise is logged. An empty note removes it. |
 | `list_exercise_notes` | List every exercise that has a setup note. |
+
+## Exercise library
+
+Which muscles an exercise trains, primary and secondary, for the fractional
+volume (#137). Each person has their own library over two shared layers.
+
+| Tool | What it does |
+|---|---|
+| `lookup_exercise` | Look an exercise name up in the exercise library and return its muscles: primary ones count 1 set, secondary ones 0.5. Lookup order: the person's alias, then their own entries, then the curated entries, then the public free-exercise-db dataset; the result names the layer and whether the match was by alias, exact name or normalized name (case, accents and punctuation ignored). A public muscle without one clear muscle group is marked uncertain with its candidate groups and is never counted. When nothing is found, found is false and candidates lists similar entries; pick none without asking the person. |
+| `list_exercises_needing_mapping` | List the person's logged exercises (working sets) whose muscles the library cannot give: not_found (no entry; their sets still count toward their set_exercise_group group, with up to 3 candidates) and uncertain (the entry has a muscle without one clear group). Fix one with set_exercise_alias or save_exercise_entry. |
+| `save_exercise_entry` | Save an exercise to the person's own library with its primary and secondary muscle groups. Their own entry wins over the curated and public ones from then on, for them only; correcting a curated or public entry copies it into their library and records which entry it was based on. Use it for an exercise lookup_exercise does not find or marks uncertain, after asking the person. |
+| `set_exercise_alias` | Make a name the person logs mean a library entry, e.g. 'press banca' for 'Barbell Bench Press - Medium Grip', for them only. The alias follows the entry: if they later correct it, the alias reaches the correction. It does not rename logged sets or change set_exercise_group. |
+
+The two writes are proposals like every other write, and undo restores the
+entry or alias as it was.
+
+**Lookup order.** The first layer that has the name wins:
+
+1. `alias`: the person's alias for the name, resolved to the entry it names;
+2. `own`: the person's own entries (`exercise_library_entries`, migration 031);
+3. `curated`: hand-checked entries in
+   `internal/training/exerciselibdata/curated.json`, changed only by pull
+   request, each with the reason it was checked;
+4. `public`: free-exercise-db, 876 exercises, vendored and pinned (see
+   [Sources and licenses](#sources-and-licenses));
+5. not found: `found` is false and `candidates` lists up to 10 entries that
+   share words with the name, own entries first among equals. Nothing is
+   picked: the coach asks, then sets an alias.
+
+`match` says how: `alias`, `exact` (the same name after trimming, lower case
+and collapsed spaces) or `normalized` (also ignoring accents and punctuation,
+so `Jalón al pecho` matches `jalon al pecho` and `Bench Press - Powerlifting`
+matches `bench press powerlifting`). An entry's `layer` is where it came from.
+
+**Copy on write.** `save_exercise_entry` with the name of a curated or public
+entry stores the person's own copy with `based_on` (`curated:<name>` or
+`public:<id>`); from then on it wins for them. Nobody else sees it: own entries
+and aliases are per person.
+
+**Aliases** point at an entry name and are resolved on every read, so an alias
+to a public entry reaches the person's correction once they save one. An alias
+target must be found without aliases, so aliases never chain.
+
+**Muscle mapping.** free-exercise-db names 17 muscles. Twelve map to one muscle
+group (`abdominals` abdomen, `adductors` aductor, `biceps`, `calves` gemelo,
+`chest` pecho, `forearms` antebrazo, `glutes` gluteo, `hamstrings` isquios,
+`lats` espalda, `quadriceps` cuadriceps, `traps` trapecio, `triceps`). Five do
+not, and are marked `uncertain` with their candidate groups instead of guessed:
+`shoulders` does not tell the heads apart (hombro anterior, lateral or
+posterior); `middle back` is rhomboids and middle trapezius (espalda or
+trapecio); `lower back` (spinal erectors), `abductors` and `neck` have no group
+of their own (nearest: espalda, gluteo, trapecio). Of the 876 public entries, 369 map
+cleanly and 507 carry at least one uncertain muscle. An uncertain muscle never
+counts toward a group; `list_exercises_needing_mapping` lists the logged
+exercises it affects.
+
+**Per exercise, not per machine.** The library describes the movement. The
+set's `equipment` stays the machine identity, and the library never reads or
+changes it. `set_exercise_group` keeps its meaning: it is the one group an
+exercise without a library entry counts toward.
 
 ## Coach memory
 
@@ -427,3 +506,24 @@ The recommendation is deliberately cautious about its own certainty:
   on top of the saved plan without changing it.
 
 `set_exercise_group`, `list_exercise_groups`, and `volume_by_muscle` add per-muscle-group volume. Each exercise maps to exactly one muscle group, so group SI is a true partition of session SI — every set counts once and the group totals add up to the session total. Sets whose exercise has no mapping are reported under an empty group rather than dropped, so gaps in the catalogue stay visible.
+
+The [exercise library](#exercise-library) adds the fractional view beside that partition instead of replacing it: an exercise trains more than one muscle, and the per-group count stays so the two can be compared (#137). The fractional credit is not a partition: a set can credit several groups, and uncertain muscles credit none.
+
+## Sources and licenses
+
+| What | Source | License | Pinned version |
+|---|---|---|---|
+| Public layer of the exercise library | [free-exercise-db](https://github.com/yuhonas/free-exercise-db) `dist/exercises.json`, 876 exercises, trimmed to `id`, `name`, `primaryMuscles`, `secondaryMuscles`, `equipment` and `category` | [Unlicense](https://unlicense.org) (public domain); the license text is vendored as `internal/training/exerciselibdata/LICENSE-free-exercise-db.md` | commit `f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5`; upstream file SHA-256 `5bb747e3fc658f095a60dcbf6d53c96627acdcc6ffb6fffde86f7e26995d40bf` |
+| Fractional volume (primary 1, secondary 0.5) | Pelland et al., *Sports Medicine* 2025, DOI [10.1007/s40279-025-02344-w](https://doi.org/10.1007/s40279-025-02344-w) (preprint DOI 10.51224/SRXIV.460) | cited, nothing copied | n/a |
+
+- The vendored file is written only by `cmd/exerciselib-import`, which
+  records the commit and the upstream SHA-256 inside it; a test checks the
+  file is in exactly the importer's form. How to re-import is in
+  `internal/training/exerciselibdata/README.md`. The download is treated as
+  untrusted input: parsed as JSON and checked, never run.
+- Pelland et al. count a direct set as 1 and an indirect set as 0.5, the
+  method with the strongest relative evidence in their meta-regressions, and
+  give no finer per-exercise weights. They weigh sets; weighting SI the same
+  way (`total_si`) is this server's extension, and `method` says so.
+- wger (CC-BY-SA) and RepDB (its terms forbid republishing the data) were
+  considered in #137 and not used.
