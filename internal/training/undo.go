@@ -43,7 +43,7 @@ const (
 // Table names the kind of row in the way: sets, sessions, plans, plan_items,
 // session_items, session_feedback, exercise_notes, exercise_groups,
 // volume_landmarks, users (the rest target), idempotency_keys, imported_sets,
-// coach_memory, coach_memory_revisions or coach_memory_relations.
+// coach_memory, coach_memory_revisions, coach_memory_relations or bodyweight.
 type UndoConflict struct {
 	Reason string
 	Table  string
