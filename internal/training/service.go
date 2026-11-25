@@ -423,8 +423,15 @@ func (s *Services) Snapshot(ctx context.Context, path string) error {
 // the prescription it currently carries in today's session, falling back to the
 // most recent plan that prescribes it.
 func (s *Service) SuggestLoad(ctx context.Context, exercise string) (LoadSuggestion, error) {
+	return s.SuggestLoadOn(ctx, exercise, "")
+}
+
+// SuggestLoadOn is SuggestLoad restricted to the sets on one equipment value;
+// an empty equipment uses every set, exactly as SuggestLoad.
+func (s *Service) SuggestLoadOn(ctx context.Context, exercise, equipment string) (LoadSuggestion, error) {
 	exercise = strings.ToLower(strings.TrimSpace(exercise))
-	if exercise == "" {
+	equipment = normalizeEquipment(equipment)
+	if exercise == "" || len(equipment) > maxEquipmentLen {
 		return LoadSuggestion{}, ErrValidation
 	}
 	history, err := s.ExerciseHistory(ctx, exercise, 100)
@@ -442,9 +449,37 @@ func (s *Service) SuggestLoad(ctx context.Context, exercise string) (LoadSuggest
 		}
 	}
 	repMin, repMax, targetRPE := s.prescriptionFor(ctx, exercise)
-	out := SuggestLoad(last, repMin, repMax, targetRPE)
-	out.Exercise = exercise
+	if equipment == "" {
+		out := SuggestLoad(last, repMin, repMax, targetRPE)
+		out.Exercise = exercise
+		if len(history.BestByEquipment) > 1 {
+			out.EquipmentSeen = equipmentValues(history.BestByEquipment)
+		}
+		return out, nil
+	}
+	// A machine is advised only from its own sets, found over the whole
+	// history, so one rarely used is not missed by the page read above.
+	for _, g := range history.BestByEquipment {
+		if g.Equipment == equipment {
+			latest := g.Latest
+			out := SuggestLoad(&latest, repMin, repMax, targetRPE)
+			out.Exercise, out.Equipment = exercise, equipment
+			return out, nil
+		}
+	}
+	out := SuggestLoad(nil, repMin, repMax, targetRPE)
+	out.Exercise, out.Equipment, out.NoSetsOnEquipment = exercise, equipment, true
+	out.Reason = fmt.Sprintf("Sin series previas de este ejercicio en el equipo %q; no uso las de otros equipos. Elige un peso que te deje en el rango objetivo.", equipment)
+	out.EquipmentSeen = equipmentValues(history.BestByEquipment)
 	return out, nil
+}
+
+func equipmentValues(groups []EquipmentBest) []string {
+	out := make([]string, 0, len(groups))
+	for _, g := range groups {
+		out = append(out, g.Equipment)
+	}
+	return out
 }
 
 // prescriptionFor finds the rep range and RPE an exercise is prescribed at,
