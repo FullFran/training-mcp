@@ -516,7 +516,13 @@ Without an active block, training works exactly as before, routine by routine.
   closes by itself; `advance_block` with `close` ends it.
 - **Placement.** While a block is active, every session started or logged is
   placed in it on its own; a session that fits nowhere is kept off-plan, never
-  rejected. `assign_session_block` moves it.
+  rejected. `assign_session_block` moves it. Deleting the session that closed
+  a microcycle of the active sequence block reopens it, when it no longer holds
+  every routine of its rotation and no later microcycle has moved on; one closed
+  by hand or by a mode change stays closed.
+- **Undoing an activation.** Refused once a session is linked to the block or
+  one of its microcycles closed, so a sketch or planned block never holds what
+  only an active block produces; undo those first.
 - **Forward only.** Edits change the remaining microcycles; done, skipped and
   elapsed ones keep what they ran. Shrinking a block drops only remaining
   microcycles with no session, and is a deleting action (`block.shorten`).

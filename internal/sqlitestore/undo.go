@@ -657,7 +657,7 @@ func (s *userStore) restore(ctx context.Context, tx *sql.Tx, changes []undoChang
 			return fmt.Errorf("undo: restored row of %s is not this account's", t.name)
 		}
 	}
-	return nil
+	return s.undoneActivations(ctx, tx, changes)
 }
 
 func sameCell(a, b cell) bool { return undoRow{"v": a}.sig() == undoRow{"v": b}.sig() }

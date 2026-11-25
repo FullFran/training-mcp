@@ -800,7 +800,12 @@ func (s *Service) DeleteSession(ctx context.Context, id int64) (int, error) {
 	if id <= 0 {
 		return 0, ErrValidation
 	}
-	return s.store.DeleteSession(ctx, id)
+	link := s.linkBeforeDelete(ctx, id)
+	n, err := s.store.DeleteSession(ctx, id)
+	if err == nil {
+		s.reopenAfterDelete(ctx, link)
+	}
+	return n, err
 }
 
 // ExerciseHistory returns one exercise's sets newest first, plus its best set
