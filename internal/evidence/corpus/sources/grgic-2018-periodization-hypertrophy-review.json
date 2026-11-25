@@ -1,0 +1,43 @@
+{
+  "id": "grgic-2018-periodization-hypertrophy-review",
+  "title": "Should resistance training programs aimed at muscular hypertrophy be periodized? A systematic review of periodized versus non-periodized approaches",
+  "authors": [
+    "J. Grgic",
+    "B. Lazinica",
+    "P. Mikulic",
+    "B.J. Schoenfeld"
+  ],
+  "year": 2018,
+  "publication": "Science & Sports",
+  "volume": "33",
+  "issue": "3",
+  "pages": "e97-e104",
+  "study_type": "systematic_review",
+  "doi": "10.1016/j.scispo.2017.09.005",
+  "url": "https://doi.org/10.1016/j.scispo.2017.09.005",
+  "population": "Not available from the bibliographic record.",
+  "topics": [
+    "periodization",
+    "hypertrophy"
+  ],
+  "debates": [
+    "periodization_value"
+  ],
+  "keywords": [
+    "periodized",
+    "non-periodized"
+  ],
+  "key_findings": [
+    "The record describes a systematic review comparing periodized with non-periodized resistance training programmes aimed at muscle hypertrophy; no abstract was available to summarize its conclusions, so read the original before relying on it."
+  ],
+  "methods": "Systematic review, according to its title.",
+  "limitations": "Summary based on the bibliographic record only: no abstract was available, so findings, population and methods are unknown here. Not indexed in PubMed; verified against Crossref only.",
+  "summary_basis": "record_only",
+  "verification": {
+    "crossref": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

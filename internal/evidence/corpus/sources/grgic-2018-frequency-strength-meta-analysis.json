@@ -1,0 +1,51 @@
+{
+  "id": "grgic-2018-frequency-strength-meta-analysis",
+  "title": "Effect of Resistance Training Frequency on Gains in Muscular Strength: A Systematic Review and Meta-Analysis",
+  "authors": [
+    "Jozo Grgic",
+    "Brad J. Schoenfeld",
+    "Timothy B. Davies",
+    "Bruno Lazinica",
+    "James W. Krieger",
+    "Zeljko Pedisic"
+  ],
+  "year": 2018,
+  "publication": "Sports Medicine",
+  "volume": "48",
+  "issue": "5",
+  "pages": "1207-1220",
+  "study_type": "meta_analysis",
+  "doi": "10.1007/s40279-018-0872-x",
+  "pmid": "29470825",
+  "url": "https://doi.org/10.1007/s40279-018-0872-x",
+  "population": "22 studies, most in untrained participants; subgroups for young and older adults, men and women.",
+  "topics": [
+    "frequency",
+    "strength",
+    "volume"
+  ],
+  "debates": [
+    "frequency_independent_effect"
+  ],
+  "keywords": [
+    "times per week",
+    "1RM",
+    "volume-equated"
+  ],
+  "key_findings": [
+    "Strength gains grew with weekly frequency: effect sizes of about 0.74, 0.82, 0.93 and 1.08 for training 1, 2, 3 and 4 or more times a week.",
+    "With volume equated, frequency had no significant effect on strength, so the authors attribute the overall effect mainly to the extra volume higher frequencies allow.",
+    "Subgroups suggested more benefit from higher frequency for multi-joint and upper-body lifts, in women and in young adults."
+  ],
+  "methods": "Systematic review and random-effects meta-analysis of studies comparing training frequencies, with subgroup analyses by volume, exercise, body region, failure, age and sex; study quality rated with a modified Downs and Black checklist.",
+  "limitations": "Only 4 of 22 studies rated good quality, the rest moderate; most participants were untrained, and the authors call for more studies in trained people.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

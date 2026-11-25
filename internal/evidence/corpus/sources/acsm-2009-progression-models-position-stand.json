@@ -1,0 +1,53 @@
+{
+  "id": "acsm-2009-progression-models-position-stand",
+  "title": "Progression Models in Resistance Training for Healthy Adults",
+  "authors": [
+    "American College of Sports Medicine"
+  ],
+  "year": 2009,
+  "publication": "Medicine & Science in Sports & Exercise",
+  "volume": "41",
+  "issue": "3",
+  "pages": "687-708",
+  "study_type": "position_stand",
+  "doi": "10.1249/mss.0b013e3181915670",
+  "pmid": "19204579",
+  "url": "https://doi.org/10.1249/mss.0b013e3181915670",
+  "population": "Healthy adults: novice, intermediate and advanced trainees.",
+  "topics": [
+    "load",
+    "rest_intervals",
+    "frequency",
+    "volume",
+    "periodization",
+    "exercise_selection",
+    "hypertrophy",
+    "strength"
+  ],
+  "debates": [
+    "rest_interval_length"
+  ],
+  "keywords": [
+    "ACSM",
+    "guidelines",
+    "progression",
+    "repetition maximum",
+    "multiple sets"
+  ],
+  "key_findings": [
+    "For hypertrophy it recommends loads from 1 to 12RM in a periodized fashion with emphasis on 6 to 12RM, rests of 1 to 2 minutes, moderate velocity, and higher-volume multiple-set programmes.",
+    "For strength in intermediate and advanced trainees it recommends 1 to 12RM periodized with eventual emphasis on 1 to 6RM and rests of 3 to 5 minutes; load rises 2 to 10% once one or two repetitions beyond the target are achieved.",
+    "Recommended frequency rises with experience: 2 to 3 days a week for novices, 3 to 4 for intermediates and 4 to 5 for advanced; it asks that recommendations be applied in context of goals, capacity and training status."
+  ],
+  "methods": "Position stand of the American College of Sports Medicine: consensus recommendations from a review of the literature.",
+  "limitations": "Published in 2009, before most of the meta-analyses on rest intervals, volume and failure in this library; consensus recommendations rather than a quantitative synthesis.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

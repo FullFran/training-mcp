@@ -1,0 +1,49 @@
+{
+  "id": "grgic-2017-rest-intervals-systematic-review",
+  "title": "The effects of short versus long inter-set rest intervals in resistance training on measures of muscle hypertrophy: A systematic review",
+  "authors": [
+    "Jozo Grgic",
+    "Bruno Lazinica",
+    "Pavle Mikulic",
+    "James W. Krieger",
+    "Brad Jon Schoenfeld"
+  ],
+  "year": 2017,
+  "publication": "European Journal of Sport Science",
+  "volume": "17",
+  "issue": "8",
+  "pages": "983-993",
+  "study_type": "systematic_review",
+  "doi": "10.1080/17461391.2017.1340524",
+  "pmid": "28641044",
+  "url": "https://doi.org/10.1080/17461391.2017.1340524",
+  "population": "6 trials in participants without known chronic disease or injury, training at least twice a week for at least four weeks.",
+  "topics": [
+    "rest_intervals",
+    "hypertrophy"
+  ],
+  "debates": [
+    "rest_interval_length"
+  ],
+  "keywords": [
+    "short rest",
+    "long rest",
+    "60 seconds"
+  ],
+  "key_findings": [
+    "Compared short (60 seconds or less) with long (over 60 seconds) rests where rest was the only difference between groups.",
+    "Both short and long rests can produce hypertrophy.",
+    "Newer studies in trained people with more sensitive measures hint at an advantage for longer rests, but the authors call the evidence insufficient for a clear distinction."
+  ],
+  "methods": "Systematic review of five databases without a pooled meta-analysis.",
+  "limitations": "Only six studies with dissimilar designs; no quantitative synthesis.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

@@ -1,0 +1,59 @@
+{
+  "id": "schoenfeld-2016-rest-intervals-trained-men",
+  "title": "Longer Interset Rest Periods Enhance Muscle Strength and Hypertrophy in Resistance-Trained Men",
+  "authors": [
+    "Brad J. Schoenfeld",
+    "Zachary K. Pope",
+    "Franklin M. Benik",
+    "Garrett M. Hester",
+    "John Sellers",
+    "Josh L. Nooner",
+    "Jessica A. Schnaiter",
+    "Katherine E. Bond-Williams",
+    "Adrian S. Carter",
+    "Corbin L. Ross",
+    "Brandon L. Just",
+    "Menno Henselmans",
+    "James W. Krieger"
+  ],
+  "year": 2016,
+  "publication": "Journal of Strength and Conditioning Research",
+  "volume": "30",
+  "issue": "7",
+  "pages": "1805-1812",
+  "study_type": "randomized_trial",
+  "doi": "10.1519/jsc.0000000000001272",
+  "pmid": "26605807",
+  "url": "https://doi.org/10.1519/jsc.0000000000001272",
+  "population": "21 young resistance-trained men.",
+  "topics": [
+    "rest_intervals",
+    "hypertrophy",
+    "strength"
+  ],
+  "debates": [
+    "rest_interval_length"
+  ],
+  "keywords": [
+    "1 minute rest",
+    "3 minutes rest",
+    "short rest",
+    "long rest"
+  ],
+  "key_findings": [
+    "Resting 3 minutes between sets gave greater squat and bench press 1RM gains than resting 1 minute over 8 weeks.",
+    "Anterior thigh thickness grew more with 3-minute rests, with a trend for the triceps (p = 0.06); local muscular endurance improved similarly.",
+    "The authors conclude longer rests favoured strength and hypertrophy in this group."
+  ],
+  "methods": "Randomized trial: 3 total-body sessions a week of 7 exercises, 3 sets of 8 to 12RM, with 1-minute or 3-minute rests and other variables held constant, for 8 weeks; 1RM, endurance and ultrasound muscle thickness.",
+  "limitations": "21 participants, men only, 8 weeks.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

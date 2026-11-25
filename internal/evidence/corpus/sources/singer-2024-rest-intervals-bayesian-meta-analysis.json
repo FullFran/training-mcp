@@ -1,0 +1,55 @@
+{
+  "id": "singer-2024-rest-intervals-bayesian-meta-analysis",
+  "title": "Give it a rest: a systematic review with Bayesian meta-analysis on the effect of inter-set rest interval duration on muscle hypertrophy",
+  "authors": [
+    "Alec Singer",
+    "Milo Wolf",
+    "Leonardo Generoso",
+    "Elizabeth Arias",
+    "Kenneth Delcastillo",
+    "Edwin Echevarria",
+    "Amaris Martinez",
+    "Patroklos Androulakis Korakakis",
+    "Martin C. Refalo",
+    "Paul A. Swinton",
+    "Brad J. Schoenfeld"
+  ],
+  "year": 2024,
+  "publication": "Frontiers in Sports and Active Living",
+  "volume": "6",
+  "study_type": "meta_analysis",
+  "doi": "10.3389/fspor.2024.1429789",
+  "pmid": "39205815",
+  "url": "https://doi.org/10.3389/fspor.2024.1429789",
+  "population": "9 randomized studies in healthy adults (19 measurements: 10 thigh, 6 arm, 3 whole body).",
+  "topics": [
+    "rest_intervals",
+    "hypertrophy"
+  ],
+  "debates": [
+    "rest_interval_length"
+  ],
+  "keywords": [
+    "inter-set rest",
+    "Bayesian",
+    "60 seconds",
+    "90 seconds",
+    "volume load"
+  ],
+  "key_findings": [
+    "Growth overlapped substantially across short, intermediate, long and very long rest periods, with considerable heterogeneity.",
+    "Direct comparisons tended to favour rests longer than 60 seconds for the arm and thigh, while whole-body estimates were near zero and marginally favoured shorter rests.",
+    "No appreciable further difference appeared beyond about 90 seconds; whether sets went to failure did not change the picture. The authors suggest any small benefit of longer rest may work through preserved volume load."
+  ],
+  "methods": "Systematic review with Bayesian hierarchical meta-analyses of randomized studies that changed only the rest interval, registered on OSF.",
+  "limitations": "Nine studies with wide credible intervals and heterogeneous results; the suggested mechanism is the authors' interpretation.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

@@ -1,0 +1,48 @@
+{
+  "id": "schoenfeld-2018-frequency-hypertrophy-meta-analysis",
+  "title": "How many times per week should a muscle be trained to maximize muscle hypertrophy? A systematic review and meta-analysis of studies examining the effects of resistance training frequency",
+  "authors": [
+    "Brad Jon Schoenfeld",
+    "Jozo Grgic",
+    "James Krieger"
+  ],
+  "year": 2018,
+  "publication": "Journal of Sports Sciences",
+  "volume": "37",
+  "issue": "11",
+  "pages": "1286-1295",
+  "study_type": "meta_analysis",
+  "doi": "10.1080/02640414.2018.1555906",
+  "pmid": "30558493",
+  "url": "https://doi.org/10.1080/02640414.2018.1555906",
+  "population": "25 experimental studies; participant characteristics are not detailed in the abstract.",
+  "topics": [
+    "frequency",
+    "hypertrophy",
+    "volume"
+  ],
+  "debates": [
+    "frequency_independent_effect"
+  ],
+  "keywords": [
+    "times per week",
+    "volume-equated",
+    "training split"
+  ],
+  "key_findings": [
+    "When weekly volume was equated, training a muscle more or less often per week made no significant difference to growth, including in trained participants, with direct measures, and for upper and lower body.",
+    "In studies where volume was not equated, higher frequencies were favoured, but the difference between once and three or more times a week was modest.",
+    "The authors conclude that, for a given weekly volume, frequency can follow personal preference."
+  ],
+  "methods": "Systematic review and meta-analysis with meta-regression of weekly frequency per muscle, separating volume-equated from non-volume-equated studies.",
+  "limitations": "In non-equated studies frequency and volume rise together, so their effects are confounded; the abstract does not describe the participants' age, sex or training status overall.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

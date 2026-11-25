@@ -1,0 +1,47 @@
+{
+  "id": "helms-2016-rir-based-rpe-application",
+  "title": "Application of the Repetitions in Reserve-Based Rating of Perceived Exertion Scale for Resistance Training",
+  "authors": [
+    "Eric R. Helms",
+    "John Cronin",
+    "Adam Storey",
+    "Michael C. Zourdos"
+  ],
+  "year": 2016,
+  "publication": "Strength & Conditioning Journal",
+  "volume": "38",
+  "issue": "4",
+  "pages": "42-49",
+  "study_type": "narrative_review",
+  "doi": "10.1519/ssc.0000000000000218",
+  "pmid": "27531969",
+  "url": "https://doi.org/10.1519/ssc.0000000000000218",
+  "population": "Practical article for coaches and athletes; no participants.",
+  "topics": [
+    "rir_rpe",
+    "autoregulation",
+    "load"
+  ],
+  "keywords": [
+    "RPE scale",
+    "repetitions remaining",
+    "load adjustment",
+    "athlete monitoring"
+  ],
+  "key_findings": [
+    "Describes a rating of perceived exertion scale anchored to the number of repetitions left at the end of a set.",
+    "Argues it may be more precise than session or exercise RPE, lets loads be adjusted set to set to the athlete's day, and may gauge intensity better near maximal loads.",
+    "Explains how to build the scale into a training plan."
+  ],
+  "methods": "Narrative practical article; it proposes and explains a method rather than testing it.",
+  "limitations": "Not an outcome study: the advantages described are the authors' arguments, not measured effects.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}

@@ -1,0 +1,50 @@
+{
+  "id": "halperin-2021-predicting-repetitions-to-failure",
+  "title": "Accuracy in Predicting Repetitions to Task Failure in Resistance Exercise: A Scoping Review and Exploratory Meta-analysis",
+  "authors": [
+    "Israel Halperin",
+    "Tomer Malleron",
+    "Itai Har-Nir",
+    "Patroklos Androulakis-Korakakis",
+    "Milo Wolf",
+    "James Fisher",
+    "James Steele"
+  ],
+  "year": 2021,
+  "publication": "Sports Medicine",
+  "volume": "52",
+  "issue": "2",
+  "pages": "377-390",
+  "study_type": "scoping_review",
+  "doi": "10.1007/s40279-021-01559-x",
+  "pmid": "34542869",
+  "url": "https://doi.org/10.1007/s40279-021-01559-x",
+  "population": "12 studies with 414 healthy participants who predicted repetitions to failure in a set taken to failure.",
+  "topics": [
+    "rir_rpe",
+    "proximity_to_failure",
+    "autoregulation"
+  ],
+  "keywords": [
+    "prediction accuracy",
+    "repetitions in reserve",
+    "task failure",
+    "estimation error"
+  ],
+  "key_findings": [
+    "On average, people underpredicted the repetitions they had left before failure by about one repetition (0.95, interval 0.17 to 1.73), with very large variation between studies.",
+    "Predictions were somewhat more accurate when made closer to failure, in sets with 12 or fewer repetitions to failure, and slightly in later sets.",
+    "Training experience did not appear to change accuracy, and upper and lower body exercises did not clearly differ."
+  ],
+  "methods": "Scoping review with an exploratory multilevel meta-analysis and meta-regressions of prediction error.",
+  "limitations": "Extreme heterogeneity (I² 97.9%); studies explained and confirmed failure differently; the authors leave open whether the observed error is acceptable.",
+  "summary_basis": "abstract",
+  "verification": {
+    "crossref": "2026-11-25",
+    "pubmed": "2026-11-25",
+    "retraction_check": "No retraction or correction notice in Crossref updated-by or in the PubMed publication types on 2026-11-25."
+  },
+  "ingested_on": "2026-11-25",
+  "content_version": 1,
+  "review_status": "unreviewed"
+}
