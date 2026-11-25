@@ -207,7 +207,10 @@ shared with the MCP tools and cannot drift apart.
   muscle group for the last four Monday-to-Sunday weeks (the call
   `weekly_volume` makes); each exercise opens a detail with the chart, the best
   sets, the fatigue between sets last time and every session's sets.
-  **Cuerpo**: body weight and measurements are not recorded yet, and it says so.
+  **Cuerpo**: an optional form for today's bodyweight (one entry a day; saving
+  the day again replaces it), the last 90 days' numbers and the recent entries,
+  each deletable; Historial then sets each week's mean bodyweight beside its
+  volume. Measurements are not recorded. A session's page edits its notes.
   The old `/history` URL redirects here.
 - **Tú** holds the profile and the coach's memory, connectors, model, account
   and conversations (kept 90 days), **Ejercicios** (every exercise with its
