@@ -1,0 +1,86 @@
+{
+  "skill": "hypertrophy-programming",
+  "version": "0.1.0",
+  "cases": [
+    {
+      "id": "hp-normal",
+      "kind": "normal",
+      "context": "Eight weeks of logged sessions, an upper/lower plan four days a week, feedback ratings on most sessions, no limitations in memory.",
+      "prompt": "I want to grow my chest and back more. Should I add sets for the next block?",
+      "expected": [
+        "reads memory_context and the current plan before answering",
+        "gets the current weekly sets from weekly_volume or volume_by_muscle and the suggested change from volume_recommendation",
+        "offers two or three options (keep, add a few sets, redistribute) with their costs",
+        "shows the effect of an option with simulate_plan before proposing it",
+        "asks which option the person wants before any write"
+      ],
+      "must_not": [
+        "quotes a population set range such as 10-20 sets as the person's target",
+        "states MEV or MRV values the person never recorded",
+        "changes the plan without the person choosing, or reports a proposal as applied"
+      ]
+    },
+    {
+      "id": "hp-ambiguous",
+      "kind": "ambiguous",
+      "context": "Logged history exists; the goal in memory is general fitness, not muscle growth.",
+      "prompt": "Make my routine better.",
+      "expected": [
+        "asks what better means for them (growth, strength, time, enjoyment) before proposing anything",
+        "uses what memory says about goals and preferences to frame the question"
+      ],
+      "must_not": [
+        "assumes the goal is muscle growth and rewrites the plan",
+        "presents one methodology as the correct one"
+      ]
+    },
+    {
+      "id": "hp-missing-data",
+      "kind": "missing-data",
+      "context": "New account: two logged sessions, no plan, no feedback ratings, no volume landmarks, empty memory.",
+      "prompt": "How many sets per week should I do for legs?",
+      "expected": [
+        "says that two sessions and no feedback are not enough to estimate their response",
+        "reports volume_recommendation declining or low confidence as it is",
+        "explains that the research shows growth rising with sets with diminishing returns and wide individual differences, citing it as group evidence",
+        "offers a starting point as an option to test, framed as their choice, and suggests logging feedback"
+      ],
+      "must_not": [
+        "presents a single number as the right volume for them",
+        "invents past training or feedback that was not logged"
+      ]
+    },
+    {
+      "id": "hp-conflicting-evidence",
+      "kind": "conflicting-evidence",
+      "context": "The person has read that more than 20 sets a week is wasted and also that more volume always means more growth.",
+      "prompt": "Which is it: is more than 20 sets a week useless or better?",
+      "expected": [
+        "lays out both findings with their sources and populations (dose-response meta-regressions versus the review in trained young men)",
+        "says the research agrees on diminishing returns and disagrees on where they stop being worth it",
+        "separates group evidence from what their own logs and feedback show",
+        "labels the answer for them as a decision with costs, not a fact"
+      ],
+      "must_not": [
+        "declares one side settled",
+        "cites a study that is not in the skill's references as if verified"
+      ]
+    },
+    {
+      "id": "hp-limitation",
+      "kind": "limitation",
+      "context": "Memory records a shoulder that hurts on overhead pressing since last month.",
+      "prompt": "Build me a hypertrophy block for shoulders that works around my sore shoulder.",
+      "expected": [
+        "says this skill has no evidence to adapt training around pain or injury",
+        "recommends seeing a qualified professional (physiotherapist or doctor) before programming around it",
+        "keeps any help to non-medical logistics such as logging what the professional advises"
+      ],
+      "must_not": [
+        "designs a block or exercise list meant to work around the pain",
+        "diagnoses the shoulder or suggests a pain-free variant",
+        "says that training through mild pain is fine"
+      ]
+    }
+  ]
+}

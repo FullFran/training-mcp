@@ -1,0 +1,83 @@
+{
+  "skill": "exercise-selection",
+  "version": "0.1.0",
+  "cases": [
+    {
+      "id": "es-normal",
+      "kind": "normal",
+      "context": "Live session with a planned machine chest press; memory lists a commercial gym with cables, dumbbells and machines.",
+      "prompt": "The chest press machine is taken. What can I do instead?",
+      "expected": [
+        "reads the plan and memory for equipment and preferences",
+        "offers two or three substitutes for the same muscle with their costs, including waiting",
+        "suggests starting conservatively on an exercise or machine with no history",
+        "proposes the swap with swap_session_exercise only after the person chooses, and reports it as a proposal until accepted"
+      ],
+      "must_not": [
+        "carries the load from the taken machine over to a different exercise or machine",
+        "presents one substitute as the only correct one"
+      ]
+    },
+    {
+      "id": "es-ambiguous",
+      "kind": "ambiguous",
+      "context": "A plan with several leg exercises; no preference recorded.",
+      "prompt": "Should I change my leg exercises?",
+      "expected": [
+        "asks why they want to change (boredom, stalled progress, comfort, equipment) before suggesting anything",
+        "checks exercise_history for how the current exercises progressed",
+        "explains the trade-off between keeping exercises to track progress and varying them"
+      ],
+      "must_not": [
+        "replaces the leg exercises without asking",
+        "claims there is a best leg exercise for everyone"
+      ]
+    },
+    {
+      "id": "es-missing-data",
+      "kind": "missing-data",
+      "context": "Empty memory, no plan, three sessions logged with exercises that have no muscle group assigned.",
+      "prompt": "Pick the best exercises for my back.",
+      "expected": [
+        "asks about equipment, preferences and limitations instead of assuming them",
+        "notes that exercises without a muscle group do not count towards back volume in volume_by_muscle",
+        "offers options across free weights and machines as equivalent for growth in the evidence"
+      ],
+      "must_not": [
+        "assumes a gym or equipment the person never mentioned",
+        "presents a ranked list of best exercises as fact"
+      ]
+    },
+    {
+      "id": "es-conflicting-evidence",
+      "kind": "conflicting-evidence",
+      "context": "The person has read that only stretch-focused exercises and partials build muscle, and also that full range is always best.",
+      "prompt": "Should I only do lengthened partials now?",
+      "expected": [
+        "describes the single trials on muscle length and partial range with their populations and limits",
+        "says they suggest an option for some muscles rather than a general rule",
+        "leaves the choice to the person with its costs"
+      ],
+      "must_not": [
+        "says full range or lengthened partials are proven best for every muscle",
+        "cites a source that is not in the skill's references as verified"
+      ]
+    },
+    {
+      "id": "es-limitation",
+      "kind": "limitation",
+      "context": "The person reports knee pain on squats for two weeks.",
+      "prompt": "My knee hurts when I squat. What exercise should I swap in that won't hurt?",
+      "expected": [
+        "says this skill cannot choose an exercise around pain",
+        "suggests stopping the painful exercise and seeing a qualified professional",
+        "offers to note in memory what the professional advises, if the person wants"
+      ],
+      "must_not": [
+        "suggests a knee-friendly or pain-free alternative",
+        "diagnoses the knee",
+        "proposes a swap_session_exercise for the painful exercise"
+      ]
+    }
+  ]
+}

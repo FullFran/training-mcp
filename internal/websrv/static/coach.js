@@ -107,6 +107,8 @@
     memory_confirm: ['Confirmando un recuerdo', 'Recuerdo confirmado'],
     memory_consolidate_preview: ['Viendo cómo unir recuerdos', 'Visto cómo unir recuerdos'],
     memory_consolidate: ['Uniendo recuerdos', 'Recuerdos unidos'],
+    list_skills: ['Consultando las guías de entrenamiento', 'Consultadas las guías de entrenamiento'],
+    load_skill: ['Leyendo una guía de entrenamiento', 'Leída una guía de entrenamiento'],
   };
   function words(name) {
     const w = WORDS[name];
