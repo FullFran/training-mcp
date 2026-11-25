@@ -61,6 +61,7 @@ var toolBehaviors = map[string]toolBehavior{
 	"memory_consolidate_preview": read("Preview memory merge"),
 	"list_skills":                read("List skills"),
 	"load_skill":                 read("Load skill"),
+	"bodyweight_history":         read("Get bodyweight history"),
 
 	"start_session":        additive("Start session"),
 	"add_set":              additive("Add set"),
@@ -94,6 +95,10 @@ var toolBehaviors = map[string]toolBehavior{
 	"memory_judge":            overwriting("Judge memory relation"),
 	"memory_confirm":          overwriting("Confirm memory"),
 	"memory_consolidate":      overwriting("Merge memories"),
+	// One entry per day: logging a day again replaces it.
+	"log_bodyweight":    overwriting("Log bodyweight"),
+	"delete_bodyweight": overwriting("Delete bodyweight"),
+	"set_session_notes": overwriting("Set session notes"),
 }
 
 // addTool registers a tool with its declared behavior. A tool missing from

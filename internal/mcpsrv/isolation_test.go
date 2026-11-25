@@ -167,6 +167,14 @@ var isolationCases = map[string]isolationCase{
 	"load_skill": {global: true, args: func(toolIDs) map[string]any {
 		return map[string]any{"id": "hypertrophy-programming"}
 	}},
+	"log_bodyweight": {count: `bodyweight WHERE user_id=2 AND date='` + isolationDay + `' AND weight_kg=70`, args: func(toolIDs) map[string]any {
+		return map[string]any{"weight": 70, "unit": "kg"}
+	}},
+	"bodyweight_history": {args: noArgs},
+	"delete_bodyweight":  {byID: true, args: func(toolIDs) map[string]any { return map[string]any{"date": isolationDay} }},
+	"set_session_notes": {byID: true, args: func(id toolIDs) map[string]any {
+		return map[string]any{"session_id": id.session, "notes": "suyas"}
+	}},
 }
 
 type isolationWorld struct {
@@ -239,6 +247,9 @@ func newIsolationWorld(t *testing.T) isolationWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err = owner.LogBodyweight(ctx, training.BodyweightInput{Date: isolationDay, Weight: 81.5, Unit: "kg"}); err != nil {
+		t.Fatal(err)
+	}
 	merge, err := owner.PreviewConsolidation(ctx, training.ConsolidationInput{MemoryIDs: []int64{memory.Memory.ID, sibling.Memory.ID}, Title: "fusion", Body: "fusion"})
 	if err != nil {
 		t.Fatal(err)
@@ -264,7 +275,8 @@ func newIsolationWorld(t *testing.T) isolationWorld {
 func dumpTables(t *testing.T, db *sql.DB, where map[string]string) string {
 	t.Helper()
 	tables := []string{"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
-		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys", "coach_memory", "coach_memory_revisions", "coach_memory_relations"}
+		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys", "coach_memory", "coach_memory_revisions", "coach_memory_relations",
+		"bodyweight"}
 	var out strings.Builder
 	for _, table := range tables {
 		rows, err := db.Query(`SELECT * FROM ` + table + ` ` + where[table] + ` ORDER BY rowid`)
@@ -306,6 +318,7 @@ var ownersRows = map[string]string{
 	"coach_memory":           `WHERE user_id=1`,
 	"coach_memory_revisions": `WHERE memory_id IN (SELECT id FROM coach_memory WHERE user_id=1)`,
 	"coach_memory_relations": `WHERE user_id=1`,
+	"bodyweight":             `WHERE user_id=1`,
 }
 
 func answer(t *testing.T, result *mcp.CallToolResult) string {
