@@ -13,7 +13,7 @@ worth.
 ```mermaid
 flowchart TB
     subgraph driving["Driving adapters — ways in"]
-        MCP["mcpsrv<br/>35 MCP tools over Streamable HTTP"]
+        MCP["mcpsrv<br/>MCP tools over Streamable HTTP"]
         WEB["websrv<br/>installable PWA, htmx"]
         HTTP["httpsrv<br/>routing, bearer auth, /health"]
     end
@@ -25,7 +25,7 @@ flowchart TB
     end
 
     subgraph driven["Driven adapters — the way out"]
-        SQL["sqlitestore<br/>SQLite + 13 migrations"]
+        SQL["sqlitestore<br/>SQLite + numbered migrations"]
     end
 
     HTTP --> MCP
@@ -47,7 +47,7 @@ type Store interface {
 	ForUser(userID int64) UserStore
 	Snapshot(context.Context, string) error // the whole database, for backup
 }
-type UserStore interface { /* 36 methods, all context-first */ }
+type UserStore interface { /* every method context-first */ }
 
 // internal/training/model.go
 type Clock func() time.Time
@@ -74,16 +74,22 @@ secret web mount was retired; backups snapshot the data volume instead.
 
 | Package | Role | Depends on |
 |---|---|---|
-| `internal/training` | Domain model, rules, SI arithmetic, ports | nothing but stdlib |
-| `internal/sqlitestore` | Driven adapter: SQL, migrations, snapshots | `training` (implements `Store`) |
+| `internal/training` | Domain model, rules, SI arithmetic, ports, the exercise library | stdlib and `evidence` (the `Index` port's types) |
+| `internal/sqlitestore` | Driven adapter: SQL, migrations, snapshots | `training` (implements `Store`), `evidence` (indexes its corpus), `engine` |
 | `internal/importer` | Reads Hevy and Strong exports and plans an import, deterministically | `training` |
-| `internal/mcpsrv` | Driving adapter: MCP tool surface | `training` |
-| `internal/websrv` | Driving adapter: PWA, templates, static | `training`, `importer` |
-| `internal/httpsrv` | Composition: routing, auth, health | the adapters above |
-| `internal/config` | Environment and flags | nothing |
+| `internal/mcpsrv` | Driving adapter: MCP tool surface | `training`, `skills`, `evidence`, `engine` |
+| `internal/websrv` | Driving adapter: PWA, templates, static | `training`, `importer`, `engine`, `engine/connector` |
+| `internal/httpsrv` | Composition: routing, auth, health | `training`, `engine`; the adapters' handlers are passed in |
+| `internal/config` | Environment and flags | `engine` |
 | `cmd/training-mcp` | Wiring | everything, briefly |
 | `internal/skills` | Embedded training-theory skills, parsed and validated; served by `mcpsrv` | nothing but stdlib |
 | `internal/evidence` | Evidence library: embedded corpus, its validation and search rules, the `Index` port | nothing but stdlib |
+| `internal/training/exerciselibdata` | Embedded exercise library data (not a Go package): the public free-exercise-db layer and the curated layer, read by `training` | none |
+| `internal/engine` | In-app coach: one engine process per person, its auth tokens, conversations and connectors | `training` |
+| `internal/engine/connector` | A person's own remote MCP servers for the coach: records, OAuth client, guarded HTTP client, loopback proxy | `engine`, `training` |
+| `internal/sqlitestore/sqlitestoretest` | Test helper: a fully migrated database file per test | `sqlitestore` |
+| `cmd/exerciselib-import` | Writes the public layer of the exercise library from a free-exercise-db download | `training` |
+| `engine/` | The coach's engine process, TypeScript on Node (see [coach.md](coach.md)) | the Pi SDK, over stdin and stdout |
 
 The dependency arrow only ever points **inwards**. `training` imports no
 adapter, which is what keeps it testable without a database and what makes the

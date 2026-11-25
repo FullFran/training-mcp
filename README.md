@@ -36,6 +36,26 @@ URL and a reverse proxy:** anyone who gets that URL has full access. Read
 [connection paths](docs/connection-paths.md) and [Web UI](#web-ui-pwa) before
 making the service accessible to others.
 
+## Beyond the log
+
+Everything below is optional; logging sets works the same without it.
+
+- **Goals and blocks:** free-text goals and training blocks made of
+  microcycles that rotate your routines, advanced by sessions done or by the
+  calendar. See [Periodization](docs/tools.md#periodization).
+- **Exercise library:** each exercise's primary and secondary muscles, from
+  your own entries, a curated layer and the public free-exercise-db dataset,
+  with a fractional volume view beside the per-group one. See
+  [Exercise library](docs/tools.md#exercise-library).
+- **Bodyweight and session notes:** one bodyweight entry a day and free notes
+  on a session, with no target or verdict. See
+  [Session context](docs/tools.md#session-context).
+- **Skills on demand:** training-theory guidance the assistant loads only when
+  it needs it. See [Skills](docs/skills.md).
+- **Evidence search:** a curated library of training-science sources, searched
+  locally and cited with their review status. See
+  [Evidence library](docs/evidence.md).
+
 ## Quick start
 
 Requires Go 1.26 or newer and a terminal with `openssl` and `curl`.
@@ -72,7 +92,7 @@ domain package and both interfaces are adapters over it:
 
 ```mermaid
 flowchart LR
-    MCP["mcpsrv<br/>35 MCP tools"] --> SVC
+    MCP["mcpsrv<br/>MCP tools"] --> SVC
     WEB["websrv<br/>PWA"] --> SVC
     SVC["training.Service<br/>rules · validation · SI"] --> PORT(["Store · Clock"])
     PORT -.-> SQL["sqlitestore<br/>SQLite + migrations"]
@@ -120,13 +140,15 @@ The unauthenticated `GET /health` endpoint returns `{"status":"ok"}`. Alternativ
 
 ## Tools
 
-35 tools, grouped by what you are doing: logging sets, managing plans,
-adjusting today's session, progression and analysis, the feedback loop, and the
-exercise catalogue.
+The tools are grouped by what you are doing: logging sets, managing plans,
+adjusting today's session, progression and analysis, the feedback loop, the
+exercise catalogue and library, coach memory, skills, session context, the
+evidence library and periodization.
 
 **Full reference: [docs/tools.md](docs/tools.md)** — every tool with the
-description the model actually receives, extracted from the source so it cannot
-drift, followed by the design notes explaining why the surface looks like this.
+description the model receives, followed by the design notes explaining why the
+surface looks like this. A test fails when the reference and the registered
+tools disagree.
 
 A few shapes worth knowing before reading it:
 
@@ -380,7 +402,7 @@ debt, not a design: see the open issues.
 ## Documentation
 
 - [Architecture](docs/architecture.md) — ports and adapters, package layout, testing
-- [MCP tool reference](docs/tools.md) — all 35 tools
+- [MCP tool reference](docs/tools.md) — every tool
 - [ChatGPT setup](docs/chatgpt-setup.md)
 - [Connection paths and tunnel safety](docs/connection-paths.md)
 - [SI formula](docs/si-formula.md)
