@@ -224,7 +224,7 @@ func TestServerToolsDescribeTheirInputsAndValidationContract(t *testing.T) {
 	}{
 		{
 			name:        "start_session",
-			description: "Start a training session on an optional date, optionally following a plan. Omit date to use the server's current local date." + pendingNote,
+			description: "Start a training session on an optional date, optionally following a plan. Omit date to use the server's current local date. Inside an active block, a session from a routine that lands in a microcycle with modifiers gets them applied to its own copy of the routine (never the routine): sets + sets_delta kept within 1-20, target RPE + effort_delta kept within 1-10 only where one is set; block_modifiers shows the base, the delta and the result with the block and microcycle." + pendingNote,
 			properties: map[string]map[string]any{
 				"date": {"description": "Training date in exact YYYY-MM-DD format.", "pattern": `^\d{4}-\d{2}-\d{2}$`},
 			},

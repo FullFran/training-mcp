@@ -8,9 +8,10 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// Periodization tools (#41, slice 1). One intent per tool, no generic action
-// dispatcher. Nothing here applies a microcycle's modifiers to a prescription:
-// they are stored and shown, and applying them is a later slice.
+// Periodization tools (#41). One intent per tool, no generic action
+// dispatcher. A microcycle's modifiers are applied by start_session to the
+// session's copy of its routine; training_status shows them applied to the
+// routine due next.
 
 // Action types. Shortening a block drops microcycles, so it is a deleting
 // action that accept_except_delete leaves to the person.
@@ -41,8 +42,8 @@ type GoalOut struct {
 type MicrocycleEdit struct {
 	Position        int      `json:"position" jsonschema:"Position of the microcycle in the block, from 1. Only a remaining microcycle (current or upcoming) can be edited."`
 	Label           *string  `json:"label,omitempty" jsonschema:"Free label, up to 80 characters, e.g. 'introducción', 'carga' or 'descarga'. An empty string clears it."`
-	SetsDelta       *int     `json:"sets_delta,omitempty" jsonschema:"Sets to add (positive) or remove (negative) per exercise in this microcycle, -20 to 20; 0 clears it. Stored and shown only: nothing applies it to a session yet."`
-	EffortDelta     *float64 `json:"effort_delta,omitempty" jsonschema:"RPE points to add or remove in this microcycle, -5 to 5; 0 clears it. Stored and shown only: nothing applies it to a session yet."`
+	SetsDelta       *int     `json:"sets_delta,omitempty" jsonschema:"Sets to add (positive) or remove (negative) per exercise in this microcycle, -20 to 20; 0 clears it. A session started from a routine in this microcycle gets it on its copy, kept within 1-20 sets."`
+	EffortDelta     *float64 `json:"effort_delta,omitempty" jsonschema:"RPE points to add or remove in this microcycle, -5 to 5; 0 clears it. A session started from a routine in this microcycle gets it on its copy, only where a target RPE is set, kept within 1-10."`
 	Rotation        *[]int64 `json:"rotation,omitempty" jsonschema:"Routines (plan IDs) of this microcycle, in order, replacing the block's rotation for it only. An empty list plans no sessions in it."`
 	InheritRotation bool     `json:"inherit_rotation,omitempty" jsonschema:"true drops this microcycle's own routines so it follows the block's rotation again."`
 }
@@ -180,7 +181,7 @@ func registerPeriodizationTools(s *mcp.Server, w *writes, service training.Servi
 	edit.Properties["effort_delta"].Minimum = jsonschema.Ptr(-training.MaxEffortDelta)
 	edit.Properties["effort_delta"].Maximum = jsonschema.Ptr(training.MaxEffortDelta)
 	setRotationSchema(edit.Properties["rotation"])
-	addWriteBy(w, &mcp.Tool{Name: "save_block", Description: "Create or edit a training block: a run of microcycles (e.g. weeks) with an intent, an optional goal and a rotation of routines (plans). Nothing is imposed: a sketch needs only intent and microcycle_count, and every other detail can be added or changed later. Edits are forward only: they change the remaining microcycles, never what was done. A microcycle may have a free label and optional sets_delta and effort_delta, which are stored and shown but not applied to any session yet. Shrinking a block waits for the person to accept it. Activate a block with advance_block.", InputSchema: blockSchema},
+	addWriteBy(w, &mcp.Tool{Name: "save_block", Description: "Create or edit a training block: a run of microcycles (e.g. weeks) with an intent, an optional goal and a rotation of routines (plans). Nothing is imposed: a sketch needs only intent and microcycle_count, and every other detail can be added or changed later. Edits are forward only: they change the remaining microcycles, never what was done. A microcycle may have a free label and optional sets_delta and effort_delta, which a session started from a routine in that microcycle applies to its own copy of the routine (never to the routine or to past sessions). Shrinking a block waits for the person to accept it. Activate a block with advance_block.", InputSchema: blockSchema},
 		func(in SaveBlockInput) string {
 			switch {
 			case in.BlockID == 0:
@@ -215,7 +216,7 @@ func registerPeriodizationTools(s *mcp.Server, w *writes, service training.Servi
 			return SessionLinkOut{Link: l}, err
 		})
 
-	addTool(s, &mcp.Tool{Name: "training_status", Description: "Where the person stands in their planning today: active goals, the active block and its current microcycle, with the routines done and still due and its stored modifiers (label, sets_delta, effort_delta). The modifiers are not applied to any prescription yet; adjust a session yourself if the person wants them. Without an active block, block and current_microcycle are absent and training works as usual, routine by routine."}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, training.TrainingStatus, error) {
+	addTool(s, &mcp.Tool{Name: "training_status", Description: "Where the person stands in their planning today: active goals, the active block and its current microcycle, with the routines done and still due and its modifiers (label, sets_delta, effort_delta), and next_prescription: the first routine still due with those modifiers applied, base and result per exercise. start_session applies them to the session's copy. Without an active block, block and current_microcycle are absent and training works as usual, routine by routine."}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, training.TrainingStatus, error) {
 		v, err := service(ctx).TrainingStatus(ctx)
 		return nil, v, toolError(err)
 	})

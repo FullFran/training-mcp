@@ -63,23 +63,11 @@ func (s *Service) StartSession(ctx context.Context, date string) (Session, error
 }
 
 // StartPlannedSession begins a session optionally following a plan. planID 0
-// means an unplanned, free-form session.
+// means an unplanned, free-form session. See StartPrescribedSession for the
+// microcycle modifiers it applies inside an active block.
 func (s *Service) StartPlannedSession(ctx context.Context, date string, planID int64) (Session, error) {
-	if date == "" {
-		date = s.clock().In(s.clock().Location()).Format("2006-01-02")
-	}
-	if _, err := time.Parse("2006-01-02", date); err != nil {
-		return Session{}, ErrValidation
-	}
-	if planID < 0 {
-		return Session{}, ErrValidation
-	}
-	session, err := s.store.Start(ctx, Session{Date: date, PlanID: planID})
-	if err != nil {
-		return Session{}, err
-	}
-	s.placeAfterWrite(ctx, session.ID)
-	return session, nil
+	session, _, err := s.StartPrescribedSession(ctx, date, planID)
+	return session, err
 }
 
 // CreatePlan stores a reusable workout template. Exercise names are normalized

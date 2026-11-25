@@ -57,9 +57,10 @@ func TestMigration030KeepsEveryRowAndLeavesSessionsUnplaced(t *testing.T) {
 	}
 }
 
-// migrateExcept builds a database with every migration applied except skip,
-// as a deployment that ran later migrations before this one landed.
-func migrateExcept(t *testing.T, path string, skip int) *sql.DB {
+// migrateExcept builds a database with every migration up to last applied
+// except skip, as a deployment that ran later migrations before this one
+// landed. Migrations past last may depend on skip, so they are left to Open.
+func migrateExcept(t *testing.T, path string, skip, last int) *sql.DB {
 	t.Helper()
 	db := migrateTo(t, path, skip-1)
 	names := mustMigrationNames()
@@ -68,7 +69,7 @@ func migrateExcept(t *testing.T, path string, skip int) *sql.DB {
 		t.Fatal(err)
 	}
 	for i, name := range names {
-		if versions[i] <= skip {
+		if versions[i] <= skip || versions[i] > last {
 			continue
 		}
 		body, err := migrationFS.ReadFile(name)
@@ -89,7 +90,7 @@ func migrateExcept(t *testing.T, path string, skip int) *sql.DB {
 // that database and every row stored before reads back unchanged.
 func TestMigration030AppliesAfterLaterMigrationsKeepingEveryRow(t *testing.T) {
 	path := t.TempDir() + "/training.db"
-	db := migrateExcept(t, path, 30)
+	db := migrateExcept(t, path, 30, 33)
 	exec := func(q string, args ...any) {
 		t.Helper()
 		if _, err := db.Exec(q, args...); err != nil {
@@ -639,7 +640,7 @@ func TestGoalsAreFreeTextWithAnOptionalDate(t *testing.T) {
 }
 
 // training_status shows the active block and the microcycle the next session
-// counts in, with nothing applied to the prescription.
+// counts in.
 func TestTrainingStatusShowsTheCurrentMicrocycle(t *testing.T) {
 	w := newPeriodWorld(t)
 	ctx := context.Background()

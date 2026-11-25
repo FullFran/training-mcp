@@ -86,6 +86,7 @@ type MicrocycleView struct {
 	Status      string          `json:"status"`
 	State       string          `json:"state"`
 	ClosedOn    string          `json:"closed_on,omitempty"`
+	ClosedBy    string          `json:"closed_by,omitempty"`
 	StartDate   string          `json:"start_date,omitempty"`
 	EndDate     string          `json:"end_date,omitempty"`
 	Sessions    []SessionLink   `json:"sessions"`
@@ -141,12 +142,14 @@ type BlockList struct {
 }
 
 // TrainingStatus is where the person stands today: active goals, the active
-// block and its current microcycle. Modifiers are shown, never applied.
+// block, its current microcycle and the routine due next in it with the
+// microcycle's modifiers applied.
 type TrainingStatus struct {
 	Today   string          `json:"today"`
 	Goals   []Goal          `json:"goals"`
 	Block   *BlockSummary   `json:"block,omitempty"`
 	Current *MicrocycleView `json:"current_microcycle,omitempty"`
+	Next    *Prescription   `json:"next_prescription,omitempty"`
 }
 
 // --- dates -------------------------------------------------------------------
@@ -264,7 +267,7 @@ func (s *Service) view(ctx context.Context, ps PeriodizationStore, b Block) (Blo
 		placed := byMicrocycle[m.ID]
 		mv := MicrocycleView{
 			ID: m.ID, Position: m.Position, Label: m.Label, SetsDelta: m.SetsDelta, EffortDelta: m.EffortDelta,
-			OwnRotation: m.OwnRotation, Rotation: nonNil(rot), Status: m.Status, State: st[i], ClosedOn: m.ClosedOn,
+			OwnRotation: m.OwnRotation, Rotation: nonNil(rot), Status: m.Status, State: st[i], ClosedOn: m.ClosedOn, ClosedBy: m.ClosedBy,
 			Sessions: nonNilLinks(placed), SessionsDone: len(placed), SessionsPlanned: len(rot), Due: due(rot, placed),
 		}
 		if calendar {
@@ -383,6 +386,9 @@ func (s *Service) TrainingStatus(ctx context.Context) (TrainingStatus, error) {
 			out.Current = &v.Microcycles[i]
 			break
 		}
+	}
+	if out.Next, err = s.nextPrescription(ctx, b, out.Current); err != nil {
+		return TrainingStatus{}, err
 	}
 	return out, nil
 }
@@ -534,6 +540,7 @@ func (s *Service) SaveBlock(ctx context.Context, in BlockInput) (BlockView, erro
 				if m.Status == MicrocyclePending && st[i] == StateElapsed {
 					m.Status = MicrocycleDone
 					m.ClosedOn = addDays(b.StartDate, m.Position*b.MicrocycleDays-1)
+					m.ClosedBy = ClosedByModeChange
 					st[i] = StateDone
 				}
 			}
@@ -701,7 +708,7 @@ func (s *Service) AdvanceBlock(ctx context.Context, in AdvanceInput) (BlockView,
 		if i < 0 {
 			return BlockView{}, ErrValidation
 		}
-		b.Microcycles[i].Status, b.Microcycles[i].ClosedOn = MicrocycleDone, today
+		b.Microcycles[i].Status, b.Microcycles[i].ClosedOn, b.Microcycles[i].ClosedBy = MicrocycleDone, today, ClosedByHand
 		if in.Action == BlockSkipCurrent {
 			b.Microcycles[i].Status = MicrocycleSkipped
 		}
@@ -826,12 +833,12 @@ func (s *Service) placeSession(ctx context.Context, sessionID int64) error {
 			}
 			planned := len(effectiveRotation(b, *m))
 			if planned > 0 && count[m.ID] >= planned {
-				m.Status, m.ClosedOn, changed = MicrocycleDone, today, &b
+				m.Status, m.ClosedOn, m.ClosedBy, changed = MicrocycleDone, today, ClosedByPlacement, &b
 				continue
 			}
 			link.MicrocycleID, link.OffPlan = m.ID, false
 			if planned > 0 && count[m.ID]+1 >= planned {
-				m.Status, m.ClosedOn, changed = MicrocycleDone, today, &b
+				m.Status, m.ClosedOn, m.ClosedBy, changed = MicrocycleDone, today, ClosedByPlacement, &b
 			}
 			break
 		}

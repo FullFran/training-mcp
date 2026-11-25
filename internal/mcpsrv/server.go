@@ -80,6 +80,9 @@ type LogSetsOut struct {
 // StartOut is start_session's result. Write results carry the proposal's status.
 type StartOut struct {
 	Session training.Session `json:"session"`
+	// Prescription is the microcycle modifiers applied to the session's copy of
+	// its routine, base and result per exercise; absent when none applied.
+	Prescription *training.Prescription `json:"block_modifiers,omitempty"`
 	ProposalRef
 }
 type PlanWriteOut struct {
@@ -192,6 +195,8 @@ type ProgressOut struct {
 	SessionID int64                   `json:"session_id"`
 	PlanName  string                  `json:"plan_name,omitempty"`
 	Progress  []training.PlanProgress `json:"progress"`
+	// BlockModifiers is what the session's microcycle applied to its targets.
+	BlockModifiers *training.Prescription `json:"block_modifiers,omitempty"`
 }
 type SessionItemInput struct {
 	SessionID  int64   `json:"session_id" jsonschema:"Positive ID of the session to adjust."`
@@ -355,9 +360,9 @@ func New(service training.ServiceFor) *Server {
 	w := &writes{server: s, service: service, actions: map[string]writeAction{}}
 	startSchema := mustInputSchema[StartInput]()
 	startSchema.Properties["date"].Pattern = `^\d{4}-\d{2}-\d{2}$`
-	addWrite(w, &mcp.Tool{Name: "start_session", Description: "Start a training session on an optional date, optionally following a plan. Omit date to use the server's current local date.", InputSchema: startSchema}, "session.start", func(ctx context.Context, svc *training.Service, in StartInput) (StartOut, error) {
-		v, err := svc.StartPlannedSession(ctx, in.Date, in.PlanID)
-		return StartOut{Session: v}, err
+	addWrite(w, &mcp.Tool{Name: "start_session", Description: "Start a training session on an optional date, optionally following a plan. Omit date to use the server's current local date. Inside an active block, a session from a routine that lands in a microcycle with modifiers gets them applied to its own copy of the routine (never the routine): sets + sets_delta kept within 1-20, target RPE + effort_delta kept within 1-10 only where one is set; block_modifiers shows the base, the delta and the result with the block and microcycle.", InputSchema: startSchema}, "session.start", func(ctx context.Context, svc *training.Service, in StartInput) (StartOut, error) {
+		v, p, err := svc.StartPrescribedSession(ctx, in.Date, in.PlanID)
+		return StartOut{Session: v, Prescription: p}, err
 	})
 	addSchema := mustInputSchema[AddInput]()
 	setPositiveID(addSchema.Properties["session_id"])
@@ -534,12 +539,13 @@ func New(service training.ServiceFor) *Server {
 	})
 	progressSchema := mustInputSchema[SessionInput]()
 	setPositiveID(progressSchema.Properties["session_id"])
-	addTool(s, &mcp.Tool{Name: "session_progress", Description: "For a session following a plan: planned versus completed sets per exercise, with the prescribed rep range and RPE. Exercises done off-plan are listed with target_sets 0.", InputSchema: progressSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in SessionInput) (*mcp.CallToolResult, ProgressOut, error) {
+	addTool(s, &mcp.Tool{Name: "session_progress", Description: "For a session following a plan: planned versus completed sets per exercise, with the prescribed rep range and RPE. Exercises done off-plan are listed with target_sets 0. block_modifiers shows the microcycle modifiers applied when the session started, if any.", InputSchema: progressSchema}, func(ctx context.Context, _ *mcp.CallToolRequest, in SessionInput) (*mcp.CallToolResult, ProgressOut, error) {
 		v, err := service(ctx).SessionProgress(ctx, in.SessionID)
 		out := ProgressOut{SessionID: in.SessionID, Progress: v}
 		if sess, e := service(ctx).GetSession(ctx, in.SessionID); e == nil {
 			out.PlanName = sess.PlanName
 		}
+		out.BlockModifiers, _ = service(ctx).SessionPrescription(ctx, in.SessionID)
 		return nil, out, toolError(err)
 	})
 
