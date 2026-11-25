@@ -61,6 +61,7 @@ var toolBehaviors = map[string]toolBehavior{
 	"memory_consolidate_preview": read("Preview memory merge"),
 	"list_skills":                read("List skills"),
 	"load_skill":                 read("Load skill"),
+	"bodyweight_history":         read("Get bodyweight history"),
 
 	"start_session":        additive("Start session"),
 	"add_set":              additive("Add set"),
@@ -99,6 +100,11 @@ var toolBehaviors = map[string]toolBehavior{
 	"list_exercises_needing_mapping": read("List exercises needing mapping"),
 	"save_exercise_entry":            overwriting("Save exercise library entry"),
 	"set_exercise_alias":             overwriting("Set exercise alias"),
+	// One entry per day: logging a day again replaces it.
+	"log_bodyweight":    overwriting("Log bodyweight"),
+	"delete_bodyweight": overwriting("Delete bodyweight"),
+	"set_session_notes": overwriting("Set session notes"),
+
 	// Periodization (#41).
 	"training_status":      read("Get training status"),
 	"list_blocks":          read("List blocks"),

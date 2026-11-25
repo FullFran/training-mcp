@@ -32,6 +32,7 @@ var wantActionType = map[string]string{
 	"memory_save":     "memory.save", "memory_forget": "memory.forget",
 	"memory_judge": "memory.judge", "memory_confirm": "memory.confirm", "memory_consolidate": "memory.consolidate",
 	"save_exercise_entry": "exercise.library.save", "set_exercise_alias": "exercise.alias.set",
+	"log_bodyweight": "bodyweight.log", "delete_bodyweight": "bodyweight.delete", "set_session_notes": "session.notes.set",
 	"set_goal": "goal.update", "save_block": "block.update", "advance_block": "block.activate", "assign_session_block": "session.block.assign",
 }
 

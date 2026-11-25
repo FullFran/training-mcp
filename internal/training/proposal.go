@@ -159,6 +159,9 @@ var deletingActions = map[string]bool{
 	"session.exercise.remove": true,
 	// set_exercise_note with an empty note deletes the note.
 	"exercise.note.remove": true,
+	"bodyweight.delete":    true,
+	// set_session_notes with empty notes clears them.
+	"session.notes.remove": true,
 	// save_block with a smaller microcycle_count drops microcycles.
 	"block.shorten": true,
 }

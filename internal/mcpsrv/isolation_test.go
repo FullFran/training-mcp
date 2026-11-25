@@ -177,6 +177,14 @@ var isolationCases = map[string]isolationCase{
 	"set_exercise_alias": {count: `exercise_aliases WHERE user_id=2 AND match_key='banca'`, args: func(toolIDs) map[string]any {
 		return map[string]any{"alias": "banca", "target": "Bench Press - Powerlifting"}
 	}},
+	"log_bodyweight": {count: `bodyweight WHERE user_id=2 AND date='` + isolationDay + `' AND weight_kg=70`, args: func(toolIDs) map[string]any {
+		return map[string]any{"weight": 70, "unit": "kg"}
+	}},
+	"bodyweight_history": {args: noArgs},
+	"delete_bodyweight":  {byID: true, args: func(toolIDs) map[string]any { return map[string]any{"date": isolationDay} }},
+	"set_session_notes": {byID: true, args: func(id toolIDs) map[string]any {
+		return map[string]any{"session_id": id.session, "notes": "suyas"}
+	}},
 	"training_status": {args: noArgs},
 	"list_blocks":     {args: noArgs},
 	"get_block":       {byID: true, args: func(id toolIDs) map[string]any { return map[string]any{"block_id": id.block} }},
@@ -264,6 +272,9 @@ func newIsolationWorld(t *testing.T) isolationWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err = owner.LogBodyweight(ctx, training.BodyweightInput{Date: isolationDay, Weight: 81.5, Unit: "kg"}); err != nil {
+		t.Fatal(err)
+	}
 	merge, err := owner.PreviewConsolidation(ctx, training.ConsolidationInput{MemoryIDs: []int64{memory.Memory.ID, sibling.Memory.ID}, Title: "fusion", Body: "fusion"})
 	if err != nil {
 		t.Fatal(err)
@@ -298,7 +309,7 @@ func dumpTables(t *testing.T, db *sql.DB, where map[string]string) string {
 	t.Helper()
 	tables := []string{"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
 		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys", "coach_memory", "coach_memory_revisions", "coach_memory_relations",
-		"exercise_library_entries", "exercise_aliases",
+		"exercise_library_entries", "exercise_aliases", "bodyweight",
 		"goals", "blocks", "block_microcycles", "block_rotations"}
 	var out strings.Builder
 	for _, table := range tables {
@@ -344,6 +355,7 @@ var ownersRows = map[string]string{
 
 	"exercise_library_entries": `WHERE user_id=1`,
 	"exercise_aliases":         `WHERE user_id=1`,
+	"bodyweight":               `WHERE user_id=1`,
 	"goals":                    `WHERE user_id=1`,
 	"blocks":                   `WHERE user_id=1`,
 	"block_microcycles":        `WHERE user_id=1`,

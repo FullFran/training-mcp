@@ -57,6 +57,83 @@ func TestMigration030KeepsEveryRowAndLeavesSessionsUnplaced(t *testing.T) {
 	}
 }
 
+// migrateExcept builds a database with every migration applied except skip,
+// as a deployment that ran later migrations before this one landed.
+func migrateExcept(t *testing.T, path string, skip int) *sql.DB {
+	t.Helper()
+	db := migrateTo(t, path, skip-1)
+	names := mustMigrationNames()
+	versions, err := migrationVersions(names)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, name := range names {
+		if versions[i] <= skip {
+			continue
+		}
+		body, err := migrationFS.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = db.Exec(string(body)); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if _, err = db.Exec(`INSERT INTO schema_migrations(version) VALUES (?)`, versions[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return db
+}
+
+// Migration 030 can land after 031 and 032 were applied: Open applies it to
+// that database and every row stored before reads back unchanged.
+func TestMigration030AppliesAfterLaterMigrationsKeepingEveryRow(t *testing.T) {
+	path := t.TempDir() + "/training.db"
+	db := migrateExcept(t, path, 30)
+	exec := func(q string, args ...any) {
+		t.Helper()
+		if _, err := db.Exec(q, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exec(`INSERT INTO plans(id,user_id,name,notes,created_at) VALUES (7,1,'Torso','',CURRENT_TIMESTAMP)`)
+	exec(`INSERT INTO sessions(id,user_id,date,started_at,plan_id,plan_name) VALUES (1,1,'2026-11-10','2026-11-10 18:00:00',7,'Torso')`)
+	exec(`INSERT INTO sets(session_id,position,exercise,weight_kg,reps,rpe,si,created_at,updated_at) VALUES (1,1,'press banca',80,5,8,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`)
+	exec(`INSERT INTO bodyweight(user_id,date,weight_kg,note,created_at,updated_at) VALUES (1,'2026-11-10',80.5,NULL,'2026-11-10','2026-11-10')`)
+	snapshot := func(db *sql.DB) string {
+		t.Helper()
+		return dumpQuery(t, db, `SELECT id,user_id,date,started_at,plan_id,plan_name FROM sessions ORDER BY id`) +
+			dumpQuery(t, db, `SELECT * FROM sets ORDER BY id`) +
+			dumpQuery(t, db, `SELECT * FROM plans ORDER BY id`) +
+			dumpQuery(t, db, `SELECT * FROM bodyweight ORDER BY rowid`)
+	}
+	before := snapshot(db)
+	if got := dumpQuery(t, db, `SELECT COUNT(*) FROM schema_migrations WHERE version=30`); got != "[]interface {}{0}\n" {
+		t.Fatalf("030 already applied: %s", got)
+	}
+	db.Close()
+
+	store, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { store.Close() })
+	if after := snapshot(store.db); after != before {
+		t.Fatalf("rows changed:\nbefore %s\nafter  %s", before, after)
+	}
+	if got := dumpQuery(t, store.db, `SELECT COUNT(*) FROM schema_migrations WHERE version=30`); got != "[]interface {}{1}\n" {
+		t.Fatalf("030 not recorded: %s", got)
+	}
+	if got := dumpQuery(t, store.db, `SELECT id FROM sessions WHERE block_id IS NOT NULL OR block_microcycle_id IS NOT NULL OR block_off_plan IS NOT NULL`); got != "" {
+		t.Fatalf("sessions placed by the migration: %s", got)
+	}
+	for _, table := range []string{"goals", "blocks", "block_microcycles", "block_rotations"} {
+		if got := dumpQuery(t, store.db, `SELECT COUNT(*) FROM `+table); got != "[]interface {}{0}\n" {
+			t.Fatalf("%s rows = %s", table, got)
+		}
+	}
+}
+
 // periodWorld is one account on a real store with a clock the test moves.
 type periodWorld struct {
 	t     *testing.T

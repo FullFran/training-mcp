@@ -73,8 +73,9 @@ to change it from the chat is tracked in #125.
 | `accept_all` | Aceptar todo | Every proposal is applied at once, in every session and in none, including action types added later, like Claude Code's `--dangerously-skip-permissions`. The decision record names the `accept_all` grant. |
 
 The deleting action types are `set.delete`, `session.delete`, `plan.delete`,
-`memory.forget`, `plan.exercise.remove`, `session.exercise.remove`, `exercise.note.remove`
-and `block.shorten` (`training.IsDeletingAction`).
+`memory.forget`, `plan.exercise.remove`, `session.exercise.remove`, `exercise.note.remove`,
+`bodyweight.delete`, `session.notes.remove` and `block.shorten`
+(`training.IsDeletingAction`).
 
 Defaults: an account created from migration 027 on starts in
 `accept_except_delete`. Every account that existed before keeps exactly its
@@ -182,6 +183,8 @@ and OQ-0005-7).
 | `memory.save` / `memory.forget` | `memory_save` / `memory_forget` |
 | `memory.judge` / `memory.confirm` / `memory.consolidate` | `memory_judge` / `memory_confirm` / `memory_consolidate` |
 | `exercise.library.save` / `exercise.alias.set` | `save_exercise_entry` / `set_exercise_alias` |
+| `bodyweight.log` / `bodyweight.delete` | `log_bodyweight` / `delete_bodyweight` |
+| `session.notes.set` / `session.notes.remove` | `set_session_notes` (empty notes remove them) |
 | `goal.create` / `goal.update` | `set_goal` (without / with `goal_id`) |
 | `block.create` / `block.update` / `block.shorten` | `save_block` (without `block_id` / with it / with a smaller `microcycle_count`) |
 | `block.activate` / `block.microcycle.complete` / `block.microcycle.skip` / `block.close` | `advance_block` (`action` `activate` / `complete_microcycle` / `skip_microcycle` / `close`) |
@@ -442,6 +445,39 @@ add one: [skills.md](skills.md).
 |---|---|
 | `list_skills` | List the training-theory skills you can load: id, version, one-line summary, the situations each is for and its review status. Metadata only; call load_skill for one skill's instructions. The same for every person. |
 | `load_skill` | Load one skill whole: its instructions (sections Evidence, Heuristics, Person-specific assumptions and Decisions), limitations, the read tools it relies on and its references. Guidance only: it changes no tool and no data. An unknown `id` is a not-found error that points back to `list_skills`. |
+
+## Session context
+
+Context the person chooses to record (#6): their bodyweight, one entry a day,
+and free notes on a session. Both are optional, neither is needed to log a set,
+and no tool judges them: there is no target, goal or verdict.
+
+| Tool | What it does |
+|---|---|
+| `log_bodyweight` | Record the person's bodyweight for a day, only when they say it. One entry per day: logging a day again replaces its entry (the result shows the one replaced). Give the number and unit exactly as the person said them; it is stored in kg and shown in the person's unit. The weight must be 20 to 400 kg. |
+| `bodyweight_history` | Get the person's bodyweight entries in a date range (default the last 90 days, at most 366), oldest first, with plain numbers about them: count, first, last, min, max, change (last minus first) and the mean of the 7 days ending on the last entry. Weights are in kg and in the person's unit. Report the numbers; they carry no target or verdict. |
+| `delete_bodyweight` | Delete the person's bodyweight entry of one day, for an entry recorded by mistake. A day with no entry is not found. |
+| `set_session_notes` | Set the free notes of a session: context the person gives, such as how they slept, a niggle or a packed gym. Replaces the notes it had; empty notes clear them. get_session returns them. |
+
+Bodyweight is stored per person and day (migration 032, table `bodyweight`,
+primary key `user_id, date`), always in kg rounded to 2 decimals, with an
+optional note of at most 500 characters. `log_bodyweight` takes `unit` (`kg` or
+`lb`) because the person may say either; a missing `date` is fixed to the
+server's today when the proposal is made, so accepting it later still records
+the day it was said. 20 to 400 kg is only a guard against typos. Every summary
+in `bodyweight_history` is arithmetic over the entries in the range: `min` and
+`max` keep the earliest of equal weights, and `avg_7d` names its own window
+and how many entries it averages. Logging, replacing and deleting an entry can
+all be undone from the history; deleting is a deleting action type.
+
+Session notes are the `sessions.notes` column (migration 022) that imports
+already filled. `set_session_notes` writes it for any of the person's sessions,
+at most 2000 characters; `get_session` returns it.
+
+The app records both too: Progreso › Cuerpo has an optional form for today's
+weight (its heading says whether today has one, and nothing else asks) and the
+recent entries, Historial sets each recent week's mean bodyweight beside its
+working volume once there are entries, and a session's page edits its notes.
 
 ## Periodization
 

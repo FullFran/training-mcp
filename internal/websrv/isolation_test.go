@@ -51,6 +51,8 @@ type webWorld struct {
 	rule string
 	// conflict is the owner's judged conflict between two facts.
 	conflict string
+	// bodyweight is the date of the owner's bodyweight entry.
+	bodyweight string
 }
 
 func webHandler(t *testing.T, services *training.Services, userID int64) http.Handler {
@@ -164,10 +166,14 @@ func newWebWorld(t *testing.T) webWorld {
 	if _, err = db.Exec(`UPDATE coach_memory SET review_after=''`); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = owner.LogBodyweight(ctx, training.BodyweightInput{Date: "2026-08-07", Weight: 81.5, Unit: training.UnitKG}); err != nil {
+		t.Fatal(err)
+	}
 	return webWorld{
 		db: db, owner: webHandler(t, services, 1), second: webHandler(t, services, 2),
 		set: itoa(set.ID), session: itoa(session.ID), plan: itoa(plan.ID), proposal: itoa(proposal.ID), accepted: itoa(accepted.ID), rule: itoa(rule),
 		memory: itoa(memory.Memory.ID), conflict: itoa(rival.Candidates[0].RelationID),
+		bodyweight: "2026-08-07",
 	}
 }
 
@@ -177,7 +183,7 @@ func dumpDatabase(t *testing.T, db *sql.DB) string {
 	for _, table := range []string{"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
 		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys",
 		"proposals", "answer_rules", "decision_records", "agent_permissions", "coach_memory", "coach_memory_revisions", "coach_memory_relations",
-		"imports", "imported_sets", "import_exercise_map"} {
+		"imports", "imported_sets", "import_exercise_map", "bodyweight"} {
 		rows, err := db.Query(`SELECT * FROM ` + table + ` ORDER BY rowid`)
 		if err != nil {
 			t.Fatal(err)
@@ -307,6 +313,15 @@ var webRoutes = map[string]func(*testing.T){
 	"GET /static/":              sharedRoute("embedded assets, the same for everyone"),
 	"GET":                       sharedRoute("a redirect to the app root"),
 	"GET /export.db":            sharedRoute("copies every user's data; it leaves the web before a second user reaches it"),
+
+	"POST /bodyweight": writeRoute("/bodyweight", url.Values{"weight": {"70"}, "weight_unit": {"kg"}, "date": {"2026-08-07"}},
+		`bodyweight WHERE user_id=2 AND date='2026-08-07' AND weight_kg=70`),
+	"POST /bodyweight/delete": idRoute(func(w webWorld) string { return w.bodyweight }, func(date string) (string, url.Values) {
+		return "/bodyweight/delete", url.Values{"date": {date}}
+	}),
+	"POST /s/{id}/notes": idRoute(func(w webWorld) string { return w.session }, func(id string) (string, url.Values) {
+		return "/s/" + id + "/notes", url.Values{"notes": {"robadas"}}
+	}),
 }
 
 func TestEveryWebRouteIsIsolated(t *testing.T) {

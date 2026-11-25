@@ -75,6 +75,7 @@ var undoTables = []undoTable{
 	{name: "coach_memory_relations", key: []string{"id"}, owned: `user_id=?`},
 	{name: "exercise_library_entries", key: []string{"user_id", "match_key"}, owned: `user_id=?`},
 	{name: "exercise_aliases", key: []string{"user_id", "match_key"}, owned: `user_id=?`},
+	{name: "bodyweight", key: []string{"user_id", "date"}, owned: `user_id=?`},
 	{name: "goals", key: []string{"id"}, owned: `user_id=?`, refs: []undoRef{{"blocks", "goal_id"}}},
 	{name: "blocks", key: []string{"id"}, owned: `user_id=?`, refs: []undoRef{{"block_microcycles", "block_id"}, {"block_rotations", "block_id"}, {"sessions", "block_id"}}},
 	{name: "block_microcycles", key: []string{"id"}, owned: `user_id=?`, temp: map[string]string{"position": positionTemp}, refs: []undoRef{{"block_rotations", "microcycle_id"}, {"sessions", "block_microcycle_id"}}},
