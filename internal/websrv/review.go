@@ -44,6 +44,18 @@ var actionLabels = map[string]string{
 	"memory.confirm":          "Confirmar recuerdo",
 	"memory.consolidate":      "Fusionar recuerdos",
 	training.UndoAction:       "Deshacer",
+
+	// Periodization (#41).
+	"goal.create":               "Crear objetivo",
+	"goal.update":               "Editar objetivo",
+	"block.create":              "Crear bloque",
+	"block.update":              "Editar bloque",
+	"block.shorten":             "Acortar bloque",
+	"block.activate":            "Activar bloque",
+	"block.microcycle.complete": "Completar microciclo",
+	"block.microcycle.skip":     "Saltar microciclo",
+	"block.close":               "Cerrar bloque",
+	"session.block.assign":      "Colocar sesión en el bloque",
 }
 
 func actionLabel(actionType string) string {

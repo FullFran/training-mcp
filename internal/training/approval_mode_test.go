@@ -9,7 +9,7 @@ import (
 	"github.com/fullfran/training-mcp/internal/training"
 )
 
-var deletingActions = []string{"set.delete", "session.delete", "plan.delete", "memory.forget", "plan.exercise.remove", "session.exercise.remove", "exercise.note.remove"}
+var deletingActions = []string{"set.delete", "session.delete", "plan.delete", "memory.forget", "plan.exercise.remove", "session.exercise.remove", "exercise.note.remove", "block.shorten"}
 
 func TestDeletingActionsAreExactlyTheDeletes(t *testing.T) {
 	for _, a := range deletingActions {

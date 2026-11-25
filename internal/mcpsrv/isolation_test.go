@@ -28,6 +28,8 @@ type toolIDs struct {
 	// fingerprint confirms merging the two.
 	sibling, relation int64
 	fingerprint       string
+	// goal, block and microcycle are periodization's: a planned block.
+	goal, block, microcycle int64
 }
 
 // isolationCase says how one tool is called. Tools addressed by an id must answer
@@ -159,6 +161,21 @@ var isolationCases = map[string]isolationCase{
 	"set_volume_landmarks": {count: `volume_landmarks WHERE user_id=2 AND muscle_group='pecho' AND mev=1`, args: func(toolIDs) map[string]any {
 		return map[string]any{"muscle_group": "pecho", "mev": 1, "mrv": 2}
 	}},
+	"training_status": {args: noArgs},
+	"list_blocks":     {args: noArgs},
+	"get_block":       {byID: true, args: func(id toolIDs) map[string]any { return map[string]any{"block_id": id.block} }},
+	"set_goal": {byID: true, args: func(id toolIDs) map[string]any {
+		return map[string]any{"goal_id": id.goal, "text": "robado"}
+	}},
+	"save_block": {byID: true, args: func(id toolIDs) map[string]any {
+		return map[string]any{"block_id": id.block, "intent": "robado"}
+	}},
+	"advance_block": {byID: true, args: func(id toolIDs) map[string]any {
+		return map[string]any{"block_id": id.block, "action": "activate"}
+	}},
+	"assign_session_block": {byID: true, args: func(id toolIDs) map[string]any {
+		return map[string]any{"session_id": id.session, "microcycle_id": id.microcycle}
+	}},
 }
 
 type isolationWorld struct {
@@ -240,6 +257,7 @@ func newIsolationWorld(t *testing.T) isolationWorld {
 	if err = services.ForUser(2).SetAcceptAll(ctx, true); err != nil {
 		t.Fatal(err)
 	}
+	period := seedPeriodization(t, owner, plan.ID)
 	ownerServer := New(only(owner))
 	return isolationWorld{
 		db:           db,
@@ -249,14 +267,16 @@ func newIsolationWorld(t *testing.T) isolationWorld {
 		owner:        mustConnect(t, ownerServer.Handler()),
 		second:       mustConnect(t, New(only(services.ForUser(2))).Handler()),
 		ids: toolIDs{session: session.ID, set: set.ID, plan: plan.ID, memory: memory.Memory.ID,
-			sibling: sibling.Memory.ID, relation: sibling.Candidates[0].RelationID, fingerprint: merge.Fingerprint},
+			sibling: sibling.Memory.ID, relation: sibling.Candidates[0].RelationID, fingerprint: merge.Fingerprint,
+			goal: period.goal, block: period.block, microcycle: period.microcycle},
 	}
 }
 
 func dumpTables(t *testing.T, db *sql.DB, where map[string]string) string {
 	t.Helper()
 	tables := []string{"users", "sessions", "sets", "plans", "plan_items", "session_items", "session_feedback",
-		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys", "coach_memory", "coach_memory_revisions", "coach_memory_relations"}
+		"exercise_notes", "exercise_groups", "volume_landmarks", "idempotency_keys", "coach_memory", "coach_memory_revisions", "coach_memory_relations",
+		"goals", "blocks", "block_microcycles", "block_rotations"}
 	var out strings.Builder
 	for _, table := range tables {
 		rows, err := db.Query(`SELECT * FROM ` + table + ` ` + where[table] + ` ORDER BY rowid`)
@@ -298,6 +318,10 @@ var ownersRows = map[string]string{
 	"coach_memory":           `WHERE user_id=1`,
 	"coach_memory_revisions": `WHERE memory_id IN (SELECT id FROM coach_memory WHERE user_id=1)`,
 	"coach_memory_relations": `WHERE user_id=1`,
+	"goals":                  `WHERE user_id=1`,
+	"blocks":                 `WHERE user_id=1`,
+	"block_microcycles":      `WHERE user_id=1`,
+	"block_rotations":        `WHERE user_id=1`,
 }
 
 func answer(t *testing.T, result *mcp.CallToolResult) string {
@@ -310,7 +334,7 @@ func answer(t *testing.T, result *mcp.CallToolResult) string {
 }
 
 func TestEveryToolIsIsolatedBetweenUsers(t *testing.T) {
-	missing := toolIDs{session: missingToolID, set: missingToolID, plan: missingToolID, memory: missingToolID, sibling: missingToolID + 1, relation: missingToolID, fingerprint: "absent"}
+	missing := toolIDs{session: missingToolID, set: missingToolID, plan: missingToolID, memory: missingToolID, sibling: missingToolID + 1, relation: missingToolID, fingerprint: "absent", goal: missingToolID, block: missingToolID, microcycle: missingToolID}
 	for name, tc := range isolationCases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

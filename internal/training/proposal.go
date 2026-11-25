@@ -159,6 +159,8 @@ var deletingActions = map[string]bool{
 	"session.exercise.remove": true,
 	// set_exercise_note with an empty note deletes the note.
 	"exercise.note.remove": true,
+	// save_block with a smaller microcycle_count drops microcycles.
+	"block.shorten": true,
 }
 
 // IsDeletingAction reports whether an action type removes data. The

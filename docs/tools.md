@@ -73,8 +73,8 @@ to change it from the chat is tracked in #125.
 | `accept_all` | Aceptar todo | Every proposal is applied at once, in every session and in none, including action types added later, like Claude Code's `--dangerously-skip-permissions`. The decision record names the `accept_all` grant. |
 
 The deleting action types are `set.delete`, `session.delete`, `plan.delete`,
-`memory.forget`, `plan.exercise.remove`, `session.exercise.remove` and `exercise.note.remove`
-(`training.IsDeletingAction`).
+`memory.forget`, `plan.exercise.remove`, `session.exercise.remove`, `exercise.note.remove`
+and `block.shorten` (`training.IsDeletingAction`).
 
 Defaults: an account created from migration 027 on starts in
 `accept_except_delete`. Every account that existed before keeps exactly its
@@ -181,6 +181,10 @@ and OQ-0005-7).
 | `set.correct_lb` | `correct_lb_sets` |
 | `memory.save` / `memory.forget` | `memory_save` / `memory_forget` |
 | `memory.judge` / `memory.confirm` / `memory.consolidate` | `memory_judge` / `memory_confirm` / `memory_consolidate` |
+| `goal.create` / `goal.update` | `set_goal` (without / with `goal_id`) |
+| `block.create` / `block.update` / `block.shorten` | `save_block` (without `block_id` / with it / with a smaller `microcycle_count`) |
+| `block.activate` / `block.microcycle.complete` / `block.microcycle.skip` / `block.close` | `advance_block` (`action` `activate` / `complete_microcycle` / `skip_microcycle` / `close`) |
+| `session.block.assign` | `assign_session_block` |
 
 A proposal is claimed before it is applied, so two answers cannot apply it
 twice. If the process stops between applying and recording the outcome, the
@@ -346,6 +350,41 @@ The in-app coach also gets memory without calling a tool: the host writes
 summary when a workout ends, and proposes the items of a reply's closing
 `## Aprendizajes` block. All three are `memory_save` proposals, never direct
 writes; see [Memory hooks](coach.md#memory-hooks).
+
+## Periodization
+
+Optional planning above the routine (#41, slice 1). It imposes no methodology:
+a **goal** is free text with an optional target date; a **block** is a run of
+microcycles with a free-text intent, an optional goal and a rotation of
+routines (plans); a **microcycle** has an optional free label and optional
+`sets_delta` and `effort_delta`, and may rotate routines of its own. A sketch
+needs only an intent and a number of microcycles; the rest is added later.
+Without an active block, training works exactly as before, routine by routine.
+
+- **Advance.** `sequence` (default): a microcycle closes when the sessions of
+  its rotation are done, whatever the dates, or by hand with `advance_block`.
+  `calendar`: microcycles follow the dates from the block's start
+  (`microcycle_days`, default 7). The mode can change mid-block. A block never
+  closes by itself; `advance_block` with `close` ends it.
+- **Placement.** While a block is active, every session started or logged is
+  placed in it on its own; a session that fits nowhere is kept off-plan, never
+  rejected. `assign_session_block` moves it.
+- **Forward only.** Edits change the remaining microcycles; done, skipped and
+  elapsed ones keep what they ran. Shrinking a block drops only remaining
+  microcycles with no session, and is a deleting action (`block.shorten`).
+- **Not yet.** `sets_delta` and `effort_delta` are stored and shown, not
+  applied to any prescription. There is no microcycle review or progression
+  rule yet.
+
+| Tool | What it does |
+|---|---|
+| `training_status` | Today's planning: active goals, the active block and its current microcycle, with routines done and due and its stored modifiers. Applies nothing. |
+| `list_blocks` | Every goal and block with its progress: microcycles done, skipped and remaining, the current one, and sessions off-plan. |
+| `get_block` | One block in full: rotation, every microcycle with its state (`done`, `skipped`, `current`, `upcoming`, `elapsed`), dates in calendar mode, sessions placed and off-plan. |
+| `set_goal` | Create or edit a goal (text, `target_date`, status `active`, `achieved` or `dropped`). A proposal. |
+| `save_block` | Create or edit a block: intent, goal, advance mode, `microcycle_days`, `microcycle_count`, status `sketch` or `planned`, rotation, and per-microcycle label, deltas and rotation. A proposal; shrinking waits for the person under `accept_except_delete`. |
+| `advance_block` | `activate` a block (one active at a time, from `start_date` or today), `complete_microcycle` or `skip_microcycle` on a sequence block, or `close` it. A proposal. |
+| `assign_session_block` | Put a session in a microcycle of any block, or off-plan. Never closes or reopens a microcycle. A proposal. |
 
 ---
 

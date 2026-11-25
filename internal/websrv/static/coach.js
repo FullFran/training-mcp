@@ -107,6 +107,13 @@
     memory_confirm: ['Confirmando un recuerdo', 'Recuerdo confirmado'],
     memory_consolidate_preview: ['Viendo cómo unir recuerdos', 'Visto cómo unir recuerdos'],
     memory_consolidate: ['Uniendo recuerdos', 'Recuerdos unidos'],
+    training_status: ['Mirando cómo va tu planificación', 'Mirado cómo va tu planificación'],
+    list_blocks: ['Consultando tus bloques', 'Consultados tus bloques'],
+    get_block: ['Consultando el bloque', 'Consultado el bloque'],
+    set_goal: ['Guardando un objetivo', 'Objetivo guardado'],
+    save_block: ['Planificando un bloque', 'Bloque planificado'],
+    advance_block: ['Avanzando el bloque', 'Bloque avanzado'],
+    assign_session_block: ['Colocando la sesión en el bloque', 'Sesión colocada en el bloque'],
   };
   function words(name) {
     const w = WORDS[name];
