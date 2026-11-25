@@ -18,7 +18,7 @@ Assumptions: a block closes only by hand, in both modes; a sequence microcycle c
 - [x] T1 (S1-S3, S5) inline: migration 030 (`goals`, `blocks`, `block_microcycles`, `block_rotations`, `sessions.block_id`, `sessions.block_microcycle_id`, `sessions.block_off_plan`); domain, `PeriodizationStore` port, service, SQLite adapter, undo tables; auto-placement on start, log and add set. Risk: item 1 (migration, additive only). Commit: `6e6feed5`.
 - [x] T2 (S4, S5) inline: MCP tools `training_status`, `list_blocks`, `get_block`, `set_goal`, `save_block`, `advance_block`, `assign_session_block`; annotations, isolation cases, action types, coach step labels, review labels, `docs/tools.md`. Risk: none (new tools; existing tools unchanged). Commit: `ed53873b`.
 
-- [x] T3 (S2, S5) inline: placement after start, log and add set is best effort: a failure is logged server-side, the session stays unplaced, and the write, its result and its proposal succeed with every set stored. Risk: none (removes an error path). Commit: see L5.
+- [x] T3 (S2, S5) inline: placement after start, log and add set is best effort: a failure is logged server-side, the session stays unplaced, and the write, its result and its proposal succeed with every set stored. Risk: none (removes an error path). Commit: `66c60dc6`.
 
 Known (not fixed in this slice):
 - K1: deleting the only session of a microcycle leaves that microcycle `done`. Reopening it would need to tell a close by placement from a close by hand (`complete_microcycle`), which needs a stored marker; fix with `advance_block` or a later slice.
